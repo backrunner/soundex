@@ -1,0 +1,248 @@
+"""SoundEx Generator: Lightweight dual-stream U-Net for spectral bandwidth extension.
+
+Architecture fuses:
+- AERO: Spectral-domain U-Net encoder-decoder
+- AP-BWE: Dual-stream amplitude + phase prediction
+- UL-UNAS: Depthwise separable convolutions + inverted residuals
+"""
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class DepthwiseSeparableConv(nn.Module):
+    """Depthwise separable convolution block (from UL-UNAS)."""
+
+    def __init__(self, channels: int, kernel_size: int = 3, stride: int = 1) -> None:
+        super().__init__()
+        padding = kernel_size // 2
+        self.depthwise = nn.Conv2d(
+            channels,
+            channels,
+            (1, kernel_size),
+            (1, stride),
+            (0, padding),
+            groups=channels,
+        )
+        self.bn1 = nn.BatchNorm2d(channels)
+        self.pointwise = nn.Conv2d(channels, channels, 1)
+        self.bn2 = nn.BatchNorm2d(channels)
+        self.act = nn.GELU()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.act(self.bn1(self.depthwise(x)))
+        x = self.act(self.bn2(self.pointwise(x)))
+        return x
+
+
+class InvertedResidual(nn.Module):
+    """Inverted residual block (MobileNetV2 style)."""
+
+    def __init__(self, channels: int, expand_ratio: int = 4) -> None:
+        super().__init__()
+        hidden = channels * expand_ratio
+        self.block = nn.Sequential(
+            nn.Conv2d(channels, hidden, 1),
+            nn.BatchNorm2d(hidden),
+            nn.GELU(),
+            nn.Conv2d(hidden, hidden, (1, 3), padding=(0, 1), groups=hidden),
+            nn.BatchNorm2d(hidden),
+            nn.GELU(),
+            nn.Conv2d(hidden, channels, 1),
+            nn.BatchNorm2d(channels),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x + self.block(x)
+
+
+class EncoderBlock(nn.Module):
+    """Encoder: DWS conv + frequency-axis downsample."""
+
+    def __init__(self, in_ch: int, out_ch: int) -> None:
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_ch, out_ch, (1, 3), stride=(1, 2), padding=(0, 1)),
+            nn.BatchNorm2d(out_ch),
+            nn.GELU(),
+            DepthwiseSeparableConv(out_ch),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.conv(x)
+
+
+class DecoderBlock(nn.Module):
+    """Decoder: upsample + DWS conv + skip connection."""
+
+    def __init__(self, in_ch: int, skip_ch: int, out_ch: int) -> None:
+        super().__init__()
+        self.upsample = nn.ConvTranspose2d(
+            in_ch,
+            in_ch,
+            kernel_size=(1, 4),
+            stride=(1, 2),
+            padding=(0, 1),
+        )
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_ch + skip_ch, out_ch, (1, 3), padding=(0, 1)),
+            nn.BatchNorm2d(out_ch),
+            nn.GELU(),
+            DepthwiseSeparableConv(out_ch),
+        )
+
+    def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
+        x = self.upsample(x)
+        x = match_frequency_size(x, skip)
+        x = torch.cat([x, skip], dim=1)
+        return self.conv(x)
+
+
+def match_frequency_size(x: torch.Tensor, reference: torch.Tensor) -> torch.Tensor:
+    """Crop or right-pad only the frequency axis to match ``reference``."""
+    if x.shape[-2] != reference.shape[-2]:
+        raise ValueError(
+            "Frequency-only generator cannot change the time dimension: "
+            f"got {x.shape[-2]} and {reference.shape[-2]}"
+        )
+    difference = reference.shape[-1] - x.shape[-1]
+    if difference > 0:
+        return F.pad(x, (0, difference))
+    if difference < 0:
+        return x[..., : reference.shape[-1]]
+    return x
+
+
+class SpectralStream(nn.Module):
+    """Single stream for amplitude or phase prediction."""
+
+    def __init__(
+        self, channels: list[int], bottleneck_blocks: int = 2, expand_ratio: int = 4
+    ) -> None:
+        super().__init__()
+        # Encoder
+        self.encoders = nn.ModuleList()
+        in_ch = 1  # Single channel input (log-mag or phase)
+        self.encoder_channels = []
+        for out_ch in channels:
+            self.encoders.append(EncoderBlock(in_ch, out_ch))
+            self.encoder_channels.append(out_ch)
+            in_ch = out_ch
+
+        # Bottleneck
+        self.bottleneck = nn.Sequential(
+            *[InvertedResidual(channels[-1], expand_ratio) for _ in range(bottleneck_blocks)]
+        )
+
+        # Decoder
+        self.decoders = nn.ModuleList()
+        for i in range(len(channels) - 1, 0, -1):
+            self.decoders.append(DecoderBlock(channels[i], channels[i - 1], channels[i - 1]))
+
+        # Output
+        self.output_conv = nn.ConvTranspose2d(
+            channels[0],
+            1,
+            kernel_size=(1, 4),
+            stride=(1, 2),
+            padding=(0, 1),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Encode with skip connections
+        skips = []
+        for encoder in self.encoders:
+            x = encoder(x)
+            skips.append(x)
+
+        # Bottleneck
+        x = self.bottleneck(x)
+
+        # Decode with skip connections
+        for i, decoder in enumerate(self.decoders):
+            skip_idx = len(skips) - 2 - i
+            x = decoder(x, skips[skip_idx])
+
+        # Final upsample to original resolution
+        x = self.output_conv(x)
+        return x
+
+
+class SoundExGenerator(nn.Module):
+    """Dual-stream U-Net generator for audio bandwidth extension.
+
+    Input: full degraded log-magnitude + phase [B, 2, T, F]
+    Output: candidate clean log-magnitude + phase [B, 2, T, F]
+    """
+
+    def __init__(
+        self,
+        channels: list[int] | None = None,
+        bottleneck_blocks: int = 2,
+        expand_ratio: int = 4,
+    ) -> None:
+        super().__init__()
+        if channels is None:
+            channels = [24, 48, 96, 96]
+
+        # Amplitude stream
+        self.amp_stream = SpectralStream(channels, bottleneck_blocks, expand_ratio)
+        # Phase stream
+        self.phase_stream = SpectralStream(channels, bottleneck_blocks, expand_ratio)
+
+        # Fusion layer
+        self.fusion = nn.Sequential(
+            nn.Conv2d(2, 16, (1, 3), padding=(0, 1)),
+            nn.GELU(),
+            nn.Conv2d(16, 2, (1, 3), padding=(0, 1)),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass.
+
+        Args:
+            x: Full degraded features [B, 2, T, F] (log-mag + phase)
+
+        Returns:
+            Candidate clean features [B, 2, T, F] (log-mag + phase)
+        """
+        if x.ndim != 4 or x.shape[1] != 2:
+            raise ValueError(f"Expected input shape [B, 2, T, F], got {tuple(x.shape)}")
+        reference = x
+
+        # Split input into amplitude and phase channels
+        amp_in = x[:, 0:1, :, :]
+        phase_in = x[:, 1:2, :, :]
+
+        # Dual-stream prediction
+        amp_out = self.amp_stream(amp_in)
+        phase_out = self.phase_stream(phase_in)
+
+        # The streams are structurally identical and must remain shape-compatible.
+        if amp_out.shape != phase_out.shape:
+            raise RuntimeError(
+                "Amplitude and phase streams produced different shapes: "
+                f"{tuple(amp_out.shape)} and {tuple(phase_out.shape)}"
+            )
+
+        # Fusion
+        combined = torch.cat([amp_out, phase_out], dim=1)  # [B, 2, T, F]
+        residual = self.fusion(combined)
+        output = combined + residual
+
+        return match_frequency_size(output, reference)
+
+    def count_parameters(self) -> int:
+        """Count total trainable parameters."""
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+
+if __name__ == "__main__":
+    # Quick parameter count verification
+    model = SoundExGenerator()
+    print(f"Generator parameters: {model.count_parameters():,}")
+    # Test forward pass
+    dummy = torch.randn(2, 2, 1, 513)
+    out = model(dummy)
+    print(f"Input shape: {dummy.shape} → Output shape: {out.shape}")

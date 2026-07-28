@@ -1,0 +1,36 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+*.egg
+.pytest_cache/
+.ruff_cache/
+
+# Training artifacts
+training/checkpoints/
+training/logs/
+training/outputs/
+*.pth
+*.pt
+
+# Data (downloaded separately)
+/data/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# OS
+Thumbs.db
+
+# Benchmark results (regenerated)
+criterion/

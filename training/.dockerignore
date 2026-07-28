@@ -1,0 +1,13 @@
+**/__pycache__
+**/*.py[cod]
+**/*.egg-info
+.ruff_cache
+.pytest_cache
+logs
+checkpoints
+*.pth
+data_host
+**/.DS_Store
+**/*.md
+!scripts/download_mix_only.md
+!scripts/environment.md

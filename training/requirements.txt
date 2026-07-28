@@ -1,0 +1,38 @@
+# SoundEx Training Dependencies
+#
+# Target stack:
+#   Python 3.12.x
+#   PyTorch 2.12.1
+#   CUDA via official wheels: cu126 or cu130 (CUDA runtime family ≤ 13.0)
+#
+# Install torch FROM THE PYTORCH INDEX FIRST (do not rely on plain PyPI for GPU):
+#
+#   # CUDA 13.0 wheels (modern GPUs / new drivers)
+#   pip install torch==2.12.1 \
+#     --index-url https://download.pytorch.org/whl/cu130
+#
+#   # CUDA 12.6 wheels (older drivers; better chance on Pascal / Titan Xp)
+#   pip install torch==2.12.1 \
+#     --index-url https://download.pytorch.org/whl/cu126
+#
+#   pip install -r requirements.txt
+#
+# torchaudio is optional (not used by current training code).
+#   pip install torchaudio==2.12.1 --index-url <same as torch>
+#
+# Details: scripts/environment.md  |  verify: python scripts/check_env.py
+#
+# Reproducible Python 3.12 CPU export / CI install:
+#   pip install torch==2.12.1 --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements.txt -c constraints-cpu-py312.txt
+
+numpy>=1.26.0,<3
+soundfile>=0.12.0
+pyyaml>=6.0
+tensorboard>=2.14.0
+tqdm>=4.65.0
+onnx>=1.15.0
+onnxruntime>=1.17.0
+onnxscript>=0.1.0
+ruff>=0.4.0
+pytest>=8.0.0

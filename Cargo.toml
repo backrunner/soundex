@@ -1,0 +1,53 @@
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+rust-version = "1.75"
+
+[workspace.dependencies]
+# Internal crates
+soundex-core = { path = "crates/soundex-core" }
+soundex-dsp = { path = "crates/soundex-dsp" }
+
+# Inference
+ort = {
+    version = "2.0.0-rc.12",
+    default-features = false,
+    features = ["std", "ndarray", "download-binaries", "tls-native", "copy-dylibs"],
+}
+ndarray = "0.17"
+
+# DSP
+rustfft = "6.2"
+realfft = "3.5"
+dasp = { version = "0.11", features = ["ring_buffer", "signal"] }
+
+# Audio I/O (CLI only)
+symphonia = { version = "0.5", features = ["mp3", "aac", "flac", "wav", "ogg", "vorbis"] }
+hound = "3.5"
+rubato = "0.16"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+indicatif = "0.17"
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Logging
+log = "0.4"
+env_logger = "0.11"
+
+# Dev
+criterion = "0.5"
+approx = "0.5"
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+libc = "0.2"

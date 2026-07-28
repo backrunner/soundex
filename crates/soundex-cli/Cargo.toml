@@ -1,0 +1,21 @@
+[package]
+name = "soundex-cli"
+description = "CLI tool for SoundEx audio enhancement: decode → enhance → WAV output"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "soundex"
+path = "src/main.rs"
+
+[dependencies]
+soundex-core.workspace = true
+symphonia.workspace = true
+hound.workspace = true
+clap.workspace = true
+indicatif.workspace = true
+anyhow.workspace = true
+log.workspace = true
+env_logger.workspace = true

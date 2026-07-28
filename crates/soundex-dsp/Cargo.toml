@@ -1,0 +1,21 @@
+[package]
+name = "soundex-dsp"
+description = "DSP algorithms for SoundEx audio enhancement: STFT, bandwidth detection, post-processing"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+rustfft.workspace = true
+realfft.workspace = true
+dasp.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+approx.workspace = true
+rand.workspace = true
+
+[[bench]]
+name = "dsp_bench"
+harness = false

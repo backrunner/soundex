@@ -1,0 +1,13 @@
+# Tested CPU-only checkpoint export stack for Python 3.12.
+# Install torch from the official CPU wheel index before requirements.txt.
+torch==2.12.1
+numpy==2.5.1
+onnx==1.22.0
+onnxruntime==1.28.0
+onnxscript==0.7.1
+pytest==9.1.1
+soundfile==0.14.0
+PyYAML==6.0.3
+tensorboard==2.21.0
+tqdm==4.70.0
+ruff==0.16.0

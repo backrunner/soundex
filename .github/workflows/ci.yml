@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace --all-targets
+      - run: cargo check -p soundex-core --no-default-features --all-targets
+
+  export-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            training/requirements.txt
+            training/constraints-cpu-py312.txt
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install CPU export dependencies
+        working-directory: training
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch==2.12.1 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -r requirements.txt -c constraints-cpu-py312.txt
+          python -m pip check
+      - name: Prebuild Rust parity utility
+        run: |
+          cargo build --locked -p soundex-core --bin soundex-model-parity
+          cargo build --locked -p soundex-core --bin soundex-stream-eval
+      - name: Lint Python
+        working-directory: training
+        run: |
+          python -m ruff check .
+          python -m ruff format --check .
+      - name: Test checkpoint, ONNX, ORT, and Rust parity
+        working-directory: training
+        env:
+          CARGO_NET_OFFLINE: "true"
+        run: python -m pytest -q
+      - name: Test synthetic evaluation pass/fail gates and Rust streaming bridge
+        working-directory: training
+        env:
+          CARGO_NET_OFFLINE: "true"
+        run: python -m pytest -q tests/test_evaluation.py
+      - name: Prove checks survive optimized Python
+        working-directory: training
+        env:
+          CARGO_NET_OFFLINE: "true"
+        run: |
+          python -O -m pytest -q \
+            tests/test_checkpoint.py::test_schema_zero_and_unknown_major_are_rejected \
+            tests/test_export.py::test_ort_perturbation_fails_without_publishing

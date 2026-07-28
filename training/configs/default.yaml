@@ -1,0 +1,209 @@
+# SoundEx Training Configuration
+model:
+  generator:
+    channels: [24, 48, 96, 96]
+    bottleneck_blocks: 2
+    expand_ratio: 4
+    use_phase_stream: true
+  discriminator:
+    type: multi_scale
+    scales: [1, 2, 4]
+
+training:
+  batch_size: 16
+  seed: 42
+  context_frames: 1
+  learning_rate: 2.0e-4
+  lr_scheduler: cosine
+  warmup_steps: 1000
+  warmup_epochs: 50
+  max_epochs: 200
+  validation_interval_epochs: 1
+  checkpoint_interval_epochs: 10
+  gradient_clip: 1.0
+  objective:
+    causal_sequence_frames: 4
+    high_band_magnitude_weight: 1.0
+    phase_weight: 0.2
+    low_band_identity_weight: 0.1
+    crossover_continuity_weight: 0.05
+    waveform_weight: 0.1
+    adversarial_weight: 0.1
+    feature_matching_weight: 0.5
+    phase_relative_floor_db: -60.0
+    phase_absolute_floor_db: -120.0
+
+audio:
+  sample_rate: 44100
+  fft_size: 1024
+  hop_size: 512
+  crossover_width_hz: 1000.0
+
+# ---------------------------------------------------------------------------
+# Data roots + mix ratios
+# ---------------------------------------------------------------------------
+# Paths: override via env (MUSDB18_HQ_PATH, …), --paths-manifest, or edit here.
+# Do NOT dump full Slakh into every epoch — synthetic volume would dominate.
+#
+# sampling.strategy:
+#   weighted          — WeightedRandomSampler; batch composition ≈ train_ratios
+#   concat_subsample  — hard cap each source then concat+shuffle
+#
+# train_ratios: target share of training draws (renormalized over *available* sets)
+# max_train_samples: hard cap after shuffle (null = keep all files found under processed/)
+# samples_per_epoch: null → use sum of capped source sizes
+#
+# Mix intent (when all three are present):
+#   - MUSDB18-HQ: full processed set (no cap), primary real corpus
+#   - MedleyDB ≥ Slakh (at least 1:1); prefer a bit more real multitrack
+#   - Overall real-heavy (~80% real / ~20% synthetic)
+data:
+  musdb18_hq_path: /data/musdb18-hq
+  slakh2100_path: /data/slakh2100
+  medleydb_path: /data/medleydb
+  # babyslakh_path: /data/babyslakh   # 16 kHz smoke only — leave ratio 0
+  recipe:
+    schema_version: 1
+    recipe_version: soundex-data-v1
+    seed: 42
+    sample_rates: [44100, 48000]
+    segment:
+      duration_seconds: [2.0, 4.0]
+      count_per_track: 4
+    codecs:
+      - id: mp3-cbr-64
+        codec: mp3
+        encoder: libmp3lame
+        container: mp3
+        mode: cbr
+        setting: 64
+        weight: 0.12
+        held_out: false
+      - id: mp3-cbr-128
+        codec: mp3
+        encoder: libmp3lame
+        container: mp3
+        mode: cbr
+        setting: 128
+        weight: 0.16
+        held_out: false
+      - id: mp3-cbr-320
+        codec: mp3
+        encoder: libmp3lame
+        container: mp3
+        mode: cbr
+        setting: 320
+        weight: 0.08
+        held_out: false
+      - id: mp3-vbr-q2
+        codec: mp3
+        encoder: libmp3lame
+        container: mp3
+        mode: vbr
+        setting: 2
+        weight: 0.12
+        held_out: false
+      - id: mp3-vbr-q6
+        codec: mp3
+        encoder: libmp3lame
+        container: mp3
+        mode: vbr
+        setting: 6
+        weight: 0.12
+        held_out: false
+      - id: aac-lc-cbr-96
+        codec: aac
+        encoder: aac
+        container: m4a
+        mode: cbr
+        setting: 96
+        weight: 0.12
+        held_out: false
+      - id: aac-lc-cbr-192
+        codec: aac
+        encoder: aac
+        container: m4a
+        mode: cbr
+        setting: 192
+        weight: 0.10
+        held_out: false
+      - id: vorbis-vbr-q3
+        codec: vorbis
+        encoder: libvorbis
+        container: ogg
+        mode: vbr
+        setting: 3
+        weight: 0.09
+        held_out: false
+      - id: vorbis-vbr-q7
+        codec: vorbis
+        encoder: libvorbis
+        container: ogg
+        mode: vbr
+        setting: 7
+        weight: 0.05
+        held_out: false
+      - id: aac-lc-cbr-160-holdout
+        codec: aac
+        encoder: aac
+        container: m4a
+        mode: cbr
+        setting: 160
+        weight: 0.04
+        held_out: true
+    channel_policy:
+      roles:
+        mono: 1.0
+        left: 0.20
+        right: 0.20
+        mid: 0.40
+        side: 0.20
+    splits:
+      musdb18_hq:
+        train: 0.8
+        validation: 0.2
+        test: 0.0
+        preserve_official_test: true
+      slakh2100:
+        train: 0.8
+        validation: 0.1
+        test: 0.1
+        preserve_official: true
+      medleydb:
+        train: 0.8
+        validation: 0.1
+        test: 0.1
+    alignment:
+      max_offset_samples: 4096
+      correlation_samples: 65536
+      residual_tolerance_samples: 1
+
+
+  sampling:
+    strategy: weighted
+    # Target share of training draws (renormalized if a source is missing).
+    train_ratios:
+      musdb18_hq: 0.50   # real — full set, main anchor
+      medleydb: 0.30     # real multitrack — ≥ Slakh
+      slakh2100: 0.20    # synthetic — diversity only
+      babyslakh: 0.0
+    # Caps: null = every processed segment. Keep MedleyDB/Slakh pools 1:1 sized.
+    max_train_samples:
+      musdb18_hq: null   # always train on all MUSDB segments
+      medleydb: 10000
+      slakh2100: 10000   # same cap as MedleyDB → pool 1:1, draw ratio still 0.30:0.20
+      babyslakh: 0
+    val_ratios:
+      musdb18_hq: 0.50
+      medleydb: 0.30
+      slakh2100: 0.20
+      babyslakh: 0.0
+    # Exact deterministic validation membership; a run fails if a source cannot
+    # satisfy its quota. Counts preserve the configured 50/30/20 source mix.
+    validation_source_quotas:
+      musdb18_hq: 1200
+      medleydb: 720
+      slakh2100: 480
+      babyslakh: 0
+    # Optional fixed epoch length (segment draws). null = sum of train caps used.
+    samples_per_epoch: null

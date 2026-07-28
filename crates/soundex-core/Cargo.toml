@@ -1,0 +1,31 @@
+[package]
+name = "soundex-core"
+description = "Core library for SoundEx real-time audio enhancement via lightweight AI model"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+soundex-dsp.workspace = true
+ort = { workspace = true, optional = true }
+ndarray.workspace = true
+thiserror.workspace = true
+log.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+approx.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+libc.workspace = true
+
+[features]
+default = ["ort-backend"]
+ort-backend = ["ort"]
+embedded-model = []
+
+[[bench]]
+name = "core_bench"
+harness = false

@@ -1,0 +1,20 @@
+schema_version: 1
+bootstrap:
+  samples: 2000
+  confidence: 0.95
+  seed: 1592594996
+thresholds:
+  mean_high_band_delta_db_max: 0.0
+  high_band_delta_ci_upper_db_max: 0.0
+  low_band_preservation_mean_db_max: 0.25
+  stream_equivalence_max_abs: 1.0e-5
+  clipped_samples_max: 0
+  nonfinite_rows_max: 0
+  gate_false_bypass_rate_max: 0.0
+  visqol_mean_delta_min: 0.0
+required_stratum_dimensions: [corpus, codec_id, sample_rate]
+required_evidence:
+  pytorch_ort_rust_parity: true
+  visqol_audio: true
+  test_manifest_file_audit: true
+  stereo_metrics: true
