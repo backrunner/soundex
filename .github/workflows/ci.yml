@@ -14,9 +14,13 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all -- --check
-      - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace --all-targets
-      - run: cargo check -p soundex-core --no-default-features --all-targets
+      - run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - run: cargo test --locked --workspace
+      - run: cargo check --locked -p soundex-core --no-default-features --all-targets
+      - name: Run self-contained model demos
+        run: |
+          cargo run --locked -p soundex-core --example offline_demo
+          cargo run --locked -p soundex-core --example realtime_demo
 
   export-contract:
     runs-on: ubuntu-latest
@@ -38,6 +42,8 @@ jobs:
           python -m pip install torch==2.12.1 --index-url https://download.pytorch.org/whl/cpu
           python -m pip install -r requirements.txt -c constraints-cpu-py312.txt
           python -m pip check
+      # ort-sys treats CARGO_NET_OFFLINE as skip-linking, even after prebuild.
+      # Keep download-binaries enabled; its verified local cache is reused.
       - name: Prebuild Rust parity utility
         run: |
           cargo build --locked -p soundex-core --bin soundex-model-parity
@@ -49,18 +55,12 @@ jobs:
           python -m ruff format --check .
       - name: Test checkpoint, ONNX, ORT, and Rust parity
         working-directory: training
-        env:
-          CARGO_NET_OFFLINE: "true"
         run: python -m pytest -q
       - name: Test synthetic evaluation pass/fail gates and Rust streaming bridge
         working-directory: training
-        env:
-          CARGO_NET_OFFLINE: "true"
         run: python -m pytest -q tests/test_evaluation.py
       - name: Prove checks survive optimized Python
         working-directory: training
-        env:
-          CARGO_NET_OFFLINE: "true"
         run: |
           python -O -m pytest -q \
             tests/test_checkpoint.py::test_schema_zero_and_unknown_major_are_rejected \
