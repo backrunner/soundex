@@ -253,7 +253,7 @@ impl SoundExProcessor {
     ) -> Result<StreamProgress> {
         self.ensure_usable()?;
         let channel_count = self.channel_count();
-        if input.len() % channel_count != 0 {
+        if !input.len().is_multiple_of(channel_count) {
             return Err(SoundExError::InvalidInput(format!(
                 "interleaved input length {} is not divisible by {channel_count} channels",
                 input.len()
@@ -385,7 +385,7 @@ impl SoundExProcessor {
             return Err(SoundExError::StreamModeConflict);
         }
         let channel_count = self.channel_count();
-        if input.len() % channel_count != 0 {
+        if !input.len().is_multiple_of(channel_count) {
             return Err(SoundExError::InvalidInput(format!(
                 "interleaved input length {} is not divisible by {channel_count} channels",
                 input.len()
@@ -589,7 +589,7 @@ pub(crate) fn validate_config(config: &SoundExConfig) -> Result<()> {
     }
     if config.hop_size == 0
         || config.hop_size > config.fft_size
-        || config.fft_size % config.hop_size != 0
+        || !config.fft_size.is_multiple_of(config.hop_size)
     {
         return Err(SoundExError::InvalidInput(
             "hop_size must divide fft_size and be in 1..=fft_size".into(),
@@ -658,12 +658,14 @@ mod tests {
 
         let attack = gate.mix_interleaved(&dry, &wet, 2, true);
 
-        for frame in attack.chunks_exact(2) {
+        for frame in attack.as_chunks::<2>().0 {
             assert_eq!(frame[0].to_bits(), frame[1].to_bits());
         }
         let theoretical_step_bound = std::f32::consts::PI / (2.0 * ramp_samples as f32);
         let max_step = attack
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|frame| frame[0])
             .collect::<Vec<_>>()
             .windows(2)
@@ -674,7 +676,9 @@ mod tests {
         let release = gate.mix_interleaved(&dry, &wet, 2, false);
         assert!(release[..4 * 2].iter().all(|sample| *sample == 1.0));
         let release_max_step = release
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|frame| frame[0])
             .collect::<Vec<_>>()
             .windows(2)
@@ -724,7 +728,10 @@ mod tests {
     #[cfg(feature = "ort-backend")]
     #[test]
     fn batched_stereo_failure_keeps_output_unchanged_and_poisons_processor() {
-        let config = SoundExConfig::with_model(identity_model()).channels(2);
+        let config = SoundExConfig::with_model(identity_model())
+            .fft_size(1024)
+            .hop_size(512)
+            .channels(2);
         let mut processor = SoundExProcessor::new(config).unwrap();
         processor.engine.fail_after_successes(0);
         let input: Vec<f32> = (0..processor.hop_size())

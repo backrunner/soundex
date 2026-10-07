@@ -24,6 +24,9 @@ impl Limiter {
     /// Process a single sample through the soft limiter.
     #[inline]
     pub fn process_sample(&self, sample: f32) -> f32 {
+        if self.ceiling == 0.0 {
+            return 0.0;
+        }
         let abs_sample = sample.abs();
         let knee_start = self.ceiling * 0.9;
         if abs_sample <= knee_start {
@@ -35,7 +38,7 @@ impl Limiter {
         let compressed =
             knee_start + knee_width * (1.0 - (-overshoot / (knee_width * self.ratio)).exp());
         let sign = if sample >= 0.0 { 1.0 } else { -1.0 };
-        sign * compressed
+        sign * compressed.clamp(0.0, self.ceiling)
     }
 
     /// Process a buffer in-place.
@@ -73,5 +76,16 @@ mod tests {
         assert!(out < 0.9);
         assert!(out > 0.81);
         assert!(limiter.process_sample(100.0) <= 0.9);
+    }
+
+    #[test]
+    fn zero_and_tiny_ceilings_are_strictly_respected() {
+        for ceiling in [0.0, 1e-20, 0.95] {
+            let limiter = Limiter::new(ceiling, 10.0);
+            for sample in [-f32::MAX, -1.0, 0.0, 1.0, f32::MAX] {
+                let output = limiter.process_sample(sample);
+                assert!(output.is_finite() && output.abs() <= ceiling);
+            }
+        }
     }
 }

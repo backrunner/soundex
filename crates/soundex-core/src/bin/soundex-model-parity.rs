@@ -65,7 +65,15 @@ fn run() -> Result<(), Box<dyn Error>> {
         .checked_sub(1)
         .and_then(|bins| bins.checked_mul(2))
         .ok_or("input frequency dimension cannot be converted to an FFT size")?;
-    let config = SoundExConfig::with_model(&model_path).fft_size(fft_size);
+    let hop_size = match fft_size {
+        256 => 128,
+        512 => 256,
+        1024 | 2048 => 512,
+        _ => return Err("unsupported parity FFT contract".into()),
+    };
+    let config = SoundExConfig::with_model(&model_path)
+        .fft_size(fft_size)
+        .hop_size(hop_size);
     let mut engine = InferenceEngine::load(&model_path, &config)?;
     let actual = engine.infer(&input_array)?;
     if actual.shape() != expected.shape {
@@ -125,8 +133,10 @@ fn read_tensor(path: &Path) -> Result<BinaryTensor, Box<dyn Error>> {
         return Err(invalid_data(path, "payload length does not match shape").into());
     }
     let values = bytes[HEADER_BYTES..]
-        .chunks_exact(4)
-        .map(|chunk| f32::from_le_bytes(chunk.try_into().expect("four-byte chunk")))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|chunk| f32::from_le_bytes(*chunk))
         .collect();
     Ok(BinaryTensor { shape, values })
 }

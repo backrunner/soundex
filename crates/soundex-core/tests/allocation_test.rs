@@ -6,7 +6,7 @@ use std::{
     path::PathBuf,
 };
 
-use soundex_core::{SoundExConfig, SoundExProcessor};
+use soundex_core::{RealtimeProcessor, SoundExConfig, SoundExProcessor};
 
 struct CountingAllocator;
 
@@ -55,8 +55,10 @@ fn count_allocations<T>(operation: impl FnOnce() -> T) -> (T, usize) {
     (result, allocations)
 }
 
-fn model_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/identity.onnx")
+fn model_path(name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures")
+        .join(name)
 }
 
 fn stereo_tone(length: usize) -> Vec<f32> {
@@ -70,34 +72,53 @@ fn stereo_tone(length: usize) -> Vec<f32> {
         .collect()
 }
 
-fn processor(enhance: bool) -> SoundExProcessor {
-    let mut config = SoundExConfig::with_model(model_path()).channels(2);
+fn processor(enhance: bool, name: &str, fft_size: usize, hop_size: usize) -> SoundExProcessor {
+    let mut config = SoundExConfig::with_model(model_path(name))
+        .fft_size(fft_size)
+        .hop_size(hop_size)
+        .channels(2);
     config.min_bandwidth_ratio = if enhance { 1.0 } else { 0.0 };
     SoundExProcessor::new(config).unwrap()
 }
 
 #[test]
 fn warmed_process_frame_has_no_rust_heap_allocations() {
-    let input = stereo_tone(512);
-    let mut output = vec![0.0; input.len()];
-
-    for enhance in [true, false] {
-        let mut processor = processor(enhance);
-        for _ in 0..4 {
-            processor.process_frame(&input, &mut output).unwrap();
+    for (name, fft_size, hop_size) in [
+        ("identity.onnx", 1024, 512),
+        ("low-latency-identity.onnx", 256, 128),
+    ] {
+        let input = stereo_tone(hop_size);
+        let mut output = vec![0.0; input.len()];
+        for enhance in [true, false] {
+            let mut processor = processor(enhance, name, fft_size, hop_size);
+            for _ in 0..4 {
+                processor.process_frame(&input, &mut output).unwrap();
+            }
+            // Rust allocator only; ORT C/C++ allocations require the RSS stress run.
+            let (result, allocations) =
+                count_allocations(|| processor.process_frame(&input, &mut output));
+            result.unwrap();
+            assert_eq!(allocations, 0, "{fft_size}/{hop_size} enhance={enhance}");
         }
-
-        // This observes Rust's global allocator. Allocations made internally by
-        // ONNX Runtime's C/C++ allocator require the production benchmark/RSS run.
-        let (result, allocations) =
-            count_allocations(|| processor.process_frame(&input, &mut output));
-
-        result.unwrap();
-        assert_eq!(
-            allocations,
-            0,
-            "warmed {} path made {allocations} Rust heap allocation(s)",
-            if enhance { "enhancement" } else { "bypass" }
-        );
     }
+}
+
+#[test]
+fn realtime_callback_allocates_nothing_including_startup_and_saturated_fallback() {
+    let config = SoundExConfig::with_model(model_path("low-latency-identity.onnx")).channels(2);
+    let mut processor = RealtimeProcessor::new(config).unwrap();
+    let mut output = [0.0; 256];
+    let mut input = [0.125; 256];
+    input[9] = f32::NAN;
+    input[12] = f32::INFINITY;
+    let (result, allocations) = count_allocations(|| {
+        for _ in 0..1000 {
+            processor.process(&input, &mut output)?;
+        }
+        Ok::<_, soundex_core::SoundExError>(())
+    });
+    result.unwrap();
+    assert_eq!(allocations, 0);
+    assert!(output.iter().all(|sample| sample.is_finite()));
+    processor.shutdown();
 }

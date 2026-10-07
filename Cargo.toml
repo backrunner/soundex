@@ -6,7 +6,9 @@ resolver = "2"
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
-rust-version = "1.75"
+rust-version = "1.88"
+authors = ["BackRunner <dev@backrunner.top>"]
+repository = "https://github.com/backrunner/soundex"
 
 [workspace.dependencies]
 # Internal crates

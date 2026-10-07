@@ -63,8 +63,8 @@ fn run() -> Result<(), Box<dyn Error>> {
     let config = SoundExConfig::with_model(model_path)
         .sample_rate(audio.sample_rate)
         .channels(audio.channels)
-        .fft_size(env_value("SOUNDEX_EVAL_FFT_SIZE", 1024_usize)?)
-        .hop_size(env_value("SOUNDEX_EVAL_HOP_SIZE", 512_usize)?);
+        .fft_size(env_value("SOUNDEX_EVAL_FFT_SIZE", 256_usize)?)
+        .hop_size(env_value("SOUNDEX_EVAL_HOP_SIZE", 128_usize)?);
     let mut config = config;
     config.crossover_width_hz = env_value("SOUNDEX_EVAL_CROSSOVER_WIDTH_HZ", 1000.0_f32)?;
     let analysis = analyze_buffer(&config, &audio.samples)?;
@@ -223,8 +223,10 @@ fn read_audio(path: &Path) -> Result<BinaryAudio, Box<dyn Error>> {
         return Err(invalid_data(path, "payload length does not match header").into());
     }
     let samples: Vec<f32> = bytes[HEADER_BYTES..]
-        .chunks_exact(4)
-        .map(|chunk| f32::from_le_bytes(chunk.try_into().expect("four-byte chunk")))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|chunk| f32::from_le_bytes(*chunk))
         .collect();
     if samples.iter().any(|sample| !sample.is_finite()) {
         return Err(invalid_data(path, "payload contains non-finite samples").into());

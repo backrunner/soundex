@@ -14,10 +14,10 @@ pub struct SoundExConfig {
     /// Number of audio channels (1 = mono, 2 = stereo).
     pub channels: u16,
 
-    /// FFT size for STFT analysis (default: 1024).
+    /// FFT size for STFT analysis (default: 256).
     pub fft_size: usize,
 
-    /// Hop size for STFT (default: 512).
+    /// Hop size for STFT (default: 128).
     pub hop_size: usize,
 
     /// Bandwidth detection threshold in dB (default: -60.0).
@@ -48,8 +48,8 @@ impl Default for SoundExConfig {
             model_path: PathBuf::from("soundex-v1.onnx"),
             sample_rate: 44100,
             channels: 1,
-            fft_size: 1024,
-            hop_size: 512,
+            fft_size: 256,
+            hop_size: 128,
             bypass_threshold_db: -60.0,
             min_bandwidth_ratio: 0.85,
             crossover_width_hz: 1000.0,

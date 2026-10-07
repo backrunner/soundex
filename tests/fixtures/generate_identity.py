@@ -39,8 +39,8 @@ METADATA = {
 }
 
 
-def main() -> None:
-    shape = ["batch", 2, 1, 513]
+def generate(fft_size: int, hop_size: int, filename: str) -> None:
+    shape = ["batch", 2, 1, fft_size // 2 + 1]
     graph = helper.make_graph(
         [helper.make_node("Identity", ["input_features"], ["output_features"])],
         "soundex_identity_fixture",
@@ -55,10 +55,32 @@ def main() -> None:
         opset_imports=[helper.make_opsetid("", 17)],
         ir_version=9,
     )
-    helper.set_model_props(model, METADATA)
+    metadata = dict(METADATA)
+    metadata.update(
+        {
+            "soundex.artifact_schema": "1.3" if fft_size < 1024 else "1.2",
+            "soundex.input_shape": f"batch,2,1,{fft_size // 2 + 1}",
+            "soundex.output_shape": f"batch,2,1,{fft_size // 2 + 1}",
+            "soundex.fft_size": str(fft_size),
+            "soundex.hop_size": str(hop_size),
+        }
+    )
+    helper.set_model_props(model, metadata)
     onnx.checker.check_model(model)
-    onnx.save(model, Path(__file__).with_name("identity.onnx"))
+    onnx.save(model, Path(__file__).with_name(filename))
 
 
 if __name__ == "__main__":
-    main()
+    generate(1024, 512, "identity.onnx")
+    generate(256, 128, "low-latency-identity.onnx")
+    # A valid contract with deliberately invalid inference results. Never deploy.
+    model = onnx.load(Path(__file__).with_name("low-latency-identity.onnx"))
+    del model.graph.node[:]
+    model.graph.node.append(
+        helper.make_node("Mul", ["input_features", "bad"], ["output_features"])
+    )
+    model.graph.initializer.append(
+        helper.make_tensor("bad", TensorProto.FLOAT, [], [float("nan")])
+    )
+    onnx.checker.check_model(model)
+    onnx.save(model, Path(__file__).with_name("nonfinite-output.onnx"))

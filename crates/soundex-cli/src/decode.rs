@@ -101,7 +101,7 @@ pub fn decode_file(path: &Path) -> Result<DecodedAudio> {
         "Audio file contains no decodable samples"
     );
     anyhow::ensure!(
-        all_samples.len() % channels as usize == 0,
+        all_samples.len().is_multiple_of(channels as usize),
         "Decoded sample count is not aligned to the channel count"
     );
 

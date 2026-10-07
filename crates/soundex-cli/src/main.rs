@@ -36,12 +36,12 @@ struct Args {
     #[arg(long, default_value_t = -60.0)]
     bypass_threshold: f32,
 
-    /// Artifact FFT size (1024 for the low-latency contract; 2048 for legacy artifacts)
-    #[arg(long, default_value_t = 1024)]
+    /// Artifact FFT size (256 for low latency; older models require their original FFT/hop)
+    #[arg(long, default_value_t = 256)]
     fft_size: usize,
 
     /// Artifact hop size
-    #[arg(long, default_value_t = 512)]
+    #[arg(long, default_value_t = 128)]
     hop_size: usize,
 
     /// Artifact crossover transition width in Hz

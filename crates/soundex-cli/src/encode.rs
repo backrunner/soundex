@@ -45,7 +45,7 @@ pub fn encode_wav(
     anyhow::ensure!(channels > 0, "Channel count must be greater than zero");
     anyhow::ensure!(sample_rate > 0, "Sample rate must be greater than zero");
     anyhow::ensure!(
-        samples.len() % channels as usize == 0,
+        samples.len().is_multiple_of(channels as usize),
         "Sample count must be divisible by the channel count"
     );
     anyhow::ensure!(

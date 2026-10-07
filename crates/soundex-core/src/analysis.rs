@@ -39,7 +39,7 @@ impl AnalysisInfo {
 pub fn analyze_buffer(config: &SoundExConfig, input: &[f32]) -> Result<AnalysisInfo> {
     validate_config(config)?;
     let channel_count = config.channels as usize;
-    if input.len() % channel_count != 0 {
+    if !input.len().is_multiple_of(channel_count) {
         return Err(SoundExError::InvalidInput(format!(
             "interleaved input length {} is not divisible by {} channels",
             input.len(),
@@ -123,7 +123,9 @@ mod tests {
                 0.5 * (2.0 * std::f32::consts::PI * 440.0 * sample as f32 / 44_100.0).sin()
             })
             .collect();
-        let config = SoundExConfig::with_model(identity_model());
+        let config = SoundExConfig::with_model(identity_model())
+            .fft_size(1024)
+            .hop_size(512);
         let expected = analyze_buffer(&config, &input).unwrap();
         let mut processor = SoundExProcessor::new(config.clone()).unwrap();
         let mut frames = 0;

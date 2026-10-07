@@ -82,9 +82,17 @@ impl ChannelProcessor {
         self.detected_bandwidth_hz = self
             .detector
             .detect(&self.original.log_magnitude, config.sample_rate);
-        self.needs_enhancement = self
-            .detector
-            .needs_enhancement(self.detected_bandwidth_hz, config.sample_rate as f32 / 2.0);
+        if frame.iter().all(|sample| sample.abs() <= 1e-10) {
+            // Silence is not missing high frequencies. Clear hangover so the
+            // generator cannot invent noise after music stops or in a silent
+            // channel of an otherwise active stereo stream.
+            self.detector.reset();
+            self.needs_enhancement = false;
+        } else {
+            self.needs_enhancement = self
+                .detector
+                .needs_enhancement(self.detected_bandwidth_hz, config.sample_rate as f32 / 2.0);
+        }
         self.enhancement_gain_db = 0.0;
         self.input.advance();
         Ok(())
