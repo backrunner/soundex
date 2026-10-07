@@ -23,6 +23,14 @@ AudioArray = np.ndarray
 Encoder = Callable[[AudioArray, int, CodecSpec], AudioArray]
 
 
+class SilentAudioError(DataProtocolError):
+    """A valid audio pair has no usable clean signal for training."""
+
+
+class CodecAlignmentError(DataProtocolError):
+    """A codec round-trip cannot satisfy the configured alignment tolerance."""
+
+
 @dataclass(frozen=True)
 class AlignedPair:
     """A sample-aligned clean/degraded pair and measured offsets."""
@@ -248,7 +256,7 @@ def align_codec_pair(
         correlation_samples=policy.correlation_samples,
     )
     if abs(residual) > policy.residual_tolerance_samples:
-        raise DataProtocolError(
+        raise CodecAlignmentError(
             f"residual codec alignment {residual} exceeds tolerance "
             f"{policy.residual_tolerance_samples}"
         )
@@ -262,11 +270,11 @@ def validate_pair_samples(clean: AudioArray, degraded: AudioArray) -> None:
         raise DataProtocolError(f"clean/degraded shape mismatch: {clean.shape} vs {degraded.shape}")
     if not np.isfinite(clean).all() or not np.isfinite(degraded).all():
         raise DataProtocolError("clean/degraded pair contains non-finite samples")
-    clean_rms = float(np.sqrt(np.mean(np.square(clean, dtype=np.float64))))
-    if clean_rms < 1e-6:
-        raise DataProtocolError("clean audio is silent")
     if float(np.max(np.abs(clean))) > 8.0 or float(np.max(np.abs(degraded))) > 8.0:
         raise DataProtocolError("clean/degraded peak exceeds safety bound")
+    clean_rms = float(np.sqrt(np.mean(np.square(clean, dtype=np.float64))))
+    if clean_rms < 1e-6:
+        raise SilentAudioError("clean audio is silent")
 
 
 def derive_channel_roles(
@@ -370,6 +378,8 @@ def process_mixture_file(
     source_checksum = sha256_file(mixture_path)
     role_weights = dict(recipe.channel_roles)
     rows: list[dict[str, object]] = []
+    silent_segments = 0
+    rejected_codecs: list[dict[str, object]] = []
     for sample_rate in recipe.sample_rates:
         clean = load_audio(mixture_path, sample_rate)
         if clean.size == 0:
@@ -379,7 +389,20 @@ def process_mixture_file(
             if split == "train" and codec.held_out:
                 continue
             degraded = encoder(clean, sample_rate, codec)
-            aligned = align_codec_pair(clean, degraded, sample_rate, recipe)
+            try:
+                aligned = align_codec_pair(clean, degraded, sample_rate, recipe)
+            except CodecAlignmentError as exc:
+                rejected_codecs.append(
+                    {
+                        "track_id": track_id,
+                        "source_checksum": source_checksum,
+                        "sample_rate": sample_rate,
+                        "codec_id": codec.id,
+                        "reason": str(exc),
+                    }
+                )
+                print(f"  {track_id}: rejected {sample_rate} Hz {codec.id}: {exc}")
+                continue
             roles = derive_channel_roles(aligned.clean, aligned.degraded, role_weights)
             for role, (clean_role, degraded_role, role_weight) in roles.items():
                 seed_material = f"{track_id}:{split}:{sample_rate}:{codec.id}:{role}"
@@ -388,7 +411,11 @@ def process_mixture_file(
                 ):
                     clean_segment = np.ascontiguousarray(clean_role[start : start + length])
                     degraded_segment = np.ascontiguousarray(degraded_role[start : start + length])
-                    validate_pair_samples(clean_segment, degraded_segment)
+                    try:
+                        validate_pair_samples(clean_segment, degraded_segment)
+                    except SilentAudioError:
+                        silent_segments += 1
+                        continue
                     row_material = f"{seed_material}:{segment_index}:{start}:{length}"
                     row_id = hashlib.sha256(row_material.encode()).hexdigest()[:24]
                     audio_dir = publisher.staging / "audio" / split
@@ -437,4 +464,13 @@ def process_mixture_file(
                             "degraded_checksum": sha256_file(degraded_path),
                         }
                     )
+    if silent_segments:
+        print(f"  {track_id}: skipped {silent_segments} silent role segments")
+    if rejected_codecs:
+        rejection_dir = publisher.staging / "rejections"
+        rejection_dir.mkdir(parents=True, exist_ok=True)
+        track_hash = hashlib.sha256(track_id.encode()).hexdigest()[:24]
+        (rejection_dir / f"{track_hash}.json").write_text(
+            json.dumps(rejected_codecs, indent=2) + "\n", encoding="utf-8"
+        )
     return rows

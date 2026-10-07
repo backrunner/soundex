@@ -4,13 +4,39 @@ import pytest
 import torch
 
 from models.generator import SoundExGenerator
+from models.losses import build_missing_band_mask
 from train import (
+    batch_missing_band_mask,
     build_lr_scheduler,
     infer_independent_frames,
     select_causal_sequence,
     select_context,
     spectral_features,
 )
+
+
+@pytest.mark.parametrize("device_name", ["cpu", "mps"])
+def test_collated_float64_metadata_builds_float32_mask(device_name: str) -> None:
+    if device_name == "mps" and not torch.backends.mps.is_available():
+        pytest.skip("MPS is unavailable")
+    metadata = torch.utils.data.default_collate(
+        [
+            {"cutoff_hz": 12000.0, "sample_rate": 44100},
+            {"cutoff_hz": 16000.0, "sample_rate": 48000},
+        ]
+    )
+    assert metadata["cutoff_hz"].dtype == torch.float64
+    audio_config = {"fft_size": 1024, "crossover_width_hz": 1000.0}
+
+    actual = batch_missing_band_mask(
+        {"metadata": metadata}, audio_config, torch.device(device_name)
+    )
+    expected = build_missing_band_mask(
+        metadata["cutoff_hz"], metadata["sample_rate"], **audio_config
+    )
+
+    assert actual.dtype == torch.float32
+    torch.testing.assert_close(actual.cpu(), expected, rtol=1e-5, atol=1e-6)
 
 
 def test_context_must_be_one_frame() -> None:

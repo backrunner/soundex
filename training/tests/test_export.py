@@ -53,17 +53,17 @@ def test_export_has_exact_graph_and_metadata_contract(exported_model) -> None:
     graph = onnx.load(str(path), load_external_data=False)
     onnx.checker.check_model(graph)
 
-    assert _dimensions(graph.graph.input[0]) == ["batch", 2, 1, 513]
-    assert _dimensions(graph.graph.output[0]) == ["batch", 2, 1, 513]
+    assert _dimensions(graph.graph.input[0]) == ["batch", 2, 1, 129]
+    assert _dimensions(graph.graph.output[0]) == ["batch", 2, 1, 129]
     assert graph.graph.input[0].name == INPUT_NAME
     assert graph.graph.output[0].name == OUTPUT_NAME
     assert graph.graph.input[0].type.tensor_type.elem_type == TensorProto.FLOAT
     assert {item.domain: item.version for item in graph.opset_import}[""] == 17
     metadata = {item.key: item.value for item in graph.metadata_props}
     assert set(metadata) == REQUIRED_METADATA_KEYS
-    assert metadata["soundex.artifact_schema"] == "1.2"
-    assert metadata["soundex.fft_size"] == "1024"
-    assert metadata["soundex.hop_size"] == "512"
+    assert metadata["soundex.artifact_schema"] == "1.3"
+    assert metadata["soundex.fft_size"] == "256"
+    assert metadata["soundex.hop_size"] == "128"
     assert metadata["soundex.source_checkpoint_sha256"]
     assert metadata["soundex.crossover_width_hz"] == "1000.0"
     assert result.sha256 == sha256_file(path)
@@ -76,7 +76,7 @@ def test_exported_model_runs_dynamic_batch_one_and_two(exported_model) -> None:
     session = ort.InferenceSession(str(path), providers=["CPUExecutionProvider"])
 
     for batch in (1, 2):
-        input_array = np.zeros((batch, 2, 1, 513), dtype=np.float32)
+        input_array = np.zeros((batch, 2, 1, 129), dtype=np.float32)
         output = session.run([OUTPUT_NAME], {INPUT_NAME: input_array})[0]
         assert output.shape == input_array.shape
         assert np.isfinite(output).all()
@@ -89,6 +89,7 @@ def test_legacy_2048_checkpoint_exports_and_runs_in_rust(
 ) -> None:
     legacy_config = copy.deepcopy(resolved_config)
     legacy_config["audio"]["fft_size"] = 2048
+    legacy_config["audio"]["hop_size"] = 512
     checkpoint_path, _ = checkpoint_factory("legacy-export.pth", config=legacy_config)
     model_path = tmp_path / "legacy.onnx"
 
@@ -97,7 +98,7 @@ def test_legacy_2048_checkpoint_exports_and_runs_in_rust(
     graph = onnx.load(str(model_path), load_external_data=False)
     assert _dimensions(graph.graph.input[0]) == ["batch", 2, 1, 1025]
     metadata = {item.key: item.value for item in graph.metadata_props}
-    assert metadata["soundex.artifact_schema"] == "1.2"
+    assert metadata["soundex.artifact_schema"] == "1.3"
     assert metadata["soundex.fft_size"] == "2048"
     input_tensor = dict(deterministic_parity_inputs(fft_size=2048, hop_size=512))[
         "random_finite_spectra"
@@ -224,7 +225,7 @@ def test_python_ort_and_rust_match_fixed_and_real_stft_tensors(
     [
         ("soundex.artifact_schema", "1.0"),
         ("soundex.input_channels", "phase_radians,log_magnitude_db"),
-        ("soundex.input_shape", "batch,2,2,513"),
+        ("soundex.input_shape", "batch,2,2,129"),
         ("soundex.output_shape", "batch,2,1,1025"),
         ("soundex.crossover_width_hz", "2000.0"),
     ],
@@ -241,7 +242,7 @@ def test_rust_rejects_tampered_contract_metadata(
     metadata[key].value = value
     tampered_path = tmp_path / "tampered.onnx"
     onnx.save(graph, tampered_path)
-    input_value = np.zeros((1, 2, 1, 513), dtype=np.float32)
+    input_value = np.zeros((1, 2, 1, 129), dtype=np.float32)
     input_path = tmp_path / "input.sxt"
     expected_path = tmp_path / "expected.sxt"
     _write_tensor(input_path, input_value)

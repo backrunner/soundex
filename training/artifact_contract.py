@@ -2,14 +2,16 @@
 
 from collections.abc import Mapping
 
-ARTIFACT_SCHEMA_VERSION = "1.2"
+ARTIFACT_SCHEMA_VERSION = "1.3"
 OPSET_VERSION = 17
 INPUT_NAME = "input_features"
 OUTPUT_NAME = "output_features"
-DEFAULT_FFT_SIZE = 1024
-DEFAULT_HOP_SIZE = 512
+DEFAULT_FFT_SIZE = 256
+DEFAULT_HOP_SIZE = 128
 LEGACY_FRAME_CONTRACT = (2048, 512)
-SUPPORTED_FRAME_CONTRACTS = frozenset({(DEFAULT_FFT_SIZE, DEFAULT_HOP_SIZE), LEGACY_FRAME_CONTRACT})
+SUPPORTED_FRAME_CONTRACTS = frozenset(
+    {(DEFAULT_FFT_SIZE, DEFAULT_HOP_SIZE), (512, 256), (1024, 512), LEGACY_FRAME_CONTRACT}
+)
 MAX_PARAMETERS = 2_000_000
 MAX_ARTIFACT_BYTES = 8 * 1024 * 1024
 MAX_ABSOLUTE_ERROR = 1e-5
@@ -85,6 +87,8 @@ def frame_contract_from_metadata(metadata: Mapping[str, str]) -> tuple[int, int]
     except (KeyError, TypeError, ValueError) as error:
         raise ExportValidationError("artifact FFT/hop metadata is missing or malformed") from error
     static_shape = tensor_shape(fft_size, hop_size)
+    if minor < 3 and (fft_size, hop_size) in {(256, 128), (512, 256)}:
+        raise ExportValidationError("small-window contracts require artifact schema 1.3 or newer")
     if minor < 2 and (fft_size, hop_size) != LEGACY_FRAME_CONTRACT:
         raise ExportValidationError(
             "artifact schema 1.1 is limited to the legacy 2048/512 frame contract"

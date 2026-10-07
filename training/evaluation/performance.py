@@ -18,11 +18,18 @@ from artifact_contract import (
     ExportValidationError,
     frame_contract_from_metadata,
 )
+from evaluation.performance_latency import check_serial_latency
+from evaluation.performance_numbers import (
+    _assert_close,
+    _percentile,
+    _required_float,
+    _required_int,
+)
 from evaluation.reporting import sha256_file
 
 _REQUIRED_CASES = {(44_100, 1), (44_100, 2), (48_000, 1), (48_000, 2)}
 _MINIMUM_STRESS_SECONDS = 30 * 60
-_MAXIMUM_ALGORITHMIC_LATENCY_SAMPLES = 512
+_MAXIMUM_ALGORITHMIC_LATENCY_SAMPLES = 128
 _MAXIMUM_STEREO_P99_US = 5_000.0
 _MINIMUM_PRODUCTION_MODEL_BYTES = 1_000_000
 _MAXIMUM_PRODUCTION_MODEL_BYTES = 8 * 1024 * 1024
@@ -43,7 +50,7 @@ def check_performance_reports(
     fft_size, hop_size = _load_artifact_frame_contract(artifact)
     if (fft_size, hop_size) != (DEFAULT_FFT_SIZE, DEFAULT_HOP_SIZE):
         raise ValueError(
-            "release performance evidence requires the 1024/512 low-latency artifact contract"
+            "release performance evidence requires the 256/128 low-latency artifact contract"
         )
     paths = [Path(path).resolve() for path in report_paths]
     if len(paths) < 2:
@@ -99,7 +106,7 @@ def _check_report(
     hop_size: int,
     label: str,
 ) -> None:
-    if report.get("schema_version") != 2 or report.get("report_type") != "soundex-performance":
+    if report.get("schema_version") != 4 or report.get("report_type") != "soundex-performance":
         raise ValueError(f"{label}: unsupported performance report schema")
     if report.get("diagnostic") is not False:
         raise ValueError(f"{label}: diagnostic benchmark cannot be release evidence")
@@ -192,6 +199,8 @@ def _check_report(
     peak_rss = _required_int(report, "peak_rss_bytes", label=label, minimum=1)
     if peak_rss != max(case_rss_values):
         raise ValueError(f"{label}: peak RSS does not match case evidence")
+    if gates.get("preferred_target_met") is not all(case["latency_target_met"] for case in cases):
+        raise ValueError(f"{label}: preferred latency target summary does not match cases")
     if peak_rss > _MAXIMUM_PEAK_RSS_BYTES:
         raise ValueError(f"{label}: peak RSS exceeds 50 MiB")
 
@@ -215,7 +224,7 @@ def _check_case(case: dict[str, Any], *, fft_size: int, hop_size: int, label: st
         minimum=1,
     )
     if not 0 < algorithmic_latency <= _MAXIMUM_ALGORITHMIC_LATENCY_SAMPLES:
-        raise ValueError(f"{label}: algorithmic latency exceeds 512 samples")
+        raise ValueError(f"{label}: algorithmic latency exceeds 128 samples")
     if algorithmic_latency != fft_size - hop_size:
         raise ValueError(f"{label}: algorithmic latency does not match frame protocol")
     algorithmic_latency_ms = _required_float(
@@ -312,6 +321,7 @@ def _check_case(case: dict[str, Any], *, fft_size: int, hop_size: int, label: st
             raise ValueError(f"{label}: {metric} does not match raw samples")
     if channels == 2 and recomputed["p99_us"] >= _MAXIMUM_STEREO_P99_US:
         raise ValueError(f"{label}: stereo p99 is not below 5 ms")
+    check_serial_latency(case, algorithmic_latency_ms, recomputed, label=label)
     return rss
 
 
@@ -336,6 +346,8 @@ def _check_thresholds(value: Any, *, label: str) -> None:
     expected = {
         "maximum_algorithmic_latency_samples": _MAXIMUM_ALGORITHMIC_LATENCY_SAMPLES,
         "maximum_stereo_p99_us": _MAXIMUM_STEREO_P99_US,
+        "target_serial_latency_us": 8000.0,
+        "maximum_serial_latency_us": 10000.0,
         "maximum_deadline_misses": 0,
         "maximum_real_time_factor": 1.0,
         "maximum_peak_rss_bytes": _MAXIMUM_PEAK_RSS_BYTES,
@@ -350,50 +362,6 @@ def _check_thresholds(value: Any, *, label: str) -> None:
             raise ValueError(f"{label}: performance gate threshold {field!r} is invalid")
         if float(actual) != float(expected_value):
             raise ValueError(f"{label}: performance gate threshold {field!r} has drifted")
-
-
-def _required_int(value: dict[str, Any], field: str, *, label: str, minimum: int) -> int:
-    actual = value.get(field)
-    if isinstance(actual, bool) or not isinstance(actual, int) or actual < minimum:
-        raise ValueError(f"{label}: integer field {field!r} is invalid or missing")
-    return actual
-
-
-def _required_float(
-    value: dict[str, Any],
-    field: str,
-    *,
-    label: str,
-    positive: bool = False,
-    minimum: float | None = None,
-) -> float:
-    actual = value.get(field)
-    if isinstance(actual, bool) or not isinstance(actual, (int, float)):
-        raise ValueError(f"{label}: numeric field {field!r} is invalid or missing")
-    number = float(actual)
-    if not math.isfinite(number):
-        raise ValueError(f"{label}: numeric field {field!r} is not finite")
-    if positive and number <= 0.0:
-        raise ValueError(f"{label}: numeric field {field!r} must be positive")
-    if minimum is not None and number < minimum:
-        raise ValueError(f"{label}: numeric field {field!r} is below its minimum")
-    return number
-
-
-def _assert_close(
-    actual: float,
-    expected: float,
-    *,
-    label: str,
-    absolute_tolerance: float = 1e-9,
-) -> None:
-    if not math.isclose(actual, expected, rel_tol=1e-12, abs_tol=absolute_tolerance):
-        raise ValueError(f"{label} does not match raw evidence")
-
-
-def _percentile(sorted_values: list[int], percentile: float) -> int:
-    rank = math.ceil(percentile * len(sorted_values))
-    return sorted_values[max(0, min(rank - 1, len(sorted_values) - 1))]
 
 
 def main() -> None:

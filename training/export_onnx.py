@@ -1,4 +1,4 @@
-"""Export a schema-1.2 SoundEx checkpoint to the artifact-schema-1.2 ONNX contract."""
+"""Export a schema-1.2 SoundEx checkpoint to the artifact-schema-1.3 ONNX contract."""
 
 from __future__ import annotations
 
@@ -29,6 +29,7 @@ from artifact_contract import (
     tensor_shape,
 )
 from checkpoint import load_checkpoint
+from configuration import normalize_config
 from export_validation import OutputTransform, validate_ort_parity
 from models.generator import SoundExGenerator
 
@@ -289,7 +290,7 @@ def _load_optional_config(path: str | Path | None) -> dict[str, Any] | None:
         value = yaml.safe_load(handle)
     if not isinstance(value, dict):
         raise ExportValidationError(f"expected a YAML mapping in {path}")
-    return value
+    return normalize_config(value)
 
 
 def main() -> None:

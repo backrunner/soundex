@@ -45,6 +45,7 @@ def test_legacy_2048_frame_contract_remains_loadable(
 ) -> None:
     legacy_config = copy.deepcopy(resolved_config)
     legacy_config["audio"]["fft_size"] = 2048
+    legacy_config["audio"]["hop_size"] = 512
     path, _ = checkpoint_factory("legacy-frame.pth", config=legacy_config)
 
     checkpoint = load_checkpoint(path, expected_config=legacy_config)

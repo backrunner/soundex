@@ -134,6 +134,7 @@ def deployment_waveform_loss(
     *,
     fft_size: int,
     hop_size: int,
+    waveform_region: str = "full",
 ) -> torch.Tensor:
     """Return L1 for the differentiable crossover, phase blend, and causal OLA proxy.
 
@@ -144,6 +145,17 @@ def deployment_waveform_loss(
     blended = blend_deployment_features(degraded, predicted, missing_band_mask)
     predicted_waveform = causal_overlap_add(blended, fft_size=fft_size, hop_size=hop_size)
     target_waveform = causal_overlap_add(target, fft_size=fft_size, hop_size=hop_size)
+    if waveform_region == "steady_state":
+        # Only supervise samples with the full overlap support of a continuous stream.
+        # A cropped sequence's single-window Hann tails are artificial boundaries.
+        edge = fft_size - hop_size
+        if predicted_waveform.shape[-1] <= 2 * edge:
+            raise ValueError("steady_state waveform loss needs more causal sequence frames")
+        if edge:
+            predicted_waveform = predicted_waveform[:, edge:-edge]
+            target_waveform = target_waveform[:, edge:-edge]
+    elif waveform_region != "full":
+        raise ValueError("waveform_region must be 'full' or 'steady_state'")
     return F.l1_loss(predicted_waveform, target_waveform)
 
 
@@ -164,6 +176,7 @@ class GeneratorLoss(nn.Module):
         phase_absolute_floor_db: float = -120.0,
         fft_size: int = 1024,
         hop_size: int = 512,
+        waveform_region: str = "full",
     ) -> None:
         super().__init__()
         self.high_band_weight = high_band_weight
@@ -177,11 +190,14 @@ class GeneratorLoss(nn.Module):
         self.phase_absolute_floor_db = phase_absolute_floor_db
         self.fft_size = fft_size
         self.hop_size = hop_size
+        if waveform_region not in {"full", "steady_state"}:
+            raise ValueError("waveform_region must be 'full' or 'steady_state'")
+        self.waveform_region = waveform_region
 
     @classmethod
     def from_config(
         cls,
-        objective: dict[str, float],
+        objective: dict[str, float | str],
         *,
         fft_size: int,
         hop_size: int,
@@ -199,6 +215,7 @@ class GeneratorLoss(nn.Module):
             phase_absolute_floor_db=float(objective["phase_absolute_floor_db"]),
             fft_size=fft_size,
             hop_size=hop_size,
+            waveform_region=str(objective.get("waveform_region", "full")),
         )
 
     def forward(
@@ -240,6 +257,7 @@ class GeneratorLoss(nn.Module):
             missing_band_mask,
             fft_size=self.fft_size,
             hop_size=self.hop_size,
+            waveform_region=self.waveform_region,
         )
 
         zero = predicted.new_zeros(())

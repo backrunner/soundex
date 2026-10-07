@@ -7,10 +7,10 @@ from typing import Any
 
 import pytest
 import torch
-import yaml
 
 from checkpoint import build_checkpoint, save_checkpoint
 from checkpoint_state import canonical_sha256
+from configuration import load_config
 from models.generator import SoundExGenerator
 from validation import BestCheckpointTracker, aggregate_validation_rows, build_validation_state
 
@@ -18,8 +18,7 @@ from validation import BestCheckpointTracker, aggregate_validation_rows, build_v
 @pytest.fixture
 def resolved_config() -> dict[str, Any]:
     path = Path(__file__).resolve().parents[1] / "configs" / "default.yaml"
-    with path.open(encoding="utf-8") as handle:
-        value = yaml.safe_load(handle)
+    value = load_config(path)
     assert isinstance(value, dict)
     return value
 

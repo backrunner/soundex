@@ -19,6 +19,7 @@ from checkpoint import (
     save_checkpoint,
 )
 from checkpoint_state import build_dataset_provenance, restore_rng_state
+from configuration import load_config
 from data.dataset import DatasetSourceSpec, create_balanced_dataloaders, set_dataset_epoch
 from data.protocol import MANIFEST_NAME, DataRecipe, validate_data_config
 from models.discriminator import MultiScaleDiscriminator
@@ -40,12 +41,6 @@ def get_device() -> torch.device:
     if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
         return torch.device("mps")
     return torch.device("cpu")
-
-
-def load_config(path: str | Path) -> dict[str, Any]:
-    """Load a YAML training configuration."""
-    with Path(path).open(encoding="utf-8") as config_file:
-        return yaml.safe_load(config_file)
 
 
 # Config keys -> human-readable names for processed mixture datasets.
@@ -246,8 +241,9 @@ def batch_missing_band_mask(
 ) -> torch.Tensor:
     """Build per-row crossover masks from manifest-derived batch metadata."""
     metadata = batch["metadata"]
-    cutoff_hz = torch.as_tensor(metadata["cutoff_hz"], device=device)
-    sample_rate = torch.as_tensor(metadata["sample_rate"], device=device)
+    # Default collation produces float64 metadata; MPS only accepts float32.
+    cutoff_hz = torch.as_tensor(metadata["cutoff_hz"], dtype=torch.float32, device=device)
+    sample_rate = torch.as_tensor(metadata["sample_rate"], dtype=torch.float32, device=device)
     return build_missing_band_mask(
         cutoff_hz,
         sample_rate,

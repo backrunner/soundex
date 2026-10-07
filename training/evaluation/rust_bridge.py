@@ -57,8 +57,8 @@ class RustStreamEvaluator:
         *,
         mode: str,
         chunk_frames: tuple[int, ...] = (),
-        fft_size: int = 1024,
-        hop_size: int = 512,
+        fft_size: int = 256,
+        hop_size: int = 128,
         crossover_width_hz: float = 1000.0,
     ) -> RustEvaluationOutput:
         """Run one offline or chunked evaluation and return aligned audio/report."""

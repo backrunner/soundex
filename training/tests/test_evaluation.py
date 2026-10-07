@@ -185,12 +185,26 @@ def test_sxa_round_trip_and_real_rust_chunk_equivalence(tmp_path: Path) -> None:
 
     evaluator = RustStreamEvaluator()
     model = REPOSITORY / "tests" / "fixtures" / "identity.onnx"
-    offline = evaluator.process(model, audio, sample_rate, mode="offline")
+    offline = evaluator.process(
+        model, audio, sample_rate, mode="offline", fft_size=1024, hop_size=512
+    )
     chunk_a = evaluator.process(
-        model, audio, sample_rate, mode="chunked", chunk_frames=(1, 257, 509)
+        model,
+        audio,
+        sample_rate,
+        mode="chunked",
+        chunk_frames=(1, 257, 509),
+        fft_size=1024,
+        hop_size=512,
     )
     chunk_b = evaluator.process(
-        model, audio, sample_rate, mode="chunked", chunk_frames=(31, 512, 997, 7)
+        model,
+        audio,
+        sample_rate,
+        mode="chunked",
+        chunk_frames=(31, 512, 997, 7),
+        fft_size=1024,
+        hop_size=512,
     )
 
     np.testing.assert_allclose(chunk_a.audio, offline.audio, rtol=0, atol=1e-5)
@@ -289,6 +303,8 @@ def test_model_card_checker_binds_artifact_and_report_hashes(
     gate_config = load_gate_config(GATE_CONFIG)
     report = _gate_report(_quality_row("release-row", -1.0), artifact_hash=artifact_hash)
     report["artifact"]["metadata"] = _read_artifact_metadata(artifact)
+    report["protocol"]["fft_size"] = 256
+    report["protocol"]["hop_size"] = 128
     report["release_gates"] = evaluate_release_gates(report, gate_config)
     bound_files = _bind_external_evidence(report, tmp_path)
     _validate_artifact_metadata_binding(report, artifact)
@@ -477,7 +493,7 @@ def test_performance_checker_rejects_false_stress_coverage_and_rss(
     case["samples_ns"] = case["samples_ns"][:3]
     case["measured_hops"] = 3
     case["processing_seconds"] = sum(case["samples_ns"]) / 1_000_000_000.0
-    case["audio_seconds"] = 3 * 512 / case["sample_rate_hz"]
+    case["audio_seconds"] = 3 * 128 / case["sample_rate_hz"]
     case["real_time_factor"] = case["processing_seconds"] / case["audio_seconds"]
     case["throughput_x_realtime"] = 1.0 / case["real_time_factor"]
     case["session_runs"] = 1 + case["warmup_hops"] + 3
@@ -499,7 +515,7 @@ def test_performance_checker_rejects_false_stress_coverage_and_rss(
 
 
 def _write_production_sized_artifact(path: Path) -> Path:
-    graph = onnx.load(str(REPOSITORY / "tests" / "fixtures" / "identity.onnx"))
+    graph = onnx.load(str(REPOSITORY / "tests" / "fixtures" / "low-latency-identity.onnx"))
     padding = graph.graph.initializer.add()
     padding.name = "performance_test_padding"
     padding.data_type = onnx.TensorProto.FLOAT
@@ -526,21 +542,21 @@ def _write_performance_report(
 ) -> Path:
     cases = []
     for sample_rate in (44_100, 48_000):
-        measured_hops = (sample_rate + 511) // 512
-        samples = [1_000_000 + index % 3 * 1_000_000 for index in range(measured_hops)]
+        measured_hops = (sample_rate + 127) // 128
+        samples = [100_000 + index % 3 * 100_000 for index in range(measured_hops)]
         processing_seconds = sum(samples) / 1_000_000_000.0
-        audio_seconds = measured_hops * 512 / sample_rate
+        audio_seconds = measured_hops * 128 / sample_rate
         real_time_factor = processing_seconds / audio_seconds
-        deadline_us = 512 / sample_rate * 1_000_000.0
+        deadline_us = 128 / sample_rate * 1_000_000.0
         for channels in (1, 2):
             cases.append(
                 {
                     "sample_rate_hz": sample_rate,
                     "channels": channels,
-                    "algorithmic_latency_samples_per_channel": 512,
-                    "algorithmic_latency_ms": 512 / sample_rate * 1_000.0,
+                    "algorithmic_latency_samples_per_channel": 128,
+                    "algorithmic_latency_ms": 128 / sample_rate * 1_000.0,
                     "processor_construction_ms": 10.0,
-                    "first_frame_us": 2_500.0,
+                    "first_frame_us": 250.0,
                     "warmup_hops": 32,
                     "configured_measurement_seconds": 1,
                     "measurement_wall_seconds": 1.1,
@@ -556,22 +572,25 @@ def _write_performance_report(
                     "expected_session_runs": 1 + 32 + measured_hops,
                     "rss_bytes": 10_000_000,
                     "rss_measurement": "fixture-peak-rss",
+                    "serial_latency_p99_ms": 128 / sample_rate * 1000.0 + 0.3,
+                    "serial_latency_max_ms": 128 / sample_rate * 1000.0 + 0.3,
+                    "latency_target_met": True,
                     "latency": {
-                        "p50_us": 2_000.0,
-                        "p95_us": 3_000.0,
-                        "p99_us": 3_000.0,
-                        "max_us": 3_000.0,
+                        "p50_us": 200.0,
+                        "p95_us": 300.0,
+                        "p99_us": 300.0,
+                        "max_us": 300.0,
                     },
                     "samples_ns": samples,
                 }
             )
     report = {
-        "schema_version": 2,
+        "schema_version": 4,
         "report_type": "soundex-performance",
         "generated_unix_seconds": 1,
         "diagnostic": False,
         "artifact": {"sha256": artifact_hash, "size_bytes": artifact_size},
-        "protocol": {"fft_size": 1024, "hop_size": 512, "frequency_bins": 513},
+        "protocol": {"fft_size": 256, "hop_size": 128, "frequency_bins": 129},
         "hardware": {
             "label": hardware_label,
             "cpu": hardware_label,
@@ -593,10 +612,13 @@ def _write_performance_report(
         "cases": cases,
         "performance_gates": {
             "passed": True,
+            "preferred_target_met": True,
             "failed": [],
             "thresholds": {
-                "maximum_algorithmic_latency_samples": 512,
+                "maximum_algorithmic_latency_samples": 128,
                 "maximum_stereo_p99_us": 5_000.0,
+                "target_serial_latency_us": 8000.0,
+                "maximum_serial_latency_us": 10000.0,
                 "maximum_deadline_misses": 0,
                 "maximum_real_time_factor": 1.0,
                 "maximum_peak_rss_bytes": 50 * 1024 * 1024,

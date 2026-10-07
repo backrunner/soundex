@@ -15,8 +15,8 @@ def evaluate_signal_triplet(
     sample_rate: int,
     cutoff_hz: float,
     crossover_width_hz: float = 1000.0,
-    fft_size: int = 1024,
-    hop_size: int = 512,
+    fft_size: int = 256,
+    hop_size: int = 128,
 ) -> dict[str, float]:
     """Compare aligned degraded/enhanced mono signals against clean audio."""
     clean, degraded, enhanced = _aligned_mono(clean, degraded, enhanced)
@@ -72,8 +72,8 @@ def evaluate_stereo_image(
     degraded: np.ndarray,
     enhanced: np.ndarray,
     *,
-    fft_size: int = 1024,
-    hop_size: int = 512,
+    fft_size: int = 256,
+    hop_size: int = 128,
 ) -> dict[str, float]:
     """Measure stereo correlation, inter-channel phase, and image width change."""
     signals = []

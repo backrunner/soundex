@@ -11,6 +11,8 @@ import onnxruntime as ort
 import torch
 
 from artifact_contract import (
+    DEFAULT_FFT_SIZE,
+    DEFAULT_HOP_SIZE,
     INPUT_NAME,
     MAX_ABSOLUTE_ERROR,
     MAX_MEAN_ERROR,
@@ -76,7 +78,7 @@ def validate_ort_parity(
 
 
 def deterministic_parity_inputs(
-    *, fft_size: int = 1024, hop_size: int = 512
+    *, fft_size: int = DEFAULT_FFT_SIZE, hop_size: int = DEFAULT_HOP_SIZE
 ) -> list[tuple[str, torch.Tensor]]:
     """Cover silence, real STFT, random spectra, floor, and phase wrapping."""
     floor = -200.0

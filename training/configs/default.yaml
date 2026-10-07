@@ -28,6 +28,7 @@ training:
     low_band_identity_weight: 0.1
     crossover_continuity_weight: 0.05
     waveform_weight: 0.1
+    waveform_region: steady_state
     adversarial_weight: 0.1
     feature_matching_weight: 0.5
     phase_relative_floor_db: -60.0
@@ -35,8 +36,8 @@ training:
 
 audio:
   sample_rate: 44100
-  fft_size: 1024
-  hop_size: 512
+  fft_size: 256
+  hop_size: 128
   crossover_width_hz: 1000.0
 
 # ---------------------------------------------------------------------------
