@@ -87,4 +87,3 @@ The default host callback standard is **128 frames, aligned with hop boundaries*
 See [real-time standard](realtime-standard.md) for callback budgets,
 bounded worker fallback and physical-device acceptance. The earlier 5 ms preference
 is an optimization reference, not an acceptance gate.
-

@@ -128,11 +128,10 @@ docker run --gpus all \
   soundex-train
 ```
 
-Prune existing trees: `python training/scripts/filter_mix_only.py --root /data/<set> --delete`.  
+Prune existing trees: `python training/scripts/filter_mix_only.py --root /data/<set> --delete`.
 Size plan / CUDA notes: [`scripts/download_mix_only.md`](scripts/download_mix_only.md),
 [`scripts/environment.md`](scripts/environment.md).
 
 Weights and datasets use **separate** legal terms from the source code. Before publishing a
 checkpoint or ONNX file, complete a [Model Card](../models/MODEL_CARD.template.md) and follow
 [`../legal/MODEL_RELEASE_CHECKLIST.md`](../legal/MODEL_RELEASE_CHECKLIST.md).
-
