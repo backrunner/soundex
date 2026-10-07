@@ -1,0 +1,89 @@
+# SoundEx
+
+[English](README.md) · [CI](https://github.com/backrunner/soundex/actions/workflows/ci.yml) · [Apache-2.0](LICENSE)
+
+SoundEx 是实验性的音乐高频恢复库，使用 Rust 实现 DSP、ONNX 推理和实时流适配，
+同时提供文件处理 CLI 和 PyTorch 训练工程。它检测高频缺失，通过幅度/相位模型生成
+高频，再进行分频融合、响度匹配与限幅。
+
+**当前状态：**源码与接入 demo 可用，尚未发布合格的音质恢复权重。
+仓库附带的合成恒等测试模型只用于验证接入，不代表音质提升。
+详细进展见[模型说明](models/README.md)。
+
+## 直接运行
+
+需要 **Rust 1.88+** 和 C/C++ 编译工具链。默认构建会下载 ONNX Runtime，首次构建需联网。
+在仓库根目录执行：
+
+```bash
+git clone https://github.com/backrunner/soundex.git
+cd soundex
+cargo run --locked -p soundex-core --example offline_demo
+cargo run --locked -p soundex-core --example realtime_demo
+```
+
+离线 demo 生成两秒 48 kHz 双声道测试音频，通过内置 ONNX 模型处理，保存至
+`target/demo/input.wav` 与 `target/demo/output.wav`。实时 demo 模拟每块 128 帧的回调，
+输出截止时间、回退和 worker 统计，不打开声卡。
+
+使用自己的合格 **256/128** 模型：
+
+```bash
+cargo run --locked --release -p soundex-core --example offline_demo -- /path/to/model.onnx target/demo
+cargo run --locked --release -p soundex-core --example realtime_demo -- /path/to/model.onnx
+```
+
+## 文件处理
+
+```bash
+# 无需模型的分析
+cargo run --locked -p soundex-cli -- target/demo/input.wav --dry-run
+# 用测试模型验证完整处理流程
+cargo run --locked -p soundex-cli -- target/demo/input.wav \
+  --model tests/fixtures/low-latency-identity.onnx \
+  --output target/demo/cli-output.wav --bits 24
+```
+
+实际恢复时应换成通过验证的训练模型。输入支持 MP3、AAC、FLAC、WAV、OGG Vorbis，
+输出支持 16/24 位 PCM 和 32 位浮点 WAV。
+
+## 实时流接入
+
+在控制线程创建 `RealtimeProcessor`，音频回调仅调用 `process(input, output)`。
+回调不执行推理、不分配堆内存、不加互斥锁；独立 worker 通过有界队列推理。
+结果超时或异常时使用时间对齐的原音回退，并通过双声道联动渐变、输入清理与最终限幅
+保持输出连续。创建、替换、销毁及 `shutdown` 必须放在控制线程。
+
+实时配置：单/双声道 **44.1/48 kHz，FFT 256 / hop 128**，推荐与 hop 对齐的 **128 帧回调**。
+固定新增延迟为 **256 帧**：44.1 kHz 下 **5.80 ms**，48 kHz 下 **5.33 ms**。
+软件新增延迟目标 **低于 8 ms**、红线 **低于 10 ms**，包含回调耗时与额外接入缓冲。
+声卡与驱动缓冲应另行测量；固定帧延迟不等于真实设备或完整链路的实测延迟。
+
+[库接入示例与契约](docs/library.md) · [实时验收标准](docs/realtime-standard.md) ·
+[时延与资源 benchmark](docs/performance.md)
+
+文件处理使用同步 `SoundExProcessor`；它直接调用 ORT，不应放进音频回调。
+
+## 训练与验证
+
+[训练说明](training/README.md)包含环境安装、混音数据预处理、固定数据划分、CPU/MPS/CUDA
+与导出命令。默认模型契约为 FP32 `[batch, 2, 1, 129]`，仅 batch 动态，
+checkpoint schema 为 1.2，artifact schema 为 1.3。导出必须通过 ONNX 与 ORT 一致性检查；
+Rust 在处理前验证模型元数据与张量契约。
+
+[评估流程](training/evaluation/README.md) · [模型卡](models/MODEL_CARD.template.md) ·
+[权重发布清单](legal/MODEL_RELEASE_CHECKLIST.md)
+
+构建与检查命令见英文 README。[贡献说明](CONTRIBUTING.md)约定测试与提交格式。
+
+## 开源许可
+
+源码、文档、demo 与无训练参数的合成测试图采用 **[Apache License 2.0](LICENSE)**。
+依赖保留各自许可，见 [THIRD_PARTY.md](THIRD_PARTY.md)。
+训练数据不随库分发，遵循上游条款；学习得到的权重使用独立
+[模型权重许可](MODEL_WEIGHTS_LICENSE.md)，每次发布必须声明对应等级。
+当前 MUSDB 训练候选按项目政策属于 **Tier C，仅研究/评估用途**。
+
+[NOTICE](NOTICE) · [许可总览](legal/LICENSING.md) · [数据与权重等级](legal/TRAINING_DATA_AND_WEIGHT_TIERS.md)
+
+Copyright 2026 BackRunner and SoundEx Contributors.

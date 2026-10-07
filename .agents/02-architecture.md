@@ -238,10 +238,17 @@ embedded-model = []             # 嵌入默认模型到二进制
 
 ## 线程模型
 
-- `SoundExProcessor` 本身 **非 Send/Sync**（单线程音频回调使用）
-- 若需多线程，调用方通过 `Mutex<SoundExProcessor>` 或 channel 包装
-- 推理引擎内部不持有锁，由调用方保证串行调用
-- CLI 使用单线程处理（文件级），无需并发
+- 实时回调使用 `RealtimeProcessor`：256/128，128 samples STFT + 128 samples
+  worker 交接，固定 256 samples/channel 延迟。音频侧使用预分配的 `rtrb` SPSC
+  有界队列，不调用模型，不等待、不加锁、不分配。迟到结果按时间戳丢弃，退回
+  同样延迟的原始音频；双声道共享 128 samples 渐变及最终限幅。
+- `SoundExProcessor` 是同步 DSP/ORT 管线，供独立推理线程、离线 CLI 和质量评估
+  串行使用。不要用 `Mutex<SoundExProcessor>` 包装后在实时回调中等待推理。
+- 模型加载、线程创建、重建或 shutdown/join 在控制线程执行。worker 失败不停止
+  音频侧输出；恢复增强需要在控制线程更换实时适配层。
+- 主机回调建议 128 frames 并与 hop 对齐，任意块大小仍保证输出长度；更小块
+  完成输入 hop 后的计算时间更短，更大块也会降低增强结果准时率。实际设备
+  延迟、xrun 和长期调度稳定性单独验收。
 
 ## 错误处理
 

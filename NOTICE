@@ -1,5 +1,5 @@
 SoundEx
-Copyright 2026 SoundEx Contributors
+Copyright 2026 BackRunner and SoundEx Contributors
 
 ===========================================================================
 1. SOFTWARE
@@ -10,6 +10,10 @@ Model Weights are licensed under the Apache License, Version 2.0.
 See the file LICENSE for the full license text.
 
 SPDX-License-Identifier: Apache-2.0
+
+Synthetic ONNX test fixtures in tests/fixtures/ contain no learned parameters
+and are licensed as Software under Apache-2.0. They are integration tests,
+not pretrained restoration models. See tests/fixtures/README.md.
 
 ===========================================================================
 2. MODEL WEIGHTS (SEPARATE LICENSE)
@@ -87,7 +91,7 @@ MedleyDB / MedleyDB 2.0
 
 Runtime and build dependencies (for example ONNX Runtime, Rust crates,
 PyTorch when training) remain under their respective licenses as declared
-by those projects. Linking or using them does not change the SoundEx
+by those projects. See THIRD_PARTY.md. Linking or using them does not change the SoundEx
 Software or Model Weights licenses above.
 
 ===========================================================================

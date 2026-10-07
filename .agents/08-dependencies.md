@@ -238,7 +238,7 @@ CMD ["python", "training/train.py", "--config", "training/configs/default.yaml"]
 
 | 平台 | 最低版本 |
 |------|----------|
-| Rust | 1.75.0+ (edition 2021) |
+| Rust | 1.88.0+ (edition 2021; ort rc.12) |
 | Python | 3.10+ |
 | macOS | 12.0+ (Apple Silicon) / 11.0+ (Intel) |
 | Linux | glibc 2.31+ (Ubuntu 20.04+) |
