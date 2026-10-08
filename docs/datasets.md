@@ -41,11 +41,12 @@ catalog. A single work/album cannot establish cross-work generalization.
 
 ## Audio directory or optional catalog
 
-The [native lossless source catalog](../training/source_catalogs/README.md)
-provides the current audited acquisition snapshot and download instructions.
-The index documents its verified count and the ongoing 1,000-track expansion;
-it excludes speech, Slakh, duplicate works and short cues. The audio is
-downloaded separately and retains each original recording's license.
+The [native lossless source documentation](../training/source_catalogs/README.md)
+provides publisher references, dated acquisition counts and local preparation
+instructions for the ongoing 1,000-track expansion. Download plans and per-file
+indexes stay local alongside audio; a fresh clone contains source documents,
+not an acquired catalog. Counts exclude speech, Slakh, duplicate works and short
+cues. Each original recording retains its publisher's license.
 
 Training has no dataset/license whitelist or mandatory rights form. Point the
 importer at a folder of lossless WAV/FLAC/AIFF/W64/CAF audio. It scans recursively, records

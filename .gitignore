@@ -20,8 +20,21 @@ training/.tools/
 *.pth
 *.pt
 
-# Data (downloaded separately)
+# Data and acquisition indexes (local only; source documentation is public)
 /data/
+/training/source_catalogs/*.jsonl
+*.wav
+*.flac
+*.aiff
+*.aif
+*.w64
+*.caf
+*.mp3
+*.m4a
+*.aac
+*.ogg
+*.opus
+!tests/fixtures/*.wav
 
 # IDE
 .idea/

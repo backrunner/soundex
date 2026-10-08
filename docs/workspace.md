@@ -13,7 +13,7 @@ training/
   models/                  Python model definitions
   evaluation/              Evaluation implementation
   scripts/                 Executable workflow tools
-  source_catalogs/         Portable original-audio indexes, without audio bytes
+  source_catalogs/         Public source documentation; acquisition indexes stay local
   tests/                   Training and export contract tests
   .venv/                   Local Python environment (ignored)
   .tools/bin/              Local FFmpeg symlink (ignored)

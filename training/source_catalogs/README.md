@@ -1,55 +1,45 @@
-# Native lossless music catalog
+# Native lossless music sources
 
-[`native_lossless.jsonl`](native_lossless.jsonl) currently indexes **360 distinct
-quality-audited music tracks**, approximately **24.0 hours / 10.0 GB**,
-as of 2026-10-08. Expansion toward approximately **1,000** distinct tracks is in
-progress. This is a verified snapshot, not a claim that the 1,000-track collection
-has already completed. The repository stores the index, not the audio.
+The public repository contains source documentation, training tools and configs.
+Downloaded originals, processed pairs, acquisition plans, per-file audit catalogs
+and training checkpoints remain local. Source declarations do not relicense audio
+under the code's Apache-2.0 license.
 
-The initial 743-track acquisition selection was superseded: 430 recordings by
-Rrrrrose/Loyalty Freak Music aliases, including Monplaisir and Komiku, were
-excluded after finding the publisher's current express AI-training prohibition.
-A further 41 of the remaining old masters have unresolved signal-quality flags
-and are held for review. See [the source review](../../legal/TRAINING_DATA.md).
-No weights were trained by the stopped 743-track run.
+## Current collection, 2026-10-09
 
-Every indexed original passed complete-file checksums, full mono/stereo decode,
-finite-frame checks and the signal audit. Publisher MD5/size receipts are verified
-where supplied. The index retains original rate/channels, decoded-PCM SHA-256,
-RMS, DC, full-scale samples/runs, silence, sampled spectral metrics and individual
-source/credit/license information. These checks describe the available master;
-they cannot prove every stage of its previous production avoided lossy codecs.
-Known lossy sources, including FMA MP3 packages, are excluded. Narrow bandwidth
-alone is not a rejection criterion.
+The regional queue reports **1,262 signal-audited candidate entries**, but only
+**169 distinct source-reviewed music works from 12 creators** count toward the
+requested approximately 1,000-work collection. Candidate entries are not approved
+song counts. China contributes 29 works, Japan 1, Korea 58, North America 49;
+32 have unknown regional repertoire. Reviewed European and Chinese/Japanese/Korean
+vocal coverage remain absent. Pop has 2 works and electronic 11; no full country
+songs are currently counted. The collection is not ready for the regional run.
 
-Only unique music works at least 30 seconds long at >=44.1 kHz count here. Exact
-decoded copies, aliases, alternate mixes, crops and codec/channel variants do not
-increase the count. Slakh and VCTK speech are separate supplements. This selection
-policy does not impose a genre, license or duration whitelist on the generic importer.
+See [the source and coverage review](../../docs/dataset-curation.md) for publisher
+links, selected grants, credits and limitations. The separate
+[creator-original WAV expansion](../../docs/source-expansion-20261008.md) documents
+21 original downloads, including exact source pages and original-file links;
+20 distinct music works count after measured float-master gain repairs. Its
+short country cue is retained separately.
 
-| Primary publisher-derived style | Tracks |
-| --- | ---: |
-| ambient | 44 |
-| blues | 14 |
-| country | 6 |
-| electronic | 81 |
-| folk | 1 |
-| jazz | 39 |
-| metal | 2 |
-| pop | 93 |
-| rock | 69 |
-| unlabeled | 11 |
+The earlier 360-track signal-audited snapshot (2026-10-08, approximately 24 hours /
+10 GB) is a historical acquisition result, not the current source-reviewed count.
+Its local index and acquisition receipts are retained outside Git. The initial
+743-track selection was superseded after excluding the publisher's current
+express training objection and holding unresolved signal flags for review.
+No weights were trained by that stopped 743-track run.
 
-Country and several other styles remain scarce. Soundtrack use and instrument
-names alone do not establish a genre; uncertain styles remain unlabeled. This
-snapshot does not establish comprehensive artist or genre coverage.
+## Local acquisition and preparation
 
-## Download and preprocess
+Download original WAV/FLAC attachments from the documented publishers. Preserve
+first-party source pages, the chosen license, credits, original-file URLs and
+publisher checksums where available. Save any optional acquisition catalog under
+`data/catalogs/`; a fresh clone does not include a completed acquisition plan.
 
-From `training/`:
+For a locally prepared source catalog, run from `training/`:
 
 ```bash
-python data/download_library.py --catalog source_catalogs/native_lossless.jsonl \
+python data/download_library.py --catalog ../data/catalogs/native_lossless.jsonl \
   --output-dir ../data
 python scripts/audit_library.py --catalog ../data/catalog.jsonl \
   --output-dir ../data/reports/music-quality
@@ -58,32 +48,25 @@ python data/preprocess_library.py --catalog ../data/reports/music-quality/accept
   --config configs/diverse_lossless.yaml
 ```
 
-The downloader verifies complete original bytes and decoded PCM before publishing
-files, and reuses verified originals on rerun. Source-quality flags are held for
-review, not declared recording defects: intentional distortion may warrant a
-separate review. Prepare all enabled corpora with the same immutable recipe.
-Derive speech's sampling probability from the smallest actual retained training
-music genre after pair generation; see [datasets](../../docs/datasets.md) and
-[workspace/run tooling](../../docs/workspace.md).
+Catalog format and direct-folder import are documented in
+[datasets](../../docs/datasets.md). Catalogs are optional for the generic importer;
+there is no dataset/license whitelist or mandatory rights form. Keep raw and
+processed paths separate. Full-file decoding, finite values, integrity, stereo/
+mono behavior and signal measurements are checked. A lossless container and
+spectrum cannot prove the upstream production never used lossy coding; retain
+publisher master provenance. Known MP3/AAC/Vorbis exports, including FMA MP3
+packages, are not clean targets.
 
-## Licenses and provenance
+Related versions share one work/split group. Duplicate PCM, alternate mixes,
+codec variants and channels do not increase song counts. Slakh and VCTK speech
+remain separate supplements. Prepare every enabled corpus with the same immutable
+recipe and derive speech sampling from the smallest actual music genre after
+pair generation; see [workspace/run tooling](../../docs/workspace.md).
 
-Recordings retain their individual publisher grants; Apache-2.0 does not relicense
-third-party audio. Preserve credits, source links, licenses and change descriptions.
-The index preserves source declarations and verified acquired versions. Official
-trained-weight publication uses the separate [artifact review](../../legal/TRAINING_DATA.md).
+## Rights and publication
 
-## Additional creator-original WAV plan
-
-[`oga_originals_plan.jsonl`](oga_originals_plan.jsonl) adds a separate 21-file
-first-party acquisition plan: Zane Little and Lennartmusic, with selected CC0
-grants. It includes at most 20 distinct music works and one short country cue.
-It is a plan, not an addition to the 360 verified entries above. See the
-[source survey and measured float-master repair](../../docs/source-expansion-20261008.md).
-Download progress, native full-frame audits and source reviews are recorded locally.
-All 21 publisher originals have now been acquired and decoded;
-[`oga_originals_verified.jsonl`](oga_originals_verified.jsonl) contains their actual
-hashes and original measurements. Three FLOAT originals need the documented gain
-derivatives, and the country cue stays outside full-song counts. The new source
-assessment adds 20 distinct music works to the local reviewed pool, bringing it
-to 169; the 1,000-work regional selection and Slakh weight-rights review remain incomplete.
+Preserve individual publisher grants, credits and edit descriptions locally;
+source documentation stays public. The
+[actual weight-license findings](../../legal/WEIGHT_LICENSE_REVIEW.md) remain
+separate from signal quality: the Slakh MIDI/rendering review is unresolved,
+and no learned restoration weights are approved for publication.

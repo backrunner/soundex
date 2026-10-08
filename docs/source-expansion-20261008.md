@@ -1,14 +1,13 @@
 # Free original-master expansion, started 2026-10-08
 
-The new [21-file acquisition plan](../training/source_catalogs/oga_originals_plan.jsonl)
-uses creator-published, uncompressed WAV attachments. It stores publisher byte
-lengths, exact original-file URLs, credits and original style tags. This is a
+The local 21-file acquisition plan uses creator-published, uncompressed WAV
+attachments. It stores publisher byte lengths, exact original-file URLs, credits and original style tags. This is a
 download plan, not a statement that all files or a released model are approved.
 All **21 originals completed download and full decoding on 2026-10-09**, totaling
-1,130,364,100 bytes and 54.93 minutes. The
-[verified original index](../training/source_catalogs/oga_originals_verified.jsonl)
-records their actual SHA-256, decoded PCM hashes and native measurements. Audio
-stays outside Git. Local receipts are in `data/reports/oga-original-expansion/`.
+1,130,364,100 bytes and 54.93 minutes. The local verified index records their
+actual SHA-256, decoded PCM hashes and native measurements. Audio, download plans
+and per-file catalogs stay outside Git; this source document remains public.
+Local receipts are in `data/reports/oga-original-expansion/`.
 
 ## First-party original WAV collection
 
@@ -85,13 +84,45 @@ specific material, price and training/weight-distribution grant. Genre/style nam
 do not replace original regional repertoire or language evidence. Chinese,
 Japanese and Korean vocal music and full country songs still require expansion.
 
-## Acquire the exact public originals
+## Original source references
 
-From `training/`:
+Each row selects the creator-offered CC0 alternative. Zane Little is credited on
+the first 20 works; Lennartmusic is credited on the last. These publisher links
+describe the acquired originals; gain derivatives and the short cue retain their
+separate local edit/count receipts.
+
+| Work / source page | Original WAV | Primary sampling genre |
+| --- | --- | --- |
+| [Miniature Saloon](https://opengameart.org/content/miniature-saloon) | [Publisher file](https://opengameart.org/sites/default/files/miniature_saloon.wav) | country |
+| [The Way It Is](https://opengameart.org/content/the-way-it-is) | [Publisher file](https://opengameart.org/sites/default/files/the_way_it_is.wav) | pop |
+| [Electronic Outlaw](https://opengameart.org/content/electronic-outlaw) | [Publisher file](https://opengameart.org/sites/default/files/electronic_outlaw.wav) | electronic |
+| [Barriers](https://opengameart.org/content/barriers) | [Publisher file](https://opengameart.org/sites/default/files/barriers.wav) | jazz |
+| [Detour](https://opengameart.org/content/detour) | [Publisher file](https://opengameart.org/sites/default/files/detour.wav) | jazz |
+| [Freeway Fumes](https://opengameart.org/content/freeway-fumes) | [Publisher file](https://opengameart.org/sites/default/files/freeway_fumes.wav) | jazz |
+| [Midnight Cruiser](https://opengameart.org/content/midnight-cruiser) | [Publisher file](https://opengameart.org/sites/default/files/midnight_cruiser.wav) | jazz |
+| [Empty Stretch](https://opengameart.org/content/empty-stretch) | [Publisher file](https://opengameart.org/sites/default/files/empty_stretch_0.wav) | jazz |
+| [Drive](https://opengameart.org/content/drive-0) | [Publisher file](https://opengameart.org/sites/default/files/drive.wav) | jazz |
+| [Shortcuts](https://opengameart.org/content/shortcuts) | [Publisher file](https://opengameart.org/sites/default/files/shortcuts.wav) | electronic |
+| [Wednesday Night Funk Fusion](https://opengameart.org/content/wednesday-night-funk-fusion) | [Publisher file](https://opengameart.org/sites/default/files/wednesday_night.wav) | funk |
+| [Rhythm Factory](https://opengameart.org/content/rhythm-factory) | [Publisher file](https://opengameart.org/sites/default/files/rhythm_factory.wav) | jazz |
+| [Synesthesia](https://opengameart.org/content/synesthesia) | [Publisher file](https://opengameart.org/sites/default/files/synesthesia.wav) | electronic |
+| [Poker Night](https://opengameart.org/content/poker-night) | [Publisher file](https://opengameart.org/sites/default/files/poker_face.wav) | electronic |
+| [Backup Plan](https://opengameart.org/content/backup-plan) | [Publisher file](https://opengameart.org/sites/default/files/backup_plan.wav) | electronic |
+| [Sideways City](https://opengameart.org/content/sideways-city) | [Publisher file](https://opengameart.org/sites/default/files/sideways_city.wav) | electronic |
+| [The Cool Factor](https://opengameart.org/content/the-cool-factor) | [Publisher file](https://opengameart.org/sites/default/files/the_cool_factor.wav) | electronic |
+| [Post Adventure Tea Party](https://opengameart.org/content/post-adventure-tea-party) | [Publisher file](https://opengameart.org/sites/default/files/post-adventure_tea_party.wav) | electronic |
+| [Moms Workout Cd](https://opengameart.org/content/moms-workout-cd) | [Publisher file](https://opengameart.org/sites/default/files/moms_workout_cd.wav) | electronic |
+| [Space Cadet Training Montage](https://opengameart.org/content/space-cadet-training-montage) | [Publisher file](https://opengameart.org/sites/default/files/space_cadet_training_montage_0.wav) | electronic |
+| [Beansjam Sad Budi Blues](https://opengameart.org/content/beansjam-sad-budi-blues) | [Publisher file](https://opengameart.org/sites/default/files/sad%20budi%20blues.wav) | unlabeled |
+
+## Acquire originals from a local plan
+
+Create an optional local plan from the publisher references above; it is not
+included in a fresh clone. From `training/`, with that plan:
 
 ```bash
 python scripts/fetch_archive_masters.py \
-  --plan source_catalogs/oga_originals_plan.jsonl --root ../data \
+  --plan ../data/catalogs/oga_originals_plan.jsonl --root ../data \
   --receipt-dir ../data/reports/oga-original-expansion --workers 3
 ```
 
@@ -100,7 +131,7 @@ in a separate catalog, retain the original SHA-256 and edit receipt, and preserv
 the original composition group. Flags trigger an appropriate review or repair;
 they are not automatically a declaration that music is defective.
 
-The verified index intentionally preserves the three originals' over-full-scale
+The local verified index intentionally preserves the three originals' over-full-scale
 flags. They require their separate gain derivatives for this selection; do not
 silently clear those measurements or distribute derivative hashes as though they
 were hashes of the publisher download.

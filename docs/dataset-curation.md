@@ -35,7 +35,7 @@ automatically count as Mandopop.
 | [Chris Zabriskie](https://chriszabriskie.com/use/) | 30 previously acquired native FLAC masters | Exact work names match six official album pages. Artist blanket CC BY 4.0 grant and credit instructions retained alongside historical archive license receipts. His official composer/recording-artist page locates his working repertoire in Brooklyn, New York; one artist does not establish US genre breadth. Fifteen other legacy tracks remain outside this reviewed subset. |
 | [Andy G. Cohen original masters](https://archive.org/details/andy-g-cohen-2014-2017) | 31 previously acquired native FLAC masters | Collection explicitly credits composition, performance, recording and mastering to the artist and grants CC BY 4.0. Every selected file matches publisher original-file MD5 and embedded creator credit. Collection tags support post-rock; regional origin remains unknown. FMA MP3 copies are not clean targets. |
 
-The source-reviewed pool currently contains 149 distinct works: China 29, Japan 1,
+The 2026-10-08 source-reviewed snapshot contained 149 distinct works: China 29, Japan 1,
 Korea 58 (including Travel), North America 30 and unknown region 31. These counts
 do not describe the older unreviewed candidate pool. Creator and genre dominance
 and remaining regional/genre/vocal gaps still prevent the requested 1,000-work
@@ -78,6 +78,40 @@ with its verified derivative, saving another 93,589,797 bytes. Download fragment
 open by active collectors and retained baseline originals were protected; all 272
 baseline hashes were checked again. Source pages, hashes, edit/deletion receipts
 and useful instrument effects remain available locally.
+
+## Readiness check, 2026-10-09
+
+The live regional queue remains in `waiting-for-regional-source-selection`.
+It has 1,262 signal-audited candidate entries, but **169 distinct source-reviewed
+music works / 12 creators**, against the requested approximately 1,000 works.
+Only retained unique music works fill that target; supplements and variants do not.
+
+| Reviewed repertoire | Distinct works |
+| --- | ---: |
+| China | 29 |
+| Japan | 1 |
+| Korea | 58 |
+| Europe | 0 |
+| North America | 49 |
+| Unknown | 32 |
+
+The reviewed genres are ambient 30, classical 53, electronic 11, folk 6, funk 2,
+jazz 7, pop 2, rock 31 and unlabeled 27. Full country, blues, hip-hop and R&B
+coverage is not yet established in this subset. No Chinese/Japanese/Korean vocal
+music is counted. These acquisition gaps remain even without the profile's
+additional creator-share and per-category working thresholds.
+
+Matching Slakh and VCTK supplements are prepared: 49 Slakh recordings / 3,557
+aligned pairs and 270 VCTK utterances / 20,056 aligned pairs, using recipe
+`7fda9e58ab583617`. Native mono input is supported; recording-balanced sampling
+avoids multiplying a stereo source's draw mass by its channel roles. The queue
+has no training child or checkpoints and will start fresh training after the
+regional selection reaches its target. A waiting queue is not a started run.
+
+Raw audio, processed pairs, source-page evidence, download plans and per-file
+catalogs stay local and ignored. Only source documentation is published; see
+[native sources](../training/source_catalogs/README.md). Public documentation
+records a dated observation; the local job's `progress.json` is the live status.
 
 ## Source and artifact review
 
