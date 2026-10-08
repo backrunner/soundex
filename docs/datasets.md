@@ -41,6 +41,11 @@ catalog. A single work/album cannot establish cross-work generalization.
 
 ## Audio directory or optional catalog
 
+The [native lossless source catalog](../training/source_catalogs/README.md)
+provides a verified 743-track acquisition index and download instructions.
+Its count excludes speech, Slakh, duplicate works and short cues. The audio is
+downloaded separately and retains each original recording's license.
+
 Training has no dataset/license whitelist or mandatory rights form. Point the
 importer at a folder of lossless WAV/FLAC/AIFF/W64/CAF audio. It scans recursively, records
 original format/rate/channel information and hashes, and deduplicates byte-identical
@@ -120,5 +125,6 @@ initialization rather than resuming historical MUSDB weights.
 For publication, complete the [source review](../legal/TRAINING_DATA.md),
 [model card](../models/MODEL_CARD.template.md) and artifact-bound maintainer review.
 That review concerns the actual grants and published artifact; it is not a training
-ingestion gate. No new trained weights or large audio archives have been downloaded
-or distributed by this survey.
+ingestion gate. Acquired audio stays local and is not redistributed with the
+repository. Each original retains its publisher's license; the code's Apache-2.0
+license does not replace those grants.
