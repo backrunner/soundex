@@ -12,7 +12,8 @@ use soundex_core::SoundExConfig;
 
 const MAGIC: &[u8; 4] = b"SXT1";
 const HEADER_BYTES: usize = 20;
-const TOLERANCE: f32 = 1e-5;
+#[path = "parity/metrics.rs"]
+mod metrics;
 
 struct BinaryTensor {
     shape: [usize; 4],
@@ -85,27 +86,9 @@ fn run() -> Result<(), Box<dyn Error>> {
         .into());
     }
 
-    let mut maximum = 0.0_f32;
-    let mut total = 0.0_f64;
-    for (&actual_value, &expected_value) in actual.iter().zip(&expected.values) {
-        if !actual_value.is_finite() || !expected_value.is_finite() {
-            return Err("runtime or golden tensor contains a non-finite value".into());
-        }
-        let difference = (actual_value - expected_value).abs();
-        maximum = maximum.max(difference);
-        total += f64::from(difference);
-    }
-    let mean = total / expected.values.len() as f64;
-    if maximum >= TOLERANCE || mean >= f64::from(TOLERANCE) {
-        return Err(format!(
-            "parity mismatch: max={maximum:.8e}, mean={mean:.8e}, tolerance={TOLERANCE:.1e}"
-        )
-        .into());
-    }
-    println!(
-        "parity passed: elements={}, max={maximum:.8e}, mean={mean:.8e}",
-        expected.values.len()
-    );
+    let report = metrics::compare(&actual, &expected.values)?;
+    println!("parity passed: elements={}", expected.values.len());
+    println!("{report}");
     Ok(())
 }
 

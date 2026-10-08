@@ -3,21 +3,24 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import struct
 import subprocess
 import tempfile
 from pathlib import Path
 
+import onnxruntime as ort
 import torch
 
 from checkpoint import load_checkpoint
 from evaluation.reporting import sha256_file, write_json_report
 from export_onnx import _build_generator, artifact_metadata, validate_onnx_contract
 from export_validation import deterministic_parity_inputs, validate_ort_parity
+from parity_metrics import PARITY_POLICY, POLICY_SHA256, validate_features
 
-PARITY_EVIDENCE_SCHEMA_VERSION = 1
-PARITY_SUITE = "pytorch-ort-rust-v1"
+PARITY_EVIDENCE_SCHEMA_VERSION = 2
+PARITY_SUITE = "pytorch-ort-rust-v2"
 
 
 def generate_parity_evidence(
@@ -42,7 +45,12 @@ def generate_parity_evidence(
         hop_size=int(feature["hop_size"]),
     )
     binary = _resolve_rust_binary(rust_binary)
-    case_names: list[str] = []
+    cases: list[dict[str, object]] = []
+    options = ort.SessionOptions()
+    options.intra_op_num_threads = 1
+    options.inter_op_num_threads = 1
+    options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    session = ort.InferenceSession(str(model_file), sess_options=options)
     with tempfile.TemporaryDirectory(prefix="soundex-parity-") as directory:
         root = Path(directory)
         for case_name, input_tensor in parity_inputs:
@@ -61,7 +69,19 @@ def generate_parity_evidence(
             if result.returncode != 0:
                 detail = result.stderr.strip() or result.stdout.strip()
                 raise RuntimeError(f"Rust parity case {case_name!r} failed: {detail}")
-            case_names.append(case_name)
+            try:
+                rust_report = json.loads(result.stdout.splitlines()[-1])
+            except (ValueError, IndexError) as error:
+                raise RuntimeError(
+                    "Rust parity utility did not return versioned evidence"
+                ) from error
+            if rust_report.get("policy") != PARITY_POLICY:
+                raise RuntimeError("Rust parity utility uses a different or stale parity policy")
+            actual = session.run(None, {"input_features": input_tensor.numpy()})[0]
+            metrics = validate_features(expected.numpy(), actual, label=case_name)
+            cases.append(
+                {"name": case_name, "pytorch_ort": metrics, "pytorch_rust": rust_report["metrics"]}
+            )
     evidence: dict[str, object] = {
         "schema_version": PARITY_EVIDENCE_SCHEMA_VERSION,
         "suite": PARITY_SUITE,
@@ -71,10 +91,11 @@ def generate_parity_evidence(
         "training_manifest_corpora": sorted(
             {str(manifest["corpus"]) for manifest in checkpoint["data"]["manifests"]}
         ),
-        "cases": case_names,
+        "cases": cases,
+        "policy": PARITY_POLICY,
+        "policy_sha256": POLICY_SHA256,
         "pytorch_ort_max_absolute_error": ort_max,
         "pytorch_ort_max_mean_error": ort_mean,
-        "rust_tolerance": 1e-5,
     }
     write_json_report(evidence, output_path)
     return evidence
@@ -103,7 +124,7 @@ def _resolve_rust_binary(path: str | Path | None) -> Path:
     repository = Path(__file__).resolve().parents[2]
     configured = path or os.environ.get("SOUNDEX_MODEL_PARITY")
     binary = Path(configured) if configured else repository / "target/debug/soundex-model-parity"
-    if binary.is_file() and os.access(binary, os.X_OK):
+    if configured and binary.is_file() and os.access(binary, os.X_OK):
         return binary
     result = subprocess.run(
         ["cargo", "build", "--locked", "-p", "soundex-core", "--bin", "soundex-model-parity"],

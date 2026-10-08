@@ -15,6 +15,8 @@ ndarray.workspace = true
 thiserror.workspace = true
 log.workspace = true
 rtrb = "0.3"
+# JSON policy/report exchange for the standalone parity validation utility.
+serde_json.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Safe, thread-local USER_INITIATED QoS; no scheduler FFI in the audio adapter.
@@ -26,7 +28,6 @@ audio_thread_priority = { version = "0.38", default-features = false }
 criterion.workspace = true
 approx.workspace = true
 serde.workspace = true
-serde_json.workspace = true
 sha2.workspace = true
 libc.workspace = true
 # WAV output for self-contained demos; already used by the CLI.

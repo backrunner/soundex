@@ -10,6 +10,8 @@ from typing import Any
 
 import yaml
 
+from parity_metrics import parity_evidence_valid
+
 GATE_SCHEMA_VERSION = 1
 _REQUIRED_STEREO_METRICS = {
     "baseline_correlation_error",
@@ -115,9 +117,7 @@ def evaluate_release_gates(report: dict[str, Any], config: dict[str, Any]) -> di
     parity = report.get("parity_evidence", {})
     parity_required = bool(config["required_evidence"].get("pytorch_ort_rust_parity", True))
     parity_matches = (
-        int(parity.get("schema_version", 0)) == 1
-        and parity.get("suite") == "pytorch-ort-rust-v1"
-        and bool(parity.get("passed", False))
+        parity_evidence_valid(parity)
         and parity.get("artifact_sha256") == report["artifact"]["sha256"]
     )
     _add(

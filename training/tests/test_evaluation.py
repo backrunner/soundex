@@ -30,6 +30,7 @@ from evaluation.reporting import aggregate_metric_rows, bootstrap_mean_ci, sha25
 from evaluation.runner import _artifact_frame_contract, _evaluation_units
 from evaluation.rust_bridge import RustStreamEvaluator, read_sxa, write_sxa
 from evaluation.visqol import _parse_score
+from parity_metrics import PARITY_POLICY, POLICY_SHA256, REQUIRED_PARITY_CASES
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 GATE_CONFIG = Path(__file__).resolve().parents[1] / "evaluation" / "release_gates.v1.yaml"
@@ -772,8 +773,18 @@ def _gate_report(row: dict[str, object], *, artifact_hash: str) -> dict[str, obj
         },
         "perceptual": {"status": "available", "required_rows": 1, "scored_rows": 1},
         "parity_evidence": {
-            "schema_version": 1,
-            "suite": "pytorch-ort-rust-v1",
+            "schema_version": 2,
+            "suite": "pytorch-ort-rust-v2",
+            "policy": PARITY_POLICY,
+            "policy_sha256": POLICY_SHA256,
+            "cases": [
+                {
+                    "name": name,
+                    "pytorch_ort": {key: 0.0 for key in PARITY_POLICY},
+                    "pytorch_rust": {key: 0.0 for key in PARITY_POLICY},
+                }
+                for name in sorted(REQUIRED_PARITY_CASES)
+            ],
             "passed": True,
             "artifact_sha256": artifact_hash,
         },

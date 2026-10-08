@@ -400,9 +400,9 @@ def _load_parity_evidence(path: str | Path | None) -> dict[str, Any]:
     evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
     if not isinstance(evidence, dict):
         raise ValueError("parity evidence must be a JSON object")
-    if int(evidence.get("schema_version", 0)) != 1:
+    if evidence.get("schema_version") != 2:
         raise ValueError("parity evidence schema is unsupported")
-    if evidence.get("suite") != "pytorch-ort-rust-v1":
+    if evidence.get("suite") != "pytorch-ort-rust-v2":
         raise ValueError("parity evidence suite is unsupported")
     return {**evidence, "path": str(evidence_path), "sha256": report_sha256_file(evidence_path)}
 

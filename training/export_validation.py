@@ -14,14 +14,13 @@ from artifact_contract import (
     DEFAULT_FFT_SIZE,
     DEFAULT_HOP_SIZE,
     INPUT_NAME,
-    MAX_ABSOLUTE_ERROR,
-    MAX_MEAN_ERROR,
     OUTPUT_NAME,
     REQUIRED_METADATA_KEYS,
     ExportValidationError,
     tensor_shape,
 )
 from models.generator import SoundExGenerator
+from parity_metrics import validate_features
 
 OutputTransform = Callable[[str, np.ndarray], np.ndarray]
 
@@ -33,7 +32,14 @@ def validate_ort_parity(
     output_transform: OutputTransform | None = None,
 ) -> tuple[float, float]:
     """Compare PyTorch and CPU ORT over deterministic deployment edge cases."""
-    session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
+    options = ort.SessionOptions()
+    options.intra_op_num_threads = 1
+    options.inter_op_num_threads = 1
+    options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+    options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    session = ort.InferenceSession(
+        str(model_path), sess_options=options, providers=["CPUExecutionProvider"]
+    )
     if session.get_inputs()[0].name != INPUT_NAME or session.get_outputs()[0].name != OUTPUT_NAME:
         raise ExportValidationError("ONNX Runtime tensor names do not match the artifact contract")
     metadata = session.get_modelmeta().custom_metadata_map
@@ -65,15 +71,11 @@ def validate_ort_parity(
             )
         if not np.isfinite(actual).all() or not np.isfinite(expected).all():
             raise ExportValidationError(f"ORT case {case_name!r} produced non-finite values")
-        difference = np.abs(actual - expected)
-        case_max = float(difference.max())
-        case_mean = float(difference.mean())
+        metrics = validate_features(expected, actual, label=f"ORT case {case_name!r}")
+        case_max = metrics["raw_max_absolute_error"]
+        case_mean = metrics["raw_mean_error"]
         maximum = max(maximum, case_max)
         maximum_mean = max(maximum_mean, case_mean)
-        if case_max >= MAX_ABSOLUTE_ERROR or case_mean >= MAX_MEAN_ERROR:
-            raise ExportValidationError(
-                f"ORT case {case_name!r} mismatch: max={case_max:.3e}, mean={case_mean:.3e}"
-            )
     return maximum, maximum_mean
 
 
@@ -119,10 +121,31 @@ def deterministic_parity_inputs(
     phase_edges = torch.full((2, *static_shape), -30.0, dtype=torch.float32)
     phase_edges[0, 1].fill_(math.pi - 1e-6)
     phase_edges[1, 1].fill_(-math.pi + 1e-6)
-    return [
+    cases = [
         ("silence", silence),
         ("near_full_scale_sine", sine.contiguous()),
         ("random_finite_spectra", random_spectra),
         ("db_floor", floor_values),
         ("phase_edges", phase_edges),
     ]
+    generator = torch.Generator().manual_seed(501)
+    for sample_rate in (44_100, 48_000):
+        time = torch.arange(fft_size, dtype=torch.float32) / sample_rate
+        impulse = torch.zeros(fft_size)
+        impulse[fft_size // 2] = 0.9
+        waveforms = {
+            "music_tones": sum(
+                amplitude * torch.sin(2 * math.pi * frequency * time)
+                for amplitude, frequency in ((0.2, 440), (0.1, 880), (0.05, 6000))
+            ),
+            "quiet": 1e-5 * torch.sin(2 * math.pi * 997 * time),
+            "noise": torch.randn(fft_size, generator=generator) * 0.2,
+            "impulse": impulse,
+        }
+        for name, waveform in waveforms.items():
+            spectrum = torch.fft.rfft(waveform * window)
+            features = torch.stack(
+                (20 * spectrum.abs().clamp_min(1e-10).log10(), torch.angle(spectrum))
+            )[None, :, None, :]
+            cases.append((f"{name}_{sample_rate}", features.contiguous()))
+    return cases

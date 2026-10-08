@@ -163,7 +163,10 @@ def export_onnx(
     print(f"Published ONNX model: {destination}")
     print(f"SHA-256: {result.sha256}")
     print(f"Size: {result.size_bytes / 1024 / 1024:.2f} MiB")
-    print(f"ORT parity: max={result.max_absolute_error:.3e}, mean={result.max_mean_error:.3e}")
+    print(
+        f"ORT parity passed (unit-aware v2): raw max={result.max_absolute_error:.3e}, "
+        f"raw mean={result.max_mean_error:.3e} (diagnostics, not acceptance limits)"
+    )
     return result
 
 

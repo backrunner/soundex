@@ -30,6 +30,7 @@ from export_onnx import (
 )
 from export_validation import deterministic_parity_inputs
 from models.generator import SoundExGenerator
+from parity_metrics import validate_features
 
 
 @pytest.fixture
@@ -197,7 +198,7 @@ def test_python_ort_and_rust_match_fixed_and_real_stft_tensors(
         with torch.no_grad():
             python_output = model(input_tensor).numpy()
         ort_output = session.run([OUTPUT_NAME], {INPUT_NAME: input_tensor.numpy()})[0]
-        np.testing.assert_allclose(ort_output, python_output, rtol=0, atol=1e-5)
+        validate_features(python_output, ort_output, label=case_name)
         input_path = tmp_path / f"{case_name}.input.sxt"
         expected_path = tmp_path / f"{case_name}.expected.sxt"
         _write_tensor(input_path, input_tensor.numpy())
