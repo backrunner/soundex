@@ -31,16 +31,19 @@ def preprocess(
     *,
     data_root: Path | None = None,
     reuse_existing: bool = False,
+    corpus: str = CORPUS,
 ) -> Path:
     """Record source metadata and split groups before creating codec variants."""
     if (catalog is None) == (data_root is None):
         raise ValueError("provide exactly one catalog or audio directory")
     records, catalog_hash = (
-        load_catalog(catalog) if catalog is not None else scan_audio_directory(data_root)
+        load_catalog(catalog, corpus=corpus)
+        if catalog is not None
+        else scan_audio_directory(data_root, corpus=corpus)
     )
     recipe = load_recipe_from_profile(config)
-    policy = recipe.split_policy(CORPUS)
-    with DatasetPublisher(output, CORPUS, recipe, reuse_existing=reuse_existing) as publisher:
+    policy = recipe.split_policy(corpus)
+    with DatasetPublisher(output, corpus, recipe, reuse_existing=reuse_existing) as publisher:
         if publisher.reused:
             rows = load_manifest(publisher.target / "manifest.jsonl")
             if any(row.get("catalog_sha256") != catalog_hash for row in rows):
@@ -51,11 +54,11 @@ def preprocess(
         for record in records:
             # A version/work group stays together even when represented by multiple recordings.
             group = record["source_metadata"]["split_group"]
-            split = assign_hashed_split(f"{CORPUS}:{group}", recipe.seed, policy)
+            split = assign_hashed_split(f"{corpus}:{group}", recipe.seed, policy)
             generated = process_mixture_file(
                 record["audio"],
                 publisher,
-                corpus=CORPUS,
+                corpus=corpus,
                 corpus_version=f"audio-catalog-{catalog_hash[:16]}",
                 track_id=record["track_id"],
                 split=split,
@@ -96,6 +99,7 @@ def main() -> None:
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--reuse-existing", action="store_true")
+    parser.add_argument("--corpus", choices=(CORPUS, "speech_library"), default=CORPUS)
     args = parser.parse_args()
     print(
         preprocess(
@@ -104,6 +108,7 @@ def main() -> None:
             args.config,
             data_root=args.data_root,
             reuse_existing=args.reuse_existing,
+            corpus=args.corpus,
         )
     )
 

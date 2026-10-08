@@ -14,6 +14,7 @@ import torch
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, Subset, WeightedRandomSampler
 
 from data.protocol import MANIFEST_NAME, load_manifest, validate_manifest_rows
+from data.sampling_weights import recording_weights
 
 
 class SoundExDataset(Dataset):
@@ -29,6 +30,7 @@ class SoundExDataset(Dataset):
         source_name: str = "unknown",
         seed: int = 42,
         audit: bool = False,
+        balance_recordings: bool = False,
     ) -> None:
         manifest_path = Path(manifest)
         if manifest_path.is_dir():
@@ -54,7 +56,12 @@ class SoundExDataset(Dataset):
         self.source_name = source_name
         self.seed = seed
         self.epoch = 0
-        self.sampling_weights = [float(row.get("sampling_weight", 1.0)) for row in self.rows]
+        self.balance_recordings = balance_recordings
+        self.sampling_weights = (
+            recording_weights(self.rows)
+            if balance_recordings
+            else [float(row.get("sampling_weight", 1.0)) for row in self.rows]
+        )
 
     def __len__(self) -> int:
         return len(self.rows)
@@ -137,6 +144,7 @@ class SoundExDataset(Dataset):
                 "cutoff_hz": float(row["measured_cutoff_hz"]),
                 "crop_start_sample": start,
                 "held_out": bool(row["held_out"]),
+                "genre": str(row.get("source_metadata", {}).get("genre", "unlabeled")),
             },
         }
 
@@ -233,6 +241,7 @@ def build_source_datasets(
     split: str,
     augment: bool,
     seed: int,
+    balance_recordings: bool = False,
 ) -> list[tuple[DatasetSourceSpec, SoundExDataset]]:
     """Load non-empty manifest datasets for one split."""
     built: list[tuple[DatasetSourceSpec, SoundExDataset]] = []
@@ -246,6 +255,7 @@ def build_source_datasets(
                 augment=augment,
                 source_name=source.name,
                 seed=seed,
+                balance_recordings=balance_recordings,
             )
         except ValueError as exc:
             print(f"  Skipping {source.label} ({split}): {exc}")
@@ -277,6 +287,8 @@ def _sampling_weights(dataset: Dataset) -> list[float]:
     if isinstance(dataset, SoundExDataset):
         return dataset.sampling_weights
     if isinstance(dataset, Subset):
+        if isinstance(dataset.dataset, SoundExDataset) and dataset.dataset.balance_recordings:
+            return recording_weights([dataset.dataset.rows[int(i)] for i in dataset.indices])
         parent = _sampling_weights(dataset.dataset)
         return [parent[int(index)] for index in dataset.indices]
     return [1.0] * len(dataset)
@@ -318,7 +330,12 @@ def create_balanced_dataloaders(
         split="train",
         augment=True,
         seed=seed,
+        balance_recordings=bool(sampling.get("recording_balance", False)),
     )
+    required = {name for name, ratio in train_ratios_cfg.items() if float(ratio) > 0}
+    missing = required - {spec.name for spec, _ in train_parts}
+    if missing:
+        raise ValueError(f"positive training sources are missing: {sorted(missing)}")
     train_subsets: list[Dataset] = []
     train_meta: list[tuple[str, str, int, float]] = []  # name, kind, n, ratio
 
@@ -440,6 +457,12 @@ def create_balanced_dataloaders(
         augment=False,
         seed=seed,
     )
+    required_val = {
+        name for name, ratio in (val_ratios_cfg or train_ratios_cfg).items() if float(ratio) > 0
+    }
+    missing_val = required_val - {spec.name for spec, _ in val_parts}
+    if missing_val:
+        raise ValueError(f"positive validation sources are missing: {sorted(missing_val)}")
     val_specs = [spec for spec, _ in val_parts]
     val_ratios = _normalize_ratios(val_specs, val_ratios_cfg or train_ratios_cfg)
     val_subsets: list[Dataset] = []

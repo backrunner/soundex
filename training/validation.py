@@ -41,7 +41,8 @@ def aggregate_validation_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
         normalized.append({**row, "row_id": str(row["row_id"]), "metrics": metrics})
 
     strata: dict[str, dict[str, dict[str, Any]]] = {}
-    for field_name in _STRATUM_FIELDS:
+    optional_fields = ("genre",) if all("genre" in row for row in normalized) else ()
+    for field_name in (*_STRATUM_FIELDS, *optional_fields):
         grouped: dict[str, list[dict[str, Any]]] = {}
         for row in normalized:
             if field_name not in row:

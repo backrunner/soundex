@@ -91,6 +91,27 @@ def test_different_albums_can_share_recording_filenames(tmp_path: Path) -> None:
     assert len({row["track_id"] for row in records}) == 2
 
 
+def test_dotted_work_numbers_do_not_collapse_recording_ids(tmp_path: Path) -> None:
+    for index in range(2):
+        sf.write(
+            tmp_path / f"Bach-Bwv.988-{index:02d}.flac",
+            np.ones(1600) * (0.1 + index * 0.1),
+            16000,
+        )
+    records, _ = scan_audio_directory(tmp_path)
+    assert len(records) == 2
+    assert len({row["track_id"] for row in records}) == 2
+
+
+def test_lossy_content_cannot_be_hidden_by_a_wav_extension(tmp_path: Path) -> None:
+    audio = tmp_path / "fake-master.wav"
+    sf.write(audio, np.sin(np.arange(1600)) * 0.1, 16000, format="OGG", subtype="VORBIS")
+    catalog = tmp_path / "catalog.jsonl"
+    catalog.write_text(json.dumps({"id": "fake-master", "path": audio.name}) + "\n")
+    with pytest.raises(ValueError, match="lossless PCM/FLAC"):
+        load_catalog(catalog)
+
+
 @pytest.mark.parametrize("channels", [1, 2])
 def test_library_publishes_source_metadata_and_grouped_codec_pairs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, channels: int

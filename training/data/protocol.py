@@ -24,7 +24,7 @@ RECIPE_NAME = "recipe.json"
 SUMMARY_NAME = "summary.json"
 SPLITS = ("train", "validation", "test")
 LEGACY_CORPORA = ("musdb18_hq", "slakh2100", "medleydb")
-CORPORA = (*LEGACY_CORPORA, "music_library")
+CORPORA = (*LEGACY_CORPORA, "music_library", "speech_library")
 
 
 class DataProtocolError(ValueError):
@@ -132,6 +132,7 @@ def validate_data_config(data_config: Mapping[str, Any]) -> DataRecipe:
         "medleydb_path",
         "babyslakh_path",
         "music_library_path",
+        "speech_library_path",
         "sampling",
         "recipe",
     }
@@ -159,8 +160,11 @@ def _validate_sampling(value: Any) -> None:
         "max_val_samples",
         "validation_source_quotas",
         "samples_per_epoch",
+        "recording_balance",
     }
     sampling = _strict_keys(value, "data.sampling", allowed)
+    if "recording_balance" in sampling and not isinstance(sampling["recording_balance"], bool):
+        raise DataProtocolError("data.sampling.recording_balance: must be a boolean")
     strategy = str(sampling.get("strategy", "weighted"))
     if strategy not in {"weighted", "concat_subsample"}:
         raise DataProtocolError(f"data.sampling.strategy: unsupported value {strategy!r}")

@@ -481,6 +481,16 @@ def test_validation_source_quota_is_exact_and_fails_closed(
 
     assert summary["validation_source_counts"] == {"musdb18_hq": 1}
     assert summary["validation_row_ids"] == ["row-quota-validation"]
+    missing_sampling = {**sampling, "train_ratios": {"musdb18_hq": 0.8, "slakh2100": 0.2}}
+    with pytest.raises(ValueError, match=r"positive training sources are missing.*slakh2100"):
+        create_balanced_dataloaders(
+            [source],
+            batch_size=1,
+            segment_length=128,
+            sample_rates=recipe.sample_rates,
+            num_workers=0,
+            sampling_config=missing_sampling,
+        )
     sampling["validation_source_quotas"]["musdb18_hq"] = 2
     with pytest.raises(ValueError, match="quota 2 exceeds 1 rows"):
         create_balanced_dataloaders(

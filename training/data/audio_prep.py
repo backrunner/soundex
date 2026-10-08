@@ -15,8 +15,10 @@ import numpy as np
 import soundfile as sf
 
 try:
+    from .input_audio import lossless_source_info
     from .protocol import CodecSpec, DataProtocolError, DataRecipe, DatasetPublisher, sha256_file
 except ImportError:
+    from input_audio import lossless_source_info
     from protocol import CodecSpec, DataProtocolError, DataRecipe, DatasetPublisher, sha256_file
 
 AudioArray = np.ndarray
@@ -46,9 +48,10 @@ def load_audio(path: Path, target_sr: int) -> AudioArray:
     path = Path(path)
     if not path.is_file():
         raise FileNotFoundError(path)
+    lossless_source_info(path)
     audio, sample_rate = sf.read(str(path), dtype="float32", always_2d=True)
-    if audio.shape[1] > 2:
-        audio = audio[:, :2]
+    if not np.isfinite(audio).all():
+        raise ValueError(f"clean audio contains non-finite samples: {path}")
     if sample_rate == target_sr:
         return np.ascontiguousarray(audio, dtype=np.float32)
     ffmpeg = shutil.which("ffmpeg")
@@ -76,8 +79,8 @@ def load_audio(path: Path, target_sr: int) -> AudioArray:
         raise DataProtocolError(
             f"resample failed for {path}: got {actual_rate} Hz, expected {target_sr}"
         )
-    if audio.shape[1] > 2:
-        audio = audio[:, :2]
+    if audio.shape[1] not in (1, 2) or not np.isfinite(audio).all():
+        raise DataProtocolError(f"resampled audio must be finite mono/stereo: {path}")
     return np.ascontiguousarray(audio, dtype=np.float32)
 
 
@@ -391,7 +394,7 @@ def process_mixture_file(
             degraded = encoder(clean, sample_rate, codec)
             try:
                 aligned = align_codec_pair(clean, degraded, sample_rate, recipe)
-            except CodecAlignmentError as exc:
+            except (CodecAlignmentError, SilentAudioError) as exc:
                 rejected_codecs.append(
                     {
                         "track_id": track_id,

@@ -1,5 +1,6 @@
 """Silent crops and mono-derived side channels must not abort corpus preparation."""
 
+import json
 from dataclasses import replace
 from pathlib import Path
 
@@ -64,3 +65,25 @@ def test_silent_pair_errors_are_distinct_from_corrupt_audio() -> None:
         with pytest.raises(DataProtocolError, match=message) as caught:
             validate_pair_samples(silence, degraded)
         assert not isinstance(caught.value, SilentAudioError)
+
+
+def test_wholly_silent_source_is_audited_without_aborting_preparation(tmp_path: Path) -> None:
+    recipe = load_recipe_from_profile(Path(__file__).resolve().parents[1] / "configs/default.yaml")
+    recipe = replace(recipe, sample_rates=(44100,), codecs=(recipe.codecs[0],))
+    source = tmp_path / "silence.wav"
+    sf.write(source, np.zeros((1024, 1), dtype=np.float32), 44100, subtype="FLOAT")
+    with DatasetPublisher(tmp_path / "processed", "slakh2100", recipe) as publisher:
+        rows = process_mixture_file(
+            source,
+            publisher,
+            corpus="slakh2100",
+            corpus_version="fixture",
+            track_id="slakh2100:silent-fixture",
+            split="train",
+            recipe=recipe,
+            encoder=lambda audio, sample_rate, codec: audio.copy(),
+        )
+        assert not rows
+        audits = list((publisher.staging / "rejections").glob("*.json"))
+        assert len(audits) == 1
+        assert "silent" in json.loads(audits[0].read_text())[0]["reason"]

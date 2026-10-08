@@ -47,6 +47,7 @@ def get_device() -> torch.device:
 _DATASET_PATH_KEYS = (
     ("slakh2100_path", "Slakh2100"),
     ("music_library_path", "Music library"),
+    ("speech_library_path", "Speech library"),
 )
 
 # Environment overrides for data.* paths (Docker / operators).
@@ -56,6 +57,7 @@ _PATH_ENV_OVERRIDES = (
     ("MEDLEYDB_PATH", "medleydb_path"),
     ("BABYSLAKH_PATH", "babyslakh_path"),
     ("MUSIC_LIBRARY_PATH", "music_library_path"),
+    ("SPEECH_LIBRARY_PATH", "speech_library_path"),
 )
 
 
@@ -87,6 +89,7 @@ def apply_data_path_overrides(
             "medleydb": "medleydb_path",
             "babyslakh": "babyslakh_path",
             "music-library": "music_library_path",
+            "speech-library": "speech_library_path",
         }
         if isinstance(datasets, dict):
             for name, value in datasets.items():
@@ -111,6 +114,7 @@ _SOURCE_META = {
     "medleydb_path": ("medleydb", "MedleyDB", "real"),
     "babyslakh_path": ("babyslakh", "BabySlakh", "synthetic"),
     "music_library_path": ("music_library", "Music library", "real"),
+    "speech_library_path": ("speech_library", "Speech library", "real"),
 }
 
 
@@ -440,6 +444,11 @@ def validate(
                     "quality": quality_label(codec_mode, codec_setting),
                     "sample_rate": int(_metadata_value(metadata, "sample_rate", row_index)),
                     "channel_role": str(_metadata_value(metadata, "channel_role", row_index)),
+                    "genre": (
+                        str(_metadata_value(metadata, "genre", row_index))
+                        if "genre" in metadata
+                        else "unlabeled"
+                    ),
                     "metrics": {
                         name: float(value.detach().cpu()) for name, value in row_losses.items()
                     },

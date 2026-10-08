@@ -5,17 +5,19 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
-import soundfile as sf
-
+from data.input_audio import lossless_source_info
 from data.protocol import canonical_track_id, sha256_file
 
-AUDIO_EXTENSIONS = frozenset({".wav", ".flac", ".aif", ".aiff", ".ogg", ".mp3"})
+AUDIO_EXTENSIONS = frozenset({".wav", ".flac", ".aif", ".aiff", ".w64", ".caf"})
 
 
-def _bind_records(entries: list[dict[str, Any]], root: Path) -> tuple[list[dict[str, Any]], str]:
+def _bind_records(
+    entries: list[dict[str, Any]], root: Path, corpus: str = "music_library"
+) -> tuple[list[dict[str, Any]], str]:
     records: list[dict[str, Any]] = []
     identities: set[str] = set()
     checksums: set[str] = set()
@@ -26,8 +28,11 @@ def _bind_records(entries: list[dict[str, Any]], root: Path) -> tuple[list[dict[
             raise ValueError("catalog entry requires an audio path")
         # Album folders often contain the same basename (e.g. track01.wav).
         identity_hash = hashlib.sha256(entry["id"].encode()).hexdigest()[:16]
-        identity = f"{Path(entry['id']).stem}-{identity_hash}"
-        track_id = canonical_track_id("music_library", identity)
+        # canonical_track_id applies Path.stem again. Remove punctuation before
+        # appending the hash so dots in work numbers cannot discard uniqueness.
+        stem = re.sub(r"[^a-zA-Z0-9]+", "-", Path(entry["id"]).stem).strip("-")
+        identity = f"{stem}-{identity_hash}"
+        track_id = canonical_track_id(corpus, identity)
         if track_id in identities:
             raise ValueError("catalog contains duplicate recording IDs")
         identities.add(track_id)
@@ -35,9 +40,7 @@ def _bind_records(entries: list[dict[str, Any]], root: Path) -> tuple[list[dict[
         checksum = sha256_file(audio)
         if entry.get("audio_sha256") and entry["audio_sha256"] != checksum:
             raise ValueError("catalog source audio checksum mismatch")
-        info = sf.info(audio)
-        if info.channels not in {1, 2} or info.frames == 0:
-            raise ValueError("recordings require nonempty mono/stereo audio")
+        info = lossless_source_info(audio)
         metadata = {key: value for key, value in entry.items() if key not in {"id", "path"}}
         if entry.get("evidence_path"):
             evidence_hash = sha256_file(root / entry["evidence_path"])
@@ -73,16 +76,18 @@ def _bind_records(entries: list[dict[str, Any]], root: Path) -> tuple[list[dict[
     return records, hashlib.sha256(canonical.encode()).hexdigest()
 
 
-def load_catalog(path: Path) -> tuple[list[dict[str, Any]], str]:
+def load_catalog(path: Path, *, corpus: str = "music_library") -> tuple[list[dict[str, Any]], str]:
     """Only id/path are required; source, license and attribution fields are optional."""
     entries = [
         json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
     ]
-    return _bind_records(entries, path.parent)
+    return _bind_records(entries, path.parent, corpus)
 
 
-def scan_audio_directory(root: Path) -> tuple[list[dict[str, Any]], str]:
-    """Recursively discover recordings; identical files share a split and are deduplicated."""
+def scan_audio_directory(
+    root: Path, *, corpus: str = "music_library"
+) -> tuple[list[dict[str, Any]], str]:
+    """Discover lossless targets; their original mastering history still needs review."""
     if not root.is_dir():
         raise ValueError(f"audio directory does not exist: {root}")
     entries = [
@@ -90,4 +95,4 @@ def scan_audio_directory(root: Path) -> tuple[list[dict[str, Any]], str]:
         for path in sorted(root.rglob("*"))
         if path.is_file() and path.suffix.lower() in AUDIO_EXTENSIONS
     ]
-    return _bind_records(entries, root)
+    return _bind_records(entries, root, corpus)
