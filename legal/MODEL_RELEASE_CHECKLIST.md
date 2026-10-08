@@ -12,6 +12,10 @@ restoration releases.
 - [ ] Record random initialization or every approved resume/parent checkpoint.
 - [ ] Record config, software commit, audio/catalog/manifest hashes and split groups.
 - [ ] Verify source grants, composition/recording rights, attribution and modifications.
+- [ ] Resolve the [documented Slakh MIDI/rendering source gaps](WEIGHT_LICENSE_REVIEW.md)
+      for the actual included tracks; a dataset license label alone is insufficient.
+- [ ] Inspect silence and unrelated held-out input outputs for retained training works;
+      account for any upstream protected material in the actual artifact.
 - [ ] Complete [DATA_RIGHTS_REVIEW.template.json](DATA_RIGHTS_REVIEW.template.json)
       with a real reviewer/date and the exact artifact/checkpoint/manifest bindings.
 

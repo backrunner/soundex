@@ -16,6 +16,11 @@ The historical MUSDB candidate has 806,276 parameters and an approximately
 but is an unpublished research experiment excluded from the application-ready
 release route. Changing this policy does not relicense its training sources.
 
+The non-MUSDB real-source smoke is also unpublished: its Slakh MIDI/composition
+rights and complete music-source grants are unresolved. The new large regional
+queue has not trained weights yet. See the hash-bound
+[current license review](../legal/WEIGHT_LICENSE_REVIEW.md).
+
 Official releases require reviewed source grants and initialization under
 [TRAINING_DATA.md](../legal/TRAINING_DATA.md). Source approval, restoration quality,
 listening and real-time runtime/continuity evidence are all required before release.

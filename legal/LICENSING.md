@@ -29,6 +29,10 @@ MUSDB18-HQ 已退出下载、预处理和训练入口。训练不设数据集或
 列出候选曲库和质量特点；[发布清单](MODEL_RELEASE_CHECKLIST.md)说明维护者发布步骤。
 自动校验只核对记录与文件的一致性，实际授权范围由维护者核验。
 
+[本次权重授权核查](WEIGHT_LICENSE_REVIEW.md)记录已有实验的实际来源、哈希和结论。
+目前尚无已完成授权核查的正式恢复权重；Slakh 的底层 MIDI 权利尚待确认，不能把
+数据集 CC BY 4.0 标记直接视为整个训练组合的商用权重授权结论。
+
 ## English scope
 
 Apache-2.0 covers SoundEx source materials and official weights explicitly released

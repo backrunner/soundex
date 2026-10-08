@@ -63,6 +63,10 @@ Useful candidates include the publisher's CC BY 4.0
 [Slakh mixes](https://www.slakh.com/), CC0 recordings, attributable permissive
 recordings, and owned or separately authorized audio. These are suggestions,
 not a fixed training allowlist. Individual grants and acquired versions matter.
+Slakh's dataset grant does not by itself resolve the underlying web-scraped Lakh
+MIDI composition/transcription rights. Slakh stays in the requested training mix;
+its weight-publication rights review remains incomplete. See the concrete
+[existing-weight and source findings](WEIGHT_LICENSE_REVIEW.md).
 
 Record source/manifest/checkpoint hashes and retain optional source metadata for
 release preparation. A completed model card and maintainer rights review identify

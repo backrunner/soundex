@@ -32,3 +32,5 @@ research experiment and is excluded from the application-ready release route.
 Maintainer approval of training provenance and release evidence is a publishing
 workflow, not an additional restriction on downstream Apache-2.0 users. See
 [licensing overview](legal/LICENSING.md) and [training data policy](legal/TRAINING_DATA.md).
+The [current factual audit](legal/WEIGHT_LICENSE_REVIEW.md) records unreleased
+experiments and unresolved source rights; it is not a release approval.
