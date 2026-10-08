@@ -57,10 +57,11 @@ def invoke(run: Path, stage: str, script: Path, *args: str) -> None:
             raise RuntimeError(f"{stage} failed; inspect {stage}.log")
 
 
-def freeze_source(project: Path, run: Path) -> tuple[Path, str]:
+def freeze_source(project: Path, run: Path, source_commit: str = "HEAD") -> tuple[Path, str]:
     """Use a committed source snapshot rather than changing code during a long run."""
     commit = subprocess.check_output(
-        ["git", "-C", str(project), "rev-parse", "HEAD"], text=True
+        ["git", "-C", str(project), "rev-parse", "--verify", source_commit + "^{commit}"],
+        text=True,
     ).strip()
     archive = subprocess.check_output(["git", "-C", str(project), "archive", commit])
     source = run / "source"
@@ -77,8 +78,10 @@ def main() -> None:
     parser.add_argument("--processed-root", type=Path, required=True)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--minimum-tracks", type=int, default=1000)
+    parser.add_argument("--project-root", type=Path)
+    parser.add_argument("--source-commit", default="HEAD")
     args = parser.parse_args()
-    project = Path(__file__).resolve().parents[2]
+    project = (args.project_root or Path(__file__).resolve().parents[2]).resolve()
     run = args.run_dir.resolve()
     run.mkdir(parents=True, exist_ok=False)
     try:
@@ -98,7 +101,7 @@ def main() -> None:
             pcm_seen.add(pcm)
             works_seen.add(work)
             entry["path"] = str((args.catalog.parent / entry["path"]).resolve())
-        training, commit = freeze_source(project, run)
+        training, commit = freeze_source(project, run, args.source_commit)
         sys.path.insert(0, str(training))
         from data.catalog import load_catalog
         from data.protocol import (
@@ -106,6 +109,7 @@ def main() -> None:
             load_manifest,
             load_recipe_from_profile,
             sha256_file,
+            validate_manifest_rows,
         )
         from data.sampling_weights import speech_mix_ratios
 
@@ -129,8 +133,9 @@ def main() -> None:
             version = root / f"{corpus}-{recipe.hash[:16]}"
             if not version.is_dir():
                 raise ValueError(f"missing matching prepared supplement: {corpus}")
-            with DatasetPublisher(root, corpus, recipe, reuse_existing=True):
-                pass
+            with DatasetPublisher(root, corpus, recipe, reuse_existing=True) as publisher:
+                rows = load_manifest(publisher.target / "manifest.jsonl")
+                validate_manifest_rows(rows, publisher.target, recipe=recipe, audit_files=True)
         receipt = {
             "code_commit": commit,
             "music_catalog_sha256": sha256_file(catalog),

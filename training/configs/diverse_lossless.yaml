@@ -52,7 +52,7 @@ data:
   music_library_path: /data/music-library
   recipe:
     schema_version: 1
-    recipe_version: soundex-data-v1
+    recipe_version: soundex-native-lossless-multigenre-20261008-v1
     seed: 42
     sample_rates:
     - 44100
