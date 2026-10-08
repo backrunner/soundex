@@ -10,6 +10,15 @@ Lossy source libraries, including the FMA MP3 packages, are excluded. Transcodin
 MP3/AAC/Vorbis to a PCM container does not create a lossless master. Review upstream
 master provenance in addition to checking the actual local encoding.
 
+The 2026-10-08 source review found an express AI-training prohibition in
+[Loyalty Freak Music's current FAQ](https://loyaltyfreakmusic.com/faq/).
+The new official training selection therefore excludes that creator's material,
+including Monplaisir and Komiku aliases. This is a source-selection decision to
+avoid disputed permissions; it does not conclude that historical CC0 grants were
+revoked. Earlier local catalogs are historical acquisition receipts, not the
+current approved training selection. No weights were trained by the superseded
+743-track run before it was stopped.
+
 MUSDB18 / MUSDB18-HQ have been removed from download/preprocessing/training
 selection because their [publisher](https://sigsep.github.io/datasets/musdb.html)
 limits use to academic purposes. Historical local experiments remain readable;

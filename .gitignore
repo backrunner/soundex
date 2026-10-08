@@ -15,7 +15,8 @@ venv/
 # Training artifacts
 training/checkpoints/
 training/logs/
-training/outputs/
+/training/outputs
+training/.tools/
 *.pth
 *.pt
 

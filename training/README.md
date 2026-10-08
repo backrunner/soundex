@@ -5,6 +5,12 @@ Use Python 3.12 and FFmpeg with the encoders required by your recipe. Install
 PyTorch for your hardware first; see [environment setup](scripts/environment.md)
 for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
+See [workspace layout](../docs/workspace.md) for local raw audio, prepared pairs,
+reports and frozen runs. Source-quality audits use `scripts/audit_library.py`;
+reviewed publisher original-file plans can be acquired with
+`scripts/fetch_archive_masters.py`. Acquisition receipts and source catalogs are
+separate from the final audited training selection.
+
 For a reproducible CPU export/test environment:
 
 ```bash

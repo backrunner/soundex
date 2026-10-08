@@ -1,5 +1,11 @@
 # Native lossless music catalog
 
+**Superseded selection:** the initial 743-track acquisition index below is being
+replaced after full signal-quality review and the discovery of a current express
+AI-training prohibition for the Rrrrrose/Loyalty Freak Music aliases. Do not use
+those entries in the new official run. See [the source review](../../legal/TRAINING_DATA.md).
+The expanded, audited replacement targets approximately 1,000 distinct tracks.
+
 [`native_lossless.jsonl`](native_lossless.jsonl) indexes **743 distinct music
 tracks**, approximately **39.4 hours / 13.5 GB**, acquired and verified on
 2026-10-08. The repository contains the index, not the audio.
