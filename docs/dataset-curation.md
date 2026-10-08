@@ -81,6 +81,13 @@ and useful instrument effects remain available locally.
 
 ## Source and artifact review
 
+The [additional creator-original survey](source-expansion-20261008.md) supplies a
+separate 21-file free WAV plan with jazz-fusion, pop, funk and electronic material.
+Its short country cue is retained but does not inflate full-song coverage. Three
+valid float masters with slight over-unity peaks receive measured common stereo
+gain derivatives rather than being discarded; originals and edits count once.
+Live acquisition/review counts are in `data/reports/oga-original-expansion/`.
+
 Retain primary pages/version receipts and hashes, audio hashes, composition and
 recording basis, credits and identifiable performer/sample restrictions.
 Do not require a separate AI letter for every CC work: [CC's FAQ](https://creativecommons.org/faq/)
@@ -93,6 +100,9 @@ intended Apache-2.0 weight publication. It is not a legal guarantee or an automa
 copyright decision about weights. Review the exact artifact's provenance and
 possible retained source material before release. Audio keeps its upstream terms
 and is not bundled with the Apache model.
+The whole planned training combination is not yet approved for weight publication:
+the [concrete Slakh MIDI/rendering review](../legal/WEIGHT_LICENSE_REVIEW.md) remains
+incomplete. Source-reviewed music counts do not imply a released-model rights approval.
 
 The generic folder/JSONL importer still accepts arbitrary audio and optional rights
 metadata. This profile applies only to the requested regional run and adds no

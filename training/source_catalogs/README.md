@@ -72,3 +72,18 @@ Recordings retain their individual publisher grants; Apache-2.0 does not relicen
 third-party audio. Preserve credits, source links, licenses and change descriptions.
 The index preserves source declarations and verified acquired versions. Official
 trained-weight publication uses the separate [artifact review](../../legal/TRAINING_DATA.md).
+
+## Additional creator-original WAV plan
+
+[`oga_originals_plan.jsonl`](oga_originals_plan.jsonl) adds a separate 21-file
+first-party acquisition plan: Zane Little and Lennartmusic, with selected CC0
+grants. It includes at most 20 distinct music works and one short country cue.
+It is a plan, not an addition to the 360 verified entries above. See the
+[source survey and measured float-master repair](../../docs/source-expansion-20261008.md).
+Download progress, native full-frame audits and source reviews are recorded locally.
+All 21 publisher originals have now been acquired and decoded;
+[`oga_originals_verified.jsonl`](oga_originals_verified.jsonl) contains their actual
+hashes and original measurements. Three FLOAT originals need the documented gain
+derivatives, and the country cue stays outside full-song counts. The new source
+assessment adds 20 distinct music works to the local reviewed pool, bringing it
+to 169; the 1,000-work regional selection and Slakh weight-rights review remain incomplete.
