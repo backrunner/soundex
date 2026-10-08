@@ -35,9 +35,9 @@ soundex/                          # Cargo workspace root
 │   │   └── default.yaml
 │   ├── data/
 │   │   ├── audio_prep.py         # 共享 MP3 降质 / 切片
-│   │   ├── preprocess_musdb.py   # MUSDB18-HQ 整轨 mixture
+│   │   ├── preprocess_library.py # 音频目录或可选清单，压缩生成训练对
 │   │   ├── preprocess_slakh.py   # Slakh2100 整轨 mix（忽略 stems）
-│   │   ├── preprocess_medleydb.py# MedleyDB 整轨 *_MIX（忽略分轨）
+│   │   ├── preprocess_medleydb.py# 历史数据工具，不进入正式发布训练
 │   │   └── dataset.py            # PyTorch Dataset
 │   ├── models/
 │   │   ├── generator.py          # 生成器网络

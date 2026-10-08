@@ -113,7 +113,7 @@
 2. **不集成音频播放**：不包含任何音频 I/O 设备交互
 3. **模型格式**：仅支持 ONNX（通过 ort 推理）
 4. **开源协议**：Apache 2.0，训练数据集需兼容此协议
-5. **数据与许可**：训练使用全带无损整轨缩混（MUSDB mixture / Slakh mix / MedleyDB MIX），不用分轨；MUSDB 研究用途、Slakh CC BY 4.0、MedleyDB CC BY-NC，商用权重需分别核验
+5. **数据与许可**：训练使用 Slakh mix 与通用音频目录，通过压缩合成训练对，不依赖分轨标签；MUSDB 入口移除，不设训练许可白名单，扩充曲风、乐器、瞬态和声场覆盖，正式发布时核对授权。正式权重采用 Apache-2.0，支持其他开源软件集成和分发；见 legal/TRAINING_DATA.md。
 
 ## API 设计草案
 

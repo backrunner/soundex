@@ -37,10 +37,10 @@ SoundEx 是一个用 Rust 编写的实时音频音质增强库，通过轻量化
 ### 训练框架
 
 - PyTorch 2.x + torchaudio
-- 数据：MUSDB18-HQ + Slakh2100 + MedleyDB（仅整轨缩混 mixture，不用分轨）
+- 数据：Slakh2100 整轨 mix + 通用音频目录；扩充各种音频模式，压缩生成训练对
 - 代码许可：Apache-2.0（LICENSE）
-- 权重许可：SoundEx Model Weights License 1.0 + Tier A/B/C（MODEL_WEIGHTS_LICENSE.md、legal/）
-- 第三方数据：NOTICE；默认多数据集合训 → Tier C
+- 正式发布权重：Apache-2.0，可供其他开源项目集成、分发、修改和商用；MODEL_WEIGHTS_LICENSE.md 说明适用范围
+- 第三方数据：legal/TRAINING_DATA.md 与 NOTICE；MUSDB 入口移除，训练不设许可白名单，正式发布时核对实际授权；历史 MUSDB checkpoint 留作研究记录
 - 导出：PyTorch → ONNX
 
 ### Rust 核心依赖

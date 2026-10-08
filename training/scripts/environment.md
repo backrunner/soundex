@@ -115,9 +115,9 @@ cd training
 docker build -t soundex-train .
 # or: docker compose build
 
-# Auto-download MUSDB (prune stems) + preprocess + train
+# Download Slakh rendered mixes + preprocess + train
 docker run --gpus all -v /data:/data \
-  -e DOWNLOAD_DATASETS=musdb18-hq \
+  -e DOWNLOAD_DATASETS=slakh2100 \
   soundex-train
 
 # Custom storage + cache paths (bind-mount each host dir)
@@ -126,14 +126,13 @@ docker run --gpus all \
   -v /mnt/scratch:/scratch \
   -e DATA_ROOT=/datasets \
   -e CACHE_DIR=/scratch/soundex-cache \
-  -e MUSDB18_HQ_PATH=/datasets/musdb \
   -e SLAKH2100_PATH=/datasets/slakh \
-  -e DOWNLOAD_DATASETS=musdb18-hq,slakh2100 \
+  -e DOWNLOAD_DATASETS=slakh2100 \
   soundex-train
 
 # Data only
 docker run --gpus all -v /data:/data \
-  -e DOWNLOAD_DATASETS=musdb18-hq -e RUN_TRAIN=0 \
+  -e DOWNLOAD_DATASETS=slakh2100 -e RUN_TRAIN=0 \
   soundex-train
 ```
 
@@ -143,9 +142,8 @@ docker run --gpus all -v /data:/data \
 |-----------------|--------|
 | `DATA_ROOT` / `--data-root` | Default parent for dataset folders |
 | `CACHE_DIR` / `--cache-dir` | Where zip/tar archives are downloaded |
-| `MUSDB18_HQ_PATH` / `--musdb18-hq-path` | MUSDB extract + `processed/` root |
 | `SLAKH2100_PATH` / `--slakh2100-path` | Slakh extract + `processed/` root |
-| `MEDLEYDB_PATH` / `--medleydb-path` | MedleyDB root |
+| `MUSIC_LIBRARY_PATH` | Generic audio-library processed-data root |
 | `--path NAME=DIR` | Same as per-dataset path (repeatable) |
 | `PATHS_MANIFEST` | YAML written by downloader; read by `train.py` |
 
@@ -153,8 +151,13 @@ Priority for dataset storage: **CLI `--path` / dedicated flags → env `*_PATH` 
 `train.py` priority: **env `*_PATH` → paths manifest → config YAML**.
 
 Entrypoint: `scripts/entrypoint.sh`  
-Downloader: `scripts/download_datasets.py` (mix-only for Slakh; prune for MUSDB)  
+Downloader: `scripts/download_datasets.py` (Slakh mix-only; MUSDB removed)
 Host needs a compatible NVIDIA driver + `nvidia-container-toolkit`.
+
+The default recipe requires FFmpeg encoders `libmp3lame`, `aac` and `libvorbis`.
+Check `ffmpeg -hide_banner -encoders`; some macOS builds omit `libvorbis`.
+Use a complete FFmpeg build on `PATH`. Preprocessing reports missing encoders
+before generating pairs; do not silently remove codec strata from a recipe.
 
 ## Dependency notes
 
@@ -162,7 +165,6 @@ Host needs a compatible NVIDIA driver + `nvidia-container-toolkit`.
 |---------|------|-------------------------|
 | numpy | arrays | Use ≥1.26; 2.x OK with torch 2.12 |
 | soundfile / ffmpeg | I/O + MP3 degrade | Independent of CUDA |
-| musdb | optional parser dep | Pure Python; not required if you only use our preprocess scripts |
 | onnx / onnxruntime | export + verify | CPU onnxruntime fine for checks |
 | tensorboard | logs | Fine on 3.12 |
 

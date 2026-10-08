@@ -179,7 +179,6 @@ soundfile>=0.12.0
 audioread>=3.0.0
 
 # Data
-musdb>=0.5.0
 
 # Training
 pyyaml>=6.0

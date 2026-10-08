@@ -190,11 +190,11 @@ InvertedResidual(ch, expand_ratio=4):
 
 | 数据集 | 用途 | 采样率 | 规模 | 许可 | 使用内容 |
 |--------|------|--------|------|------|----------|
-| MUSDB18-HQ | 真实音乐 | 44.1kHz WAV | 150首/~10h | 研究用途 | 仅 `mixture.wav` |
+| 通用音频目录 | 真实音乐 | 优先原始无损；兼容低采样率素材 | 按录入结果统计 | 可选来源元数据；发布前核对 | directory / optional catalog |
 | Slakh2100 | 合成音乐扩量 | 44.1kHz FLAC | 2100曲/~145h | CC BY 4.0 | 仅 `mix.flac` |
-| MedleyDB | 真实多轨缩混 | 44.1kHz WAV | 百曲级 | CC BY-NC | 仅 `*_MIX.wav` |
+| 来源限制 | MUSDB 入口移除；训练不设许可白名单，发布时核对用途授权 | 详见 legal/TRAINING_DATA.md | — | — | — |
 
-分轨/stems 一律不进入训练；clean 目标必须是全带无损缩混。
+训练不依赖分轨/stems 标签；优先全带无损缩混作 clean 目标，其他素材按实际带宽记录，避免误作全带恢复证据。
 
 ### 数据预处理 Pipeline
 
@@ -237,9 +237,8 @@ audio:
   hop_size: 512
 
 data:
-  musdb18_hq_path: /data/musdb18-hq
+  music_library_path: /data/music-library
   slakh2100_path: /data/slakh2100
-  medleydb_path: /data/medleydb
   recipe:
     schema_version: 1
     sample_rates: [44100, 48000]
