@@ -20,29 +20,25 @@
 | **Release date** | YYYY-MM-DD |
 | **Authors / maintainers** | |
 
-## 2. License (weights — not software)
+## 2. License and source approval
 
 | Field | Value |
-|-------|--------|
-| **Weight license** | SoundEx Model Weights License 1.0 |
-| **License file** | [`MODEL_WEIGHTS_LICENSE.md`](../MODEL_WEIGHTS_LICENSE.md) |
-| **Weight Tier (required)** | `SoundEx-Weights-Tier-A-BY-1.0` **or** `…-Tier-B-NC-SA-1.0` **or** `…-Tier-C-Research-1.0` |
-| **SPDX-style id** | `LicenseRef-SoundEx-Model-Weights-1.0` + tier id above |
-| **Software license** | Apache-2.0 (does **not** apply to this weight file) |
+|-------|-------|
+| **Weight license** | Apache-2.0 |
+| **License file** | LICENSE |
+| **Data rights review / SHA-256** | path/to/completed-rights-review.json + SHA-256 |
+| **Software license** | Apache-2.0 |
 
-**Human-readable grant summary (pick the tier you declared):**
-
-- **Tier A:** Use and redistribution allowed, including commercial, with attribution.  
-- **Tier B:** Non-commercial use and redistribution only; share-alike for derivatives; attribution required.  
-- **Tier C:** Non-commercial research / evaluation only; redistribution limited as in the weight license.
+Official weights permit application use, redistribution, adaptation and commercial
+use under Apache-2.0. Complete the rights review for the exact artifact and source
+checkpoint before publishing; see [training data policy](../legal/TRAINING_DATA.md).
 
 ## 3. Training data bill-of-materials
 
 | Dataset | Snapshot / version | Approx. duration | Split role | Upstream license | Mix-only? |
 |---------|-------------------|------------------|------------|------------------|-----------|
-| e.g. MUSDB18-HQ | 2019 HQ | ~10 h | train/validation/test | Research-only | yes (`mixture.wav`) |
-| e.g. Slakh2100 | flac_redux | ~145 h | train/validation/test | CC BY 4.0 | yes (`mix.*`) |
-| e.g. MedleyDB | V1+V2 | ~… h | train/validation/test | CC BY-NC-SA | yes (`*_MIX.wav`) |
+| e.g. Slakh2100 | official redux | measured | train/validation/test | CC BY 4.0 | yes (`mix.*`) |
+| e.g. music library | catalog SHA-256 | measured | train/validation/test | actual per-source grants | yes |
 
 | Data protocol field | Value |
 |---------------------|-------|
@@ -70,7 +66,7 @@
 - The deployed model processes channels independently even though training includes
   post-codec left/right/mid/side examples; joint-stereo coherence still requires evaluation.  
 - Dataset bias (genre, synthetic vs live, Western popular music skew).  
-- Weight Tier may prohibit commercial deployment — check Section 2.
+- Genre and source bandwidth coverage require measured evaluation.
 
 ## 6. Evaluation (required for release)
 
@@ -99,11 +95,10 @@ machine gates. ViSQOLAudio and the listening record may not be silently omitted.
 ## 7. Attribution (copy into redistributions)
 
 ```text
-SoundEx Model Weights ([TIER_ID])
+SoundEx Model Weights
 Copyright [YEAR] SoundEx Contributors
-Licensed under the SoundEx Model Weights License 1.0
-(MODEL_WEIGHTS_LICENSE.md). This file is NOT Apache-2.0.
-Training data attributions: see Section 3 of this Model Card and NOTICE.
+Licensed under Apache License 2.0 (LICENSE).
+Training-source credits and modifications: see this model card and NOTICE.
 ```
 
 ## 8. Contact
@@ -113,7 +108,8 @@ Training data attributions: see Section 3 of this Model Card and NOTICE.
 
 ## 9. Maintainer sign-off
 
-I confirm that the declared Weight Tier is consistent with the training data BOM and `legal/TRAINING_DATA_AND_WEIGHT_TIERS.md`.
+I confirm the data and initialization provenance support the Apache-2.0 release,
+and the signed rights review and release evidence describe this exact artifact.
 
 ```text
 Name: _______________  Date: _______________

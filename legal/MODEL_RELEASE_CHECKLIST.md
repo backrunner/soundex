@@ -1,65 +1,39 @@
-# Model Weights Release Checklist
+# Official weight release checklist
 
-Use this checklist before publishing any learned SoundEx checkpoint or ONNX file (official or community release that claims a SoundEx Weight Tier).
+Official releases use Apache-2.0 and support application integration, redistribution
+and commercial use. This is a maintainer workflow, not extra end-user license terms.
+Synthetic identity test graphs already use the software license and are not learned
+restoration releases.
 
-Synthetic test graphs without learned parameters are Apache-2.0 software fixtures;
-this learned-weight release checklist does not apply to them.
+## 1. Rights and training provenance
 
-## A. Training provenance
+- [ ] Publication grants for training/validation sources satisfy [TRAINING_DATA.md](TRAINING_DATA.md).
+- [ ] Source and parent/teacher grants support application use, redistribution and commercial use; resolve missing or incompatible permissions before release.
+- [ ] Record random initialization or every approved resume/parent checkpoint.
+- [ ] Record config, software commit, audio/catalog/manifest hashes and split groups.
+- [ ] Verify source grants, composition/recording rights, attribution and modifications.
+- [ ] Complete [DATA_RIGHTS_REVIEW.template.json](DATA_RIGHTS_REVIEW.template.json)
+      with a real reviewer/date and the exact artifact/checkpoint/manifest bindings.
 
-- [ ] Record git commit hash of the Software used to train and export
-- [ ] Record training config path(s) and any CLI overrides
-- [ ] List **every** dataset that contributed clean or degraded pairs
-- [ ] Confirm only **full-track mixes** were used (no stems / RAW / MIDI audio)
-- [ ] Estimate training hours / steps / epochs for the Model Card
-- [ ] Note random seed(s) if reproducibility is claimed
+## 2. Model and evidence
 
-## B. Tier selection
+- [ ] Complete [MODEL_CARD.template.md](../models/MODEL_CARD.template.md); license is `Apache-2.0`.
+- [ ] ONNX checker, metadata/tensor contract and artifact-bound PyTorch/ORT/Rust
+      [parity budgets](../docs/parity.md) pass.
+- [ ] Immutable validation membership selects the checkpoint; test tracks remain held out.
+- [ ] Rust offline and both arbitrary-chunk evaluations include degraded baselines,
+      per-stratum high/low-band, perceptual/stereo/gate/clipping metrics and 95% CIs.
+- [ ] Canonical release gates, ViSQOLAudio and randomized, level-matched blinded listening pass.
+- [ ] The exact artifact passes 30-minute mono/stereo performance and continuity
+      evidence on named Apple Silicon and x86_64 reference CPUs.
+- [ ] From `training/`, run
+      `python -m evaluation.model_card ARTIFACT CARD REPORT APPLE_PERF_JSON X86_PERF_JSON`.
+      Licensing/provenance and quality/runtime checks must all pass.
 
-- [ ] Apply `legal/TRAINING_DATA_AND_WEIGHT_TIERS.md` matrix
-- [ ] Choose tier **≤ maximum permitted** (stricter is OK)
-- [ ] If MUSDB18-HQ appears in the BOM → **Tier C only**
-- [ ] If MedleyDB appears without MUSDB → at best **Tier B**
-- [ ] If only Slakh2100 (or other Tier-A-approved data) → **Tier A** allowed
-- [ ] Set SPDX-style identifier string in the Model Card
+## 3. Package and publish
 
-## C. Artifacts
-
-- [ ] Weight file(s) (e.g. `soundex-v1.onnx`, checkpoint)
-- [ ] Model Card completed from `models/MODEL_CARD.template.md`
-- [ ] SHA-256 checksum of each weight file recorded in the Model Card
-- [ ] ONNX checker and mandatory PyTorch / ORT / Rust parity passed under [version-2 unit-aware budgets](../docs/parity.md), with policy hash and all per-case metrics
-- [ ] Tensor contract is dynamic batch only and fixed `[B, 2, 1, fft_size / 2 + 1]` FP32 (`129` bins for default 256/128)
-- [ ] Required `soundex.*` metadata matches the schema-1.2 source checkpoint contract; default 256/128 ONNX artifact schema is 1.3
-- [ ] `best-validation.pth` was selected only from immutable validation rows and its validation-manifest hash is recorded
-- [ ] Held-out test evaluation ran the ONNX model through Rust offline and both required chunk patterns
-- [ ] High/low-band, perceptual, stereo, gate, clipping, and chunk-equivalence metrics include degraded baselines and 95% CIs
-- [ ] Versioned release gates pass, including artifact-bound PyTorch / ORT / Rust evidence and ViSQOLAudio
-- [ ] Randomized, level-matched, blinded listening protocol is completed and its anonymized aggregate recorded
-- [ ] The same ONNX artifact passes 30-minute mono/stereo performance evidence on named Apple Silicon and x86_64 reference CPUs
-- [ ] `python -m evaluation.model_card ARTIFACT CARD REPORT APPLE_PERF_JSON X86_PERF_JSON` passes
-- [ ] Copy of or link to `MODEL_WEIGHTS_LICENSE.md` (version 1.0)
-- [ ] Dataset attributions matching `NOTICE`
-
-## D. Legal packaging
-
-- [ ] Do **not** mark weight archives as `Apache-2.0` only
-- [ ] Archive or release notes state: “Software: Apache-2.0; Weights: SoundEx Model Weights License 1.0, Tier X”
-- [ ] `NOTICE` included or linked for third-party data credits
-- [ ] No dataset audio redistributed in the weight archive
-- [ ] Trademark use limited to attribution (no false “official” claims if unofficial)
-
-## E. Distribution channels
-
-- [ ] Git LFS / release asset / Hugging Face / other host updated
-- [ ] README download section points to Model Card + weight license
-- [ ] (If HF) `license` metadata set to a custom/other tag + link to Model Card, not bare Apache-2.0
-
-## F. Sign-off
-
-- [ ] Maintainer name / date
-- [ ] Statement: “I confirm the Weight Tier matches the training data BOM.”
-
-```text
-Signed: __________________  Date: __________
-```
+- [ ] Include weight artifact, full LICENSE, applicable NOTICE, model card and rights review.
+- [ ] Record artifact SHA-256 and download links; host metadata says `apache-2.0`.
+- [ ] Keep dataset audio, private grant documents and optimizer checkpoints out of Git.
+- [ ] Publish only the approved artifact; acknowledge that the model synthesizes
+      plausible content and cannot guarantee recovery of an original recording.

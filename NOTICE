@@ -1,102 +1,21 @@
 SoundEx
 Copyright 2026 BackRunner and SoundEx Contributors
 
-===========================================================================
-1. SOFTWARE
-===========================================================================
+SoundEx source code, documentation, demos and synthetic test graphs are licensed
+under the Apache License, Version 2.0. See LICENSE.
 
-The SoundEx source code and accompanying project materials that are not
-Model Weights are licensed under the Apache License, Version 2.0.
-See the file LICENSE for the full license text.
+Official learned weights explicitly released with an Apache-2.0 model card use
+the same license. See MODEL_WEIGHTS_LICENSE.md for scope. Unreleased experiments
+and third-party checkpoints are not granted a new license by this notice.
 
-SPDX-License-Identifier: Apache-2.0
+Training audio is not distributed with this repository and retains its upstream
+terms. Every official weight release supplies the credits applicable to its actual
+training sources in its accompanying NOTICE and model card. Where Slakh2100 is
+used, credit Ethan Manilow, Gordon Wichern, Prem Seetharaman and Jonathan Le Roux;
+identify Slakh2100-redux, CC BY 4.0, https://www.slakh.com/ and
+https://doi.org/10.5281/zenodo.4599666, and describe preprocessing modifications.
+Other recordings retain their own grants and applicable credits; preserve source metadata.
 
-Synthetic ONNX test fixtures in tests/fixtures/ contain no learned parameters
-and are licensed as Software under Apache-2.0. They are integration tests,
-not pretrained restoration models. See tests/fixtures/README.md.
-
-===========================================================================
-2. MODEL WEIGHTS (SEPARATE LICENSE)
-===========================================================================
-
-Model Weights (neural network parameters, checkpoints, ONNX exports, and
-equivalent artifacts) are NOT licensed under Apache-2.0.
-
-They are licensed under:
-
-    SoundEx Model Weights License, Version 1.0
-    File: MODEL_WEIGHTS_LICENSE.md
-    SPDX-License-Identifier: LicenseRef-SoundEx-Model-Weights-1.0
-
-Each published weight artifact MUST declare a Weight Tier in its Model Card:
-
-    Tier A  SoundEx-Weights-Tier-A-BY-1.0       (attribution; commercial OK)
-    Tier B  SoundEx-Weights-Tier-B-NC-SA-1.0    (non-commercial + share-alike)
-    Tier C  SoundEx-Weights-Tier-C-Research-1.0 (research / evaluation only)
-
-If a weight file is distributed without a Model Card or tier, Tier C applies.
-
-Policy and dataset→tier matrix: legal/TRAINING_DATA_AND_WEIGHT_TIERS.md
-Release checklist:              legal/MODEL_RELEASE_CHECKLIST.md
-Overview:                       legal/LICENSING.md
-Disclaimer:                     legal/DISCLAIMER.md
-
-===========================================================================
-3. THIRD-PARTY TRAINING DATA (NOT REDISTRIBUTED)
-===========================================================================
-
-This repository does not ship dataset audio. Users who train models must
-obtain corpora separately and comply with upstream terms. Dataset licenses
-are independent of both Apache-2.0 and the SoundEx Model Weights License.
-SoundEx preprocessors use full-track mixtures only (no stems).
-
----------------------------------------------------------------------------
-MUSDB18-HQ
----------------------------------------------------------------------------
-  Summary:    Research-oriented terms as published by the MUSDB authors;
-              commercial use and audio redistribution are restricted.
-  Used as:    Clean full-track mixture only (mixture.wav).
-  Weight impact: Any model trained with MUSDB18-HQ must be at least Tier C.
-  More info:  https://sigsep.github.io/datasets/musdb.html
-              https://doi.org/10.5281/zenodo.3338373
-
----------------------------------------------------------------------------
-Slakh2100 / Slakh2100-redux
----------------------------------------------------------------------------
-  Summary:    Creative Commons Attribution 4.0 International (CC BY 4.0).
-  Used as:    Clean full-track rendered mixture only (mix.flac / mix.wav).
-  Weight impact: Slakh-only training may qualify for Tier A (with attribution).
-  More info:  http://www.slakh.com/
-              https://zenodo.org/records/4599666
-
-  Attribution example:
-    "This work uses the Slakh2100 dataset (Manilow et al.), CC BY 4.0."
-
----------------------------------------------------------------------------
-MedleyDB / MedleyDB 2.0
----------------------------------------------------------------------------
-  Summary:    Creative Commons Attribution-NonCommercial-ShareAlike
-              (CC BY-NC-SA). Non-commercial; share-alike for adaptations.
-  Used as:    Clean full-track mix only (*_MIX.wav); STEMS/RAW ignored.
-  Weight impact: MedleyDB in the BOM requires at least Tier B; if combined
-              with MUSDB18-HQ, Tier C.
-  More info:  https://medleydb.weebly.com/
-
-  Attribution example:
-    "This work uses MedleyDB (Bittner et al.), CC BY-NC-SA."
-
-===========================================================================
-4. OTHER THIRD-PARTY COMPONENTS
-===========================================================================
-
-Runtime and build dependencies (for example ONNX Runtime, Rust crates,
-PyTorch when training) remain under their respective licenses as declared
-by those projects. See THIRD_PARTY.md. Linking or using them does not change the SoundEx
-Software or Model Weights licenses above.
-
-===========================================================================
-5. CONTACT
-===========================================================================
-
-For licensing questions about official weight releases, open a project issue
-or contact the maintainers listed in the relevant Model Card.
+Runtime and build dependencies retain their respective licenses. See THIRD_PARTY.md.
+Training-source policy: legal/TRAINING_DATA.md
+License overview: legal/LICENSING.md

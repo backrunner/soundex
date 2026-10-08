@@ -19,6 +19,7 @@ from artifact_contract import (
 from evaluation.gates import evaluate_release_gates, load_gate_config
 from evaluation.performance import check_performance_reports
 from evaluation.reporting import aggregate_metric_rows, sha256_file
+from weight_licensing import check_license_review
 
 _TABLE_FIELD = re.compile(r"^\|\s*\*\*(.+?)\*\*\s*\|\s*(.*?)\s*\|\s*$")
 _REQUIRED_FIELDS = {
@@ -33,7 +34,9 @@ _REQUIRED_FIELDS = {
     "Training config",
     "Release date",
     "Authors / maintainers",
-    "Weight Tier (required)",
+    "Weight license",
+    "License file",
+    "Data rights review / SHA-256",
     "Recipe version / SHA-256",
     "Manifest file(s) / SHA-256",
     "Manifest row and track counts by split",
@@ -96,6 +99,9 @@ def check_release_model_card(
     if card_evaluation_hash != report_sha256:
         raise ValueError("model card evaluation report hash does not match JSON report")
     _validate_artifact_metadata_binding(report, artifact)
+    rights_review_hash = check_license_review(
+        fields, report["artifact"]["metadata"], artifact_sha256, card
+    )
     _validate_evaluation_evidence(report)
     _validate_external_evidence(report)
     if report.get("listening_protocol", {}).get("status") != "recorded":
@@ -113,6 +119,7 @@ def check_release_model_card(
         "evaluation_report_sha256": report_sha256,
         "performance_report_sha256": sorted(performance_hashes),
         "model_card": str(card),
+        "data_rights_review_sha256": rights_review_hash,
     }
 
 

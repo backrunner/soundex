@@ -1,98 +1,46 @@
-# SoundEx Licensing Overview
+# SoundEx 许可说明 / Licensing
 
-**语言说明 / Language:** 下面「简明中文」便于快速理解；**具有约束力的条款以英文法律文本为准**（`LICENSE`、`MODEL_WEIGHTS_LICENSE.md` 及本目录下英文正文）。
+## 适用范围
 
----
+| 内容 | 许可与范围 |
+|------|------------|
+| 源码、文档、demo、合成测试模型 | [Apache-2.0](../LICENSE) |
+| 附完整模型卡的正式发布权重 | [Apache-2.0](../LICENSE)，适用范围见[权重许可说明](../MODEL_WEIGHTS_LICENSE.md) |
+| 本地实验、外部 checkpoint | 按其来源和实际授权处理，不能默认视为正式 Apache 权重 |
+| 第三方音频、依赖 | 各自上游条款；音频不随仓库分发，依赖见 [THIRD_PARTY.md](../THIRD_PARTY.md) |
 
-## 简明中文
+## 在其他项目中使用
 
-SoundEx 仓库里有 **两套彼此独立的许可**：
+正式权重允许其他开源项目实际集成、随应用分发、修改和微调，也允许商用。
+遵守 Apache-2.0 的许可副本、声明保留和修改说明要求即可；没有额外的学术用途限制。
+不同许可证的项目组合分发时，仍需满足对应许可证的兼容性要求。
 
-| 客体 | 许可文件 | 默认含义 |
-|------|----------|----------|
-| **源代码**（Rust、CLI、训练脚本、文档中的代码） | 根目录 [`LICENSE`](../LICENSE) | **Apache License 2.0** — 可商用、可修改、可再分发（须保留声明） |
-| **模型权重**（`.pth`、`.onnx`、导出的网络参数及等价物） | [`MODEL_WEIGHTS_LICENSE.md`](../MODEL_WEIGHTS_LICENSE.md) | **不**自动适用 Apache-2.0；按训练数据落入对应 **权重等级** |
-| **第三方数据集音频** | 各数据集自身条款 | **不随本仓库分发**；使用者自行获取并遵守 |
-| **第三方依赖**（如 ONNX Runtime） | 各依赖自有许可 | 见构建与链接说明 |
+## 如何保证发布路线可用
 
-**关键规则：**
+MUSDB18-HQ 已退出下载、预处理和训练入口。训练不设数据集或许可白名单，也不强制逐条
+填写授权字段；可直接导入音频目录，尽量覆盖不同曲风、乐器、瞬态、声场和录音条件。
+来源、署名和许可可作为元数据保留，不影响训练启动。
 
-1. 能跑 SoundEx **代码**，不等于能随便商用某个 **预训练权重**。  
-2. 官方若发布权重，必须附带 **模型卡（Model Card）**，写明训练数据与权重等级。  
-3. 使用 **MUSDB18-HQ** 和/或 **MedleyDB** 训练出的权重，默认只能 **非商业 / 研究**，且须署名。  
-4. 仅在 **Slakh2100**（及同等宽松、可再分发的数据）上训练的权重，可按更宽松的 **署名（CC BY 4.0 对齐）** 等级发布。  
-5. 权重许可不能授予超出权利人实际拥有或上游授权的权利。
+正式发布权重时，维护者核对实际数据授权、初始化与恢复来源，确认能够支持应用集成、
+分发和商用。已有 MUSDB 实验结果保留为未发布的研究记录，不能靠修改文档变成正式权重。
+训练入口的宽松接入不改变上游权利，未确认或不兼容的授权需在发布前解决。
 
-**Tier C 是什么？可以训练吗？**
+[训练数据说明](TRAINING_DATA.md)介绍导入与发布的区别；[数据来源调查](../docs/datasets.md)
+列出候选曲库和质量特点；[发布清单](MODEL_RELEASE_CHECKLIST.md)说明维护者发布步骤。
+自动校验只核对记录与文件的一致性，实际授权范围由维护者核验。
 
-Tier A/B/C 是 SoundEx 自定义的权重发布政策，不是 Apache、MUSDB 或通用开源
-标准定义的等级。Tier C 允许非商业研究、学术教学和个人评估，禁止商业产品、
-收费 API、营收服务；再分发仅限许可列出的科研协作或论文复现情形。
-它不单独授予数据获取、训练或公开分发权，也不是所有训练权重法律属性的自动认定。
+## English scope
 
-源码可按 Apache-2.0 用于训练。具体数据能否用于某种训练，须遵守上游授权：
-[MUSDB 官方说明](https://sigsep.github.io/datasets/musdb.html)写明数据仅限学术用途；
-不能仅凭我们的 Tier C 文档认定商业公司的内部产品研发已获授权。
-可商用权重路线应选用自有明确授权、CC0 或允许商用且义务可满足的数据；
-[Slakh2100](https://www.slakh.com/)声明 CC BY 4.0，需要遵守署名等条款。
-本项目要求更宽松的官方权重从随机初始化训练并排除受限数据和受限母权重，
-不得仅靠重命名许可或在现有 MUSDB 权重上微调来改变等级。
+Apache-2.0 covers SoundEx source materials and official weights explicitly released
+with a completed Apache-2.0 model card. It permits application integration,
+redistribution, adaptation and commercial use under its standard conditions.
+No custom research-only tier applies to new official weight releases.
 
-详细矩阵见 [TRAINING_DATA_AND_WEIGHT_TIERS.md](TRAINING_DATA_AND_WEIGHT_TIERS.md)。  
-发布清单见 [MODEL_RELEASE_CHECKLIST.md](MODEL_RELEASE_CHECKLIST.md)。  
-第三方数据集摘要见根目录 [NOTICE](../NOTICE)。
+Unreleased experiments and third-party materials are outside this weight grant.
+Training-data approval and release checks are maintainer publishing procedures,
+not additional downstream license terms. A project notice cannot extend upstream
+rights. This policy does not determine that every trained model is a copyright
+derivative of its training audio.
 
----
-
-## English (binding structure)
-
-### 1. Dual-licensing architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  SoundEx Software (source code)                             │
-│  → Apache License 2.0  (./LICENSE)                          │
-└─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐
-│  SoundEx Model Weights (parameters / ONNX / checkpoints)     │
-│  → SoundEx Model Weights License 1.0                        │
-│    (./MODEL_WEIGHTS_LICENSE.md)                             │
-│  → Specific Tier declared per release (Model Card required) │
-└─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐
-│  Third-party training corpora (audio)                       │
-│  → Not redistributed here; each corpus keeps its own terms  │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 2. Document map
-
-| Document | Role |
-|----------|------|
-| [`../LICENSE`](../LICENSE) | Software: Apache-2.0 full text |
-| [`../MODEL_WEIGHTS_LICENSE.md`](../MODEL_WEIGHTS_LICENSE.md) | Operative license for model weights |
-| [`TRAINING_DATA_AND_WEIGHT_TIERS.md`](TRAINING_DATA_AND_WEIGHT_TIERS.md) | Dataset → weight-tier matrix |
-| [`MODEL_RELEASE_CHECKLIST.md`](MODEL_RELEASE_CHECKLIST.md) | Mandatory steps before publishing weights |
-| [`../models/MODEL_CARD.template.md`](../models/MODEL_CARD.template.md) | Per-artifact disclosure template |
-| [`../NOTICE`](../NOTICE) | Attribution & third-party training-data notices |
-| [`DISCLAIMER.md`](DISCLAIMER.md) | Warranty, liability, non-advice notice |
-
-### 3. Precedence
-
-1. For **software**: Apache-2.0 controls.  
-2. For **weights**: `MODEL_WEIGHTS_LICENSE.md` + the **Tier and Model Card** shipped with that artifact control.  
-3. If software and weights conflict regarding a weight file, **weight terms control for that file**.  
-4. Nothing in this repository grants rights in third-party audio datasets.
-
-### 4. Scope of the project tier policy
-
-The tier matrix is SoundEx's conservative release policy, not an upstream dataset
-license or a determination that all trained weights are copyright derivatives.
-A Tier C label does not grant dataset access/training rights or cure incomplete
-third-party authorization. MUSDB's published academic-purpose limitation still
-controls use of its audio. Verify the actual grant for the intended training and
-release use; Apache-2.0 software rights alone do not supply that grant.
-
-### 5. No legal advice
-
-These documents are project policies and license grants from the copyright holders of SoundEx contributions. They are **not** a substitute for legal advice. Dataset terms can change; verify upstream licenses before commercial use or redistribution.
+The full English [Apache License](../LICENSE) controls the license grant, warranty
+disclaimer and limitation of liability. This overview is explanatory.

@@ -127,16 +127,19 @@ See [contribution guide](CONTRIBUTING.md) for conventions.
 
 ## License
 
-| Material | Terms |
-|----------|-------|
-| Source, documentation, demo code, synthetic test graphs | [Apache License 2.0](LICENSE) |
-| Future learned weights/checkpoints | [SoundEx Model Weights License 1.0](MODEL_WEIGHTS_LICENSE.md), tier declared in each model card |
-| Training audio | Upstream dataset terms; not distributed here |
-| Dependencies | Their own licenses; see [third-party components](THIRD_PARTY.md) |
+Source, documentation, demos, synthetic test graphs and **official released weights**
+use **[Apache License 2.0](LICENSE)**. Released weights permit application integration,
+redistribution, modification and commercial use under that license. Each weight
+release includes its model card, checksum and applicable credits.
 
-Source licensing does not grant rights to training audio or learned weights.
-The current MUSDB training candidate is **Tier C (research/evaluation)** under
-project policy. See [NOTICE](NOTICE), [licensing overview](legal/LICENSING.md) and
-[dataset/tier policy](legal/TRAINING_DATA_AND_WEIGHT_TIERS.md).
+Training audio and dependencies retain their own terms. The existing MUSDB-trained
+candidate is an unpublished research experiment, excluded from the official
+application-ready weight route. Training accepts diverse audio folders without a
+license whitelist; maintainers review source grants and lineage before publishing
+official weights.
+
+[Weight license scope](MODEL_WEIGHTS_LICENSE.md) · [NOTICE](NOTICE) ·
+[Licensing overview](legal/LICENSING.md) · [Training data policy](legal/TRAINING_DATA.md) ·
+[Dataset survey](docs/datasets.md)
 
 Copyright 2026 BackRunner and SoundEx Contributors.

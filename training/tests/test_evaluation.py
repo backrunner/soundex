@@ -299,6 +299,9 @@ def test_model_card_checker_binds_artifact_and_report_hashes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(performance, "_MINIMUM_STRESS_SECONDS", 1)
+    # This synthetic test isolates existing quality/hash binding; source-rights
+    # acceptance and rejection are exercised in test_weight_licensing.py.
+    monkeypatch.setattr("evaluation.model_card.check_license_review", lambda *_args: "a" * 64)
     artifact = _write_production_sized_artifact(tmp_path / "model.onnx")
     artifact_hash = sha256_file(artifact)
     gate_config = load_gate_config(GATE_CONFIG)

@@ -78,12 +78,15 @@ Rust 在处理前验证模型元数据与张量契约。
 
 ## 开源许可
 
-源码、文档、demo 与无训练参数的合成测试图采用 **[Apache License 2.0](LICENSE)**。
-依赖保留各自许可，见 [THIRD_PARTY.md](THIRD_PARTY.md)。
-训练数据不随库分发，遵循上游条款；学习得到的权重使用独立
-[模型权重许可](MODEL_WEIGHTS_LICENSE.md)，每次发布必须声明对应等级。
-当前 MUSDB 训练候选按项目政策属于 **Tier C，仅研究/评估用途**。
+源码、文档、demo、合成测试图与**正式发布权重**统一采用 **[Apache-2.0](LICENSE)**。
+正式权重允许其他开源项目集成、随软件分发、修改、微调和商用；发布时附模型卡、
+校验值及适用的署名声明。
 
-[NOTICE](NOTICE) · [许可总览](legal/LICENSING.md) · [数据与权重等级](legal/TRAINING_DATA_AND_WEIGHT_TIERS.md)
+训练音频和依赖保留各自许可。现有 MUSDB 候选保留为未发布的研究记录，退出正式权重
+路线。训练不设数据集或许可白名单，可直接扩充音频目录；正式发布时核对授权和模型来源。
+依赖说明见 [THIRD_PARTY.md](THIRD_PARTY.md)。
+
+[权重许可范围](MODEL_WEIGHTS_LICENSE.md) · [NOTICE](NOTICE) · [许可说明](legal/LICENSING.md) ·
+[训练数据政策](legal/TRAINING_DATA.md) · [数据来源调查](docs/datasets.md)
 
 Copyright 2026 BackRunner and SoundEx Contributors.
