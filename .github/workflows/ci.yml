@@ -35,6 +35,10 @@ jobs:
             training/constraints-cpu-py312.txt
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - name: Install audio preprocessing dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
       - name: Install CPU export dependencies
         working-directory: training
         run: |
