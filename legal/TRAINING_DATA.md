@@ -5,8 +5,10 @@
 SoundEx learns from audio, not source-separation labels. Mixes, music, instruments,
 voices, ambience and transient sounds can all contribute useful patterns. Expand
 coverage across genres, dynamics, bandwidth, recording conditions and stereo
-images. Prefer original lossless masters for full-band restoration, and include
-lower-bandwidth material where useful without treating it as full-band evidence.
+images. Clean targets for codec-restoration training use original lossless masters.
+Lossy source libraries, including the FMA MP3 packages, are excluded. Transcoding
+MP3/AAC/Vorbis to a PCM container does not create a lossless master. Review upstream
+master provenance in addition to checking the actual local encoding.
 
 MUSDB18 / MUSDB18-HQ have been removed from download/preprocessing/training
 selection because their [publisher](https://sigsep.github.io/datasets/musdb.html)
@@ -24,7 +26,9 @@ metadata. Missing information is left unknown, not replaced with an assumed gran
 Necessary technical checks remain: readable/nonempty mono/stereo audio, finite
 samples, checksum integrity, codec delay alignment, recipe consistency and
 separate train/validation/test groups. Exact file copies are deduplicated.
-Optional supplied checksums must match their files. Original sample rate/channel
+Optional supplied checksums must match their files. Actual target encoding must
+be lossless PCM/FLAC; this is a technical quality check, not a license whitelist.
+Original sample rate/channel
 information is recorded; low-rate material is accepted. Shared preprocessing
 creates MP3/AAC/Vorbis degradation at 44.1/48 kHz after assigning groups to splits.
 

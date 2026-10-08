@@ -49,6 +49,14 @@ when publishing official weights. Training keeps necessary technical checks for
 format, finite samples, hashes, alignment, immutable recipes and disjoint splits.
 Use positive source ratios and explicit validation quotas for enabled sources.
 
+Clean targets must be lossless PCM WAV/FLAC/AIFF. FMA MP3 packages and lossy
+encodings disguised by file extensions are excluded. Verify original-master
+provenance too: transcoding MP3 into FLAC does not restore the original signal.
+`configs/diverse_lossless.yaml` combines real music, Slakh and speech; prepare
+speech with `--corpus speech_library` using the same profile. Derive speech mass
+from the smallest actual training genre with `data.sampling_weights.speech_mix_ratios`.
+See [genre coverage and sampling](../docs/datasets.md).
+
 Training checkpoints use schema 1.2 and contain the resolved model/audio/data configuration,
 feature contract, dataset recipe and manifest hashes, provenance, and all RNG states needed to
 resume sampling. Older 1.x checkpoints lack the crossover-bound feature contract and fail closed;
