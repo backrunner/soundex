@@ -87,6 +87,10 @@ def review_errors(entry: dict[str, Any], review: dict[str, Any], root: Path) -> 
     ):
         if not isinstance(review.get(field), str) or not review[field].strip():
             errors.append("missing_" + field)
+    if "credited_author" in review and (
+        not isinstance(review["credited_author"], str) or not review["credited_author"].strip()
+    ):
+        errors.append("invalid_credited_author")
     evidence = review.get("evidence", [])
     if not isinstance(evidence, list) or not evidence:
         errors.append("missing_primary_evidence")
@@ -121,6 +125,7 @@ def audit_curation(
     """Report actual approved distinct works, creators, regional repertoire and genre gaps."""
     validate_policy(policy)
     approved, held = [], []
+    reviewed_works: set[str] = set()
     regions: Counter[str] = Counter()
     genres: Counter[str] = Counter()
     artists: Counter[str] = Counter()
@@ -135,8 +140,22 @@ def audit_curation(
         if errors:
             held.append({"id": entry["id"], "reasons": errors})
             continue
+        if review.get("content_kind", "music") != "music":
+            held.append({"id": entry["id"], "reasons": ["not_a_music_recording"]})
+            continue
+        work = review.get("work_group", entry.get("split_group", entry["id"]))
+        if not isinstance(work, str) or not work.strip():
+            held.append({"id": entry["id"], "reasons": ["missing_reviewed_work_group"]})
+            continue
+        if work in reviewed_works:
+            held.append({"id": entry["id"], "reasons": ["duplicate_reviewed_work"]})
+            continue
         original_genre = entry.get("genre", "unlabeled")
-        label = original_genre.strip().casefold()
+        reviewed_genre = review.get("reviewed_genre", original_genre)
+        if not isinstance(reviewed_genre, str) or not reviewed_genre.strip():
+            held.append({"id": entry["id"], "reasons": ["invalid_reviewed_genre"]})
+            continue
+        label = reviewed_genre.strip().casefold()
         genre, artist = GENRE_ALIASES.get(label, label), review["artist_id"]
         if genre not in {"unlabeled", "unknown"} and not review.get("genre_basis"):
             held.append({"id": entry["id"], "reasons": ["unreviewed_genre"]})
@@ -144,12 +163,18 @@ def audit_curation(
         approved.append(
             {
                 **entry,
+                "author": review.get("credited_author", entry.get("author", "unknown")),
+                "publisher_original_author": entry.get(
+                    "publisher_original_author", entry.get("author", "unknown")
+                ),
                 "genre": genre,
-                "publisher_original_genre": original_genre,
+                "publisher_original_genre": entry.get("publisher_original_genre", original_genre),
+                "split_group": work,
                 "source_review": review,
                 "music_region": region,
             }
         )
+        reviewed_works.add(work)
         regions[region] += 1
         genres[genre] += 1
         artists[artist] += 1

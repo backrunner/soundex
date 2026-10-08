@@ -124,3 +124,48 @@ def test_equivalent_genre_spelling_does_not_create_a_false_coverage_gap(tmp_path
     assert report["ready_for_this_regional_run"]
     assert report["genres"] == {"hiphop": 1}
     assert approved[0]["publisher_original_genre"] == "Hip Hop"
+
+
+def test_reviewed_alternate_arrangements_count_as_one_work(tmp_path: Path) -> None:
+    entry, review, policy = fixture(tmp_path)
+    review["work_group"] = "composer:shared-melody"
+    entries = [{**entry, "id": str(i), "split_group": str(i)} for i in range(5)]
+    policy["minimum_music_recordings"] = 5
+    approved, report = audit_curation(entries, {e["id"]: review for e in entries}, policy, tmp_path)
+    assert len(approved) == 1
+    assert approved[0]["split_group"] == "composer:shared-melody"
+    assert not report["ready_for_this_regional_run"]
+    assert len(report["held_for_source_review"]) == 4
+
+
+def test_source_review_corrects_credits_and_genre_without_rewriting_receipts(
+    tmp_path: Path,
+) -> None:
+    entry, review, policy = fixture(tmp_path)
+    entry.update(author="Recommended artist", genre="unlabeled")
+    review.update(credited_author="Actual composer", reviewed_genre="pop")
+    approved, report = audit_curation([entry], {"song": review}, policy, tmp_path)
+    assert report["ready_for_this_regional_run"]
+    assert approved[0]["author"] == "Actual composer"
+    assert approved[0]["publisher_original_author"] == "Recommended artist"
+    assert entry["author"] == "Recommended artist"
+    repeated, _ = audit_curation(approved, {"song": review}, policy, tmp_path)
+    assert repeated[0]["publisher_original_author"] == "Recommended artist"
+    assert repeated[0]["publisher_original_genre"] == "unlabeled"
+
+
+def test_licensed_sound_effect_cannot_fill_music_target(tmp_path: Path) -> None:
+    entry, review, policy = fixture(tmp_path)
+    review["content_kind"] = "instrument-effect"
+    approved, report = audit_curation([entry], {"song": review}, policy, tmp_path)
+    assert not approved
+    assert report["held_for_source_review"][0]["reasons"] == ["not_a_music_recording"]
+
+
+@pytest.mark.parametrize("genre", [None, "", 123])
+def test_malformed_reviewed_genre_is_held(tmp_path: Path, genre: Any) -> None:
+    entry, review, policy = fixture(tmp_path)
+    review["reviewed_genre"] = genre
+    approved, report = audit_curation([entry], {"song": review}, policy, tmp_path)
+    assert not approved
+    assert report["held_for_source_review"][0]["reasons"] == ["invalid_reviewed_genre"]
