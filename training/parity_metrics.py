@@ -21,7 +21,7 @@ METRIC_FIELDS = frozenset(
         "max_phase_rad",
         "mean_phase_rad",
         "max_complex_relative_rms",
-        "max_inverse_fft_error_bound",
+        "max_inverse_fft_error",
     }
 )
 if set(PARITY_POLICY) != METRIC_FIELDS | {"schema_version", "policy_id", "complex_rms_floor"}:
@@ -111,13 +111,17 @@ def compare_features(expected: np.ndarray, actual: np.ndarray) -> dict[str, floa
         relative = error_rms / np.maximum(reference_rms, PARITY_POLICY["complex_rms_floor"])
         # Triangle inequality bounds every sample of the normalized real inverse FFT.
         bound = np.sum(weights * complex_error, axis=-1) / (2 * (expected.shape[-1] - 1))
+        inverse_error = np.fft.irfft(
+            candidate_spectrum - reference_spectrum, n=2 * (expected.shape[-1] - 1)
+        )
     return {
         "max_magnitude_db": float(magnitude_error.max()),
         "mean_magnitude_db": float(magnitude_error.mean()),
         "max_phase_rad": float(phase_error.max()),
         "mean_phase_rad": float(phase_error.mean()),
         "max_complex_relative_rms": float(relative.max()),
-        "max_inverse_fft_error_bound": float(bound.max()),
+        "max_inverse_fft_error": float(np.abs(inverse_error).max()),
+        "raw_inverse_fft_error_bound": float(bound.max()),
         "raw_max_absolute_error": float(np.abs(delta).max()),
         "raw_mean_error": float(np.abs(delta).mean()),
     }

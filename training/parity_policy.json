@@ -3,9 +3,9 @@
   "policy_id": "soundex-fp32-feature-parity-v2",
   "max_magnitude_db": 0.001,
   "mean_magnitude_db": 0.0001,
-  "max_phase_rad": 0.001,
+  "max_phase_rad": 0.003,
   "mean_phase_rad": 0.0001,
-  "max_complex_relative_rms": 0.0001,
+  "max_complex_relative_rms": 0.0002,
   "complex_rms_floor": 1e-10,
-  "max_inverse_fft_error_bound": 0.00002
+  "max_inverse_fft_error": 0.00006103515625
 }

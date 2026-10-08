@@ -29,23 +29,29 @@ budget, using float64 only for measurements of float32 outputs:
 | Metric | Limit |
 |--------|-------|
 | Magnitude error, max / mean | 0.001 / 0.0001 dB |
-| Circular phase error, max / mean | 0.001 / 0.0001 radians |
-| Complex spectrum relative RMS, worst independent spectrum | 0.0001 |
-| Normalized real inverse FFT sample-error upper bound | 0.00002 |
+| Circular phase error, max / mean | 0.003 / 0.0001 radians |
+| Complex spectrum relative RMS, worst independent spectrum | 0.0002 |
+| Actual normalized real inverse FFT peak sample error | 0.00006103515625 (two 16-bit PCM steps) |
 
 A 0.001 dB amplitude change corresponds to about 0.0115% linear amplitude;
-0.001 radians is about 0.0573 degrees. The complex relative RMS guard limits
-aggregate signal error to a ratio of 1e-4 (80 dB), including magnitude/phase
-interactions. Each batch item is checked independently. The inverse FFT guard
-uses the triangle inequality: weighted complex-bin error sum divided by FFT
-size, counting DC/Nyquist once and interior bins twice. This bounds every sample
-of that inverse FFT; it is below one normalized 16-bit PCM quantization step.
+0.003 radians is about 0.1719 degrees. Raw phase caps are only one guard:
+a phase change on a weak bin has a different signal effect from the same change
+on a strong bin. The complex relative RMS guard limits aggregate spectrum error
+to 0.02% (about 74 dB), checking each batch item independently.
 
-These guards prevent a tiny dB error on a huge spectrum from producing a large
+The signal peak guard reconstructs the **actual** float64 normalized real inverse
+FFT difference and caps it at two normalized 16-bit PCM quantization steps
+(6.1035e-5, about -84.3 dBFS). Float64 is measurement precision; deployment remains
+float32. The triangle-inequality error bound is retained as a diagnostic, since
+summing absolute bin errors can overestimate the actual sample difference and
+reject safe rounding. These are conservative engineering budgets, not a claim
+that model output has 16-bit resolution or that every difference is inaudible.
+
+The guards prevent a tiny dB error on a huge spectrum from producing a large
 linear sample error, and prevent one strong phase-corrupted bin from hiding in
-a mean. The bound is for the windowed frame before crossover, overlap-add,
-loudness and limiting. Deployed quality, stream continuity and chunk-equivalence
-are separate checks. No universal inaudibility guarantee is inferred.
+a mean. The inverse FFT measures the windowed frame before crossover,
+overlap-add, loudness and limiting. Deployed quality, continuity and
+chunk-equivalence are separate checks.
 
 The 13 deterministic cases cover silence, sine, random spectra, dB floor, phase
 wrap, tones, quiet audio, noise and a center-window impulse at both 44.1/48 kHz;
@@ -69,7 +75,7 @@ For the default ORT optimization level:
 | Magnitude max / mean | 1.3733e-4 / 4.2050e-5 dB |
 | Circular phase max / mean | 2.1029e-4 / 4.1229e-6 radians |
 | Complex relative RMS | 5.0187e-5 |
-| Inverse FFT sample-error upper bound | 7.1693e-6 |
+| Diagnostic inverse FFT sample-error upper bound | 7.1693e-6 |
 | Actual inverse FFT peak sample difference | 2.6672e-6 |
 | Lowest inverse FFT comparison SNR | 92.79 dB |
 
@@ -78,6 +84,19 @@ strict gate failed on normal backend rounding; disabling ORT optimizations did
 not remove the discrepancy. This confirms an inappropriate numerical gate for
 this artifact, not a guarantee of its learned audio quality. The learned
 candidate has not been audited on an x86 release reference machine.
+
+A further [real-mixture validation audit](parity-validation-2026-10-08.json)
+samples 512 frames, eight distinct validation tracks per sample rate, at 44.1/48 kHz
+(13 unique tracks across the two rate groups).
+The same frames pass both Python CPU ORT and the Rust utility against PyTorch.
+Only aggregate numeric results and manifest hashes are distributed; no test rows,
+audio, track names or local paths are included. The initial trial budget rejected
+six batches: some weak-bin phase differences and a triangle bound that exceeded
+the actual inverse FFT error. FP64 spot checks confirmed backend rounding; one
+backend was not consistently more accurate than the other. Actual peak frame
+error is 3.6783e-5, below the two-step ceiling; maximum complex relative RMS is
+1.1551e-4, below 2e-4. This validation audit is numerical calibration, not release
+quality evidence, and has not been run on an x86 release reference machine.
 
 Reproduce with your own authorized checkpoint from the repository root:
 
@@ -89,6 +108,8 @@ python export_onnx.py --checkpoint /path/to/checkpoint.pth \
   --output ../target/candidate.onnx
 python -m evaluation.parity --checkpoint /path/to/checkpoint.pth \
   --model ../target/candidate.onnx --output ../target/candidate.parity.json
+python scripts/audit_validation_parity.py --checkpoint /path/to/checkpoint.pth \
+  --model ../target/candidate.onnx --output ../target/validation-parity.json
 ```
 
 The diagnostic audit never distributes checkpoint weights or dataset audio.

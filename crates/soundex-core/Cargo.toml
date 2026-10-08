@@ -17,6 +17,8 @@ log.workspace = true
 rtrb = "0.3"
 # JSON policy/report exchange for the standalone parity validation utility.
 serde_json.workspace = true
+# Float64 inverse FFT in the standalone parity utility; already a DSP dependency.
+rustfft.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Safe, thread-local USER_INITIATED QoS; no scheduler FFI in the audio adapter.

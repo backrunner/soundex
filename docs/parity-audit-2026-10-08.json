@@ -13,11 +13,12 @@
         "inverse_fft_snr_db": 129.14748644590344,
         "metrics": {
           "max_complex_relative_rms": 1.0499653502909717e-06,
-          "max_inverse_fft_error_bound": 1.7238060418152855e-11,
+          "max_inverse_fft_error": 5.8795581860590286e-12,
           "max_magnitude_db": 0.0001220703125,
           "max_phase_rad": 1.1444091796875e-05,
           "mean_magnitude_db": 3.2794567965721896e-05,
           "mean_phase_rad": 2.9534332511961e-06,
+          "raw_inverse_fft_error_bound": 1.7238060418152855e-11,
           "raw_max_absolute_error": 0.0001220703125,
           "raw_mean_error": 1.7874000608459e-05
         },
@@ -31,11 +32,12 @@
         "inverse_fft_snr_db": 108.09865517527803,
         "metrics": {
           "max_complex_relative_rms": 3.936025981424951e-06,
-          "max_inverse_fft_error_bound": 1.5848311653953885e-06,
+          "max_inverse_fft_error": 1.3351201482642082e-06,
           "max_magnitude_db": 3.0517578125e-05,
           "max_phase_rad": 7.62939453125e-06,
           "mean_magnitude_db": 7.0139419200808505e-06,
           "mean_phase_rad": 1.2771103733269743e-06,
+          "raw_inverse_fft_error_bound": 1.5848311653953885e-06,
           "raw_max_absolute_error": 3.0517578125e-05,
           "raw_mean_error": 4.1455261467039125e-06
         },
@@ -49,11 +51,12 @@
         "inverse_fft_snr_db": 94.06036971961404,
         "metrics": {
           "max_complex_relative_rms": 4.309480409504531e-05,
-          "max_inverse_fft_error_bound": 7.08351772692303e-08,
+          "max_inverse_fft_error": 6.33722722725234e-08,
           "max_magnitude_db": 9.918212890625e-05,
           "max_phase_rad": 7.915496826171875e-05,
           "mean_magnitude_db": 2.3804893789365312e-05,
           "mean_phase_rad": 3.5855197167211725e-06,
+          "raw_inverse_fft_error_bound": 7.08351772692303e-08,
           "raw_max_absolute_error": 9.918212890625e-05,
           "raw_mean_error": 1.3695206753043241e-05
         },
@@ -67,11 +70,12 @@
         "inverse_fft_snr_db": 132.0784958275005,
         "metrics": {
           "max_complex_relative_rms": 3.7719307161124545e-06,
-          "max_inverse_fft_error_bound": 6.245786646521105e-11,
+          "max_inverse_fft_error": 3.7915593264964005e-12,
           "max_magnitude_db": 0.0001220703125,
           "max_phase_rad": 9.5367431640625e-06,
           "mean_magnitude_db": 3.371127816133721e-05,
           "mean_phase_rad": 3.360038579896439e-06,
+          "raw_inverse_fft_error_bound": 6.245786646521105e-11,
           "raw_max_absolute_error": 0.0001220703125,
           "raw_mean_error": 1.8535658370616824e-05
         },
@@ -85,11 +89,12 @@
         "inverse_fft_snr_db": 98.38061046966146,
         "metrics": {
           "max_complex_relative_rms": 1.6167764054201597e-05,
-          "max_inverse_fft_error_bound": 1.5764580067086401e-07,
+          "max_inverse_fft_error": 7.563152293735928e-08,
           "max_magnitude_db": 2.47955322265625e-05,
           "max_phase_rad": 0.0001277923583984375,
           "mean_magnitude_db": 7.585037586300872e-06,
           "mean_phase_rad": 2.6798987573431445e-06,
+          "raw_inverse_fft_error_bound": 1.5764580067086401e-07,
           "raw_max_absolute_error": 0.0001277923583984375,
           "raw_mean_error": 5.1324681718220085e-06
         },
@@ -103,11 +108,12 @@
         "inverse_fft_snr_db": 108.18394108909453,
         "metrics": {
           "max_complex_relative_rms": 3.897396232127059e-06,
-          "max_inverse_fft_error_bound": 8.302660212292478e-07,
+          "max_inverse_fft_error": 6.836292461268077e-07,
           "max_magnitude_db": 7.62939453125e-05,
           "max_phase_rad": 5.7220458984375e-06,
           "mean_magnitude_db": 1.1466270269349564e-05,
           "mean_phase_rad": 1.382458117581153e-06,
+          "raw_inverse_fft_error_bound": 8.302660212292478e-07,
           "raw_max_absolute_error": 7.62939453125e-05,
           "raw_mean_error": 6.424364193465359e-06
         },
@@ -121,11 +127,12 @@
         "inverse_fft_snr_db": 112.5702811603195,
         "metrics": {
           "max_complex_relative_rms": 3.6819425933221886e-06,
-          "max_inverse_fft_error_bound": 2.18057130260885e-10,
+          "max_inverse_fft_error": 1.005052694092158e-10,
           "max_magnitude_db": 0.0001373291015625,
           "max_phase_rad": 1.1444091796875e-05,
           "mean_magnitude_db": 4.7491502392199615e-05,
           "mean_phase_rad": 3.6095463952352835e-06,
+          "raw_inverse_fft_error_bound": 2.18057130260885e-10,
           "raw_max_absolute_error": 0.0001373291015625,
           "raw_mean_error": 2.555052439371745e-05
         },
@@ -139,11 +146,12 @@
         "inverse_fft_snr_db": 99.70220094594174,
         "metrics": {
           "max_complex_relative_rms": 1.0345876835553677e-05,
-          "max_inverse_fft_error_bound": 7.782200794587721e-06,
+          "max_inverse_fft_error": 2.7691304850888807e-06,
           "max_magnitude_db": 2.86102294921875e-05,
           "max_phase_rad": 4.76837158203125e-05,
           "mean_magnitude_db": 8.54610472686531e-06,
           "mean_phase_rad": 4.0826871413593145e-06,
+          "raw_inverse_fft_error_bound": 7.782200794587721e-06,
           "raw_max_absolute_error": 4.76837158203125e-05,
           "raw_mean_error": 6.314395934112312e-06
         },
@@ -157,11 +165,12 @@
         "inverse_fft_snr_db": 114.97324077748888,
         "metrics": {
           "max_complex_relative_rms": 1.7897359241416937e-06,
-          "max_inverse_fft_error_bound": 1.3442286579411888e-06,
+          "max_inverse_fft_error": 6.310582345705721e-07,
           "max_magnitude_db": 2.3603439331054688e-05,
           "max_phase_rad": 4.291534423828125e-06,
           "mean_magnitude_db": 7.91217005530069e-06,
           "mean_phase_rad": 1.1015307995700097e-06,
+          "raw_inverse_fft_error_bound": 1.3442286579411888e-06,
           "raw_max_absolute_error": 2.3603439331054688e-05,
           "raw_mean_error": 4.50685042743535e-06
         },
@@ -175,11 +184,12 @@
         "inverse_fft_snr_db": 106.01656085128027,
         "metrics": {
           "max_complex_relative_rms": 5.001972696359805e-06,
-          "max_inverse_fft_error_bound": 9.077266414113616e-07,
+          "max_inverse_fft_error": 7.747562653230755e-07,
           "max_magnitude_db": 4.57763671875e-05,
           "max_phase_rad": 5.7220458984375e-06,
           "mean_magnitude_db": 1.1532805686773256e-05,
           "mean_phase_rad": 1.3445698937704397e-06,
+          "raw_inverse_fft_error_bound": 9.077266414113616e-07,
           "raw_max_absolute_error": 4.57763671875e-05,
           "raw_mean_error": 6.4386877902718474e-06
         },
@@ -193,11 +203,12 @@
         "inverse_fft_snr_db": 123.90743899732732,
         "metrics": {
           "max_complex_relative_rms": 1.6972087877054089e-06,
-          "max_inverse_fft_error_bound": 1.1437881518114778e-10,
+          "max_inverse_fft_error": 3.672327032543805e-11,
           "max_magnitude_db": 0.0001220703125,
           "max_phase_rad": 1.0013580322265625e-05,
           "mean_magnitude_db": 3.371127816133721e-05,
           "mean_phase_rad": 2.6207561640776405e-06,
+          "raw_inverse_fft_error_bound": 1.1437881518114778e-10,
           "raw_max_absolute_error": 0.0001220703125,
           "raw_mean_error": 1.8166017162707425e-05
         },
@@ -211,11 +222,12 @@
         "inverse_fft_snr_db": 109.23204980565467,
         "metrics": {
           "max_complex_relative_rms": 3.4545076654989565e-06,
-          "max_inverse_fft_error_bound": 3.4805904317455058e-06,
+          "max_inverse_fft_error": 1.0109414101971486e-06,
           "max_magnitude_db": 2.574920654296875e-05,
           "max_phase_rad": 1.6689300537109375e-05,
           "mean_magnitude_db": 6.901201351668484e-06,
           "mean_phase_rad": 1.877777336179748e-06,
+          "raw_inverse_fft_error_bound": 3.4805904317455058e-06,
           "raw_max_absolute_error": 2.574920654296875e-05,
           "raw_mean_error": 4.3894893439241155e-06
         },
@@ -229,11 +241,12 @@
         "inverse_fft_snr_db": 114.97324077748888,
         "metrics": {
           "max_complex_relative_rms": 1.7897359241416937e-06,
-          "max_inverse_fft_error_bound": 1.3442286579411888e-06,
+          "max_inverse_fft_error": 6.310582345705721e-07,
           "max_magnitude_db": 2.3603439331054688e-05,
           "max_phase_rad": 4.291534423828125e-06,
           "mean_magnitude_db": 7.91217005530069e-06,
           "mean_phase_rad": 1.1015307995700097e-06,
+          "raw_inverse_fft_error_bound": 1.3442286579411888e-06,
           "raw_max_absolute_error": 2.3603439331054688e-05,
           "raw_mean_error": 4.50685042743535e-06
         },
@@ -249,11 +262,12 @@
         "inverse_fft_snr_db": 126.71038624976339,
         "metrics": {
           "max_complex_relative_rms": 4.99761826926504e-07,
-          "max_inverse_fft_error_bound": 8.36205465598631e-12,
+          "max_inverse_fft_error": 7.571717230692817e-12,
           "max_magnitude_db": 0.0001220703125,
           "max_phase_rad": 1.33514404296875e-05,
           "mean_magnitude_db": 3.2912853152252904e-05,
           "mean_phase_rad": 3.1049861464389535e-06,
+          "raw_inverse_fft_error_bound": 8.36205465598631e-12,
           "raw_max_absolute_error": 0.0001220703125,
           "raw_mean_error": 1.8008919649345932e-05
         },
@@ -267,11 +281,12 @@
         "inverse_fft_snr_db": 111.51907547169387,
         "metrics": {
           "max_complex_relative_rms": 2.6549500917552454e-06,
-          "max_inverse_fft_error_bound": 1.1864410372219712e-06,
+          "max_inverse_fft_error": 9.051869407615344e-07,
           "max_magnitude_db": 3.4332275390625e-05,
           "max_phase_rad": 5.7220458984375e-06,
           "mean_magnitude_db": 9.331823319427726e-06,
           "mean_phase_rad": 1.3843063236207e-06,
+          "raw_inverse_fft_error_bound": 1.1864410372219712e-06,
           "raw_max_absolute_error": 3.4332275390625e-05,
           "raw_mean_error": 5.358064821524213e-06
         },
@@ -285,11 +300,12 @@
         "inverse_fft_snr_db": 92.7858221223809,
         "metrics": {
           "max_complex_relative_rms": 5.018744963772942e-05,
-          "max_inverse_fft_error_bound": 8.16140669187371e-08,
+          "max_inverse_fft_error": 7.440338506429737e-08,
           "max_magnitude_db": 0.0001220703125,
           "max_phase_rad": 9.489059448242188e-05,
           "mean_magnitude_db": 2.5046888247940892e-05,
           "mean_phase_rad": 4.122885622719462e-06,
+          "raw_inverse_fft_error_bound": 8.16140669187371e-08,
           "raw_max_absolute_error": 0.0001220703125,
           "raw_mean_error": 1.4584886935330177e-05
         },
@@ -303,11 +319,12 @@
         "inverse_fft_snr_db": 116.10235690465679,
         "metrics": {
           "max_complex_relative_rms": 3.3666342813164573e-06,
-          "max_inverse_fft_error_bound": 5.5801331864241945e-11,
+          "max_inverse_fft_error": 2.2361866924906925e-11,
           "max_magnitude_db": 0.0001373291015625,
           "max_phase_rad": 9.5367431640625e-06,
           "mean_magnitude_db": 3.5869982815528104e-05,
           "mean_phase_rad": 3.2445257024247517e-06,
+          "raw_inverse_fft_error_bound": 5.5801331864241945e-11,
           "raw_max_absolute_error": 0.0001373291015625,
           "raw_mean_error": 1.9557254258976425e-05
         },
@@ -321,11 +338,12 @@
         "inverse_fft_snr_db": 94.09985617149958,
         "metrics": {
           "max_complex_relative_rms": 2.6560843167087995e-05,
-          "max_inverse_fft_error_bound": 2.369879145444815e-07,
+          "max_inverse_fft_error": 1.244634031204635e-07,
           "max_magnitude_db": 4.76837158203125e-05,
           "max_phase_rad": 0.00021028518676757812,
           "mean_magnitude_db": 8.675479149633599e-06,
           "mean_phase_rad": 3.8830808890882386e-06,
+          "raw_inverse_fft_error_bound": 2.369879145444815e-07,
           "raw_max_absolute_error": 0.00021028518676757812,
           "raw_mean_error": 6.27928001936092e-06
         },
@@ -339,11 +357,12 @@
         "inverse_fft_snr_db": 112.62032677666149,
         "metrics": {
           "max_complex_relative_rms": 2.3385950589672087e-06,
-          "max_inverse_fft_error_bound": 5.975438781964631e-07,
+          "max_inverse_fft_error": 4.617819291949892e-07,
           "max_magnitude_db": 6.103515625e-05,
           "max_phase_rad": 5.7220458984375e-06,
           "mean_magnitude_db": 1.052599544673003e-05,
           "mean_phase_rad": 1.3963196628777555e-06,
+          "raw_inverse_fft_error_bound": 5.975438781964631e-07,
           "raw_max_absolute_error": 6.103515625e-05,
           "raw_mean_error": 5.9611575548038925e-06
         },
@@ -357,11 +376,12 @@
         "inverse_fft_snr_db": 112.56927947210131,
         "metrics": {
           "max_complex_relative_rms": 3.6820384608129846e-06,
-          "max_inverse_fft_error_bound": 2.1667737967649492e-10,
+          "max_inverse_fft_error": 1.003114661383079e-10,
           "max_magnitude_db": 0.0001068115234375,
           "max_phase_rad": 1.1444091796875e-05,
           "mean_magnitude_db": 4.2050383811773256e-05,
           "mean_phase_rad": 3.3739001251930413e-06,
+          "raw_inverse_fft_error_bound": 2.1667737967649492e-10,
           "raw_max_absolute_error": 0.0001068115234375,
           "raw_mean_error": 2.2712141968483148e-05
         },
@@ -375,11 +395,12 @@
         "inverse_fft_snr_db": 100.5265334648167,
         "metrics": {
           "max_complex_relative_rms": 9.409090837892891e-06,
-          "max_inverse_fft_error_bound": 7.169268319841842e-06,
+          "max_inverse_fft_error": 2.66719511957181e-06,
           "max_magnitude_db": 2.6226043701171875e-05,
           "max_phase_rad": 3.9577484130859375e-05,
           "mean_magnitude_db": 7.819413214690926e-06,
           "mean_phase_rad": 3.858130107554355e-06,
+          "raw_inverse_fft_error_bound": 7.169268319841842e-06,
           "raw_max_absolute_error": 3.9577484130859375e-05,
           "raw_mean_error": 5.83877166112264e-06
         },
@@ -393,11 +414,12 @@
         "inverse_fft_snr_db": 115.53536711671869,
         "metrics": {
           "max_complex_relative_rms": 1.6783660203042878e-06,
-          "max_inverse_fft_error_bound": 1.262796291051928e-06,
+          "max_inverse_fft_error": 5.861854454895206e-07,
           "max_magnitude_db": 2.4139881134033203e-05,
           "max_phase_rad": 4.172325134277344e-06,
           "mean_magnitude_db": 7.8080929526987e-06,
           "mean_phase_rad": 1.0081963945728865e-06,
+          "raw_inverse_fft_error_bound": 1.262796291051928e-06,
           "raw_max_absolute_error": 2.4139881134033203e-05,
           "raw_mean_error": 4.408144673635793e-06
         },
@@ -411,11 +433,12 @@
         "inverse_fft_snr_db": 108.98785748211981,
         "metrics": {
           "max_complex_relative_rms": 3.5528459944353905e-06,
-          "max_inverse_fft_error_bound": 6.866661980011878e-07,
+          "max_inverse_fft_error": 5.36379670205495e-07,
           "max_magnitude_db": 5.340576171875e-05,
           "max_phase_rad": 5.7220458984375e-06,
           "mean_magnitude_db": 1.0694182196328806e-05,
           "mean_phase_rad": 1.3519627179286277e-06,
+          "raw_inverse_fft_error_bound": 6.866661980011878e-07,
           "raw_max_absolute_error": 5.340576171875e-05,
           "raw_mean_error": 6.023072457128717e-06
         },
@@ -429,11 +452,12 @@
         "inverse_fft_snr_db": 127.89327098567689,
         "metrics": {
           "max_complex_relative_rms": 8.668612403621132e-07,
-          "max_inverse_fft_error_bound": 7.455973827520475e-11,
+          "max_inverse_fft_error": 2.4886567226499345e-11,
           "max_magnitude_db": 0.0001220703125,
           "max_phase_rad": 1.0013580322265625e-05,
           "mean_magnitude_db": 3.841311432594477e-05,
           "mean_phase_rad": 3.0218168746593385e-06,
+          "raw_inverse_fft_error_bound": 7.455973827520475e-11,
           "raw_max_absolute_error": 0.0001220703125,
           "raw_mean_error": 2.0717465600302052e-05
         },
@@ -447,11 +471,12 @@
         "inverse_fft_snr_db": 109.60744675252315,
         "metrics": {
           "max_complex_relative_rms": 3.3084945677815425e-06,
-          "max_inverse_fft_error_bound": 3.475821853638855e-06,
+          "max_inverse_fft_error": 1.2960606769727816e-06,
           "max_magnitude_db": 2.5987625122070312e-05,
           "max_phase_rad": 1.4632940292358398e-05,
           "mean_magnitude_db": 6.4587870309519215e-06,
           "mean_phase_rad": 2.047581266063128e-06,
+          "raw_inverse_fft_error_bound": 3.475821853638855e-06,
           "raw_max_absolute_error": 2.5987625122070312e-05,
           "raw_mean_error": 4.253184148507525e-06
         },
@@ -465,11 +490,12 @@
         "inverse_fft_snr_db": 115.53536711671869,
         "metrics": {
           "max_complex_relative_rms": 1.6783660203042878e-06,
-          "max_inverse_fft_error_bound": 1.262796291051928e-06,
+          "max_inverse_fft_error": 5.861854454895206e-07,
           "max_magnitude_db": 2.4139881134033203e-05,
           "max_phase_rad": 4.172325134277344e-06,
           "mean_magnitude_db": 7.8080929526987e-06,
           "mean_phase_rad": 1.0081963945728865e-06,
+          "raw_inverse_fft_error_bound": 1.262796291051928e-06,
           "raw_max_absolute_error": 2.4139881134033203e-05,
           "raw_mean_error": 4.408144673635793e-06
         },
@@ -485,11 +511,12 @@
         "inverse_fft_snr_db": 129.14748644590344,
         "metrics": {
           "max_complex_relative_rms": 1.0499653502909717e-06,
-          "max_inverse_fft_error_bound": 1.7238060418152855e-11,
+          "max_inverse_fft_error": 5.8795581860590286e-12,
           "max_magnitude_db": 0.0001220703125,
           "max_phase_rad": 1.1444091796875e-05,
           "mean_magnitude_db": 3.2794567965721896e-05,
           "mean_phase_rad": 2.9534332511961e-06,
+          "raw_inverse_fft_error_bound": 1.7238060418152855e-11,
           "raw_max_absolute_error": 0.0001220703125,
           "raw_mean_error": 1.7874000608459e-05
         },
@@ -503,11 +530,12 @@
         "inverse_fft_snr_db": 108.09865517527803,
         "metrics": {
           "max_complex_relative_rms": 3.936025981424951e-06,
-          "max_inverse_fft_error_bound": 1.5848311653953885e-06,
+          "max_inverse_fft_error": 1.3351201482642082e-06,
           "max_magnitude_db": 3.0517578125e-05,
           "max_phase_rad": 7.62939453125e-06,
           "mean_magnitude_db": 7.0139419200808505e-06,
           "mean_phase_rad": 1.2771103733269743e-06,
+          "raw_inverse_fft_error_bound": 1.5848311653953885e-06,
           "raw_max_absolute_error": 3.0517578125e-05,
           "raw_mean_error": 4.1455261467039125e-06
         },
@@ -521,11 +549,12 @@
         "inverse_fft_snr_db": 94.06036971961404,
         "metrics": {
           "max_complex_relative_rms": 4.309480409504531e-05,
-          "max_inverse_fft_error_bound": 7.08351772692303e-08,
+          "max_inverse_fft_error": 6.33722722725234e-08,
           "max_magnitude_db": 9.918212890625e-05,
           "max_phase_rad": 7.915496826171875e-05,
           "mean_magnitude_db": 2.3804893789365312e-05,
           "mean_phase_rad": 3.5855197167211725e-06,
+          "raw_inverse_fft_error_bound": 7.08351772692303e-08,
           "raw_max_absolute_error": 9.918212890625e-05,
           "raw_mean_error": 1.3695206753043241e-05
         },
@@ -539,11 +568,12 @@
         "inverse_fft_snr_db": 132.0784958275005,
         "metrics": {
           "max_complex_relative_rms": 3.7719307161124545e-06,
-          "max_inverse_fft_error_bound": 6.245786646521105e-11,
+          "max_inverse_fft_error": 3.7915593264964005e-12,
           "max_magnitude_db": 0.0001220703125,
           "max_phase_rad": 9.5367431640625e-06,
           "mean_magnitude_db": 3.371127816133721e-05,
           "mean_phase_rad": 3.360038579896439e-06,
+          "raw_inverse_fft_error_bound": 6.245786646521105e-11,
           "raw_max_absolute_error": 0.0001220703125,
           "raw_mean_error": 1.8535658370616824e-05
         },
@@ -557,11 +587,12 @@
         "inverse_fft_snr_db": 98.38061046966146,
         "metrics": {
           "max_complex_relative_rms": 1.6167764054201597e-05,
-          "max_inverse_fft_error_bound": 1.5764580067086401e-07,
+          "max_inverse_fft_error": 7.563152293735928e-08,
           "max_magnitude_db": 2.47955322265625e-05,
           "max_phase_rad": 0.0001277923583984375,
           "mean_magnitude_db": 7.585037586300872e-06,
           "mean_phase_rad": 2.6798987573431445e-06,
+          "raw_inverse_fft_error_bound": 1.5764580067086401e-07,
           "raw_max_absolute_error": 0.0001277923583984375,
           "raw_mean_error": 5.1324681718220085e-06
         },
@@ -575,11 +606,12 @@
         "inverse_fft_snr_db": 108.18394108909453,
         "metrics": {
           "max_complex_relative_rms": 3.897396232127059e-06,
-          "max_inverse_fft_error_bound": 8.302660212292478e-07,
+          "max_inverse_fft_error": 6.836292461268077e-07,
           "max_magnitude_db": 7.62939453125e-05,
           "max_phase_rad": 5.7220458984375e-06,
           "mean_magnitude_db": 1.1466270269349564e-05,
           "mean_phase_rad": 1.382458117581153e-06,
+          "raw_inverse_fft_error_bound": 8.302660212292478e-07,
           "raw_max_absolute_error": 7.62939453125e-05,
           "raw_mean_error": 6.424364193465359e-06
         },
@@ -593,11 +625,12 @@
         "inverse_fft_snr_db": 112.5702811603195,
         "metrics": {
           "max_complex_relative_rms": 3.6819425933221886e-06,
-          "max_inverse_fft_error_bound": 2.18057130260885e-10,
+          "max_inverse_fft_error": 1.005052694092158e-10,
           "max_magnitude_db": 0.0001373291015625,
           "max_phase_rad": 1.1444091796875e-05,
           "mean_magnitude_db": 4.7491502392199615e-05,
           "mean_phase_rad": 3.6095463952352835e-06,
+          "raw_inverse_fft_error_bound": 2.18057130260885e-10,
           "raw_max_absolute_error": 0.0001373291015625,
           "raw_mean_error": 2.555052439371745e-05
         },
@@ -611,11 +644,12 @@
         "inverse_fft_snr_db": 99.70220094594174,
         "metrics": {
           "max_complex_relative_rms": 1.0345876835553677e-05,
-          "max_inverse_fft_error_bound": 7.782200794587721e-06,
+          "max_inverse_fft_error": 2.7691304850888807e-06,
           "max_magnitude_db": 2.86102294921875e-05,
           "max_phase_rad": 4.76837158203125e-05,
           "mean_magnitude_db": 8.54610472686531e-06,
           "mean_phase_rad": 4.0826871413593145e-06,
+          "raw_inverse_fft_error_bound": 7.782200794587721e-06,
           "raw_max_absolute_error": 4.76837158203125e-05,
           "raw_mean_error": 6.314395934112312e-06
         },
@@ -629,11 +663,12 @@
         "inverse_fft_snr_db": 114.97324077748888,
         "metrics": {
           "max_complex_relative_rms": 1.7897359241416937e-06,
-          "max_inverse_fft_error_bound": 1.3442286579411888e-06,
+          "max_inverse_fft_error": 6.310582345705721e-07,
           "max_magnitude_db": 2.3603439331054688e-05,
           "max_phase_rad": 4.291534423828125e-06,
           "mean_magnitude_db": 7.91217005530069e-06,
           "mean_phase_rad": 1.1015307995700097e-06,
+          "raw_inverse_fft_error_bound": 1.3442286579411888e-06,
           "raw_max_absolute_error": 2.3603439331054688e-05,
           "raw_mean_error": 4.50685042743535e-06
         },
@@ -647,11 +682,12 @@
         "inverse_fft_snr_db": 106.01656085128027,
         "metrics": {
           "max_complex_relative_rms": 5.001972696359805e-06,
-          "max_inverse_fft_error_bound": 9.077266414113616e-07,
+          "max_inverse_fft_error": 7.747562653230755e-07,
           "max_magnitude_db": 4.57763671875e-05,
           "max_phase_rad": 5.7220458984375e-06,
           "mean_magnitude_db": 1.1532805686773256e-05,
           "mean_phase_rad": 1.3445698937704397e-06,
+          "raw_inverse_fft_error_bound": 9.077266414113616e-07,
           "raw_max_absolute_error": 4.57763671875e-05,
           "raw_mean_error": 6.4386877902718474e-06
         },
@@ -665,11 +701,12 @@
         "inverse_fft_snr_db": 123.90743899732732,
         "metrics": {
           "max_complex_relative_rms": 1.6972087877054089e-06,
-          "max_inverse_fft_error_bound": 1.1437881518114778e-10,
+          "max_inverse_fft_error": 3.672327032543805e-11,
           "max_magnitude_db": 0.0001220703125,
           "max_phase_rad": 1.0013580322265625e-05,
           "mean_magnitude_db": 3.371127816133721e-05,
           "mean_phase_rad": 2.6207561640776405e-06,
+          "raw_inverse_fft_error_bound": 1.1437881518114778e-10,
           "raw_max_absolute_error": 0.0001220703125,
           "raw_mean_error": 1.8166017162707425e-05
         },
@@ -683,11 +720,12 @@
         "inverse_fft_snr_db": 109.23204980565467,
         "metrics": {
           "max_complex_relative_rms": 3.4545076654989565e-06,
-          "max_inverse_fft_error_bound": 3.4805904317455058e-06,
+          "max_inverse_fft_error": 1.0109414101971486e-06,
           "max_magnitude_db": 2.574920654296875e-05,
           "max_phase_rad": 1.6689300537109375e-05,
           "mean_magnitude_db": 6.901201351668484e-06,
           "mean_phase_rad": 1.877777336179748e-06,
+          "raw_inverse_fft_error_bound": 3.4805904317455058e-06,
           "raw_max_absolute_error": 2.574920654296875e-05,
           "raw_mean_error": 4.3894893439241155e-06
         },
@@ -701,11 +739,12 @@
         "inverse_fft_snr_db": 114.97324077748888,
         "metrics": {
           "max_complex_relative_rms": 1.7897359241416937e-06,
-          "max_inverse_fft_error_bound": 1.3442286579411888e-06,
+          "max_inverse_fft_error": 6.310582345705721e-07,
           "max_magnitude_db": 2.3603439331054688e-05,
           "max_phase_rad": 4.291534423828125e-06,
           "mean_magnitude_db": 7.91217005530069e-06,
           "mean_phase_rad": 1.1015307995700097e-06,
+          "raw_inverse_fft_error_bound": 1.3442286579411888e-06,
           "raw_max_absolute_error": 2.3603439331054688e-05,
           "raw_mean_error": 4.50685042743535e-06
         },
@@ -721,11 +760,12 @@
         "inverse_fft_snr_db": 129.72972606727132,
         "metrics": {
           "max_complex_relative_rms": 1.2704350614666838e-06,
-          "max_inverse_fft_error_bound": 2.075469796455622e-11,
+          "max_inverse_fft_error": 5.476485474884953e-12,
           "max_magnitude_db": 0.0001220703125,
           "max_phase_rad": 1.1444091796875e-05,
           "mean_magnitude_db": 3.421399020409399e-05,
           "mean_phase_rad": 3.225119539009508e-06,
+          "raw_inverse_fft_error_bound": 2.075469796455622e-11,
           "raw_max_absolute_error": 0.0001220703125,
           "raw_mean_error": 1.871955487155175e-05
         },
@@ -739,11 +779,12 @@
         "inverse_fft_snr_db": 108.74789005415494,
         "metrics": {
           "max_complex_relative_rms": 3.6526403795050028e-06,
-          "max_inverse_fft_error_bound": 1.4205815493892556e-06,
+          "max_inverse_fft_error": 1.170428609615404e-06,
           "max_magnitude_db": 3.62396240234375e-05,
           "max_phase_rad": 7.62939453125e-06,
           "mean_magnitude_db": 9.146771689718084e-06,
           "mean_phase_rad": 1.2530836948128633e-06,
+          "raw_inverse_fft_error_bound": 1.4205815493892556e-06,
           "raw_max_absolute_error": 3.62396240234375e-05,
           "raw_mean_error": 5.199927692265474e-06
         },
@@ -757,11 +798,12 @@
         "inverse_fft_snr_db": 93.25363894983893,
         "metrics": {
           "max_complex_relative_rms": 4.739879198025679e-05,
-          "max_inverse_fft_error_bound": 7.80327383503248e-08,
+          "max_inverse_fft_error": 7.072891783066479e-08,
           "max_magnitude_db": 0.00012969970703125,
           "max_phase_rad": 8.821487426757812e-05,
           "mean_magnitude_db": 2.6126240575036336e-05,
           "mean_phase_rad": 4.2896862177885784e-06,
+          "raw_inverse_fft_error_bound": 7.80327383503248e-08,
           "raw_max_absolute_error": 0.00012969970703125,
           "raw_mean_error": 1.5207963396412457e-05
         },
@@ -775,11 +817,12 @@
         "inverse_fft_snr_db": 120.14068171221284,
         "metrics": {
           "max_complex_relative_rms": 3.221511630135144e-06,
-          "max_inverse_fft_error_bound": 5.34716619239808e-11,
+          "max_inverse_fft_error": 1.4188550618467004e-11,
           "max_magnitude_db": 0.0001220703125,
           "max_phase_rad": 9.5367431640625e-06,
           "mean_magnitude_db": 3.524898558624031e-05,
           "mean_phase_rad": 3.1733697699021925e-06,
+          "raw_inverse_fft_error_bound": 5.34716619239808e-11,
           "raw_max_absolute_error": 0.0001220703125,
           "raw_mean_error": 1.921117767807125e-05
         },
@@ -793,11 +836,12 @@
         "inverse_fft_snr_db": 93.93440209708169,
         "metrics": {
           "max_complex_relative_rms": 2.7079294564615056e-05,
-          "max_inverse_fft_error_bound": 2.3796257726792893e-07,
+          "max_inverse_fft_error": 1.2521422321987714e-07,
           "max_magnitude_db": 4.57763671875e-05,
           "max_phase_rad": 0.0002155303955078125,
           "mean_magnitude_db": 8.823335632797359e-06,
           "mean_phase_rad": 3.783277762952701e-06,
+          "raw_inverse_fft_error_bound": 2.3796257726792893e-07,
           "raw_max_absolute_error": 0.0002155303955078125,
           "raw_mean_error": 6.30330669787503e-06
         },
@@ -811,11 +855,12 @@
         "inverse_fft_snr_db": 112.32285687143097,
         "metrics": {
           "max_complex_relative_rms": 2.4200697396491135e-06,
-          "max_inverse_fft_error_bound": 6.077695477510226e-07,
+          "max_inverse_fft_error": 4.867513984787765e-07,
           "max_magnitude_db": 7.2479248046875e-05,
           "max_phase_rad": 5.7220458984375e-06,
           "mean_magnitude_db": 1.18137330047844e-05,
           "mean_phase_rad": 1.40278838401617e-06,
+          "raw_inverse_fft_error_bound": 6.077695477510226e-07,
           "raw_max_absolute_error": 7.2479248046875e-05,
           "raw_mean_error": 6.608260694400285e-06
         },
@@ -829,11 +874,12 @@
         "inverse_fft_snr_db": 114.32810059436784,
         "metrics": {
           "max_complex_relative_rms": 3.2204628159680344e-06,
-          "max_inverse_fft_error_bound": 1.8902452522283173e-10,
+          "max_inverse_fft_error": 8.244591416886401e-11,
           "max_magnitude_db": 0.0001373291015625,
           "max_phase_rad": 9.5367431640625e-06,
           "mean_magnitude_db": 4.3528948643410855e-05,
           "mean_phase_rad": 3.4986540328624635e-06,
+          "raw_inverse_fft_error_bound": 1.8902452522283173e-10,
           "raw_max_absolute_error": 0.0001373291015625,
           "raw_mean_error": 2.3513801338136658e-05
         },
@@ -847,11 +893,12 @@
         "inverse_fft_snr_db": 100.92049919186883,
         "metrics": {
           "max_complex_relative_rms": 8.990848203461558e-06,
-          "max_inverse_fft_error_bound": 6.963288602756927e-06,
+          "max_inverse_fft_error": 2.6944218912089832e-06,
           "max_magnitude_db": 2.86102294921875e-05,
           "max_phase_rad": 3.814697265625e-05,
           "mean_magnitude_db": 8.039696272029433e-06,
           "mean_phase_rad": 3.733376199884932e-06,
+          "raw_inverse_fft_error_bound": 6.963288602756927e-06,
           "raw_max_absolute_error": 3.814697265625e-05,
           "raw_mean_error": 5.8865362359571825e-06
         },
@@ -865,11 +912,12 @@
         "inverse_fft_snr_db": 115.40189065265834,
         "metrics": {
           "max_complex_relative_rms": 1.700699951907582e-06,
-          "max_inverse_fft_error_bound": 1.250911165108302e-06,
+          "max_inverse_fft_error": 5.897909868648347e-07,
           "max_magnitude_db": 2.193450927734375e-05,
           "max_phase_rad": 3.814697265625e-06,
           "mean_magnitude_db": 7.5018683145212575e-06,
           "mean_phase_rad": 1.001727673434472e-06,
+          "raw_inverse_fft_error_bound": 1.250911165108302e-06,
           "raw_max_absolute_error": 2.193450927734375e-05,
           "raw_mean_error": 4.251797993977864e-06
         },
@@ -883,11 +931,12 @@
         "inverse_fft_snr_db": 105.98373560740511,
         "metrics": {
           "max_complex_relative_rms": 5.020910648820322e-06,
-          "max_inverse_fft_error_bound": 8.853980702636624e-07,
+          "max_inverse_fft_error": 7.250984783348781e-07,
           "max_magnitude_db": 5.340576171875e-05,
           "max_phase_rad": 5.7220458984375e-06,
           "mean_magnitude_db": 1.0852665864219962e-05,
           "mean_phase_rad": 1.373217087383418e-06,
+          "raw_inverse_fft_error_bound": 8.853980702636624e-07,
           "raw_max_absolute_error": 5.340576171875e-05,
           "raw_mean_error": 6.11294147580169e-06
         },
@@ -901,11 +950,12 @@
         "inverse_fft_snr_db": 127.70465652263468,
         "metrics": {
           "max_complex_relative_rms": 1.4933807644739648e-06,
-          "max_inverse_fft_error_bound": 1.0336858553589138e-10,
+          "max_inverse_fft_error": 2.4472571434981738e-11,
           "max_magnitude_db": 0.0001373291015625,
           "max_phase_rad": 1.0013580322265625e-05,
           "mean_magnitude_db": 4.074924675993217e-05,
           "mean_phase_rad": 3.1992446544558505e-06,
+          "raw_inverse_fft_error_bound": 1.0336858553589138e-10,
           "raw_max_absolute_error": 0.0001373291015625,
           "raw_mean_error": 2.197424570719401e-05
         },
@@ -919,11 +969,12 @@
         "inverse_fft_snr_db": 109.9134246390579,
         "metrics": {
           "max_complex_relative_rms": 3.193872435420549e-06,
-          "max_inverse_fft_error_bound": 3.2369998864022787e-06,
+          "max_inverse_fft_error": 1.0650087784148264e-06,
           "max_magnitude_db": 2.47955322265625e-05,
           "max_phase_rad": 1.3828277587890625e-05,
           "mean_magnitude_db": 6.073205045951429e-06,
           "mean_phase_rad": 1.848206039546996e-06,
+          "raw_inverse_fft_error_bound": 3.2369998864022787e-06,
           "raw_max_absolute_error": 2.47955322265625e-05,
           "raw_mean_error": 3.9607055427492125e-06
         },
@@ -937,11 +988,12 @@
         "inverse_fft_snr_db": 115.40189065265834,
         "metrics": {
           "max_complex_relative_rms": 1.700699951907582e-06,
-          "max_inverse_fft_error_bound": 1.250911165108302e-06,
+          "max_inverse_fft_error": 5.897909868648347e-07,
           "max_magnitude_db": 2.193450927734375e-05,
           "max_phase_rad": 3.814697265625e-06,
           "mean_magnitude_db": 7.5018683145212575e-06,
           "mean_phase_rad": 1.001727673434472e-06,
+          "raw_inverse_fft_error_bound": 1.250911165108302e-06,
           "raw_max_absolute_error": 2.193450927734375e-05,
           "raw_mean_error": 4.251797993977864e-06
         },
@@ -954,16 +1006,16 @@
   "ort": "1.28.0",
   "policy": {
     "complex_rms_floor": 1e-10,
-    "max_complex_relative_rms": 0.0001,
-    "max_inverse_fft_error_bound": 2e-05,
+    "max_complex_relative_rms": 0.0002,
+    "max_inverse_fft_error": 6.103515625e-05,
     "max_magnitude_db": 0.001,
-    "max_phase_rad": 0.001,
+    "max_phase_rad": 0.003,
     "mean_magnitude_db": 0.0001,
     "mean_phase_rad": 0.0001,
     "policy_id": "soundex-fp32-feature-parity-v2",
     "schema_version": 2
   },
-  "policy_sha256": "aa32bb88e8e371f225f9650f7c170585699af5750eaab99a55c96c87bd5fd0e7",
+  "policy_sha256": "dc9dbd80a4898576f696c777bd9d1871b79b274cbaa8b635c99d73e156e6e830",
   "system": "Darwin",
   "torch": "2.12.1",
   "waveform_scope": "Normalized real inverse FFT of one windowed spectrum; before crossover, OLA, loudness and limiting. Not a deployed-quality or device test."

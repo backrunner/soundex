@@ -1,0 +1,56 @@
+{
+  "artifact_sha256": "2e6a1ecc9caa761205646d6205630928d6ea921df911419db250e612739f8f98",
+  "audit_kind": "diagnostic-validation-numerical-parity",
+  "batch_size": 2,
+  "checkpoint_sha256": "5134cd9b80c5e36cb674dcad1686b77dc1fc39dbac1595d58d230e33407d9d21",
+  "failed_batches": 0,
+  "failure_examples": [],
+  "frame_count": 512,
+  "manifest_sha256": [
+    "8de5b7c519bbbf0ba0ca4ce692d805de1a3b1447dde43a02a37cb34719c8e602"
+  ],
+  "max_metrics": {
+    "max_complex_relative_rms": 0.00011551091132457647,
+    "max_inverse_fft_error": 3.678282064910798e-05,
+    "max_magnitude_db": 0.000240325927734375,
+    "max_phase_rad": 0.0013689994812011719,
+    "mean_magnitude_db": 1.2274167334386544e-05,
+    "mean_phase_rad": 3.9195945096570394e-05,
+    "raw_inverse_fft_error_bound": 7.12641840156987e-05,
+    "raw_max_absolute_error": 0.0013689994812011719,
+    "raw_mean_error": 2.5100630614184593e-05
+  },
+  "ort": "1.28.0",
+  "policy": {
+    "complex_rms_floor": 1e-10,
+    "max_complex_relative_rms": 0.0002,
+    "max_inverse_fft_error": 6.103515625e-05,
+    "max_magnitude_db": 0.001,
+    "max_phase_rad": 0.003,
+    "mean_magnitude_db": 0.0001,
+    "mean_phase_rad": 0.0001,
+    "policy_id": "soundex-fp32-feature-parity-v2",
+    "schema_version": 2
+  },
+  "policy_sha256": "dc9dbd80a4898576f696c777bd9d1871b79b274cbaa8b635c99d73e156e6e830",
+  "rust_max_metrics": {
+    "max_complex_relative_rms": 0.00011551091132457644,
+    "max_inverse_fft_error": 3.6782820649107996e-05,
+    "max_magnitude_db": 0.000240325927734375,
+    "max_phase_rad": 0.0013689994812011719,
+    "mean_magnitude_db": 1.2274167334386544e-05,
+    "mean_phase_rad": 3.9195945096570394e-05,
+    "raw_inverse_fft_error_bound": 7.126418401569866e-05,
+    "raw_max_absolute_error": 0.0013689994812011719,
+    "raw_mean_error": 2.5100630614184593e-05
+  },
+  "scope": "Python and Rust CPU ORT versus PyTorch features and normalized inverse FFT, before deployed DSP; not model-quality or real-time evidence.",
+  "seed": 1307,
+  "source": "Degraded validation mixtures; no training/test rows used. Track names, paths and audio are not distributed.",
+  "torch": "2.12.1",
+  "tracks_per_sample_rate": {
+    "44100": 8,
+    "48000": 8
+  },
+  "unique_track_count": 13
+}

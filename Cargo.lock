@@ -1450,6 +1450,7 @@ dependencies = [
  "ort",
  "qos-threads",
  "rtrb",
+ "rustfft",
  "serde",
  "serde_json",
  "sha2",

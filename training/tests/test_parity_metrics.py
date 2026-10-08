@@ -73,7 +73,7 @@ def test_mean_and_linear_signal_guards_are_independent() -> None:
     expected[0, 0, 0, 64] = 80
     actual = expected.copy()
     actual[0, 0, 0, 64] += 5e-5
-    with pytest.raises(ExportValidationError, match="max_inverse_fft_error_bound"):
+    with pytest.raises(ExportValidationError, match="max_inverse_fft_error"):
         validate_features(expected, actual, label="large-linear-signal")
 
 
@@ -84,6 +84,16 @@ def test_loud_batch_item_cannot_mask_corruption_in_a_quiet_item() -> None:
     actual[1, 1, 0, 64] = 5e-4
     with pytest.raises(ExportValidationError, match="max_complex_relative_rms"):
         validate_features(expected, actual, label="asymmetric-stereo")
+
+
+def test_conservative_bin_sum_cannot_reject_small_actual_sample_error() -> None:
+    expected = features(0)
+    expected[:, 1] = np.random.default_rng(1307).uniform(-np.pi, np.pi, (1, 1, 129))
+    actual = expected.copy()
+    actual[:, 1] += np.float32(9e-5)
+    metrics = validate_features(expected, actual, label="phase-rounding")
+    assert metrics["raw_inverse_fft_error_bound"] > PARITY_POLICY["max_inverse_fft_error"]
+    assert metrics["max_inverse_fft_error"] < PARITY_POLICY["max_inverse_fft_error"]
 
 
 def passing_evidence() -> dict[str, object]:
