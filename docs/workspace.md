@@ -20,6 +20,8 @@ data/                      Local artifacts, all ignored
   raw/{music,speech,slakh2100}/
   processed/{music_library,speech_library,slakh2100}/
   source-discovery/         Candidate metadata; not approved training data
+  catalogs/                Local input and final audited selection catalogs
+  evidence/                Publisher/acquisition receipts and historical surveys
   reports/                 Quality, inventory and cleanup receipts
   runs/<run-id>/           Frozen config, source, logs and checkpoints
 ```
@@ -47,3 +49,20 @@ files and acquisition evidence, and exclude known lossy transcodes separately.
 Before cleanup, stop the exact superseded process, check open files and references,
 record the deletion inventory, and verify retained paths afterward. Do not remove
 raw audio, checkpoints or mixed `target/` trees just because they are ignored.
+
+For a fresh run with matching prepared Slakh/speech supplements:
+
+```bash
+cd training
+PATH="$PWD/.tools/bin:$PATH" python scripts/run_native_training.py \
+  --catalog ../data/catalogs/training-music.jsonl \
+  --run-dir ../data/runs/native-1000-YYYYMMDD-HHMMSS \
+  --processed-root ../data/processed \
+  --config ../data/configs/native-lossless.yaml --minimum-tracks 1000
+```
+
+Use a profile with the exact recipe of the prepared supplements. The runner
+verifies their immutable manifests, freezes committed code and the final music
+catalog, prepares music pairs, derives speech's sampling probability from the
+smallest retained music genre, then starts training from random initialization.
+The run's `progress.json` and stage logs distinguish preparation from training.
