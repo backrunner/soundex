@@ -168,7 +168,7 @@
 - ONNX 文件 < 8MB
 - 测试集 LSD 显著优于 baseline（无增强）
 - 主观听感有明显改善
-- Rust 端推理结果与 PyTorch 误差 < 1e-5
+- Rust / ORT / PyTorch 通过 docs/parity.md 中的版本 2 分项误差预算与信号误差保护
 
 ---
 

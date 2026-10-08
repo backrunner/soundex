@@ -30,11 +30,12 @@ No qualified restoration weights are published in this repository. The bundled
 and use the software's Apache-2.0 license; they do not restore missing frequencies.
 
 As of 2026-10-08, the local 806,276-parameter candidate has an approximately
-3.16 MiB diagnostic ONNX graph and a 12.95 MiB training/resume checkpoint. These
-sizes are small enough for distribution, but the latest audited export fails the
-strict CPU-ORT silence parity gate (max `1.221e-4`, mean `2.079e-5`; both must be
-below `1e-5`). Diagnostic exports are not release artifacts. The current MUSDB
-training provenance also requires Tier C under the project's weight policy.
+3.16 MiB ONNX graph and a 12.95 MiB training/resume checkpoint. The old pooled
+`1e-5` feature gate incorrectly rejected normal FP32 backend rounding. After a
+[numerical audit](../docs/parity.md), the frozen candidate passes all 13 cases of
+the unit-aware version-2 PyTorch/CPU-ORT/Rust parity policy. This qualifies its
+export equivalence; held-out quality, listening and release runtime gates remain
+pending. The current MUSDB provenance requires Tier C under project policy.
 
 Future weight releases need a completed model card, qualified export and the
 quality/runtime gates listed in the release checklist. Training data, optimizer

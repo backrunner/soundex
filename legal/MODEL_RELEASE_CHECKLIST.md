@@ -28,7 +28,7 @@ this learned-weight release checklist does not apply to them.
 - [ ] Weight file(s) (e.g. `soundex-v1.onnx`, checkpoint)
 - [ ] Model Card completed from `models/MODEL_CARD.template.md`
 - [ ] SHA-256 checksum of each weight file recorded in the Model Card
-- [ ] ONNX checker and mandatory PyTorch / ORT / Rust parity passed (`<1e-5`)
+- [ ] ONNX checker and mandatory PyTorch / ORT / Rust parity passed under [version-2 unit-aware budgets](../docs/parity.md), with policy hash and all per-case metrics
 - [ ] Tensor contract is dynamic batch only and fixed `[B, 2, 1, fft_size / 2 + 1]` FP32 (`129` bins for default 256/128)
 - [ ] Required `soundex.*` metadata matches the schema-1.2 source checkpoint contract; default 256/128 ONNX artifact schema is 1.3
 - [ ] `best-validation.pth` was selected only from immutable validation rows and its validation-manifest hash is recorded

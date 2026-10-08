@@ -71,7 +71,7 @@ cargo run --locked -p soundex-cli -- target/demo/input.wav \
 checkpoint schema 为 1.2，artifact schema 为 1.3。导出必须通过 ONNX 与 ORT 一致性检查；
 Rust 在处理前验证模型元数据与张量契约。
 
-[评估流程](training/evaluation/README.md) · [模型卡](models/MODEL_CARD.template.md) ·
+[一致性误差预算](docs/parity.md) · [评估流程](training/evaluation/README.md) · [模型卡](models/MODEL_CARD.template.md) ·
 [权重发布清单](legal/MODEL_RELEASE_CHECKLIST.md)
 
 构建与检查命令见英文 README。[贡献说明](CONTRIBUTING.md)约定测试与提交格式。

@@ -60,7 +60,7 @@ resume sampling. Older 1.x checkpoints lack the crossover-bound feature contract
 schema-0 checkpoints are inspection-only and cannot be exported. ONNX export
 derives every model and feature setting from the checkpoint; `--config` is optional comparison
 input and never overrides checkpoint semantics. A successful export is atomically published only
-after ONNX checker and mandatory PyTorch/CPU-ORT parity pass, and prints the artifact SHA-256.
+after ONNX checker and mandatory PyTorch/CPU-ORT [unit-aware parity](../docs/parity.md) pass, and prints the artifact SHA-256.
 
 Runtime artifacts use artifact schema 1.3, opset 17, dynamic batch only, and fixed float32
 input/output `[batch, 2, 1, 129]` for the default 256/128 contract. Rust validates all

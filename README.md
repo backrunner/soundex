@@ -105,7 +105,7 @@ checkpoint schema 1.2 and artifact schema 1.3. Export binds preprocessing and pr
 the checkpoint and publishes atomically only after mandatory ONNX/ORT validation.
 Rust validates tensor and `soundex.*` metadata before processing.
 
-[Held-out evaluation](training/evaluation/README.md) ·
+[Parity budgets](docs/parity.md) · [Held-out evaluation](training/evaluation/README.md) ·
 [Model card](models/MODEL_CARD.template.md) · [Weight release checklist](legal/MODEL_RELEASE_CHECKLIST.md)
 
 ## Development
