@@ -2,6 +2,7 @@
 """Publisher receipts reject altered, incomplete and lossy source bytes."""
 
 import hashlib
+from io import BytesIO
 from pathlib import Path
 
 import numpy as np
@@ -45,3 +46,41 @@ def test_acquisition_paths_and_urls_are_contained(tmp_path: Path) -> None:
         acquire({"path": "../escape.wav"}, tmp_path)
     with pytest.raises(ValueError, match="HTTPS"):
         acquire({"path": "original.wav", "source_url": "http://example.com/a"}, tmp_path)
+
+
+def test_cached_partial_response_is_retried_and_never_published(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = tmp_path / "source.wav"
+    sf.write(original, np.sin(np.arange(44100) * 0.1) * 0.1, 44100)
+    payload = original.read_bytes()
+    entry = {
+        "id": "song",
+        "path": "raw/song.wav",
+        "source_url": "https://publisher.example/song.wav",
+        "source_bytes": len(payload),
+        "publisher_original_md5": hashlib.md5(payload).hexdigest(),
+    }
+    urls: list[str] = []
+
+    class Response(BytesIO):
+        def __init__(self, data: bytes, status: int) -> None:
+            super().__init__(data)
+            self.status = status
+            self.headers = {"Content-Length": str(len(data))}
+
+    def open_response(url: str, timeout: int) -> Response:
+        urls.append(url)
+        assert timeout > 0
+        if len(urls) == 1:
+            return Response(payload[:100], 206)
+        assert not (tmp_path / entry["path"]).exists()
+        return Response(payload, 200)
+
+    monkeypatch.setattr("scripts.fetch_archive_masters.urlopen", open_response)
+    monkeypatch.setattr("scripts.fetch_archive_masters.time.sleep", lambda _: None)
+    result = acquire(entry, tmp_path)
+    assert len(urls) == 2
+    assert "soundex_original=" in urls[1]
+    assert Path(result["path"]).read_bytes() == payload
+    assert not list(tmp_path.rglob("*.part"))

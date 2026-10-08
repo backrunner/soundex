@@ -12,7 +12,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 from urllib.request import urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -22,8 +22,9 @@ from data.source_quality import inspect_master
 
 def verify_original(path: Path, entry: dict[str, Any]) -> dict[str, Any]:
     """Bind publisher bytes and full decoded measurements to the acquired recording."""
-    if path.stat().st_size != entry["source_bytes"]:
-        raise ValueError("publisher original length mismatch")
+    size = path.stat().st_size
+    if size != entry["source_bytes"]:
+        raise ValueError(f"publisher original length mismatch: {size} != {entry['source_bytes']}")
     md5 = hashlib.md5()
     with path.open("rb") as source:
         while chunk := source.read(1 << 20):
@@ -61,7 +62,22 @@ def acquire(entry: dict[str, Any], root: Path) -> dict[str, Any]:
                 dir=target.parent, suffix=".part", delete=False
             ) as out:
                 pending = Path(out.name)
-                with urlopen(entry["source_url"], timeout=60) as response:
+                url = entry["source_url"]
+                if attempt:
+                    separator = "&" if "?" in url else "?"
+                    url += separator + urlencode(
+                        {"soundex_original": entry["publisher_original_md5"], "attempt": attempt}
+                    )
+                with urlopen(url, timeout=60) as response:
+                    if response.status != 200:
+                        raise ValueError(
+                            f"expected complete original, received HTTP {response.status}"
+                        )
+                    length = response.headers.get("Content-Length")
+                    if length is not None and int(length) != entry["source_bytes"]:
+                        raise ValueError(
+                            f"original response length {length} differs from publisher"
+                        )
                     while chunk := response.read(1 << 20):
                         out.write(chunk)
             verified = verify_original(pending, entry)
