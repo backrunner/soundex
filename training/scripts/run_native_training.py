@@ -80,7 +80,11 @@ def main() -> None:
     parser.add_argument("--minimum-tracks", type=int, default=1000)
     parser.add_argument("--project-root", type=Path)
     parser.add_argument("--source-commit", default="HEAD")
+    parser.add_argument("--curation-policy", type=Path)
+    parser.add_argument("--evidence-root", type=Path)
     args = parser.parse_args()
+    if bool(args.curation_policy) != bool(args.evidence_root):
+        parser.error("--curation-policy and --evidence-root must be supplied together")
     project = (args.project_root or Path(__file__).resolve().parents[2]).resolve()
     run = args.run_dir.resolve()
     run.mkdir(parents=True, exist_ok=False)
@@ -113,6 +117,24 @@ def main() -> None:
         )
         from data.sampling_weights import speech_mix_ratios
 
+        curation_report = None
+        if args.curation_policy:
+            from data.curation import audit_curation
+
+            policy_text = args.curation_policy.read_text()
+            (run / "curation-policy.yaml").write_text(policy_text)
+            _, curation_report = audit_curation(
+                music,
+                {e["id"]: e.get("source_review", {}) for e in music},
+                yaml.safe_load(policy_text),
+                args.evidence_root.resolve(),
+            )
+            (run / "curation-report.json").write_text(json.dumps(curation_report, indent=2) + "\n")
+            if not curation_report["ready_for_this_regional_run"] or curation_report[
+                "source_reviewed_music_recordings"
+            ] != len(music):
+                raise ValueError("requested regional/source review is incomplete")
+
         catalog = run / "music-catalog.jsonl"
         catalog.write_text("".join(json.dumps(e) + "\n" for e in music))
         bound, catalog_hash = load_catalog(catalog)
@@ -144,6 +166,10 @@ def main() -> None:
             "initialization": "fresh random weights; no legacy checkpoint/teacher",
             "recipe_hash": recipe.hash,
             "supplements": {c: str(processed / c) for c in ("slakh2100", "speech_library")},
+            "curation": curation_report,
+            "curation_policy_sha256": sha256_file(run / "curation-policy.yaml")
+            if curation_report
+            else None,
         }
         (run / "source-receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
         invoke(

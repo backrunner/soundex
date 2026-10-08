@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: Apache-2.0
+# Acquisition targets for this regional run; the generic importer has no whitelist.
+minimum_music_recordings: 1000
+minimum_distinct_artists: 25
+minimum_artists_per_region: 3
+minimum_genres_per_region: 3
+minimum_artists_per_genre: 3
+maximum_artist_fraction: 0.10
+maximum_genre_fraction: 0.35
+maximum_unknown_region_fraction: 0.05
+regions:
+  china: 50
+  japan: 50
+  korea: 50
+  europe: 100
+  north_america: 100
+genres:
+  pop: 60
+  rock: 60
+  electronic: 60
+  country: 30
+  folk: 30
+  jazz: 30
+  blues: 30
+  hiphop: 30
+  rnb: 30
+  classical: 30
+regional_vocal_music:
+  china: 10
+  japan: 10
+  korea: 10

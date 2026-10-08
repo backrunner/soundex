@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import yaml
 
+from data.curation import audit_curation
 from data.protocol import (
     DatasetPublisher,
     load_manifest,
@@ -75,7 +76,11 @@ def main() -> None:
     parser.add_argument("--source-commit", required=True)
     parser.add_argument("--minimum-tracks", type=int, default=1000)
     parser.add_argument("--poll-seconds", type=float, default=60)
+    parser.add_argument("--curation-policy", type=Path)
+    parser.add_argument("--source-reviews", type=Path)
     args = parser.parse_args()
+    if bool(args.curation_policy) != bool(args.source_reviews):
+        parser.error("--curation-policy and --source-reviews must be supplied together")
     if args.minimum_tracks < 1 or not 1 <= args.poll_seconds <= 60:
         parser.error("positive track minimum and poll interval in [1, 60] required")
     job, processed = args.job_dir.resolve(), args.processed_root.resolve()
@@ -84,6 +89,10 @@ def main() -> None:
         raise ValueError("queue directory already contains a run")
     config = job / "config.yaml"
     config.write_text(yaml.safe_dump(yaml.safe_load(args.config.read_text()), sort_keys=False))
+    if args.curation_policy:
+        policy_text = args.curation_policy.read_text()
+        args.curation_policy = job / "curation-policy.yaml"
+        args.curation_policy.write_text(policy_text)
     try:
         write_progress(job, "verify-prepared-supplements")
         verify_supplements(config, processed)
@@ -94,18 +103,46 @@ def main() -> None:
             for directory in args.acquisition_dir:
                 entries.extend(read_catalog(directory / "acquired.jsonl"))
             selected, held = select_recordings(entries)
+            coverage = None
+            if args.curation_policy:
+                rows = [
+                    json.loads(line)
+                    for line in args.source_reviews.read_text().splitlines()
+                    if line.strip()
+                ]
+                reviews = {row["id"]: row for row in rows}
+                if len(reviews) != len(rows):
+                    raise ValueError("duplicate source-review recording IDs")
+                selected, coverage = audit_curation(
+                    selected,
+                    reviews,
+                    yaml.safe_load(args.curation_policy.read_text()),
+                    args.source_reviews.parent.resolve(),
+                )
+                pending = job / "curation-report.json.tmp"
+                pending.write_text(json.dumps(coverage, indent=2) + "\n")
+                pending.replace(job / "curation-report.json")
             write_progress(
                 job,
-                "waiting-for-audited-native-masters",
+                "waiting-for-regional-source-selection"
+                if coverage
+                else "waiting-for-audited-native-masters",
                 distinct_music_recordings=len(selected),
                 minimum_required=args.minimum_tracks,
                 held_for_review=len(held),
                 genres=dict(sorted(Counter(e.get("genre", "unlabeled") for e in selected).items())),
                 excludes_speech_and_slakh_from_music_count=True,
+                signal_audited_candidates=coverage["signal_audited_candidates"]
+                if coverage
+                else len(selected),
+                regional_coverage=coverage["regions"] if coverage else None,
+                coverage_gap_count=len(coverage["coverage_gaps"]) if coverage else 0,
             )
-            if len(selected) >= args.minimum_tracks:
+            if len(selected) >= args.minimum_tracks and (
+                coverage is None or coverage["ready_for_this_regional_run"]
+            ):
                 break
-            if not any(collection_active(d) for d in args.acquisition_dir):
+            if coverage is None and not any(collection_active(d) for d in args.acquisition_dir):
                 raise ValueError("acquisition stopped below target; obtain more audited originals")
             time.sleep(args.poll_seconds)
         catalog = job / "music-catalog.jsonl"
@@ -131,6 +168,16 @@ def main() -> None:
                     str(args.project_root.resolve()),
                     "--source-commit",
                     args.source_commit,
+                    *(
+                        [
+                            "--curation-policy",
+                            str(args.curation_policy.resolve()),
+                            "--evidence-root",
+                            str(args.source_reviews.parent.resolve()),
+                        ]
+                        if args.curation_policy
+                        else []
+                    ),
                 ],
                 stdout=log,
                 stderr=subprocess.STDOUT,

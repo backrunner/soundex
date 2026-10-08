@@ -64,3 +64,83 @@ def test_completed_collection_below_target_never_starts_training(
     assert progress["stage"] == "failed"
     assert not (job / "music-catalog.jsonl").exists()
     assert not (job / "training-run").exists()
+
+
+def test_count_target_cannot_start_unreviewed_regional_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    catalog = tmp_path / "base.jsonl"
+    catalog.write_text(
+        json.dumps(
+            {
+                "id": "song",
+                "path": "native.wav",
+                "audio_sha256": "a" * 64,
+                "split_group": "artist:work",
+                "source_quality": {
+                    "audio_sha256": "a" * 64,
+                    "decoded_pcm_sha256": "b" * 64,
+                    "review_flags": [],
+                    "sample_rate": 48000,
+                    "duration_seconds": 60,
+                },
+            }
+        )
+        + "\n"
+    )
+    reviews = tmp_path / "reviews.jsonl"
+    reviews.write_text("")
+    profile = tmp_path / "profile.yaml"
+    profile.write_text("data: {}\n")
+    policy = tmp_path / "curation.yaml"
+    settings = yaml.safe_load(
+        (Path(__file__).parents[1] / "configs/curation_1000.yaml").read_text()
+    )
+    settings["minimum_music_recordings"] = 1
+    policy.write_text(yaml.safe_dump(settings))
+    job = tmp_path / "job"
+    monkeypatch.setattr("scripts.wait_for_native_training.verify_supplements", lambda *_: None)
+
+    class StopPolling(BaseException):
+        pass
+
+    def stop_polling(seconds: float) -> None:
+        raise StopPolling
+
+    def no_launch(*args: object, **kwargs: object) -> None:
+        pytest.fail("training must not start when only the signal/count target is met")
+
+    monkeypatch.setattr("scripts.wait_for_native_training.time.sleep", stop_polling)
+    monkeypatch.setattr("scripts.wait_for_native_training.subprocess.Popen", no_launch)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "queue",
+            "--base-catalog",
+            str(catalog),
+            "--acquisition-dir",
+            str(tmp_path / "collection"),
+            "--job-dir",
+            str(job),
+            "--processed-root",
+            str(tmp_path / "processed"),
+            "--config",
+            str(profile),
+            "--project-root",
+            str(tmp_path),
+            "--source-commit",
+            "HEAD",
+            "--minimum-tracks",
+            "1",
+            "--curation-policy",
+            str(policy),
+            "--source-reviews",
+            str(reviews),
+        ],
+    )
+    with pytest.raises(StopPolling):
+        main()
+    progress = json.loads((job / "progress.json").read_text())
+    assert progress["stage"] == "waiting-for-regional-source-selection"
+    assert progress["signal_audited_candidates"] == 1
+    assert not (job / "training-run").exists()
