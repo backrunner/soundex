@@ -3,7 +3,7 @@
 > **Executor instructions**: Follow this plan step by step. Run every
 > verification command and confirm the expected result before moving on. If a
 > STOP condition occurs, stop and report it instead of improvising. When done,
-> update this plan's status row in `plans/README.md`.
+> update this plan's status row in `docs/design/archive/README.md`.
 >
 > **Drift check (run first)**: run
 > `rtk shasum -a 256 training/models/generator.py training/train.py training/models/losses.py training/configs/default.yaml training/configs/titan_xp.yaml crates/soundex-core/src/inference.rs`.
@@ -180,7 +180,7 @@ returns no stale production-contract claim.
 - [ ] `rtk python3 -m pytest -q` passes.
 - [ ] Ruff check and format check pass.
 - [ ] `rtk cargo test --workspace --all-targets` still passes.
-- [ ] Only in-scope files and `plans/README.md` changed.
+- [ ] Only in-scope files and `docs/design/archive/README.md` changed.
 
 ## STOP Conditions
 

@@ -5,6 +5,7 @@ generated pairs and experiment state live under the ignored `data/` directory:
 
 ```text
 crates/                    Rust runtime, DSP and CLI
+docs/design/archive/       Historical design plans and audit baselines
 models/                    Release model artifacts and their provenance
 training/
   configs/                 Reproducible model/data/training profiles
@@ -58,7 +59,7 @@ PATH="$PWD/.tools/bin:$PATH" python scripts/run_native_training.py \
   --catalog ../data/catalogs/training-music.jsonl \
   --run-dir ../data/runs/native-1000-YYYYMMDD-HHMMSS \
   --processed-root ../data/processed \
-  --config ../data/configs/native-lossless.yaml --minimum-tracks 1000
+  --config configs/diverse_lossless.yaml --minimum-tracks 1000
 ```
 
 Use a profile with the exact recipe of the prepared supplements. The runner
@@ -66,3 +67,11 @@ verifies their immutable manifests, freezes committed code and the final music
 catalog, prepares music pairs, derives speech's sampling probability from the
 smallest retained music genre, then starts training from random initialization.
 The run's `progress.json` and stage logs distinguish preparation from training.
+
+During acquisition, `scripts/wait_for_native_training.py` can watch growing
+`acquired.jsonl` receipts alongside an audited base catalog. It requires the exact
+source commit, verifies prepared supplements before waiting and starts the above
+pipeline only once the distinct music count reaches the configured minimum. A
+finished or stopped collection below target fails visibly; it never reduces the
+target or silently starts with fewer songs. Keep the queue's source/config snapshot
+and its `progress.json` under `data/runs/<job-id>/`.

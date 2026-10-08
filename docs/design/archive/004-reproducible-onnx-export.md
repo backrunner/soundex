@@ -2,7 +2,7 @@
 
 > **Executor instructions**: Execute in order and run every verification. This
 > plan creates a breaking artifact schema; do not preserve silent compatibility
-> with unverifiable checkpoints. Update `plans/README.md` when complete.
+> with unverifiable checkpoints. Update `docs/design/archive/README.md` when complete.
 >
 > **Drift check (run first)**: run
 > `rtk shasum -a 256 training/train.py training/export_onnx.py training/requirements.txt crates/soundex-core/src/inference.rs crates/soundex-core/src/processor.rs crates/soundex-core/tests/processor_test.rs .github/workflows/ci.yml`.
@@ -20,7 +20,7 @@
 - **Priority**: P1
 - **Effort**: L
 - **Risk**: MED
-- **Depends on**: `plans/001-streaming-model-contract.md`
+- **Depends on**: `docs/design/archive/001-streaming-model-contract.md`
 - **Category**: tests
 - **Planned at**: workspace snapshot without Git metadata, 2026-07-28
 
@@ -207,7 +207,7 @@ network access after dependency installation and publishes no model artifact.
 - [ ] Rust rejects every mismatched model/config before processing audio.
 - [ ] Python 3.12 CI runs the complete export/parity path.
 - [ ] Rust fmt, clippy, and all-target tests pass.
-- [ ] Only in-scope files and `plans/README.md` changed.
+- [ ] Only in-scope files and `docs/design/archive/README.md` changed.
 
 ## STOP Conditions
 

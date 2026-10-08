@@ -1,7 +1,7 @@
 # Plan 002: Make The Rust Stream State Machine And Spectral Blend Correct
 
 > **Executor instructions**: Follow every step and verification gate. Stop on
-> any listed condition instead of widening scope. Update `plans/README.md` when
+> any listed condition instead of widening scope. Update `docs/design/archive/README.md` when
 > complete.
 >
 > **Drift check (run first)**: run
@@ -209,7 +209,7 @@ the same buffer with an identity model.
 - [ ] Processing failure cannot partially advance stereo state or output.
 - [ ] Dry-run and processing share causal frame decisions.
 - [ ] Rust fmt, clippy, default tests, and no-default-feature check all pass.
-- [ ] Only in-scope files and `plans/README.md` changed.
+- [ ] Only in-scope files and `docs/design/archive/README.md` changed.
 
 ## STOP Conditions
 

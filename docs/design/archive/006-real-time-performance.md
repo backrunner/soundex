@@ -2,7 +2,7 @@
 
 > **Executor instructions**: Finish dependency plans first. Establish benchmarks
 > before optimizing, preserve quality gates after every change, and stop if the
-> target cannot be met without a model/quality decision. Update `plans/README.md`
+> target cannot be met without a model/quality decision. Update `docs/design/archive/README.md`
 > when complete.
 >
 > **Drift check (run first)**: run
@@ -28,9 +28,9 @@
   identity fixture, no trained artifact with passing plan-005 evidence, and the
   available Apple M4 host cannot supply the required x86_64 reference result.
   The selected 1024/512 contract still requires retraining and quality evaluation.
-- **Depends on**: `plans/001-streaming-model-contract.md`,
-  `plans/002-correct-rust-stream.md`, `plans/004-reproducible-onnx-export.md`,
-  `plans/005-deployment-evaluation.md`
+- **Depends on**: `docs/design/archive/001-streaming-model-contract.md`,
+  `docs/design/archive/002-correct-rust-stream.md`, `docs/design/archive/004-reproducible-onnx-export.md`,
+  `docs/design/archive/005-deployment-evaluation.md`
 - **Category**: perf
 - **Planned at**: workspace snapshot without Git metadata, 2026-07-28
 
@@ -245,7 +245,7 @@ matches the benchmark JSON and release model card.
 - [ ] Every plan-005 quality gate passes after the final performance changes.
 - [x] Rust fmt, clippy, tests, and no-default-feature check pass.
 - [x] Performance docs separate algorithmic, compute, cold-start, and device delay.
-- [ ] Only in-scope files and `plans/README.md` changed.
+- [ ] Only in-scope files and `docs/design/archive/README.md` changed.
 
 ## STOP Conditions
 

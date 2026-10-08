@@ -2,7 +2,7 @@
 
 > **Executor instructions**: Complete dependency plans first. Follow every
 > verification command and stop on listed conditions. Do not train or publish a
-> release model as part of this plan. Update `plans/README.md` when complete.
+> release model as part of this plan. Update `docs/design/archive/README.md` when complete.
 >
 > **Drift check (run first)**: run
 > `rtk shasum -a 256 training/train.py training/models/losses.py training/evaluate.py training/data/dataset.py training/configs/default.yaml crates/soundex-core/src/channel.rs crates/soundex-core/tests/processor_test.rs models/MODEL_CARD.template.md`.
@@ -23,9 +23,9 @@
 - **Priority**: P1
 - **Effort**: L
 - **Risk**: HIGH
-- **Depends on**: `plans/001-streaming-model-contract.md`,
-  `plans/002-correct-rust-stream.md`, `plans/003-training-data-protocol.md`,
-  `plans/004-reproducible-onnx-export.md`
+- **Depends on**: `docs/design/archive/001-streaming-model-contract.md`,
+  `docs/design/archive/002-correct-rust-stream.md`, `docs/design/archive/003-training-data-protocol.md`,
+  `docs/design/archive/004-reproducible-onnx-export.md`
 - **Category**: tests
 - **Planned at**: workspace snapshot without Git metadata, 2026-07-28
 
@@ -227,7 +227,7 @@ and metric reports whose artifact hash differs from the ONNX file.
       are present with tested implementations.
 - [ ] Release gates exit nonzero on regression and model cards require their output.
 - [ ] Python/Rust tests, Ruff, Rust fmt, and clippy pass.
-- [ ] Only in-scope files and `plans/README.md` changed.
+- [ ] Only in-scope files and `docs/design/archive/README.md` changed.
 
 ## STOP Conditions
 

@@ -2,7 +2,7 @@
 
 > **Executor instructions**: Follow each step and verification gate. Do not run
 > destructive preprocessing against an existing dataset tree. Stop on any listed
-> condition. Update `plans/README.md` when complete.
+> condition. Update `docs/design/archive/README.md` when complete.
 >
 > **Drift check (run first)**: run
 > `rtk shasum -a 256 training/data/audio_prep.py training/data/dataset.py training/data/preprocess_musdb.py training/data/preprocess_slakh.py training/data/preprocess_medleydb.py training/configs/default.yaml`.
@@ -221,7 +221,7 @@ across workers and runs.
 - [ ] The loader consumes only manifest rows and returns degradation metadata.
 - [ ] Python tests and Ruff checks pass.
 - [ ] No third-party audio or stems are added to the repository.
-- [ ] Only in-scope files and `plans/README.md` changed.
+- [ ] Only in-scope files and `docs/design/archive/README.md` changed.
 
 ## STOP Conditions
 

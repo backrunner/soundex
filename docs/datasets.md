@@ -42,8 +42,9 @@ catalog. A single work/album cannot establish cross-work generalization.
 ## Audio directory or optional catalog
 
 The [native lossless source catalog](../training/source_catalogs/README.md)
-provides a verified 743-track acquisition index and download instructions.
-Its count excludes speech, Slakh, duplicate works and short cues. The audio is
+provides the current audited acquisition snapshot and download instructions.
+The index documents its verified count and the ongoing 1,000-track expansion;
+it excludes speech, Slakh, duplicate works and short cues. The audio is
 downloaded separately and retains each original recording's license.
 
 Training has no dataset/license whitelist or mandatory rights form. Point the
