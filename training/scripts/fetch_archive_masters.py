@@ -37,7 +37,7 @@ def verify_original(path: Path, entry: dict[str, Any]) -> dict[str, Any]:
     quality = inspect_master(path, entry.get("audio_sha256"))
     return {
         **entry,
-        "path": str(path),
+        "path": str(path.resolve()),
         "audio_sha256": quality["audio_sha256"],
         "decoded_pcm_sha256": quality["decoded_pcm_sha256"],
         "source_quality": quality,
@@ -102,7 +102,7 @@ def acquire(entry: dict[str, Any], root: Path) -> dict[str, Any]:
                         out.write(chunk)
             verified = verify_original(pending, entry)
             pending.replace(target)
-            verified["path"] = str(target)
+            verified["path"] = str(target.resolve())
             return verified
         except Exception:
             if attempt == 3:

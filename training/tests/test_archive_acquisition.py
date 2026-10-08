@@ -42,6 +42,18 @@ def test_lossy_upload_cannot_be_a_clean_master(tmp_path: Path) -> None:
         verify_original(path, entry)
 
 
+def test_relative_input_receipt_resolves_from_any_consumer_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    source = Path("raw/native.wav")
+    source.parent.mkdir()
+    sf.write(source, np.sin(np.arange(44100) * 0.1) * 0.1, 44100)
+    result = verify_original(source, {"id": "native"})
+    assert Path(result["path"]).is_absolute()
+    assert Path(result["path"]).samefile(source)
+
+
 def test_acquisition_paths_and_urls_are_contained(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="relative"):
         acquire({"path": "../escape.wav"}, tmp_path)
