@@ -23,7 +23,8 @@ MANIFEST_NAME = "manifest.jsonl"
 RECIPE_NAME = "recipe.json"
 SUMMARY_NAME = "summary.json"
 SPLITS = ("train", "validation", "test")
-CORPORA = ("musdb18_hq", "slakh2100", "medleydb")
+LEGACY_CORPORA = ("musdb18_hq", "slakh2100", "medleydb")
+CORPORA = (*LEGACY_CORPORA, "music_library")
 
 
 class DataProtocolError(ValueError):
@@ -130,6 +131,7 @@ def validate_data_config(data_config: Mapping[str, Any]) -> DataRecipe:
         "slakh2100_path",
         "medleydb_path",
         "babyslakh_path",
+        "music_library_path",
         "sampling",
         "recipe",
     }
@@ -280,11 +282,13 @@ def recipe_from_mapping(value: Any, *, path: str = "recipe") -> DataRecipe:
         raise DataProtocolError(f"{path}.channel_policy.roles: weights must be positive")
 
     split_raw = _strict_keys(
-        recipe["splits"], f"{path}.splits", set(CORPORA), required=set(CORPORA)
+        recipe["splits"], f"{path}.splits", set(CORPORA), required=set(LEGACY_CORPORA)
     )
     splits: list[tuple[str, tuple[tuple[str, float | bool], ...]]] = []
     split_keys = {"train", "validation", "test", "preserve_official", "preserve_official_test"}
     for corpus in CORPORA:
+        if corpus not in split_raw:
+            continue
         policy_path = f"{path}.splits.{corpus}"
         policy = _strict_keys(
             split_raw[corpus],
@@ -574,8 +578,10 @@ def manifest_summary(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
-def assert_deployment_coverage(rows: Sequence[Mapping[str, Any]], recipe: DataRecipe) -> None:
-    """Require every validation/test codec and sample-rate stratum before release."""
+def assert_deployment_coverage(
+    rows: Sequence[Mapping[str, Any]], recipe: DataRecipe, *, require_stereo: bool = True
+) -> None:
+    """Require codec/rate coverage; mono-only source prep can explicitly omit stereo."""
     expected_codecs = {spec.id for spec in recipe.codecs}
     expected_rates = set(recipe.sample_rates)
     stereo_roles = {"left", "right", "mid", "side"}
@@ -592,7 +598,7 @@ def assert_deployment_coverage(rows: Sequence[Mapping[str, Any]], recipe: DataRe
         if rates != expected_rates:
             missing = sorted(expected_rates - rates)
             raise DataProtocolError(f"manifest coverage: {split} missing sample rates {missing}")
-        if not stereo_roles <= roles:
+        if require_stereo and not stereo_roles <= roles:
             missing = sorted(stereo_roles - roles)
             raise DataProtocolError(
                 f"manifest coverage: {split} missing stereo channel roles {missing}"

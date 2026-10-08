@@ -1,4 +1,4 @@
-# SoundEx Training Configuration
+# Generic music-library profile; source metadata is optional at ingestion.
 model:
   generator:
     channels: [24, 48, 96, 96]
@@ -43,9 +43,9 @@ audio:
 # Audio source paths; use MUSIC_LIBRARY_PATH for a generic audio library.
 data:
   musdb18_hq_path: null  # legacy checkpoint key; not a training source
-  slakh2100_path: /data/slakh2100
+  slakh2100_path: null
   medleydb_path: null  # legacy key; default trainer uses Slakh / audio libraries
-  music_library_path: null
+  music_library_path: /data/music-library
   recipe:
     schema_version: 1
     recipe_version: soundex-data-v1
@@ -169,8 +169,8 @@ data:
 
   sampling:
     strategy: weighted
-    train_ratios: {slakh2100: 1.0}
-    max_train_samples: {slakh2100: 10000}
-    val_ratios: {slakh2100: 1.0}
-    validation_source_quotas: {slakh2100: 2400}
+    train_ratios: {music_library: 1.0}
+    max_train_samples: {music_library: null}
+    val_ratios: {music_library: 1.0}
+    validation_source_quotas: {music_library: 256}
     samples_per_epoch: null

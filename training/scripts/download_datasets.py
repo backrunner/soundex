@@ -1,47 +1,11 @@
 #!/usr/bin/env python3
-"""Download SoundEx training datasets (mix-only where possible).
+"""Download mix-only SoundEx audio; default is official Slakh2100-redux.
 
-Public Zenodo sources:
-
-  musdb18-hq   https://zenodo.org/records/3338373  (~23 GB zip → prune stems)
-  slakh2100    https://zenodo.org/records/4599666  (~104 GB tar → extract mix only)
-  babyslakh    https://zenodo.org/records/4603870  (tiny smoke subset; 16 kHz — not for full BWE)
-
-MedleyDB is access-controlled on Zenodo; pass a pre-approved URL via
-``--medleydb-url`` or place files under the configured medleydb path manually.
-
-Path configuration (priority high → low)
-----------------------------------------
-For each dataset storage directory:
-
-  1. ``--path NAME=/abs/or/rel``  (repeatable)
-  2. ``--musdb18-hq-path`` / ``--slakh2100-path`` / ``--medleydb-path`` / ``--babyslakh-path``
-  3. Environment: ``MUSDB18_HQ_PATH``, ``SLAKH2100_PATH``, ``MEDLEYDB_PATH``, ``BABYSLAKH_PATH``
-  4. Default: ``$DATA_ROOT/<dest_name>``  (DATA_ROOT from ``--data-root`` / env, default ``/data``)
-
-Archive download cache (zip/tar only, not extracted audio):
-
-  1. ``--cache-dir``
-  2. ``CACHE_DIR`` or ``DOWNLOAD_CACHE_DIR``
-  3. Default: ``$DATA_ROOT/.cache/downloads``
-
-Examples
---------
-  # Default layout under /data
-  python scripts/download_datasets.py --datasets musdb18-hq --data-root /data
-
-  # Custom storage + cache on different disks
-  python scripts/download_datasets.py --datasets musdb18-hq,slakh2100 \\
-      --data-root /mnt/datasets \\
-      --cache-dir /mnt/scratch/soundex-cache \\
-      --path musdb18-hq=/mnt/datasets/musdb \\
-      --path slakh2100=/mnt/huge/slakh
-
-  # Env-based (Docker-friendly)
-  export DATA_ROOT=/data
-  export MUSDB18_HQ_PATH=/data/custom/musdb
-  export CACHE_DIR=/scratch/dl
-  python scripts/download_datasets.py --datasets musdb18-hq --preprocess
+MUSDB is not a selectable source. BabySlakh is a 16 kHz smoke subset only;
+MedleyDB remains an explicit legacy data utility outside default training. Consult legal/TRAINING_DATA.md before acquiring audio.
+Storage: --path NAME=DIR / dedicated flag, then source env, then DATA_ROOT.
+Archives: --cache-dir, CACHE_DIR / DOWNLOAD_CACHE_DIR, then DATA_ROOT/.cache/downloads.
+Example: python scripts/download_datasets.py --datasets slakh2100 --data-root /data
 """
 
 from __future__ import annotations
@@ -67,7 +31,6 @@ except ImportError:  # pragma: no cover - yaml is in requirements.txt
 
 # Maps dataset id → env var for storage path override
 PATH_ENV_KEYS: dict[str, str] = {
-    "musdb18-hq": "MUSDB18_HQ_PATH",
     "slakh2100": "SLAKH2100_PATH",
     "babyslakh": "BABYSLAKH_PATH",
     "medleydb": "MEDLEYDB_PATH",
@@ -75,23 +38,12 @@ PATH_ENV_KEYS: dict[str, str] = {
 
 # Maps dataset id → training config yaml key
 CONFIG_PATH_KEYS: dict[str, str] = {
-    "musdb18-hq": "musdb18_hq_path",
     "slakh2100": "slakh2100_path",
     "babyslakh": "babyslakh_path",
     "medleydb": "medleydb_path",
 }
 
 REGISTRY: dict[str, dict] = {
-    "musdb18-hq": {
-        "url": "https://zenodo.org/records/3338373/files/musdb18hq.zip?download=1",
-        "filename": "musdb18hq.zip",
-        "kind": "zip_then_filter",
-        "filter_dataset": "musdb",
-        "dest_name": "musdb18-hq",
-        "ready_marker": ("train", "test"),
-        "size_hint_gb": 23,
-        "license_note": "MUSDB18-HQ: research-oriented terms (see NOTICE).",
-    },
     "slakh2100": {
         "url": ("https://zenodo.org/records/4599666/files/slakh2100_flac_redux.tar.gz?download=1"),
         "filename": "slakh2100_flac_redux.tar.gz",
@@ -421,21 +373,7 @@ def maybe_preprocess(
     *,
     reuse_existing: bool,
 ) -> None:
-    if name == "musdb18-hq":
-        script = "data/preprocess_musdb.py"
-        root = raw_root
-        flat = flatten_if_single_child(raw_root)
-        if (flat / "train").is_dir():
-            root = flat
-        cmd = [
-            sys.executable,
-            script,
-            "--data-root",
-            str(root),
-            "--output-dir",
-            str(root / "processed"),
-        ]
-    elif name == "slakh2100":
+    if name == "slakh2100":
         script = "data/preprocess_slakh.py"
         cmd = [
             sys.executable,
@@ -551,11 +489,6 @@ def prepare_dataset(
         filter_name = entry.get("filter_dataset")
         if filter_name:
             run_filter_mix_only(root, filter_name)
-        if name == "musdb18-hq" and root != dest:
-            for split in ("train", "test"):
-                src = root / split
-                if src.is_dir() and not (dest / split).exists():
-                    shutil.move(str(src), str(dest / split))
     else:
         raise RuntimeError(f"Unhandled kind: {kind}")
 
@@ -580,14 +513,14 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Path env vars: DATA_ROOT, CACHE_DIR, DOWNLOAD_CACHE_DIR,\n"
-            "  MUSDB18_HQ_PATH, SLAKH2100_PATH, MEDLEYDB_PATH, BABYSLAKH_PATH"
+            "  SLAKH2100_PATH, MEDLEYDB_PATH, BABYSLAKH_PATH"
         ),
     )
     parser.add_argument(
         "--datasets",
         type=str,
-        default="musdb18-hq",
-        help="Comma-separated: musdb18-hq,slakh2100,babyslakh,medleydb",
+        default="slakh2100",
+        help="Comma-separated: slakh2100,babyslakh,medleydb; default slakh2100",
     )
     parser.add_argument(
         "--data-root",
@@ -606,13 +539,7 @@ def main() -> int:
         action="append",
         default=[],
         metavar="NAME=DIR",
-        help="Per-dataset storage directory (repeatable), e.g. musdb18-hq=/mnt/musdb",
-    )
-    parser.add_argument(
-        "--musdb18-hq-path",
-        type=Path,
-        default=None,
-        help="Storage path for MUSDB18-HQ (alias for --path musdb18-hq=…)",
+        help="Per-dataset storage directory (repeatable), e.g. slakh2100=/mnt/slakh",
     )
     parser.add_argument(
         "--slakh2100-path",
@@ -683,7 +610,6 @@ def main() -> int:
     cli_paths = parse_path_overrides(args.path)
     # Dedicated flags override --path for the same dataset
     for name, flag_val in (
-        ("musdb18-hq", args.musdb18_hq_path),
         ("slakh2100", args.slakh2100_path),
         ("medleydb", args.medleydb_path),
         ("babyslakh", args.babyslakh_path),

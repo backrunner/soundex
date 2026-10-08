@@ -4,14 +4,14 @@
 #   # Build
 #   docker compose build
 #
-#   # Download MUSDB (mix-only prune) + preprocess + train
-#   DATA_HOST=/path/on/host DOWNLOAD_DATASETS=musdb18-hq docker compose run --rm train
+#   # Download Slakh (mix-only) + preprocess + train
+#   DATA_HOST=/path/on/host DOWNLOAD_DATASETS=slakh2100 docker compose run --rm train
 #
-#   # Full auto (huge): MUSDB + Slakh mix-only
-#   DATA_HOST=/path/on/host DOWNLOAD_DATASETS=musdb18-hq,slakh2100 docker compose run --rm train
+#   # Full auto (huge): Slakh mix-only
+#   DATA_HOST=/path/on/host DOWNLOAD_DATASETS=slakh2100 docker compose run --rm train
 #
 #   # Data prep only (no train)
-#   DATA_HOST=/path/on/host DOWNLOAD_DATASETS=musdb18-hq RUN_TRAIN=0 docker compose run --rm train
+#   DATA_HOST=/path/on/host DOWNLOAD_DATASETS=slakh2100 RUN_TRAIN=0 docker compose run --rm train
 #
 #   # Env check only
 #   docker compose run --rm train-check
@@ -32,9 +32,8 @@ services:
       DATA_ROOT: ${DATA_ROOT:-/data}
       CACHE_DIR: ${CACHE_DIR:-}
       DOWNLOAD_CACHE_DIR: ${DOWNLOAD_CACHE_DIR:-}
-      MUSDB18_HQ_PATH: ${MUSDB18_HQ_PATH:-}
+      MUSIC_LIBRARY_PATH: ${MUSIC_LIBRARY_PATH:-}
       SLAKH2100_PATH: ${SLAKH2100_PATH:-}
-      MEDLEYDB_PATH: ${MEDLEYDB_PATH:-}
       BABYSLAKH_PATH: ${BABYSLAKH_PATH:-}
       PATHS_MANIFEST: ${PATHS_MANIFEST:-}
       DOWNLOAD_DATASETS: ${DOWNLOAD_DATASETS:-}

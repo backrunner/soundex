@@ -45,10 +45,8 @@ def get_device() -> torch.device:
 
 # Config keys -> human-readable names for processed mixture datasets.
 _DATASET_PATH_KEYS = (
-    ("musdb18_hq_path", "MUSDB18-HQ"),
     ("slakh2100_path", "Slakh2100"),
-    ("medleydb_path", "MedleyDB"),
-    ("babyslakh_path", "BabySlakh"),
+    ("music_library_path", "Music library"),
 )
 
 # Environment overrides for data.* paths (Docker / operators).
@@ -57,6 +55,7 @@ _PATH_ENV_OVERRIDES = (
     ("SLAKH2100_PATH", "slakh2100_path"),
     ("MEDLEYDB_PATH", "medleydb_path"),
     ("BABYSLAKH_PATH", "babyslakh_path"),
+    ("MUSIC_LIBRARY_PATH", "music_library_path"),
 )
 
 
@@ -87,6 +86,7 @@ def apply_data_path_overrides(
             "slakh2100": "slakh2100_path",
             "medleydb": "medleydb_path",
             "babyslakh": "babyslakh_path",
+            "music-library": "music_library_path",
         }
         if isinstance(datasets, dict):
             for name, value in datasets.items():
@@ -110,6 +110,7 @@ _SOURCE_META = {
     "slakh2100_path": ("slakh2100", "Slakh2100", "synthetic"),
     "medleydb_path": ("medleydb", "MedleyDB", "real"),
     "babyslakh_path": ("babyslakh", "BabySlakh", "synthetic"),
+    "music_library_path": ("music_library", "Music library", "real"),
 }
 
 
@@ -152,7 +153,7 @@ def resolve_dataset_sources(
     if not sources:
         raise FileNotFoundError(
             "No processed training data found. Preprocess at least one of "
-            "MUSDB18-HQ / Slakh2100 / MedleyDB (mixtures only)."
+            "Slakh2100 mixes or audio libraries (no stems required)."
         )
     return sources
 

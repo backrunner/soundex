@@ -28,7 +28,6 @@ from data.dataset import (
 )
 from data.preprocess_medleydb import find_mix_files
 from data.preprocess_medleydb import iter_tracks as iter_medley_tracks
-from data.preprocess_musdb import iter_tracks as iter_musdb_tracks
 from data.preprocess_slakh import iter_tracks as iter_slakh_tracks
 from data.protocol import (
     DATA_SCHEMA_VERSION,
@@ -497,13 +496,6 @@ def test_validation_source_quota_is_exact_and_fails_closed(
 def test_mix_discovery_preserves_upstream_roles_and_excludes_stems(
     tmp_path: Path, recipe: DataRecipe
 ) -> None:
-    for split in ("train", "test"):
-        track = tmp_path / "musdb" / split / f"Song-{split}"
-        track.mkdir(parents=True)
-        (track / "mixture.wav").touch()
-    musdb = iter_musdb_tracks(tmp_path / "musdb", recipe)
-    assert {split for split, _track, _path in musdb if "test" in _track} == {"test"}
-
     for split in ("train", "validation", "test", "omitted"):
         track = tmp_path / "slakh" / split / f"Track-{split}"
         track.mkdir(parents=True)

@@ -6,12 +6,12 @@
 #   DATA_ROOT              Default parent for datasets (/data)
 #   CACHE_DIR              Archive download cache (default $DATA_ROOT/.cache/downloads)
 #   DOWNLOAD_CACHE_DIR     Alias for CACHE_DIR
-#   MUSDB18_HQ_PATH        Storage dir for MUSDB18-HQ (override default $DATA_ROOT/musdb18-hq)
+#   MUSIC_LIBRARY_PATH    Generic audio-library processed-data root
 #   SLAKH2100_PATH         Storage dir for Slakh2100
 #   MEDLEYDB_PATH          Storage dir for MedleyDB
 #   BABYSLAKH_PATH         Storage dir for BabySlakh
 #   PATHS_MANIFEST         Where to write/read soundex_data_paths.yaml
-#   DOWNLOAD_DATASETS      Comma list: musdb18-hq,slakh2100,babyslakh,medleydb
+#   DOWNLOAD_DATASETS      slakh2100 for official training; BabySlakh is smoke only
 #   SKIP_EXISTING          1 (default) skip download when tree looks ready
 #   PREPROCESS             1 after download (default 1 if DOWNLOAD_DATASETS set)
 #   KEEP_ARCHIVE           1 keep zip/tar after extract
@@ -28,9 +28,9 @@
 #     -v /mnt/datasets:/datasets -v /mnt/scratch:/scratch \
 #     -e DATA_ROOT=/datasets \
 #     -e CACHE_DIR=/scratch/soundex-cache \
-#     -e MUSDB18_HQ_PATH=/datasets/musdb \
+#     -e MUSIC_LIBRARY_PATH=/datasets/music-library \
 #     -e SLAKH2100_PATH=/datasets/slakh \
-#     -e DOWNLOAD_DATASETS=musdb18-hq,slakh2100 \
+#     -e DOWNLOAD_DATASETS=slakh2100 \
 #     soundex-train
 
 set -euo pipefail
@@ -64,7 +64,7 @@ fi
 echo "=== SoundEx container entrypoint ==="
 echo "DATA_ROOT=${DATA_ROOT}"
 echo "CACHE_DIR=${CACHE_DIR:-<default under DATA_ROOT>}"
-echo "MUSDB18_HQ_PATH=${MUSDB18_HQ_PATH:-<default>}"
+echo "MUSIC_LIBRARY_PATH=${MUSIC_LIBRARY_PATH:-<unset>}"
 echo "SLAKH2100_PATH=${SLAKH2100_PATH:-<default>}"
 echo "MEDLEYDB_PATH=${MEDLEYDB_PATH:-<default>}"
 echo "BABYSLAKH_PATH=${BABYSLAKH_PATH:-<default>}"
@@ -91,7 +91,7 @@ if [[ -n "${CACHE_DIR}" ]]; then
 fi
 # Ensure per-dataset parents exist when overridden
 for p in \
-  "${MUSDB18_HQ_PATH:-}" \
+  "${MUSIC_LIBRARY_PATH:-}" \
   "${SLAKH2100_PATH:-}" \
   "${MEDLEYDB_PATH:-}" \
   "${BABYSLAKH_PATH:-}"
@@ -109,9 +109,6 @@ if [[ -n "${DOWNLOAD_DATASETS}" ]]; then
   )
   if [[ -n "${CACHE_DIR}" ]]; then
     dl_args+=(--cache-dir "${CACHE_DIR}")
-  fi
-  if [[ -n "${MUSDB18_HQ_PATH:-}" ]]; then
-    dl_args+=(--musdb18-hq-path "${MUSDB18_HQ_PATH}")
   fi
   if [[ -n "${SLAKH2100_PATH:-}" ]]; then
     dl_args+=(--slakh2100-path "${SLAKH2100_PATH}")
@@ -141,27 +138,11 @@ if [[ -n "${DOWNLOAD_DATASETS}" ]]; then
   python scripts/download_datasets.py "${dl_args[@]}"
 elif [[ "${PREPROCESS}" == "1" ]]; then
   echo ">>> PREPROCESS=1 without DOWNLOAD_DATASETS — preprocessing existing trees"
-  musdb_root="${MUSDB18_HQ_PATH:-${DATA_ROOT}/musdb18-hq}"
   slakh_root="${SLAKH2100_PATH:-${DATA_ROOT}/slakh2100}"
-  medley_root="${MEDLEYDB_PATH:-${DATA_ROOT}/medleydb}"
-  if [[ -d "${musdb_root}" ]]; then
-    python data/preprocess_musdb.py \
-      --data-root "${musdb_root}" \
-      --output-dir "${musdb_root}/processed" \
-      --config "${CONFIG}" \
-      --reuse-existing
-  fi
   if [[ -d "${slakh_root}" ]]; then
     python data/preprocess_slakh.py \
       --data-root "${slakh_root}" \
       --output-dir "${slakh_root}/processed" \
-      --config "${CONFIG}" \
-      --reuse-existing
-  fi
-  if [[ -d "${medley_root}" ]]; then
-    python data/preprocess_medleydb.py \
-      --data-root "${medley_root}" \
-      --output-dir "${medley_root}/processed" \
       --config "${CONFIG}" \
       --reuse-existing
   fi
@@ -170,7 +151,7 @@ fi
 export DATA_ROOT
 export PATHS_MANIFEST
 # Propagate path env so train.py apply_data_path_overrides sees them
-[[ -n "${MUSDB18_HQ_PATH:-}" ]] && export MUSDB18_HQ_PATH
+[[ -n "${MUSIC_LIBRARY_PATH:-}" ]] && export MUSIC_LIBRARY_PATH
 [[ -n "${SLAKH2100_PATH:-}" ]] && export SLAKH2100_PATH
 [[ -n "${MEDLEYDB_PATH:-}" ]] && export MEDLEYDB_PATH
 [[ -n "${BABYSLAKH_PATH:-}" ]] && export BABYSLAKH_PATH
