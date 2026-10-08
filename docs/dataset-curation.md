@@ -32,11 +32,14 @@ automatically count as Mandopop.
 | [KCC expansion](https://gongu.copyright.or.kr/gongu/wrt/wrt/view.do?menuNo=200020&wrtSn=13300271) | 100 original WAV/FLAC files downloaded | 53 orchestral works have linked original-score/composer checks and 4 other original-composer recordings have first-party rights-assignment records. Short instrument effects and carol arrangements do not inflate reviewed regional-song counts. |
 | [KCC Travel](https://gongu.copyright.or.kr/gongu/wrt/wrt/view.do?menuNo=200020&wrtSn=13048721) | Stereo 44.1 kHz PCM16 WAV, 174.093 s, no signal flags; CC BY 4.0 | Source review retained. Page duration 258 s disagrees with both actual native and publisher preview, approximately 174 s. Aligned low-band correlation 0.9847 supports the same recording; stale metadata is not a hard audio failure. |
 | [Yubatake Kawarayu](https://opengameart.org/content/kawarayu) | Stereo 48 kHz PCM24 FLAC, 292.656 s, no signal flags; CC BY 4.0 | Source review retained. Explicit Japanese enka/folk repertoire; creator nationality unknown. One instrumental track does not establish broad Japanese coverage. |
+| [Chris Zabriskie](https://chriszabriskie.com/use/) | 30 previously acquired native FLAC masters | Exact work names match six official album pages. Artist blanket CC BY 4.0 grant and credit instructions retained alongside historical archive license receipts. His official composer/recording-artist page locates his working repertoire in Brooklyn, New York; one artist does not establish US genre breadth. Fifteen other legacy tracks remain outside this reviewed subset. |
+| [Andy G. Cohen original masters](https://archive.org/details/andy-g-cohen-2014-2017) | 31 previously acquired native FLAC masters | Collection explicitly credits composition, performance, recording and mastering to the artist and grants CC BY 4.0. Every selected file matches publisher original-file MD5 and embedded creator credit. Collection tags support post-rock; regional origin remains unknown. FMA MP3 copies are not clean targets. |
 
-The reviewed regional pool currently contains 88 distinct works: China 29, Japan 1
-and Korea 58 (including Travel). These counts do not describe the older unreviewed
-candidate pool. Creator and genre dominance and remaining regional/genre/vocal gaps
-still prevent the requested 1,000-work regional run from starting.
+The source-reviewed pool currently contains 149 distinct works: China 29, Japan 1,
+Korea 58 (including Travel), North America 30 and unknown region 31. These counts
+do not describe the older unreviewed candidate pool. Creator and genre dominance
+and remaining regional/genre/vocal gaps still prevent the requested 1,000-work
+regional run from starting.
 
 The Chinese pack's [publisher terms](https://www.heiyaoyao.cn/announcements/import-notice/)
 offer CC BY 4.0 as an alternative to custom terms. Keep the chosen grant and credits
