@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Publisher receipts reject altered, incomplete and lossy source bytes."""
 
+import gzip
 import hashlib
 from io import BytesIO
 from pathlib import Path
@@ -46,6 +47,38 @@ def test_acquisition_paths_and_urls_are_contained(tmp_path: Path) -> None:
         acquire({"path": "../escape.wav"}, tmp_path)
     with pytest.raises(ValueError, match="HTTPS"):
         acquire({"path": "original.wav", "source_url": "http://example.com/a"}, tmp_path)
+
+
+def test_http_gzip_is_transport_only_and_not_a_lossy_transcode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "native.wav"
+    sf.write(path, np.sin(np.arange(44100) * 0.1) * 0.1, 44100)
+    payload = path.read_bytes()
+    compressed = gzip.compress(payload)
+
+    class Response(BytesIO):
+        def __init__(self, data: bytes) -> None:
+            super().__init__(data)
+            self.status = 200
+            self.headers = {"Content-Encoding": "gzip", "Content-Length": str(len(data))}
+
+    def open_response(url: str, timeout: int) -> Response:
+        return Response(compressed)
+
+    monkeypatch.setattr("scripts.fetch_archive_masters.urlopen", open_response)
+    result = acquire(
+        {
+            "id": "kcc-song",
+            "path": "raw/native.wav",
+            "source_url": "https://example.com/native",
+            "source_bytes": len(payload),
+        },
+        tmp_path,
+    )
+    assert Path(result["path"]).read_bytes() == payload
+    assert result["source_quality"]["frames"] == 44100
+    assert not result["upstream_original_md5_verified"]
 
 
 def test_cached_partial_response_is_retried_and_never_published(

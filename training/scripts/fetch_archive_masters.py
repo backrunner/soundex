@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import json
 import sys
@@ -23,14 +24,16 @@ from data.source_quality import inspect_master
 def verify_original(path: Path, entry: dict[str, Any]) -> dict[str, Any]:
     """Bind publisher bytes and full decoded measurements to the acquired recording."""
     size = path.stat().st_size
-    if size != entry["source_bytes"]:
+    if entry.get("source_bytes") is not None and size != entry["source_bytes"]:
         raise ValueError(f"publisher original length mismatch: {size} != {entry['source_bytes']}")
-    md5 = hashlib.md5()
-    with path.open("rb") as source:
-        while chunk := source.read(1 << 20):
-            md5.update(chunk)
-    if md5.hexdigest() != entry["publisher_original_md5"]:
-        raise ValueError("publisher original checksum mismatch")
+    expected_md5 = entry.get("publisher_original_md5")
+    if expected_md5 is not None:
+        md5 = hashlib.md5()
+        with path.open("rb") as source:
+            while chunk := source.read(1 << 20):
+                md5.update(chunk)
+        if md5.hexdigest() != expected_md5:
+            raise ValueError("publisher original checksum mismatch")
     quality = inspect_master(path, entry.get("audio_sha256"))
     return {
         **entry,
@@ -38,7 +41,8 @@ def verify_original(path: Path, entry: dict[str, Any]) -> dict[str, Any]:
         "audio_sha256": quality["audio_sha256"],
         "decoded_pcm_sha256": quality["decoded_pcm_sha256"],
         "source_quality": quality,
-        "upstream_original_md5_verified": True,
+        "source_bytes": size,
+        "upstream_original_md5_verified": expected_md5 is not None,
     }
 
 
@@ -66,7 +70,10 @@ def acquire(entry: dict[str, Any], root: Path) -> dict[str, Any]:
                 if attempt:
                     separator = "&" if "?" in url else "?"
                     url += separator + urlencode(
-                        {"soundex_original": entry["publisher_original_md5"], "attempt": attempt}
+                        {
+                            "soundex_original": entry.get("publisher_original_md5", entry["id"]),
+                            "attempt": attempt,
+                        }
                     )
                 with urlopen(url, timeout=60) as response:
                     if response.status != 200:
@@ -74,11 +81,24 @@ def acquire(entry: dict[str, Any], root: Path) -> dict[str, Any]:
                             f"expected complete original, received HTTP {response.status}"
                         )
                     length = response.headers.get("Content-Length")
-                    if length is not None and int(length) != entry["source_bytes"]:
+                    encoding = response.headers.get("Content-Encoding", "identity").lower()
+                    if encoding not in {"identity", "gzip", "x-gzip"}:
+                        raise ValueError(f"unsupported HTTP content encoding: {encoding}")
+                    if (
+                        encoding == "identity"
+                        and length is not None
+                        and entry.get("source_bytes") is not None
+                        and int(length) != entry["source_bytes"]
+                    ):
                         raise ValueError(
                             f"original response length {length} differs from publisher"
                         )
-                    while chunk := response.read(1 << 20):
+                    stream = (
+                        gzip.GzipFile(fileobj=response)
+                        if encoding in {"gzip", "x-gzip"}
+                        else response
+                    )
+                    while chunk := stream.read(1 << 20):
                         out.write(chunk)
             verified = verify_original(pending, entry)
             pending.replace(target)
