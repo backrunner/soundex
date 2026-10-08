@@ -75,3 +75,8 @@ pipeline only once the distinct music count reaches the configured minimum. A
 finished or stopped collection below target fails visibly; it never reduces the
 target or silently starts with fewer songs. Keep the queue's source/config snapshot
 and its `progress.json` under `data/runs/<job-id>/`.
+
+For the requested China/Japan/Korea/Europe/North America run, use the optional
+[regional curation profile](dataset-curation.md). Its queue also requires source
+review and actual regional/genre coverage before starting. The count-only queue
+has been superseded; acquisition continues and the current job reports the gaps.

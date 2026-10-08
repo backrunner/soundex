@@ -134,3 +134,5 @@ Official source and released weights use Apache-2.0. Training audio retains its
 upstream terms. An export is a local candidate until the completed model card,
 artifact-bound rights review and all [release checks](../legal/MODEL_RELEASE_CHECKLIST.md)
 pass. No application-ready learned weights have been published yet.
+
+See [regional music acquisition](../docs/dataset-curation.md) for the current free-first, native-lossless regional run and its optional source/coverage audit.

@@ -72,3 +72,8 @@ extra conditions to the Apache-2.0 license granted to downstream users.
 
 See [licensing](LICENSING.md), [model card](../models/MODEL_CARD.template.md) and
 [release checklist](MODEL_RELEASE_CHECKLIST.md).
+
+The requested regional acquisition uses an optional
+[source-and-coverage review](../docs/dataset-curation.md) before selecting its new
+official run. Free sources have priority; paid libraries need separate approval.
+This profile does not change generic ingestion or supply missing publisher rights.

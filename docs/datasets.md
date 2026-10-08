@@ -129,3 +129,5 @@ That review concerns the actual grants and published artifact; it is not a train
 ingestion gate. Acquired audio stays local and is not redistributed with the
 repository. Each original retains its publisher's license; the code's Apache-2.0
 license does not replace those grants.
+
+The current [regional acquisition review](dataset-curation.md) distinguishes downloaded originals, source review and actual repertoire coverage. Free sources have priority; paid libraries require separate approval.
