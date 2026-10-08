@@ -113,3 +113,14 @@ def test_invalid_policy_cannot_approve_incomplete_region(tmp_path: Path) -> None
     policy["regions"] = {"invented": 1}
     with pytest.raises(ValueError, match="unsupported"):
         audit_curation([entry], {"song": review}, policy, tmp_path)
+
+
+def test_equivalent_genre_spelling_does_not_create_a_false_coverage_gap(tmp_path: Path) -> None:
+    entry, review, policy = fixture(tmp_path)
+    entry["genre"] = "Hip Hop"
+    review["genre_basis"] = "publisher says Hip Hop"
+    policy["genres"] = {"hiphop": 1}
+    approved, report = audit_curation([entry], {"song": review}, policy, tmp_path)
+    assert report["ready_for_this_regional_run"]
+    assert report["genres"] == {"hiphop": 1}
+    assert approved[0]["publisher_original_genre"] == "Hip Hop"

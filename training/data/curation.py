@@ -13,6 +13,13 @@ from data.protocol import sha256_file
 REVIEW_SCOPE = "commercial-codec-restoration-and-apache-2.0-weight-distribution"
 REGIONS = {"china", "japan", "korea", "europe", "north_america"}
 VOCAL_LANGUAGES = {"china": {"zh", "yue"}, "japan": {"ja"}, "korea": {"ko"}}
+GENRE_ALIASES = {
+    "hip hop": "hiphop",
+    "hip-hop": "hiphop",
+    "r&b": "rnb",
+    "rhythm and blues": "rnb",
+    "classical music": "classical",
+}
 
 
 def validate_policy(policy: dict[str, Any]) -> None:
@@ -128,11 +135,21 @@ def audit_curation(
         if errors:
             held.append({"id": entry["id"], "reasons": errors})
             continue
-        genre, artist = entry.get("genre", "unlabeled"), review["artist_id"]
+        original_genre = entry.get("genre", "unlabeled")
+        label = original_genre.strip().casefold()
+        genre, artist = GENRE_ALIASES.get(label, label), review["artist_id"]
         if genre not in {"unlabeled", "unknown"} and not review.get("genre_basis"):
             held.append({"id": entry["id"], "reasons": ["unreviewed_genre"]})
             continue
-        approved.append({**entry, "source_review": review, "music_region": region})
+        approved.append(
+            {
+                **entry,
+                "genre": genre,
+                "publisher_original_genre": original_genre,
+                "source_review": review,
+                "music_region": region,
+            }
+        )
         regions[region] += 1
         genres[genre] += 1
         artists[artist] += 1
