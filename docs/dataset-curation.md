@@ -82,21 +82,21 @@ and useful instrument effects remain available locally.
 ## Readiness check, 2026-10-09
 
 The live regional queue remains in `waiting-for-regional-source-selection`.
-It has 1,262 signal-audited candidate entries, but **169 distinct source-reviewed
-music works / 12 creators**, against the requested approximately 1,000 works.
+It has 1,285 signal-audited candidate entries, but **178 distinct source-reviewed
+music works / 13 creators**, against the requested approximately 1,000 works.
 Only retained unique music works fill that target; supplements and variants do not.
 
 | Reviewed repertoire | Distinct works |
 | --- | ---: |
 | China | 29 |
-| Japan | 1 |
+| Japan | 4 |
 | Korea | 58 |
 | Europe | 0 |
 | North America | 49 |
-| Unknown | 32 |
+| Unknown | 38 |
 
-The reviewed genres are ambient 30, classical 53, electronic 11, folk 6, funk 2,
-jazz 7, pop 2, rock 31 and unlabeled 27. Full country, blues, hip-hop and R&B
+The reviewed genres are ambient 30, classical 53, electronic 17, folk 6, funk 2,
+jazz 7, pop 2, rock 31 and unlabeled 30. Full country, blues, hip-hop and R&B
 coverage is not yet established in this subset. No Chinese/Japanese/Korean vocal
 music is counted. These acquisition gaps remain even without the profile's
 additional creator-share and per-category working thresholds.
@@ -112,6 +112,12 @@ Raw audio, processed pairs, source-page evidence, download plans and per-file
 catalogs stay local and ignored. Only source documentation is published; see
 [native sources](../training/source_catalogs/README.md). Public documentation
 records a dated observation; the local job's `progress.json` is the live status.
+
+The [Japanese source expansion](japanese-sources-20261009.md) acquired 42 original
+WAV/FLAC masters: three Japanese creator compositions and six standalone JRPG
+themes add nine reviewed full works. Thirty-three loops/cues/variants remain
+supplements. Native mono and Japanese-style music are retained without inventing
+Japanese regional or vocal coverage.
 
 ## Source and artifact review
 

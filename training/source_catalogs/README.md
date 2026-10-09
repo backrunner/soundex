@@ -7,12 +7,12 @@ under the code's Apache-2.0 license.
 
 ## Current collection, 2026-10-09
 
-The regional queue reports **1,262 signal-audited candidate entries**, but only
-**169 distinct source-reviewed music works from 12 creators** count toward the
+The regional queue reports **1,285 signal-audited candidate entries**, but only
+**178 distinct source-reviewed music works from 13 creators** count toward the
 requested approximately 1,000-work collection. Candidate entries are not approved
-song counts. China contributes 29 works, Japan 1, Korea 58, North America 49;
-32 have unknown regional repertoire. Reviewed European and Chinese/Japanese/Korean
-vocal coverage remain absent. Pop has 2 works and electronic 11; no full country
+song counts. China contributes 29 works, Japan 4, Korea 58, North America 49;
+38 have unknown regional repertoire. Reviewed European and Chinese/Japanese/Korean
+vocal coverage remain absent. Pop has 2 works and electronic 17; no full country
 songs are currently counted. The collection is not ready for the regional run.
 
 See [the source and coverage review](../../docs/dataset-curation.md) for publisher
@@ -20,7 +20,11 @@ links, selected grants, credits and limitations. The separate
 [creator-original WAV expansion](../../docs/source-expansion-20261008.md) documents
 21 original downloads, including exact source pages and original-file links;
 20 distinct music works count after measured float-master gain repairs. Its
-short country cue is retained separately.
+short country cue is retained separately. The
+[Japanese source expansion](../../docs/japanese-sources-20261009.md) documents
+another 42 native WAV/FLAC masters: nine standalone compositions count, while
+33 loop/cue/variant files remain supplements. Three new works have first-party
+Japanese creator repertoire evidence; six JRPG themes retain unknown region.
 
 The earlier 360-track signal-audited snapshot (2026-10-08, approximately 24 hours /
 10 GB) is a historical acquisition result, not the current source-reviewed count.
