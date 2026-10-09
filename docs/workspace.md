@@ -51,7 +51,7 @@ Before cleanup, stop the exact superseded process, check open files and referenc
 record the deletion inventory, and verify retained paths afterward. Do not remove
 raw audio, checkpoints or mixed `target/` trees just because they are ignored.
 
-For a fresh run with matching prepared Slakh/speech supplements:
+For a fresh run with the matching prepared VCTK speech supplement:
 
 ```bash
 cd training
@@ -62,7 +62,8 @@ PATH="$PWD/.tools/bin:$PATH" python scripts/run_native_training.py \
   --config configs/diverse_lossless.yaml --minimum-tracks 1000
 ```
 
-Use a profile with the exact recipe of the prepared supplements. The runner
+Slakh is disabled in the current profile; existing directories do not enable it.
+Use a profile with the exact recipe of the enabled supplements. The runner
 verifies their immutable manifests, freezes committed code and the final music
 catalog, prepares music pairs, derives speech's sampling probability from the
 smallest retained music genre, then starts training from random initialization.

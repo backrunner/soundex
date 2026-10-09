@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download mix-only SoundEx audio; default is official Slakh2100-redux.
+"""Download legacy mix-only datasets only by explicit selection.
 
 MUSDB is not a selectable source. BabySlakh is a 16 kHz smoke subset only;
 MedleyDB remains an explicit legacy data utility outside default training. Consult legal/TRAINING_DATA.md before acquiring audio.

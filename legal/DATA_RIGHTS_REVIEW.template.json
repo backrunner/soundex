@@ -8,7 +8,7 @@
   "artifact_sha256": "TODO exact ONNX SHA-256",
   "source_checkpoint": {"path": "best-validation.pth", "sha256": "TODO source checkpoint SHA-256"},
   "manifest_set_sha256": "TODO from checkpoint / ONNX metadata",
-  "training_manifests": [{"corpus": "slakh2100", "sha256": "TODO immutable manifest SHA-256"}],
+  "training_manifests": [{"corpus": "music_library", "sha256": "TODO immutable manifest SHA-256"}],
   "initialization_and_resume_review": "TODO random initialization and every approved parent/resume file; no restricted teachers",
   "source_grants_and_credits": "TODO verified upstream versions, saved evidence and release NOTICE credits"
 }

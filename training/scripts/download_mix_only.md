@@ -4,7 +4,7 @@ SoundEx creates aligned compression-degradation pairs from full rendered mixes o
 audio recordings. No stems are needed. See the [source survey](../../docs/datasets.md)
 and [training source policy](../../legal/TRAINING_DATA.md).
 
-## Slakh2100-redux
+## Legacy Slakh2100-redux (explicit opt-in)
 
 Use the [official archive](https://zenodo.org/records/4599666) and verify its source
 license. The archive is about 104 GB even when only mixes are extracted; allow
@@ -17,9 +17,12 @@ python scripts/download_datasets.py --datasets slakh2100 \
   --data-root /data --cache-dir /scratch/soundex-cache --preprocess
 ```
 
-The downloader defaults to Slakh. MUSDB is no longer selectable. BabySlakh is
+There is no default dataset: `--datasets` is required for acquisition.
+The current regional run excludes Slakh and uses real music plus VCTK speech.
+MUSDB is no longer selectable. BabySlakh is
 16 kHz and suitable only for pipeline smoke tests, not full-bandwidth targets.
-MedleyDB utilities remain for historical data inspection; the default trainer uses Slakh or generic audio libraries.
+MedleyDB and Slakh utilities remain for historical data inspection; they are not
+enabled by the current training profiles.
 
 ## Real recordings
 

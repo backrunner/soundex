@@ -115,22 +115,14 @@ cd training
 docker build -t soundex-train .
 # or: docker compose build
 
-# Download Slakh rendered mixes + preprocess + train
+# Train with previously prepared music-library pairs matching configs/default.yaml
+# Keep the existing paths manifest from opting historical datasets back in.
 docker run --gpus all -v /data:/data \
-  -e DOWNLOAD_DATASETS=slakh2100 \
+  -e MUSIC_LIBRARY_PATH=/data/music-library \
+  -e PATHS_MANIFEST=/data/native-only-paths.yaml \
   soundex-train
 
-# Custom storage + cache paths (bind-mount each host dir)
-docker run --gpus all \
-  -v /mnt/datasets:/datasets \
-  -v /mnt/scratch:/scratch \
-  -e DATA_ROOT=/datasets \
-  -e CACHE_DIR=/scratch/soundex-cache \
-  -e SLAKH2100_PATH=/datasets/slakh \
-  -e DOWNLOAD_DATASETS=slakh2100 \
-  soundex-train
-
-# Data only
+# Explicit legacy data inspection only; not the upcoming regional run
 docker run --gpus all -v /data:/data \
   -e DOWNLOAD_DATASETS=slakh2100 -e RUN_TRAIN=0 \
   soundex-train
@@ -151,7 +143,7 @@ Priority for dataset storage: **CLI `--path` / dedicated flags → env `*_PATH` 
 `train.py` priority: **env `*_PATH` → paths manifest → config YAML**.
 
 Entrypoint: `scripts/entrypoint.sh`  
-Downloader: `scripts/download_datasets.py` (Slakh mix-only; MUSDB removed)
+Downloader: `scripts/download_datasets.py` (explicit legacy dataset selection; MUSDB removed)
 Host needs a compatible NVIDIA driver + `nvidia-container-toolkit`.
 
 The default recipe requires FFmpeg encoders `libmp3lame`, `aac` and `libvorbis`.
