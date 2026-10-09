@@ -15,7 +15,7 @@ SHA-256 一致性，并记录 42 个 checkpoint/诊断 ONNX 文件的哈希。�
 | `local-mps-20261007-125023` | manifest 为 MUSDB18-HQ | 未发布，排除出可商用正式权重路线 |
 | `local-mps-256-128-20261007-220130` | manifest 为 MUSDB18-HQ；`parity-qualified.onnx` 仅表示数值核查 | 未发布，数值合格不代表授权合格 |
 | `local-mps-diverse-lossless-smoke-20261008` | 音乐为 The Crypts! / Revolution Void；另含 Slakh 和 VCTK；并非已经完成的新大规模训练 | 未发布，Slakh 底层权利及音乐来源完整授权仍待确认 |
-| 新的 300 首区域无损训练 | 300 首音乐与 VCTK 已通过配对清单/文件检查；随机初始化，无旧权重或教师；20:57 首轮 checkpoint 已核对配置、配方、实际 manifest 哈希及参数有限性；见[当前训练](../docs/native-training-20261009.md) | MUSDB、Slakh 均不参与；训练继续，最终 artifact 的发布权利及质量核查尚未完成 |
+| 新的 300 首区域无损训练 | 300 首音乐与 VCTK 已通过配对清单/文件检查；随机初始化，无旧权重或教师；10 月 10 日 01:00 完成 200 轮；第 168 轮候选已导出并通过 13 项跨运行时一致性检查；见[当前训练](../docs/native-training-20261009.md)及[验证记录](../docs/native-validation-20261010.md) | MUSDB、Slakh 均不参与；最终 artifact 的发布权利及完整质量验收尚未完成 |
 
 两个 MUSDB 实验的最佳 checkpoint SHA-256 分别为
 `167174450fc6591f616a3a5d645623417d06c76d3651623ddf802d573ff52c20`、

@@ -18,9 +18,11 @@ release route. Changing this policy does not relicense its training sources.
 
 The non-MUSDB real-source smoke is also unpublished: its Slakh MIDI/composition
 rights and complete music-source grants are unresolved. The new 300-work native
-music/VCTK run started fresh MPS training on 2026-10-09 and has saved its first
-checked checkpoint (about 10.77 MiB, including training state). The full run and
-restoration/release qualification remain in progress; see
+music/VCTK run completed 200 fresh MPS training epochs at 01:00 Singapore time
+on 2026-10-10. Its selected epoch-168 checkpoint is about 12.94 MiB including
+training state; its local diagnostic ONNX is 3.16 MiB and passes 13 cross-runtime
+parity cases. The [deployment diagnostic](../docs/native-validation-20261010.md)
+does not establish restoration/release qualification; see
 [current training](../docs/native-training-20261009.md) and the hash-bound
 [current license review](../legal/WEIGHT_LICENSE_REVIEW.md).
 

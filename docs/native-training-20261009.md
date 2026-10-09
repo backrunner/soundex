@@ -7,7 +7,7 @@ validation and test, not multiplied codec/channel examples.
 
 The current job is `regional-native-300-no-slakh-20261009-181934`. Its training
 implementation is frozen at commit `abe0e497eca5d72643c18f2929f1c7527c7143b6`;
-later documentation commits do not change the running code. Initialization is
+later documentation commits do not change the frozen code. Initialization is
 random, without a historical checkpoint or teacher. MUSDB and Slakh are disabled.
 
 ## Data and model contract
@@ -36,10 +36,12 @@ it is not complete genre or regional coverage. See
 
 ## Live status and artifacts
 
-At **20:57 Singapore time on 2026-10-09**, preparation and manifest/file audits
-had passed and MPS training had completed epoch 1 (128 optimizer steps). The
-806,276-parameter generator started from random weights. The planned 200 epochs
-are still running; this observation is not a completed quality evaluation.
+Training completed at **01:00 Singapore time on 2026-10-10**: 200 epochs and
+25,600 optimizer steps on MPS, with an 806,276-parameter generator initialized
+randomly. The selected checkpoint is epoch 168, with validation total 11.6241
+and high-band error 10.8692. The final epoch reports 11.7189 / 10.9424.
+The first [deployment diagnostic](native-validation-20261010.md) checks this
+selected artifact; training completion does not establish release qualification.
 
 | Corpus | Training recordings / pairs | Validation recordings / pairs | Test recordings / pairs | Total pairs |
 | --- | --- | --- | --- | --- |
@@ -51,14 +53,14 @@ from training. Speech is **1/254 = 0.3937008%** of training draws, equal to the
 smallest training genre (funk, one recording); music is 253/254. This describes
 sampling probability, not speech's share of stored pairs or audio duration.
 
-The first epoch reported generator loss 70.9548, validation loss 66.6289 and
+The historical first epoch reported generator loss 70.9548, validation loss 66.6289 and
 high-band validation loss 62.8678. These initial objective values do not establish
 restoration improvement. Both schema-1.2 checkpoints passed configuration,
 recipe/manifest hash and finite-generator-state checks. The epoch-1 best candidate
 is **11,292,919 bytes (10.77 MiB)**, including training state; its SHA-256 is
 `30826811486ea1e1dab8bcdc8c4a78c7e74e67826a10ee387b80d31c77ad3367`.
 A local audit snapshot is retained under `data/evidence/native-training-20261009/`;
-the live checkpoint paths below change as subsequent epochs finish. This is not
+the completed run's best/final checkpoints are separate from this first-epoch snapshot. This is not
 the size of a qualified inference export.
 
 On the maintainer's local workspace, read the actual run files:

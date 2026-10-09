@@ -121,10 +121,10 @@ Slakh was removed from the upcoming run on 2026-10-09. The retained VCTK speech
 supplement has 270 utterances / 20,056 aligned pairs, using recipe
 `7fda9e58ab583617`. Native mono input is supported; recording-balanced sampling
 avoids multiplying a stereo source's draw mass by its channel roles.
-At the 20:57 Singapore-time observation on 2026-10-09, all 300 works had produced
+At the completed-run observation on 2026-10-10, all 300 works had produced
 86,086 music pairs and passed publication/file audits. Including speech, there
-are 106,142 pairs. Fresh MPS training had completed epoch 1 and saved checked
-schema-1.2 weights; the 200-epoch run continues without a legacy checkpoint or
+are 106,142 pairs. Fresh MPS training completed all 200 epochs at 01:00 Singapore
+time and saved checked schema-1.2 weights, without a legacy checkpoint or
 teacher. Speech's actual draw share is 1/254 (0.3937008%), matching the smallest
 training genre. See [the current run](native-training-20261009.md) for split counts,
 checkpoint hashes and qualification still pending.
