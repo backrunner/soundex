@@ -17,8 +17,11 @@ but is an unpublished research experiment excluded from the application-ready
 release route. Changing this policy does not relicense its training sources.
 
 The non-MUSDB real-source smoke is also unpublished: its Slakh MIDI/composition
-rights and complete music-source grants are unresolved. The new large regional
-queue has not trained weights yet. See the hash-bound
+rights and complete music-source grants are unresolved. The new 300-work native
+music/VCTK run started fresh MPS training on 2026-10-09 and has saved its first
+checked checkpoint (about 10.77 MiB, including training state). The full run and
+restoration/release qualification remain in progress; see
+[current training](../docs/native-training-20261009.md) and the hash-bound
 [current license review](../legal/WEIGHT_LICENSE_REVIEW.md).
 
 Official releases require reviewed source grants and initialization under

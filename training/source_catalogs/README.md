@@ -16,8 +16,11 @@ repertoire. Chinese/Japanese/Korean vocal coverage and R&B remain absent.
 Pop has 14 works, electronic 56, blues 11 and country 5; the new indie-pop and
 blues/Americana works are fusion recordings, not broad genre-market coverage.
 The original strict 1,000-work plan remains available for later expansion.
-The 18:20 observation found the fresh run preparing music pairs after supplement
-verification; model optimization had not started. Local run progress is authoritative.
+At 20:57 Singapore time on 2026-10-09, all preparation/file audits had passed:
+86,086 music pairs plus 20,056 speech pairs. Fresh MPS training had completed
+epoch 1 and saved checked weights; the 200-epoch run continues. See
+[current training](../../docs/native-training-20261009.md) for split counts,
+sampling and the first checkpoint hash. Local run progress is authoritative.
 
 See [the source and coverage review](../../docs/dataset-curation.md) for publisher
 links, selected grants, credits and limitations. The separate

@@ -36,17 +36,44 @@ it is not complete genre or regional coverage. See
 
 ## Live status and artifacts
 
+At **20:57 Singapore time on 2026-10-09**, preparation and manifest/file audits
+had passed and MPS training had completed epoch 1 (128 optimizer steps). The
+806,276-parameter generator started from random weights. The planned 200 epochs
+are still running; this observation is not a completed quality evaluation.
+
+| Corpus | Training recordings / pairs | Validation recordings / pairs | Test recordings / pairs | Total pairs |
+| --- | --- | --- | --- | --- |
+| Music | 253 / 71,327 | 26 / 8,308 | 21 / 6,451 | 86,086 |
+| Speech | 193 / 13,896 | 59 / 4,720 | 18 / 1,440 | 20,056 |
+
+The **106,142 pairs** retain disjoint work groups and exclude the held-out codec
+from training. Speech is **1/254 = 0.3937008%** of training draws, equal to the
+smallest training genre (funk, one recording); music is 253/254. This describes
+sampling probability, not speech's share of stored pairs or audio duration.
+
+The first epoch reported generator loss 70.9548, validation loss 66.6289 and
+high-band validation loss 62.8678. These initial objective values do not establish
+restoration improvement. Both schema-1.2 checkpoints passed configuration,
+recipe/manifest hash and finite-generator-state checks. The epoch-1 best candidate
+is **11,292,919 bytes (10.77 MiB)**, including training state; its SHA-256 is
+`30826811486ea1e1dab8bcdc8c4a78c7e74e67826a10ee387b80d31c77ad3367`.
+A local audit snapshot is retained under `data/evidence/native-training-20261009/`;
+the live checkpoint paths below change as subsequent epochs finish. This is not
+the size of a qualified inference export.
+
 On the maintainer's local workspace, read the actual run files:
 
 ```bash
 cat data/reports/current-training-job.json
+cat data/reports/current-training-dataset.json
+cat data/reports/current-new-weight-verification.json
 cat data/runs/regional-native-300-no-slakh-20261009-181934/training-run/progress.json
 tail -n 10 data/runs/regional-native-300-no-slakh-20261009-181934/training-run/preprocess-music.log
 tail -n 10 data/runs/regional-native-300-no-slakh-20261009-181934/training-run/training.log
 ```
 
-Preparation must finish and the immutable manifest/file audit must pass before
-model optimization starts. A live preparation process is not a trained weight.
+The runner requires completed preparation and immutable manifest/file audits
+before optimization. Those checks passed for this run.
 The runner writes its source receipt, exact config, curation report, genre
 sampling report and stage logs under the job's `training-run/` directory.
 `checkpoints/final-resume.pth` is updated atomically after each completed epoch;
