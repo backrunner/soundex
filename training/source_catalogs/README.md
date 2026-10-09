@@ -7,12 +7,12 @@ under the code's Apache-2.0 license.
 
 ## Current collection, 2026-10-09
 
-The regional queue reports **1,285 signal-audited candidate entries**, but only
-**178 distinct source-reviewed music works from 13 creators** count toward the
-requested approximately 1,000-work collection. Candidate entries are not approved
-song counts. China contributes 29 works, Japan 4, Korea 58, North America 49;
+The updated acquisition/review snapshot contains **1,329 signal-audited candidate
+entries**, but only **222 distinct source-reviewed music works from 16 creators**
+count toward the requested approximately 1,000-work collection. Candidate entries are not approved
+song counts. China contributes 29 works, Japan 48, Korea 58, North America 49;
 38 have unknown regional repertoire. Reviewed European and Chinese/Japanese/Korean
-vocal coverage remain absent. Pop has 2 works and electronic 17; no full country
+vocal coverage remain absent. Pop has 2 works and electronic 56; no full country
 songs are currently counted. The collection is not ready for the regional run.
 
 See [the source and coverage review](../../docs/dataset-curation.md) for publisher
@@ -25,6 +25,10 @@ short country cue is retained separately. The
 another 42 native WAV/FLAC masters: nine standalone compositions count, while
 33 loop/cue/variant files remain supplements. Three new works have first-party
 Japanese creator repertoire evidence; six JRPG themes retain unknown region.
+The [additional Japanese acquisition](../../docs/japanese-additional-sources-20261009.md)
+adds 46 original FLAC masters from three creators, representing 44 distinct works.
+Two DC-offset repairs retain their originals and edit receipts. Source-specific
+CC BY 4.0 reviews do not settle the complete corpus's separate Slakh release issue.
 
 The earlier 360-track signal-audited snapshot (2026-10-08, approximately 24 hours /
 10 GB) is a historical acquisition result, not the current source-reviewed count.

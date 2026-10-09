@@ -82,23 +82,25 @@ and useful instrument effects remain available locally.
 ## Readiness check, 2026-10-09
 
 The live regional queue remains in `waiting-for-regional-source-selection`.
-It has 1,285 signal-audited candidate entries, but **178 distinct source-reviewed
-music works / 13 creators**, against the requested approximately 1,000 works.
+The updated acquisition/review snapshot has 1,329 signal-audited candidate entries,
+but **222 distinct source-reviewed music works / 16 creators**, against the
+requested approximately 1,000 works.
 Only retained unique music works fill that target; supplements and variants do not.
 
 | Reviewed repertoire | Distinct works |
 | --- | ---: |
 | China | 29 |
-| Japan | 4 |
+| Japan | 48 |
 | Korea | 58 |
 | Europe | 0 |
 | North America | 49 |
 | Unknown | 38 |
 
-The reviewed genres are ambient 30, classical 53, electronic 17, folk 6, funk 2,
-jazz 7, pop 2, rock 31 and unlabeled 30. Full country, blues, hip-hop and R&B
-coverage is not yet established in this subset. No Chinese/Japanese/Korean vocal
-music is counted. These acquisition gaps remain even without the profile's
+The reviewed genres are ambient 30, classical 55, electronic 56, folk 7, funk 2,
+hip-hop 2, jazz 7, pop 2, rock 31 and unlabeled 30. Country, blues and R&B remain
+absent; two hip-hop works from one creator do not establish broad coverage.
+No Chinese/Japanese/Korean vocal music is counted. These acquisition gaps remain
+even without the profile's
 additional creator-share and per-category working thresholds.
 
 Matching Slakh and VCTK supplements are prepared: 49 Slakh recordings / 3,557
@@ -118,6 +120,13 @@ WAV/FLAC masters: three Japanese creator compositions and six standalone JRPG
 themes add nine reviewed full works. Thirty-three loops/cues/variants remain
 supplements. Native mono and Japanese-style music are retained without inventing
 Japanese regional or vocal coverage.
+
+The [additional Japanese acquisition](japanese-additional-sources-20261009.md)
+retains 46 original FLAC masters from kazunocobit, menogin and HarryArtz, adding
+44 distinct works after grouping variants and keeping the short cue separate.
+Two valid masters with DC offsets have measured, explicitly credited derivatives;
+their originals remain intact. The current source/coverage review reports 37
+remaining gaps. Raw downloads and private email delivery links remain local.
 
 ## Source and artifact review
 
