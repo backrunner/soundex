@@ -10,7 +10,7 @@ clean/degraded pair. Source separation labels and multitrack stems are unnecessa
 | Source | Publisher grant / acquisition | SoundEx use |
 |--------|-------------------------------|-------------|
 | [Open Goldberg Variations](https://kimikoishizaka.bandcamp.com/album/j-s-bach-open-goldberg-variations-bwv-988-piano) | Artist states all tracks are CC0; offers lossless/24-bit 96 kHz downloads | Strong small piano seed/validation source; insufficient genre/instrument coverage on its own |
-| [Slakh2100-redux](https://www.slakh.com/) / [official archive](https://zenodo.org/records/4599666) | Publisher states CC BY 4.0; underlying Lakh composition/transcription authority remains unresolved | Retained synthetic mix supplement; [commercial weight review is incomplete](../legal/WEIGHT_LICENSE_REVIEW.md). Not a substitute for real stereo music |
+| [Slakh2100-redux](https://www.slakh.com/) / [official archive](https://zenodo.org/records/4599666) | Publisher states CC BY 4.0; underlying Lakh composition/transcription authority remains unresolved | Removed from the current regional run on 2026-10-09. Historical experiments retain an [incomplete commercial weight review](../legal/WEIGHT_LICENSE_REVIEW.md). |
 | [MusicNet](https://zenodo.org/records/5120004) | 330 classical recordings, PCM WAV archive about 11.1 GB; publisher describes CC and public-domain performances and gives per-recording provenance | Promising real-music candidate; review original recording grants individually when preparing a release; do not assume one label grants all recordings |
 | [Musopen](https://musopen.org/music/) / [terms](https://musopen.org/tos/) | Per-recording public-domain/CC labels; not a single permissive license for the whole site | Prefer lossless recordings with clear reusable grants; retain exact source and recording credits |
 | [FMA](https://github.com/mdeff/fma) | Available audio packages are MP3 | Excluded from clean-target training; converting MP3 to WAV/FLAC does not supply a lossless original |
@@ -81,13 +81,12 @@ Rows bind source metadata and catalog checksum to the source checksum and recipe
 `source-credits.json` provides a starting point for release credits.
 
 The library profile's validation quota is explicit (256 rows). Adjust it to the
-actual source coverage; use sufficient recordings for each split. To mix Slakh
-and audio libraries, set both paths, positive source ratios and exact per-source
-quotas. Bound the epoch budget so one large corpus does not dominate. Add stereo,
+actual source coverage; use sufficient recordings for each split. For any explicitly selected supplemental source, set its path, positive source
+ratios and exact per-source quotas. Bound the epoch budget so one large corpus does not dominate. Add stereo,
 mono, diverse instruments, transients, voices, ambience and dynamics; report the
 coverage rather than inferring generalization from one album or genre.
 
-`configs/diverse_lossless.yaml` includes distinct music, Slakh and speech paths.
+`configs/diverse_lossless.yaml` enables distinct real-music and speech paths; Slakh is disabled.
 Prepare speech with `preprocess_library.py --corpus speech_library` and that
 profile; catalog `split_group` should identify the speaker. Set all source ratios
 and quotas for the acquired data. A positive configured source missing from either
@@ -104,8 +103,8 @@ multi-label tags separately. Unknown genres remain `unlabeled`.
 
 `data.sampling_weights.speech_mix_ratios` derives speech probability equal to the
 smallest labeled music genre's final draw probability, including normalization
-after adding speech. Slakh has an explicit synthetic budget and is not assigned
-an invented genre. Inspect the resulting report before freezing a run: a genre
+after adding speech. No synthetic corpus is added by default. An explicitly requested synthetic budget
+is separate from music genre counts. Inspect the resulting report before freezing a run: a genre
 with one recording is an acquisition gap, not adequate coverage. Validation adds
 genre strata and reports speech separately through its corpus stratum.
 

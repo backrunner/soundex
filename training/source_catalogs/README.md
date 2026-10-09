@@ -28,7 +28,8 @@ Japanese creator repertoire evidence; six JRPG themes retain unknown region.
 The [additional Japanese acquisition](../../docs/japanese-additional-sources-20261009.md)
 adds 46 original FLAC masters from three creators, representing 44 distinct works.
 Two DC-offset repairs retain their originals and edit receipts. Source-specific
-CC BY 4.0 reviews do not settle the complete corpus's separate Slakh release issue.
+CC BY 4.0 reviews do not approve an eventual checkpoint automatically. Slakh has
+since been removed from the upcoming run; its historical experiments remain separate.
 
 The earlier 360-track signal-audited snapshot (2026-10-08, approximately 24 hours /
 10 GB) is a historical acquisition result, not the current source-reviewed count.
@@ -66,8 +67,8 @@ publisher master provenance. Known MP3/AAC/Vorbis exports, including FMA MP3
 packages, are not clean targets.
 
 Related versions share one work/split group. Duplicate PCM, alternate mixes,
-codec variants and channels do not increase song counts. Slakh and VCTK speech
-remain separate supplements. Prepare every enabled corpus with the same immutable
+codec variants and channels do not increase song counts. VCTK speech remains a separate supplement; Slakh is excluded from the upcoming
+regional run. Prepare every enabled corpus with the same immutable
 recipe and derive speech sampling from the smallest actual music genre after
 pair generation; see [workspace/run tooling](../../docs/workspace.md).
 
@@ -76,5 +77,5 @@ pair generation; see [workspace/run tooling](../../docs/workspace.md).
 Preserve individual publisher grants, credits and edit descriptions locally;
 source documentation stays public. The
 [actual weight-license findings](../../legal/WEIGHT_LICENSE_REVIEW.md) remain
-separate from signal quality: the Slakh MIDI/rendering review is unresolved,
+separate from signal quality: historical Slakh experiments retain unresolved MIDI/rendering findings,
 and no learned restoration weights are approved for publication.

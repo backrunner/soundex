@@ -44,7 +44,7 @@ audio:
 data:
   musdb18_hq_path: null  # legacy checkpoint key; not a training source
   slakh2100_path: null
-  medleydb_path: null  # legacy key; default trainer uses Slakh / audio libraries
+  medleydb_path: null  # legacy key; default trainer uses audio libraries
   music_library_path: /data/music-library
   recipe:
     schema_version: 1

@@ -23,8 +23,8 @@ python -m pip check
 
 ## Audio sources and codec synthesis
 
-Default and Titan Xp profiles use Slakh2100 rendered mixes; `music_library.yaml`
-accepts generic audio libraries. MUSDB has been removed from download/preprocessing/
+Default and Titan Xp profiles now use real music libraries; `music_library.yaml`
+accepts generic audio libraries. The current regional run excludes Slakh. MUSDB has been removed from download/preprocessing/
 training selection. Historical checkpoint identifiers remain readable for audits.
 
 Import folders directly or add an optional source catalog. Training has no dataset
@@ -36,11 +36,6 @@ stems and separation labels are unnecessary.
 
 ```bash
 cd training
-# Synthetic mixes, existing route:
-python data/preprocess_slakh.py --data-root /data/slakh2100 \
-  --output-dir /data/slakh2100/processed --config configs/default.yaml
-python train.py --config configs/default.yaml
-
 # Audio library, directory route (or --catalog /data/catalog.jsonl):
 python data/preprocess_library.py --data-root /data/audio-library \
   --output-dir /data/music-library/processed --config configs/music_library.yaml
@@ -58,7 +53,7 @@ Use positive source ratios and explicit validation quotas for enabled sources.
 Clean targets must be lossless PCM WAV/FLAC/AIFF. FMA MP3 packages and lossy
 encodings disguised by file extensions are excluded. Verify original-master
 provenance too: transcoding MP3 into FLAC does not restore the original signal.
-`configs/diverse_lossless.yaml` combines real music, Slakh and speech; prepare
+`configs/diverse_lossless.yaml` combines real music and speech; prepare
 speech with `--corpus speech_library` using the same profile. Derive speech mass
 from the smallest actual training genre with `data.sampling_weights.speech_mix_ratios`.
 See [genre coverage and sampling](../docs/datasets.md).
@@ -95,7 +90,7 @@ checksummed JSONL manifest, and atomically publishes it. Existing versions are n
 deleted. The manifest holds disjoint track-level `train`, `validation`, and untouched `test`
 roles. `train.py` loads only the exact recipe version from the selected profile; missing roots or
 versions are skipped. **Mix ratios and per-source caps** live under
-`data.sampling` in the selected profile (default Slakh-only;
+`data.sampling` in the selected profile (default real music;
 `music_library.yaml` uses a generic audio directory or optional catalog).
 Paths are set in the same config.
 
@@ -116,9 +111,9 @@ required blinded listening protocol.
 
 ## Acquisition and release
 
-The downloader defaults to Slakh2100-redux and can extract rendered mixes only.
-The full transfer is still about 104 GB; mix-only extraction reduces retained
-storage, not network traffic. Acquire music libraries from their publisher and
+The legacy dataset downloader requires an explicit `--datasets` choice; its Slakh
+importer remains available for reproducing historical experiments, and is not
+part of the current training route. Acquire music libraries from their publisher and
 retain source information when available. Publication requires actual source grants,
 not a blanket inference from a “free” site.
 

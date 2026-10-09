@@ -6,7 +6,18 @@ from pathlib import Path
 
 import pytest
 
-from scripts.run_native_training import main
+from scripts.run_native_training import configured_native_corpora, main
+
+
+@pytest.mark.parametrize("profile", ["default.yaml", "titan_xp.yaml", "diverse_lossless.yaml"])
+def test_current_profiles_do_not_bind_slakh(profile: str) -> None:
+    import yaml
+
+    config = yaml.safe_load((Path(__file__).parents[1] / "configs" / profile).read_text())
+    assert "music_library" in configured_native_corpora(config)
+    assert "slakh2100" not in configured_native_corpora(config)
+    assert "slakh2100" not in config["data"]["sampling"]["train_ratios"]
+    assert "slakh2100" not in config["data"]["sampling"]["val_ratios"]
 
 
 @pytest.mark.parametrize(

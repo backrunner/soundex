@@ -47,7 +47,7 @@ audio:
   crossover_width_hz: 1000.0
 data:
   musdb18_hq_path: null
-  slakh2100_path: /data/slakh2100
+  slakh2100_path: null
   medleydb_path: null
   music_library_path: /data/music-library
   recipe:
@@ -181,20 +181,16 @@ data:
     recording_balance: true
     strategy: weighted
     train_ratios:
-      music_library: 0.75
-      slakh2100: 0.2
+      music_library: 0.95
       speech_library: 0.05
     max_train_samples:
       music_library: null
-      slakh2100: null
       speech_library: null
     val_ratios:
-      music_library: 0.75
-      slakh2100: 0.2
+      music_library: 0.95
       speech_library: 0.05
     validation_source_quotas:
       music_library: 768
-      slakh2100: 128
       speech_library: 128
     samples_per_epoch: 2048
   speech_library_path: /data/speech-library

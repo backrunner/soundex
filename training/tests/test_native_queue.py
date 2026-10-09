@@ -14,11 +14,22 @@ from scripts.wait_for_native_training import main, verify_supplements
 def test_matching_recipe_does_not_allow_an_invalid_prepared_manifest(tmp_path: Path) -> None:
     config = Path(__file__).parents[1] / "configs/diverse_lossless.yaml"
     recipe = load_recipe_from_profile(config)
-    version = tmp_path / "slakh2100/processed" / f"slakh2100-{recipe.hash[:16]}"
+    version = tmp_path / "speech_library/processed" / f"speech_library-{recipe.hash[:16]}"
     version.mkdir(parents=True)
     (version / "recipe.json").write_text(json.dumps({"recipe_hash": recipe.hash}))
     (version / "manifest.jsonl").write_text("{}\n")
     with pytest.raises(DataProtocolError, match="required field"):
+        verify_supplements(config, tmp_path)
+
+
+def test_disabled_slakh_is_not_required_or_audited(tmp_path: Path) -> None:
+    config = Path(__file__).parents[1] / "configs/diverse_lossless.yaml"
+    recipe = load_recipe_from_profile(config)
+    stale = tmp_path / "slakh2100/processed" / f"slakh2100-{recipe.hash[:16]}"
+    stale.mkdir(parents=True)
+    (stale / "manifest.jsonl").write_text("invalid legacy manifest\n")
+    # The enabled speech source must be checked; Slakh on disk must not opt itself in.
+    with pytest.raises(ValueError, match="missing matching prepared supplement: speech_library"):
         verify_supplements(config, tmp_path)
 
 

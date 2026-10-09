@@ -103,8 +103,8 @@ No Chinese/Japanese/Korean vocal music is counted. These acquisition gaps remain
 even without the profile's
 additional creator-share and per-category working thresholds.
 
-Matching Slakh and VCTK supplements are prepared: 49 Slakh recordings / 3,557
-aligned pairs and 270 VCTK utterances / 20,056 aligned pairs, using recipe
+Slakh was removed from the upcoming run on 2026-10-09. The retained VCTK speech
+supplement has 270 utterances / 20,056 aligned pairs, using recipe
 `7fda9e58ab583617`. Native mono input is supported; recording-balanced sampling
 avoids multiplying a stereo source's draw mass by its channel roles. The queue
 has no training child or checkpoints and will start fresh training after the
@@ -149,8 +149,8 @@ intended Apache-2.0 weight publication. It is not a legal guarantee or an automa
 copyright decision about weights. Review the exact artifact's provenance and
 possible retained source material before release. Audio keeps its upstream terms
 and is not bundled with the Apache model.
-The whole planned training combination is not yet approved for weight publication:
-the [concrete Slakh MIDI/rendering review](../legal/WEIGHT_LICENSE_REVIEW.md) remains
+The exact future checkpoint still requires artifact and full-provenance release
+review. Slakh is excluded from the current combination; the [historical Slakh MIDI/rendering review](../legal/WEIGHT_LICENSE_REVIEW.md) remains
 incomplete. Source-reviewed music counts do not imply a released-model rights approval.
 
 The generic folder/JSONL importer still accepts arbitrary audio and optional rights

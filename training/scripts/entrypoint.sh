@@ -11,7 +11,7 @@
 #   MEDLEYDB_PATH          Storage dir for MedleyDB
 #   BABYSLAKH_PATH         Storage dir for BabySlakh
 #   PATHS_MANIFEST         Where to write/read soundex_data_paths.yaml
-#   DOWNLOAD_DATASETS      slakh2100 for official training; BabySlakh is smoke only
+#   DOWNLOAD_DATASETS      legacy datasets only when explicitly requested; current run uses audio libraries
 #   SKIP_EXISTING          1 (default) skip download when tree looks ready
 #   PREPROCESS             1 after download (default 1 if DOWNLOAD_DATASETS set)
 #   KEEP_ARCHIVE           1 keep zip/tar after extract
@@ -139,7 +139,7 @@ if [[ -n "${DOWNLOAD_DATASETS}" ]]; then
 elif [[ "${PREPROCESS}" == "1" ]]; then
   echo ">>> PREPROCESS=1 without DOWNLOAD_DATASETS — preprocessing existing trees"
   slakh_root="${SLAKH2100_PATH:-${DATA_ROOT}/slakh2100}"
-  if [[ -d "${slakh_root}" ]]; then
+  if [[ -n "${SLAKH2100_PATH:-}" && -d "${slakh_root}" ]]; then
     python data/preprocess_slakh.py \
       --data-root "${slakh_root}" \
       --output-dir "${slakh_root}/processed" \

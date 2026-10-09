@@ -21,13 +21,13 @@ def recording_weights(rows: Sequence[Mapping[str, Any]]) -> list[float]:
 
 
 def speech_mix_ratios(
-    music_rows: Sequence[Mapping[str, Any]], *, synthetic_ratio: float = 0.2
+    music_rows: Sequence[Mapping[str, Any]], *, synthetic_ratio: float = 0.0
 ) -> tuple[dict[str, float], dict[str, Any]]:
     """Match speech's draw mass to the smallest labeled real-music genre's mass.
 
     Count unique training recordings, not role files or codec variants. Unlabeled
     recordings are reported separately and cannot be substituted for a genre.
-    Synthetic mass remains explicit; all three final source ratios sum to one.
+    Synthetic mass is opt-in; disabled sources are omitted from the final ratios.
     """
     if not 0 <= synthetic_ratio < 1:
         raise ValueError("synthetic_ratio must be in [0, 1)")
@@ -53,9 +53,10 @@ def speech_mix_ratios(
     total = 1 + speech_mass
     ratios = {
         "music_library": music_mass / total,
-        "slakh2100": synthetic_ratio / total,
         "speech_library": speech_mass / total,
     }
+    if synthetic_ratio:
+        ratios["slakh2100"] = synthetic_ratio / total
     report = {
         "training_recordings_by_genre": dict(sorted(counts.items())),
         "smallest_genres": sorted(g for g, count in labeled.items() if count == smallest),
@@ -79,7 +80,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest", type=Path)
-    parser.add_argument("--synthetic-ratio", type=float, default=0.2)
+    parser.add_argument("--synthetic-ratio", type=float, default=0.0)
     args = parser.parse_args()
     ratios, report = speech_mix_ratios(
         load_manifest(args.manifest), synthetic_ratio=args.synthetic_ratio

@@ -17,6 +17,16 @@ from typing import Any
 import yaml
 
 
+def configured_native_corpora(config: dict[str, Any]) -> tuple[str, ...]:
+    """Bind only explicitly enabled paths; existing local corpora do not opt in."""
+    data = config["data"]
+    return tuple(
+        corpus
+        for corpus in ("music_library", "slakh2100", "speech_library")
+        if data.get(corpus + "_path")
+    )
+
+
 def write_progress(run: Path, stage: str, **fields: Any) -> None:
     value = {
         "stage": stage,
@@ -144,13 +154,15 @@ def main() -> None:
             raise ValueError(
                 "bound music sources are below the requested target after deduplication"
             )
-        for corpus in ("music_library", "slakh2100", "speech_library"):
+        corpora = configured_native_corpora(config)
+        supplements = tuple(c for c in corpora if c != "music_library")
+        for corpus in corpora:
             config["data"][corpus + "_path"] = str(processed / corpus)
         profile = run / "config.yaml"
         profile.write_text(yaml.safe_dump(config, sort_keys=False))
         recipe = load_recipe_from_profile(profile)
         write_progress(run, "verify-prepared-supplements", music_recordings=len(bound))
-        for corpus in ("slakh2100", "speech_library"):
+        for corpus in supplements:
             root = processed / corpus / "processed"
             version = root / f"{corpus}-{recipe.hash[:16]}"
             if not version.is_dir():
@@ -165,7 +177,7 @@ def main() -> None:
             "music_recordings": len(bound),
             "initialization": "fresh random weights; no legacy checkpoint/teacher",
             "recipe_hash": recipe.hash,
-            "supplements": {c: str(processed / c) for c in ("slakh2100", "speech_library")},
+            "supplements": {c: str(processed / c) for c in supplements},
             "curation": curation_report,
             "curation_policy_sha256": sha256_file(run / "curation-policy.yaml")
             if curation_report
@@ -191,7 +203,20 @@ def main() -> None:
             / "music_library/processed"
             / (f"music_library-{recipe.hash[:16]}/manifest.jsonl")
         )
-        ratios, report = speech_mix_ratios(load_manifest(music_manifest), synthetic_ratio=0.2)
+        if "speech_library" in corpora:
+            synthetic_ratio = (
+                float(config["data"]["sampling"]["train_ratios"].get("slakh2100", 0))
+                if "slakh2100" in corpora
+                else 0.0
+            )
+            ratios, report = speech_mix_ratios(
+                load_manifest(music_manifest), synthetic_ratio=synthetic_ratio
+            )
+        else:
+            ratios = {c: config["data"]["sampling"]["train_ratios"][c] for c in corpora}
+            total = sum(ratios.values())
+            ratios = {c: mass / total for c, mass in ratios.items()}
+            report = {"basis": "configured sources; speech is disabled"}
         config["data"]["sampling"]["train_ratios"] = ratios
         config["data"]["sampling"]["val_ratios"] = ratios
         profile.write_text(yaml.safe_dump(config, sort_keys=False))

@@ -519,8 +519,8 @@ def main() -> int:
     parser.add_argument(
         "--datasets",
         type=str,
-        default="slakh2100",
-        help="Comma-separated: slakh2100,babyslakh,medleydb; default slakh2100",
+        required=True,
+        help="Explicit opt-in, comma-separated: slakh2100,babyslakh,medleydb",
     )
     parser.add_argument(
         "--data-root",

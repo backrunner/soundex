@@ -24,7 +24,7 @@ from data.protocol import (
     load_recipe_from_profile,
     validate_manifest_rows,
 )
-from scripts.run_native_training import write_progress
+from scripts.run_native_training import configured_native_corpora, write_progress
 from scripts.select_native_catalog import select_recordings, write_jsonl
 
 
@@ -54,9 +54,11 @@ def collection_active(directory: Path) -> bool:
 
 
 def verify_supplements(config: Path, processed: Path) -> None:
-    """Fail before waiting hours if either positive training corpus is unavailable."""
+    """Fail before waiting hours if an enabled supplemental corpus is unavailable."""
     recipe = load_recipe_from_profile(config)
-    for corpus in ("slakh2100", "speech_library"):
+    for corpus in configured_native_corpora(yaml.safe_load(config.read_text())):
+        if corpus == "music_library":
+            continue
         root = processed / corpus / "processed"
         if not (root / f"{corpus}-{recipe.hash[:16]}").is_dir():
             raise ValueError(f"missing matching prepared supplement: {corpus}")

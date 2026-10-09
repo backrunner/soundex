@@ -59,12 +59,12 @@ publishing that artifact; changing a license label or fine-tuning does not suppl
 missing permission. A public-domain composition does not establish rights in its
 recording. CC grants cover only rights the licensor holds.
 
-Useful candidates include the publisher's CC BY 4.0
-[Slakh mixes](https://www.slakh.com/), CC0 recordings, attributable permissive
-recordings, and owned or separately authorized audio. These are suggestions,
+Useful candidates include CC0 recordings, attributable permissive recordings,
+and owned or separately authorized audio. These are suggestions,
 not a fixed training allowlist. Individual grants and acquired versions matter.
 Slakh's dataset grant does not by itself resolve the underlying web-scraped Lakh
-MIDI composition/transcription rights. Slakh stays in the requested training mix;
+MIDI composition/transcription rights. Slakh was removed from the upcoming regional
+training mix on 2026-10-09;
 its weight-publication rights review remains incomplete. See the concrete
 [existing-weight and source findings](WEIGHT_LICENSE_REVIEW.md).
 
