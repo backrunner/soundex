@@ -114,3 +114,8 @@ material and the complete corpus provenance. The separate
 See [regional targets and current readiness](dataset-curation.md). This expansion
 adds Japanese instrumentals; regional vocal music and wider Japanese genre and
 creator coverage remain incomplete.
+
+The [subsequent same-day acquisition](japanese-additional-sources-20261009.md)
+adds creator-published albums by kazunocobit and menogin, plus four original
+HarryArtz instrumentals. The counts above describe this earlier batch;
+current coverage is reported in the regional readiness document.
