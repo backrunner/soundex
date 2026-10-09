@@ -11,6 +11,11 @@ includes the DSP, inference engine, real-time adapter and PyTorch training pipel
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
+The [current native-lossless run](docs/native-training-20261009.md) uses 300
+reviewed music works plus VCTK speech, from fresh initialization with MUSDB and
+Slakh disabled. Raw audio, prepared pairs and training checkpoints stay local;
+the repository publishes their source documentation and reproducible workflow.
+
 ## Quick start
 
 Requires **Rust 1.88+** and a C/C++ build toolchain. The default build downloads

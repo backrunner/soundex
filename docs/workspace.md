@@ -18,19 +18,25 @@ training/
   .venv/                   Local Python environment (ignored)
   .tools/bin/              Local FFmpeg symlink (ignored)
 data/                      Local artifacts, all ignored
-  raw/{music,speech,slakh2100}/
-  processed/{music_library,speech_library,slakh2100}/
+  raw/{music,speech}/
+  processed/{music_library,speech_library}/
   source-discovery/         Candidate metadata; not approved training data
   catalogs/                Local input and final audited selection catalogs
   evidence/                Publisher/acquisition receipts and historical surveys
   reports/                 Quality, inventory and cleanup receipts
   runs/<run-id>/           Frozen config, source, logs and checkpoints
+  archive/runs/            Inactive historical runs and unique audit checkpoints
 ```
 
 `training/outputs` is a local compatibility symlink to `data/runs`, preserving
 references in historical immutable manifests. New runs should use `data/` paths.
 Retained survey receipts are historical evidence, not an approved source catalog.
 Only the current audited catalog selects training inputs.
+The current run and artifact locations are documented in
+[native-lossless training](native-training-20261009.md). Retired Slakh audio/pairs
+have been removed; their historical manifest and recipe receipts remain under
+`data/evidence/retired-corpora/`. Historical generated audio, duplicate periodic
+checkpoints and unused tool/cache copies are removed with deletion receipts.
 
 Run the optional source audit before generating codec pairs:
 
@@ -84,4 +90,5 @@ For the requested China/Japan/Korea/Europe/North America run, use the optional
 minimum and basic regional/creator balance;
 fine-grained genre and regional-vocal gaps remain advisory. Source review and
 quality selection are required before starting. The count-only queue
-has been superseded; acquisition continues and the current job reports the gaps.
+has been superseded. The selected catalog now meets its 300-work target and
+required checks; fine-grained coverage gaps remain acquisition work.

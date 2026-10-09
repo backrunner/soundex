@@ -5,6 +5,11 @@ Use Python 3.12 and FFmpeg with the encoders required by your recipe. Install
 PyTorch for your hardware first; see [environment setup](scripts/environment.md)
 for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
+The current maintainer run starts fresh with 300 reviewed native-lossless music
+works plus VCTK speech. MUSDB and Slakh are disabled. See
+[the current run](../docs/native-training-20261009.md) for source totals, recipe,
+model profile, live status paths and local checkpoint locations.
+
 See [workspace layout](../docs/workspace.md) for local raw audio, prepared pairs,
 reports and frozen runs. Source-quality audits use `scripts/audit_library.py`;
 reviewed publisher original-file plans can be acquired with
@@ -119,8 +124,19 @@ not a blanket inference from a “free” site.
 
 ```bash
 cd training
-python scripts/download_datasets.py --datasets slakh2100 --data-root /mnt/datasets \
-  --cache-dir /mnt/scratch/soundex-cache --preprocess
+# Prepare the enabled speech supplement with the same recipe as music:
+PATH="$PWD/.tools/bin:$PATH" python data/preprocess_library.py \
+  --data-root /path/to/native-speech --corpus speech_library \
+  --output-dir ../data/processed/speech_library/processed \
+  --config configs/diverse_lossless.yaml
+
+# Use your own reviewed catalog; local source files are not included in Git:
+PATH="$PWD/.tools/bin:$PATH" python scripts/run_native_training.py \
+  --catalog ../data/catalogs/training-music.jsonl \
+  --run-dir ../data/runs/native-300-YYYYMMDD-HHMMSS \
+  --processed-root ../data/processed \
+  --config configs/diverse_lossless.yaml --minimum-tracks 300 \
+  --curation-policy configs/curation_300.yaml --evidence-root ../data/catalogs
 ```
 
 [Storage guide](scripts/download_mix_only.md) · [environment](scripts/environment.md)
