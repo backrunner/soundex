@@ -94,10 +94,9 @@ and useful instrument effects remain available locally.
 
 ## Readiness check, 2026-10-09
 
-The live regional queue remains in `waiting-for-regional-source-selection`.
-The updated acquisition/review snapshot has 1,384 signal-audited candidate entries,
-but **277 distinct source-reviewed music works / 20 creators**, against the
-new first-run target of 300 works: **23 more reviewed works are needed**.
+The current acquisition/review snapshot has 1,407 signal-audited candidate
+entries and **300 distinct source-reviewed music works / 22 creators**. It meets
+the first-run target and all required source, quality and basic diversity checks.
 Only retained unique music works fill that target; supplements and variants do not.
 
 | Reviewed repertoire | Distinct works |
@@ -106,25 +105,26 @@ Only retained unique music works fill that target; supplements and variants do n
 | Japan | 48 |
 | Korea | 58 |
 | Europe | 32 |
-| North America | 72 |
+| North America | 95 |
 | Unknown | 38 |
 
-The reviewed genres are ambient 30, classical 55, country 5, electronic 56, folk 29,
-funk 2, hip-hop 2, jazz 7, pop 2, rock 59 and unlabeled 30.
-Blues and R&B remain absent; country has one creator, and two hip-hop works
-from one creator do not establish broad coverage.
-
+Reviewed genres are ambient 30, blues 11, classical 55, country 5, electronic 56,
+folk 29, funk 2, hip-hop 2, jazz 7, pop 14, rock 59 and unlabeled 30.
+The new blues/Americana and indie-pop works retain their fusion descriptions;
+their genre labels do not establish broad traditional-blues or mainstream-pop coverage.
+R&B remains absent; country and hip-hop still lack creator diversity.
 No Chinese/Japanese/Korean vocal music is counted. These remain acquisition
-gaps in the advisory report. The current 300-work policy has one blocking gap:
-the selected music count.
+issues among the **13 advisory gaps**, with **zero blocking gaps** under the
+300-work policy. The stricter 1,000-work profile remains available.
 
 Slakh was removed from the upcoming run on 2026-10-09. The retained VCTK speech
 supplement has 270 utterances / 20,056 aligned pairs, using recipe
 `7fda9e58ab583617`. Native mono input is supported; recording-balanced sampling
-avoids multiplying a stereo source's draw mass by its channel roles. The queue
-has no training child or checkpoints and will start fresh training after the
-300-work selection reaches its target and required diversity checks pass.
-A waiting queue is not a started run.
+avoids multiplying a stereo source's draw mass by its channel roles.
+At the 18:20 observation, the new run had frozen the 300-work catalog, passed
+supplement verification and entered `preprocess-music`. Model optimization had
+not started. Full preparation and manifest checks precede fresh training;
+no legacy checkpoint or teacher is used. Preparation is not a model-training result.
 
 Raw audio, processed pairs, source-page evidence, download plans and per-file
 catalogs stay local and ignored. Only source documentation is published; see
@@ -147,8 +147,11 @@ remaining gaps. Raw downloads and private email delivery links remain local.
 The [native Slakh replacement batch](slakh-replacement-sources-20261009.md) adds 55
 reviewed works from free German and US publisher FLAC albums, including vocal
 rock, acoustic/anti-folk and country-rock. That source/coverage snapshot
-reported 34 gaps against the strict 1,000-work plan. Unique selected music totals 1132.55 minutes; VCTK adds
-23.85 minutes, for 1156.40 source minutes across future train/validation/test splits.
+reported 34 gaps against the strict 1,000-work plan. The subsequent
+[free pilot completion batch](pilot-300-sources-20261009.md) adds another 23 works
+from two creators and 79.84 minutes. Unique selected music now totals 1212.39
+minutes; VCTK adds 23.85 minutes, for 1236.24 source minutes across future
+train/validation/test splits.
 Slakh contributes zero minutes to this run.
 
 ## Source and artifact review

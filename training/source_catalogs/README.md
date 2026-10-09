@@ -7,16 +7,17 @@ under the code's Apache-2.0 license.
 
 ## Current collection, 2026-10-09
 
-The updated acquisition/review snapshot contains **1,384 signal-audited candidate
-entries**, but only **277 distinct source-reviewed music works from 20 creators**
-count toward the first 300-work run; 23 more reviewed works are needed. Candidate entries
-are not approved song counts. China contributes 29 works, Japan 48, Korea 58,
-Europe 32 and North America 72; 38 have unknown regional repertoire.
-Chinese/Japanese/Korean vocal coverage remains absent. Pop has 2 works,
-electronic 56 and country 5. Fine-grained coverage remains incomplete and is
-reported for continued acquisition. The 300-work profile retains basic regional
-and creator balance plus source/quality checks; its current blocking gap is count.
+The updated snapshot has **1,407 signal-audited candidate entries** and
+**300 distinct source-reviewed music works from 22 creators**. It meets the
+first-run policy, with zero blocking gaps and 13 advisory coverage gaps.
+Candidate entries are not approved song counts. China contributes 29 works,
+Japan 48, Korea 58, Europe 32 and North America 95; 38 have unknown regional
+repertoire. Chinese/Japanese/Korean vocal coverage and R&B remain absent.
+Pop has 14 works, electronic 56, blues 11 and country 5; the new indie-pop and
+blues/Americana works are fusion recordings, not broad genre-market coverage.
 The original strict 1,000-work plan remains available for later expansion.
+The 18:20 observation found the fresh run preparing music pairs after supplement
+verification; model optimization had not started. Local run progress is authoritative.
 
 See [the source and coverage review](../../docs/dataset-curation.md) for publisher
 links, selected grants, credits and limitations. The separate
@@ -36,8 +37,10 @@ since been removed from the upcoming run; its historical experiments remain sepa
 
 The [Slakh replacement acquisition](../../docs/slakh-replacement-sources-20261009.md)
 retains 83 original FLAC recordings and adds 55 reviewed works from four creators.
-Selected music totals 1132.55 minutes; with VCTK speech, 1156.40 source minutes
-are available across future train/validation/test splits. Slakh is excluded.
+The [free pilot completion batch](../../docs/pilot-300-sources-20261009.md) adds
+another 23 works / 79.84 minutes from two creators, without email or subscription.
+Selected music now totals 1212.39 minutes; with VCTK speech, 1236.24 source
+minutes are available across future train/validation/test splits. Slakh is excluded.
 
 The earlier 360-track signal-audited snapshot (2026-10-08, approximately 24 hours /
 10 GB) is a historical acquisition result, not the current source-reviewed count.

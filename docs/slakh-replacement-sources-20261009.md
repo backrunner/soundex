@@ -127,3 +127,8 @@ are not used as clean targets. Paid acquisition needs separate approval.
 
 See [current coverage and readiness](dataset-curation.md) and
 [weight release findings](../legal/WEIGHT_LICENSE_REVIEW.md).
+
+The later [free pilot completion batch](pilot-300-sources-20261009.md) adds 23
+more reviewed works from two creators, reaching 300 works and satisfying the
+first-run blocking checks. The 277-work figures above describe this earlier batch
+snapshot; see the current [readiness check](dataset-curation.md) for updated totals.
