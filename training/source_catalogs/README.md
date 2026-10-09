@@ -9,12 +9,14 @@ under the code's Apache-2.0 license.
 
 The updated acquisition/review snapshot contains **1,384 signal-audited candidate
 entries**, but only **277 distinct source-reviewed music works from 20 creators**
-count toward the requested approximately 1,000-work collection. Candidate entries
+count toward the first 300-work run; 23 more reviewed works are needed. Candidate entries
 are not approved song counts. China contributes 29 works, Japan 48, Korea 58,
 Europe 32 and North America 72; 38 have unknown regional repertoire.
 Chinese/Japanese/Korean vocal coverage remains absent. Pop has 2 works,
-electronic 56 and country 5; regional/genre/creator breadth is still below target.
-The collection is not ready for the regional run.
+electronic 56 and country 5. Fine-grained coverage remains incomplete and is
+reported for continued acquisition. The 300-work profile retains basic regional
+and creator balance plus source/quality checks; its current blocking gap is count.
+The original strict 1,000-work plan remains available for later expansion.
 
 See [the source and coverage review](../../docs/dataset-curation.md) for publisher
 links, selected grants, credits and limitations. The separate

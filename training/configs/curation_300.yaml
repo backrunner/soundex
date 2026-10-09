@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: Apache-2.0
+# First 300-work run. Source/quality checks and basic diversity remain required.
+# Fine-grained genre/language targets are reported for continued acquisition.
+minimum_music_recordings: 300
+minimum_distinct_artists: 15
+minimum_artists_per_region: 1
+minimum_genres_per_region: 2
+minimum_artists_per_genre: 2
+maximum_artist_fraction: 0.20
+maximum_genre_fraction: 0.35
+maximum_unknown_region_fraction: 0.15
+regions:
+  china: 15
+  japan: 15
+  korea: 15
+  europe: 30
+  north_america: 30
+genres:
+  pop: 18
+  rock: 18
+  electronic: 18
+  country: 9
+  folk: 9
+  jazz: 9
+  blues: 9
+  hiphop: 9
+  rnb: 9
+  classical: 9
+regional_vocal_music:
+  china: 3
+  japan: 3
+  korea: 3
+advisory_metrics:
+  - genres
+  - genre-artists
+  - regional-vocal-music

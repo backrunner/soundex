@@ -52,7 +52,9 @@ remain outside the clean-target selection. Related versions retain shared work g
 
 The updated pool has **277 works / 20 creators / 1132.55 music minutes**.
 Adding VCTK speech gives **1156.40 minutes** across future train/validation/test source material.
-There are 34 remaining acquisition/coverage gaps; the 1,000-work regional run is still waiting.
+This snapshot reported 34 gaps against the strict 1,000-work plan. The active
+[first-run policy](dataset-curation.md) now targets 300 reviewed works, with
+fine-grained coverage gaps reported separately from its required readiness checks.
 
 Three new vocal rock/folk/country samples passed 18 real FFmpeg codec round-trips:
 MP3 CBR 64 kbps, AAC-LC 96 kbps and Vorbis q3 at both 44.1 and 48 kHz.

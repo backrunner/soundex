@@ -7,16 +7,29 @@ a diverse approved corpus.
 
 ## Collection targets
 
-[`curation_1000.yaml`](../training/configs/curation_1000.yaml) records initial
-targets: 1,000 distinct recordings, 25 creators, 50 recordings each for
-China/Japan/Korea and 100 each for Europe/North America. Each region needs three
-creators and three genres. Pop, rock, electronic, country, folk, jazz, blues,
-hip-hop, R&B and classical have coverage floors. No creator should exceed 10%
-or genre 35% of the selected pool.
+The first run now targets **300 distinct reviewed music works** using
+[`curation_300.yaml`](../training/configs/curation_300.yaml). Source rights,
+full-file quality, independent work groups and split isolation remain required.
+Its basic diversity gates require 15 creators, 15 works each for China/Japan/Korea
+and 30 each for Europe/North America, at least one creator and two genres per
+region, at most 20% from one creator, 35% from one genre and 15% unknown region.
+
+Fine-grained genre and regional-vocal targets remain visible acquisition goals
+for this first run, rather than blocking its start. Only `genres`, `genre-artists`
+and `regional-vocal-music` may be declared advisory; source review, the 300-work
+minimum and basic regional/creator balance cannot be made advisory. Reports expose
+both `coverage_gaps` and `blocking_gaps`, so readiness does not imply complete
+coverage. Continued acquisition should prioritize the weak genres and regional
+vocal repertoire, not just increase the largest existing catalogs.
+
+The original [`curation_1000.yaml`](../training/configs/curation_1000.yaml) remains
+the strict larger-collection plan: 1,000 works, 25 creators, three creators/genres
+per region and the original per-genre/language floors. It is not the active queue.
 
 These are working acquisition targets, not a claim of comprehensive market
-coverage. Chinese/Japanese/Korean vocal music has separate ten-song floors in
-the corresponding language. Speech, Slakh mixes, effects, short loops and alternate
+coverage. The strict plan has separate ten-song floors for Chinese/Japanese/Korean
+vocal music in the corresponding language; the first-run advisory targets are
+three songs per language. Speech, Slakh mixes, effects, short loops and alternate
 versions do not fill full-song or regional-vocal counts. Creator aliases share one
 canonical ID; related versions share a work group before splitting.
 
@@ -84,7 +97,7 @@ and useful instrument effects remain available locally.
 The live regional queue remains in `waiting-for-regional-source-selection`.
 The updated acquisition/review snapshot has 1,384 signal-audited candidate entries,
 but **277 distinct source-reviewed music works / 20 creators**, against the
-requested approximately 1,000 works.
+new first-run target of 300 works: **23 more reviewed works are needed**.
 Only retained unique music works fill that target; supplements and variants do not.
 
 | Reviewed repertoire | Distinct works |
@@ -101,16 +114,17 @@ funk 2, hip-hop 2, jazz 7, pop 2, rock 59 and unlabeled 30.
 Blues and R&B remain absent; country has one creator, and two hip-hop works
 from one creator do not establish broad coverage.
 
-No Chinese/Japanese/Korean vocal music is counted. These acquisition gaps remain
-even without the profile's
-additional creator-share and per-category working thresholds.
+No Chinese/Japanese/Korean vocal music is counted. These remain acquisition
+gaps in the advisory report. The current 300-work policy has one blocking gap:
+the selected music count.
 
 Slakh was removed from the upcoming run on 2026-10-09. The retained VCTK speech
 supplement has 270 utterances / 20,056 aligned pairs, using recipe
 `7fda9e58ab583617`. Native mono input is supported; recording-balanced sampling
 avoids multiplying a stereo source's draw mass by its channel roles. The queue
 has no training child or checkpoints and will start fresh training after the
-regional selection reaches its target. A waiting queue is not a started run.
+300-work selection reaches its target and required diversity checks pass.
+A waiting queue is not a started run.
 
 Raw audio, processed pairs, source-page evidence, download plans and per-file
 catalogs stay local and ignored. Only source documentation is published; see
@@ -132,8 +146,8 @@ remaining gaps. Raw downloads and private email delivery links remain local.
 
 The [native Slakh replacement batch](slakh-replacement-sources-20261009.md) adds 55
 reviewed works from free German and US publisher FLAC albums, including vocal
-rock, acoustic/anti-folk and country-rock. The updated source/coverage audit
-reports 34 gaps. Unique selected music totals 1132.55 minutes; VCTK adds
+rock, acoustic/anti-folk and country-rock. That source/coverage snapshot
+reported 34 gaps against the strict 1,000-work plan. Unique selected music totals 1132.55 minutes; VCTK adds
 23.85 minutes, for 1156.40 source minutes across future train/validation/test splits.
 Slakh contributes zero minutes to this run.
 
@@ -173,20 +187,23 @@ cd training
 python scripts/audit_native_curation.py \
   --catalog ../data/reports/regional-pilot/acquired.jsonl \
   --reviews ../data/catalogs/regional-source-reviews.jsonl \
-  --policy configs/curation_1000.yaml \
+  --policy configs/curation_300.yaml \
   --output ../data/catalogs/regionally-curated-YYYYMMDD.jsonl
 ```
 
 Repeat `--catalog` for other audited receipts. Reviews bind recording IDs and
 audio/evidence hashes. Missing/changed evidence, unresolved rights, insufficient
-diversity or wrong-language vocals stay visible in the report. Incomplete audits
-publish a report and no training catalog. Published catalogs are immutable;
+diversity or wrong-language vocals stay visible in the report. Audits below the
+required readiness checks
+publish a report and no training catalog; advisory gaps remain visible even when
+the first-run requirements pass. Published catalogs are immutable;
 use a new output path for each approved snapshot.
 
-Add `--curation-policy configs/curation_1000.yaml` and
+Add `--curation-policy configs/curation_300.yaml` and
 `--source-reviews ../data/catalogs/regional-source-reviews.jsonl` to
 `scripts/wait_for_native_training.py` to watch acquisition. The queue freezes the
-policy and waits for coverage/source review even after downloads finish. It passes
+policy and waits for its required coverage/source checks even after downloads
+finish. It passes
 the policy and evidence root to the runner for another check before preprocessing.
 Manual runs use `--curation-policy` and `--evidence-root` together. Run receipts
 retain the actual policy hash and source review results.

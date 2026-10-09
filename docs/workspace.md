@@ -57,9 +57,11 @@ For a fresh run with the matching prepared VCTK speech supplement:
 cd training
 PATH="$PWD/.tools/bin:$PATH" python scripts/run_native_training.py \
   --catalog ../data/catalogs/training-music.jsonl \
-  --run-dir ../data/runs/native-1000-YYYYMMDD-HHMMSS \
+  --run-dir ../data/runs/native-300-YYYYMMDD-HHMMSS \
   --processed-root ../data/processed \
-  --config configs/diverse_lossless.yaml --minimum-tracks 1000
+  --config configs/diverse_lossless.yaml --minimum-tracks 300 \
+  --curation-policy configs/curation_300.yaml \
+  --evidence-root ../data/catalogs
 ```
 
 Slakh is disabled in the current profile; existing directories do not enable it.
@@ -78,6 +80,8 @@ target or silently starts with fewer songs. Keep the queue's source/config snaps
 and its `progress.json` under `data/runs/<job-id>/`.
 
 For the requested China/Japan/Korea/Europe/North America run, use the optional
-[regional curation profile](dataset-curation.md). Its queue also requires source
-review and actual regional/genre coverage before starting. The count-only queue
+[regional curation profile](dataset-curation.md). The first run uses a 300-work
+minimum and basic regional/creator balance;
+fine-grained genre and regional-vocal gaps remain advisory. Source review and
+quality selection are required before starting. The count-only queue
 has been superseded; acquisition continues and the current job reports the gaps.

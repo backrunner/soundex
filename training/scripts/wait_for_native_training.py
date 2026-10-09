@@ -139,6 +139,7 @@ def main() -> None:
                 else len(selected),
                 regional_coverage=coverage["regions"] if coverage else None,
                 coverage_gap_count=len(coverage["coverage_gaps"]) if coverage else 0,
+                blocking_gap_count=len(coverage["blocking_gaps"]) if coverage else 0,
             )
             if len(selected) >= args.minimum_tracks and (
                 coverage is None or coverage["ready_for_this_regional_run"]

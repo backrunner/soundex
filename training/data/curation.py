@@ -13,6 +13,7 @@ from data.protocol import sha256_file
 REVIEW_SCOPE = "commercial-codec-restoration-and-apache-2.0-weight-distribution"
 REGIONS = {"china", "japan", "korea", "europe", "north_america"}
 VOCAL_LANGUAGES = {"china": {"zh", "yue"}, "japan": {"ja"}, "korea": {"ko"}}
+ADVISORY_METRICS = {"genres", "genre-artists", "regional-vocal-music"}
 GENRE_ALIASES = {
     "hip hop": "hiphop",
     "hip-hop": "hiphop",
@@ -24,6 +25,13 @@ GENRE_ALIASES = {
 
 def validate_policy(policy: dict[str, Any]) -> None:
     """Reject malformed targets rather than silently approving incomplete coverage."""
+    advisory = policy.get("advisory_metrics", [])
+    if (
+        not isinstance(advisory, list)
+        or any(not isinstance(metric, str) or metric not in ADVISORY_METRICS for metric in advisory)
+        or len(set(advisory)) != len(advisory)
+    ):
+        raise ValueError("advisory_metrics must contain unique supported coverage metrics")
     for key in (
         "minimum_music_recordings",
         "minimum_distinct_artists",
@@ -238,6 +246,8 @@ def audit_curation(
                             "maximum_fraction": limit,
                         }
                     )
+    advisory = set(policy.get("advisory_metrics", []))
+    blocking_gaps = [gap for gap in gaps if gap["metric"] not in advisory]
     report = {
         "signal_audited_candidates": len(entries),
         "source_reviewed_music_recordings": count,
@@ -247,7 +257,10 @@ def audit_curation(
         "regional_vocal_music": dict(sorted(regional_vocals.items())),
         "held_for_source_review": held,
         "coverage_gaps": gaps,
-        "ready_for_this_regional_run": not gaps,
+        "blocking_gaps": blocking_gaps,
+        "advisory_metrics": sorted(advisory),
+        "coverage_targets_met": not gaps,
+        "ready_for_this_regional_run": not blocking_gaps,
         "scope": REVIEW_SCOPE,
         "not_a_legal_opinion_or_comprehensive_market_coverage_claim": True,
     }

@@ -169,3 +169,36 @@ def test_malformed_reviewed_genre_is_held(tmp_path: Path, genre: Any) -> None:
     approved, report = audit_curation([entry], {"song": review}, policy, tmp_path)
     assert not approved
     assert report["held_for_source_review"][0]["reasons"] == ["invalid_reviewed_genre"]
+
+
+def test_pilot_advisories_report_gaps_without_weakening_source_review(tmp_path: Path) -> None:
+    entry, review, policy = fixture(tmp_path)
+    policy.update(genres={"pop": 3}, advisory_metrics=["genres"])
+    approved, report = audit_curation([entry], {"song": review}, policy, tmp_path)
+    assert approved and report["ready_for_this_regional_run"]
+    assert not report["coverage_targets_met"]
+    assert report["coverage_gaps"][0]["metric"] == "genres"
+    assert report["blocking_gaps"] == []
+    approved, report = audit_curation(
+        [entry], {"song": {**review, "commercial_training": False}}, policy, tmp_path
+    )
+    assert not approved and not report["ready_for_this_regional_run"]
+    assert any(gap["metric"] == "music" for gap in report["blocking_gaps"])
+
+
+def test_pilot_count_and_region_remain_required(tmp_path: Path) -> None:
+    entry, review, policy = fixture(tmp_path)
+    policy.update(minimum_music_recordings=2, regions={"korea": 2}, advisory_metrics=["genres"])
+    _, report = audit_curation([entry], {"song": review}, policy, tmp_path)
+    assert not report["ready_for_this_regional_run"]
+    assert {gap["metric"] for gap in report["blocking_gaps"]} == {"music", "regions"}
+
+
+@pytest.mark.parametrize(
+    "metrics", [["music"], ["regions"], ["genres", "genres"], "genres", [None]]
+)
+def test_advisories_cannot_disable_required_selection_checks(tmp_path: Path, metrics: Any) -> None:
+    entry, review, policy = fixture(tmp_path)
+    policy["advisory_metrics"] = metrics
+    with pytest.raises(ValueError, match="advisory_metrics"):
+        audit_curation([entry], {"song": review}, policy, tmp_path)
