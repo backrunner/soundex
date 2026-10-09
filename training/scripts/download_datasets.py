@@ -519,7 +519,7 @@ def main() -> int:
     parser.add_argument(
         "--datasets",
         type=str,
-        required=True,
+        default=None,
         help="Explicit opt-in, comma-separated: slakh2100,babyslakh,medleydb",
     )
     parser.add_argument(
@@ -601,6 +601,9 @@ def main() -> int:
                 f"env={env or '-'}  {entry['license_note']}"
             )
         return 0
+
+    if not args.datasets:
+        parser.error("--datasets is required for download; no dataset is selected by default")
 
     data_root = args.data_root.expanduser().resolve()
     cache_dir = resolve_cache_dir(args.cache_dir, data_root)
