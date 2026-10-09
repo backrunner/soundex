@@ -7,13 +7,14 @@ under the code's Apache-2.0 license.
 
 ## Current collection, 2026-10-09
 
-The updated acquisition/review snapshot contains **1,329 signal-audited candidate
-entries**, but only **222 distinct source-reviewed music works from 16 creators**
-count toward the requested approximately 1,000-work collection. Candidate entries are not approved
-song counts. China contributes 29 works, Japan 48, Korea 58, North America 49;
-38 have unknown regional repertoire. Reviewed European and Chinese/Japanese/Korean
-vocal coverage remain absent. Pop has 2 works and electronic 56; no full country
-songs are currently counted. The collection is not ready for the regional run.
+The updated acquisition/review snapshot contains **1,384 signal-audited candidate
+entries**, but only **277 distinct source-reviewed music works from 20 creators**
+count toward the requested approximately 1,000-work collection. Candidate entries
+are not approved song counts. China contributes 29 works, Japan 48, Korea 58,
+Europe 32 and North America 72; 38 have unknown regional repertoire.
+Chinese/Japanese/Korean vocal coverage remains absent. Pop has 2 works,
+electronic 56 and country 5; regional/genre/creator breadth is still below target.
+The collection is not ready for the regional run.
 
 See [the source and coverage review](../../docs/dataset-curation.md) for publisher
 links, selected grants, credits and limitations. The separate
@@ -30,6 +31,11 @@ adds 46 original FLAC masters from three creators, representing 44 distinct work
 Two DC-offset repairs retain their originals and edit receipts. Source-specific
 CC BY 4.0 reviews do not approve an eventual checkpoint automatically. Slakh has
 since been removed from the upcoming run; its historical experiments remain separate.
+
+The [Slakh replacement acquisition](../../docs/slakh-replacement-sources-20261009.md)
+retains 83 original FLAC recordings and adds 55 reviewed works from four creators.
+Selected music totals 1132.55 minutes; with VCTK speech, 1156.40 source minutes
+are available across future train/validation/test splits. Slakh is excluded.
 
 The earlier 360-track signal-audited snapshot (2026-10-08, approximately 24 hours /
 10 GB) is a historical acquisition result, not the current source-reviewed count.
