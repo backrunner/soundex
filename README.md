@@ -2,10 +2,11 @@
 
 [中文](README.zh-CN.md) · [CI](https://github.com/backrunner/soundex/actions/workflows/ci.yml) · [Apache-2.0](LICENSE)
 
-SoundEx is an experimental Rust library and CLI for music bandwidth extension.
-It detects missing high-frequency content, runs a lightweight magnitude/phase
-ONNX model, and applies crossover, loudness matching and limiting. The repository
-includes the DSP, inference engine, real-time adapter and PyTorch training pipeline.
+SoundEx is an experimental Rust library and CLI for restoring compressed audio.
+Its goal is high-frequency spectral inpainting followed by DSP fusion and artifact
+control, bringing the final audio closer to its original lossless reference.
+It combines a lightweight magnitude/phase ONNX model with causal spectral processing.
+The repository includes the DSP, inference engine, real-time adapter and PyTorch training pipeline.
 
 **Status:** the software and runnable integration demos are available. Qualified
 restoration weights are not yet published. Bundled synthetic identity graphs
@@ -17,6 +18,8 @@ Slakh disabled. Raw audio, prepared pairs and training checkpoints stay local;
 the repository publishes their source documentation and reproducible workflow.
 The original 200 epochs are complete; [loss auditing and controlled continuation](docs/loss-audit-20261010.md)
 address the remaining fidelity issues. Deployment validation still determines release qualification.
+The [inpainting objective and neural/DSP paths](docs/inpainting-objective.md) make
+high-band reconstruction the main training target; DSP-only and hybrid paths remain experimental.
 
 ## Quick start
 

@@ -31,6 +31,11 @@ native epoch-168 generator, retains identical data/validation membership and sta
 a new optimizer trajectory with explicit parent hashes. Its experimental artifacts
 remain local and do not replace the baseline without comparative deployment evidence.
 
+The [inpainting objective](../docs/inpainting-objective.md) adds explicit high-band
+shape, energy, transient and reconstructed-spectrum supervision. Its new continuation
+and [DSP comparisons](../docs/optimization-followup-20261010.md) remain local experiments;
+none establishes a released restoration model.
+
 Official releases require reviewed source grants and initialization under
 [TRAINING_DATA.md](../legal/TRAINING_DATA.md). Source approval, restoration quality,
 listening and real-time runtime/continuity evidence are all required before release.

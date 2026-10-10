@@ -85,6 +85,15 @@ selection defaults to missing-high-band validation loss, using low-band identity
 as the tie-breaker. The controlled `balanced_continuation.yaml` objective-v2 profile
 uses normalized total loss and high-band loss as the tie-breaker, with raw metrics
 retained for comparison. See [the loss audit](../docs/loss-audit-20261010.md).
+
+`inpainting_continuation.yaml` introduces objective v3: missing-band spectral
+shape, frame energy, reference-relative transient changes and high-band error
+after differentiable crossover/phase/OLA reconstruction. Waveform and valid-phase
+terms constrain fidelity alongside retained-band and seam preservation. It uses
+8 causal training frames, independent-frame inference, frozen BatchNorm statistics
+and an explicitly fresh optimizer trajectory. Initial weights were gradient-audited
+on 64 training draws; they are experimental. V1/V2 totals are not comparable to V3.
+See [the inpainting design and proxy limits](../docs/inpainting-objective.md).
 `checkpoints/best-validation.pth` is the export candidate;
 `checkpoints/final-resume.pth` is atomically updated every epoch for exact resume.
 Each schema-1.2 checkpoint stores the full validation vector, selected-row manifest

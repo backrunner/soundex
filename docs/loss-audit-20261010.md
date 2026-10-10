@@ -145,3 +145,10 @@ waveform_relative = mean(L1(predicted_blended_OLA, reference_OLA) / detach(scale
 本次审计还发现原训练的 checkpoint 中 `source_git_sha` 为 `dd0d15ab`，实际冻结源码收据为 `abe0e497`：归档目录位于主仓库内部，旧实现调用 Git 时会向上读到随后变化的主仓库 HEAD。逐个比较原归档的 106 个受版本控制的训练文件与 `abe0e497` 的 Git archive，差异为零。
 
 保留原 checkpoint 和 ONNX 的原始字节、哈希，明确区分旧元数据的声明与实际冻结版本。现在归档运行从其 `source-receipt.json` 读取完整冻结版本并记录收据哈希；没有收据的归档不再声称主仓库版本。独立 Git worktree 则读取自己的 HEAD。本次续训使用后一种方式，checkpoint 已确认绑定 `b4ed52c`。
+
+## 后续目标与实验
+
+后续已明确以高频频谱 inpainting 和模型加 DSP 后接近原始无损音频为目标。
+新版 Objective v3 的公式与处理代理边界见[目标设计](inpainting-objective.md)，
+训练、实际 Rust 对照、资源及连续输出的最新结果见[后续实验](optimization-followup-20261010.md)。
+本页旧版 loss 的历史数值保持原口径，不与新版总分直接比较。
