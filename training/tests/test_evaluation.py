@@ -843,3 +843,16 @@ def _gate_report(row: dict[str, object], *, artifact_hash: str) -> dict[str, obj
         },
         "release_gate_config": config,
     }
+
+
+def test_energy_bias_distinguishes_under_and_over_reconstruction():
+    sample_rate = 48000
+    time = np.arange(4096, dtype=np.float64) / sample_rate
+    target = 0.1 * np.sin(2 * np.pi * 16000 * time)
+    metrics = evaluate_signal_triplet(
+        target, target * 0.5, target * 2, sample_rate=sample_rate, cutoff_hz=12000
+    )
+    expected = 20 * np.log10(2)
+    assert metrics["baseline_high_energy_bias_db"] == pytest.approx(-expected)
+    assert metrics["enhanced_high_energy_bias_db"] == pytest.approx(expected)
+    assert metrics["enhanced_high_band_energy_error_db"] == pytest.approx(expected)
