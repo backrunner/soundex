@@ -340,6 +340,28 @@ def _metadata_value(metadata: dict[str, Any], key: str, index: int) -> Any:
     return value[index]
 
 
+def configure_generator_training_mode(generator: torch.nn.Module, statistics: str) -> None:
+    """Optionally keep pretrained BatchNorm buffers fixed during continuation.
+
+    Affine parameters and the rest of the generator remain trainable. This
+    changes the optimization trajectory, so the policy belongs in the bound
+    training config and cannot be silently applied to an existing resume.
+    """
+    if statistics not in {"update", "frozen"}:
+        raise ValueError("training.batch_norm_statistics must be 'update' or 'frozen'")
+    batch_norms = [
+        module
+        for module in generator.modules()
+        if isinstance(module, torch.nn.modules.batchnorm._BatchNorm)
+    ]
+    if statistics == "frozen" and any(not module.track_running_stats for module in batch_norms):
+        raise ValueError("frozen BatchNorm statistics require tracked running statistics")
+    generator.train()
+    if statistics == "frozen":
+        for module in batch_norms:
+            module.eval()
+
+
 def train_one_epoch(
     generator: SoundExGenerator,
     discriminator: MultiScaleDiscriminator,
@@ -356,7 +378,9 @@ def train_one_epoch(
     training_config: dict[str, Any],
 ) -> tuple[dict[str, float], float]:
     """Run one training epoch and return every observable mean loss."""
-    generator.train()
+    configure_generator_training_mode(
+        generator, str(training_config.get("batch_norm_statistics", "update"))
+    )
     discriminator.train()
     generator_totals: defaultdict[str, float] = defaultdict(float)
     discriminator_total = 0.0
@@ -571,6 +595,9 @@ def main() -> None:
         bottleneck_blocks=model_config["bottleneck_blocks"],
         expand_ratio=model_config["expand_ratio"],
     ).to(device)
+    configure_generator_training_mode(
+        generator, str(config["training"].get("batch_norm_statistics", "update"))
+    )
     parameter_count = generator.count_parameters()
     if parameter_count > 2_000_000:
         raise ValueError(f"Generator has {parameter_count:,} parameters; expected <=2M")

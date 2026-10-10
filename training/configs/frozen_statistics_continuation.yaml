@@ -1,0 +1,206 @@
+# SPDX-License-Identifier: Apache-2.0
+# Controlled statistics ablation; only BatchNorm running statistics are frozen.
+# Same objective and settings as balanced_continuation.yaml; affine parameters train.
+model:
+  generator:
+    channels:
+    - 24
+    - 48
+    - 96
+    - 96
+    bottleneck_blocks: 2
+    expand_ratio: 4
+    use_phase_stream: true
+  discriminator:
+    type: multi_scale
+    scales:
+    - 1
+    - 2
+    - 4
+training:
+  batch_norm_statistics: frozen
+  batch_size: 16
+  seed: 42
+  context_frames: 1
+  learning_rate: 2.0e-05
+  lr_scheduler: cosine
+  warmup_steps: 128
+  warmup_epochs: 0
+  max_epochs: 8
+  validation_interval_epochs: 1
+  checkpoint_interval_epochs: 10
+  gradient_clip: 1.0
+  objective:
+    causal_sequence_frames: 4
+    high_band_magnitude_weight: 1.0
+    # Initial eval-mode gradient audit on 64 training draws: high 2.83, phase 4.01, wave 2.99.
+    phase_weight: 0.2
+    low_band_identity_weight: 0.1
+    crossover_continuity_weight: 0.05
+    waveform_weight: 1.0
+    waveform_region: steady_state
+    adversarial_weight: 0.0
+    feature_matching_weight: 0.0
+    phase_relative_floor_db: -60.0
+    phase_absolute_floor_db: -120.0
+    version: 2
+    magnitude_scale_db: 20.0
+    waveform_normalization_floor: 0.0001
+    waveform_relative_floor: 0.01
+  validation_selection:
+    primary_metric: total
+    tie_breaker_metric: high_band_magnitude
+audio:
+  sample_rate: 44100
+  fft_size: 256
+  hop_size: 128
+  crossover_width_hz: 1000.0
+data:
+  musdb18_hq_path: null
+  slakh2100_path: null
+  medleydb_path: null
+  music_library_path: /data/music-library
+  recipe:
+    schema_version: 1
+    recipe_version: soundex-native-lossless-multigenre-20261008-v1
+    seed: 42
+    sample_rates:
+    - 44100
+    - 48000
+    segment:
+      duration_seconds:
+      - 2.0
+      - 4.0
+      count_per_track: 4
+    codecs:
+    - id: mp3-cbr-64
+      codec: mp3
+      encoder: libmp3lame
+      container: mp3
+      mode: cbr
+      setting: 64
+      weight: 0.12
+      held_out: false
+    - id: mp3-cbr-128
+      codec: mp3
+      encoder: libmp3lame
+      container: mp3
+      mode: cbr
+      setting: 128
+      weight: 0.16
+      held_out: false
+    - id: mp3-cbr-320
+      codec: mp3
+      encoder: libmp3lame
+      container: mp3
+      mode: cbr
+      setting: 320
+      weight: 0.08
+      held_out: false
+    - id: mp3-vbr-q2
+      codec: mp3
+      encoder: libmp3lame
+      container: mp3
+      mode: vbr
+      setting: 2
+      weight: 0.12
+      held_out: false
+    - id: mp3-vbr-q6
+      codec: mp3
+      encoder: libmp3lame
+      container: mp3
+      mode: vbr
+      setting: 6
+      weight: 0.12
+      held_out: false
+    - id: aac-lc-cbr-96
+      codec: aac
+      encoder: aac
+      container: m4a
+      mode: cbr
+      setting: 96
+      weight: 0.12
+      held_out: false
+    - id: aac-lc-cbr-192
+      codec: aac
+      encoder: aac
+      container: m4a
+      mode: cbr
+      setting: 192
+      weight: 0.1
+      held_out: false
+    - id: vorbis-vbr-q3
+      codec: vorbis
+      encoder: libvorbis
+      container: ogg
+      mode: vbr
+      setting: 3
+      weight: 0.09
+      held_out: false
+    - id: vorbis-vbr-q7
+      codec: vorbis
+      encoder: libvorbis
+      container: ogg
+      mode: vbr
+      setting: 7
+      weight: 0.05
+      held_out: false
+    - id: aac-lc-cbr-160-holdout
+      codec: aac
+      encoder: aac
+      container: m4a
+      mode: cbr
+      setting: 160
+      weight: 0.04
+      held_out: true
+    channel_policy:
+      roles:
+        mono: 1.0
+        left: 0.2
+        right: 0.2
+        mid: 0.4
+        side: 0.2
+    splits:
+      musdb18_hq:
+        train: 0.8
+        validation: 0.2
+        test: 0.0
+        preserve_official_test: true
+      slakh2100:
+        train: 0.8
+        validation: 0.1
+        test: 0.1
+        preserve_official: true
+      medleydb:
+        train: 0.8
+        validation: 0.1
+        test: 0.1
+      music_library:
+        train: 0.8
+        validation: 0.1
+        test: 0.1
+      speech_library:
+        train: 0.8
+        validation: 0.1
+        test: 0.1
+    alignment:
+      max_offset_samples: 4096
+      correlation_samples: 65536
+      residual_tolerance_samples: 1
+  sampling:
+    recording_balance: true
+    strategy: weighted
+    train_ratios:
+      music_library: 0.95
+      speech_library: 0.05
+    max_train_samples:
+      music_library: null
+      speech_library: null
+    val_ratios:
+      music_library: 0.95
+      speech_library: 0.05
+    validation_source_quotas:
+      music_library: 768
+      speech_library: 128
+    samples_per_epoch: 2048
+  speech_library_path: /data/speech-library
