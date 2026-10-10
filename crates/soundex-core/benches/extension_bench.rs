@@ -51,10 +51,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let start = Instant::now();
     let mut processor = SoundExProcessor::new(config)?;
     let load_ms = start.elapsed().as_secs_f64() * 1000.0;
-    let mut source = source::Input::new(rate, channels)?;
+    let hops = (u64::from(seconds) * u64::from(rate)).div_ceil(128) as usize;
+    let mut source = source::Input::new(rate, channels, (hops + 32) * 128)?;
     let mut input = vec![0.0; 128 * channels as usize];
     let mut output = vec![0.0; input.len()];
-    let hops = (u64::from(seconds) * u64::from(rate)).div_ceil(128) as usize;
     let mut times = Vec::with_capacity(hops);
     let mut elapsed_ns = 0_u64;
     let mut peak = 0.0_f32;
