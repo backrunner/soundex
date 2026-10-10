@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use soundex_core::{SoundExConfig, SoundExProcessor};
+use soundex_dsp::limiter::Limiter;
 
 fn model_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/identity.onnx")
@@ -64,6 +65,47 @@ fn full_bandwidth_stereo_preserves_interleaving() {
     let output = processor.process_buffer(&input).unwrap();
 
     assert_eq!(output, input);
+}
+
+#[test]
+fn decoded_overfullscale_bypass_is_limited_and_chunk_invariant() {
+    for channels in [1, 2] {
+        let input: Vec<f32> = (0..4097)
+            .flat_map(|index| {
+                let value = 1.3 * (2.0 * std::f32::consts::PI * index as f32 / 37.0).sin();
+                [value, -value].into_iter().take(channels as usize)
+            })
+            .collect();
+        let config = forced_gate_config(channels, false);
+        let limiter = Limiter::new(config.limiter_ceiling, 10.0);
+        let expected: Vec<f32> = input
+            .iter()
+            .map(|&sample| limiter.process_sample(sample))
+            .collect();
+        let mut offline = SoundExProcessor::new(config.clone()).unwrap();
+        let output = offline.process_buffer(&input).unwrap();
+        assert_eq!(output, expected);
+        assert!(output
+            .iter()
+            .all(|sample| sample.is_finite() && sample.abs() <= 0.95));
+        assert_eq!(offline.inference_run_count(), 0);
+
+        let mut streamed = SoundExProcessor::new(config).unwrap();
+        let mut chunk_output = Vec::new();
+        let mut position = 0;
+        for frames in [31, 512, 997, 7].into_iter().cycle() {
+            let end = (position + frames * channels as usize).min(input.len());
+            streamed
+                .process_chunk(&input[position..end], &mut chunk_output)
+                .unwrap();
+            position = end;
+            if position == input.len() {
+                break;
+            }
+        }
+        streamed.finalize(&mut chunk_output).unwrap();
+        assert_eq!(chunk_output, output);
+    }
 }
 
 #[test]

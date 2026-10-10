@@ -1,6 +1,7 @@
 //! Public streaming and offline audio enhancement processor.
 
 use ndarray::{s, Array4};
+use soundex_dsp::limiter::Limiter;
 
 use crate::channel::ChannelProcessor;
 use crate::config::SoundExConfig;
@@ -153,6 +154,7 @@ pub struct SoundExProcessor {
     engine: InferenceEngine,
     channels: Vec<ChannelProcessor>,
     gate: GateMixer,
+    dry_limiter: Limiter,
     last_info: ProcessInfo,
     mode: StreamMode,
     pending_input: Vec<f32>,
@@ -184,11 +186,13 @@ impl SoundExProcessor {
         let hop_samples = hop_size * channel_count;
         let frequency_bins = config.fft_size / 2 + 1;
         let gate = GateMixer::new(config.hop_size.min(128), latency);
+        let dry_limiter = Limiter::new(config.limiter_ceiling, 10.0);
         Ok(Self {
             config,
             engine,
             channels,
             gate,
+            dry_limiter,
             last_info: ProcessInfo::default(),
             mode: StreamMode::Ready,
             pending_input: Vec::new(),
@@ -527,6 +531,11 @@ impl SoundExProcessor {
                 self.wet_interleaved[output_index] = self.channels[channel_index].wet()[sample];
             }
         }
+        // Codec decoders may produce finite PCM beyond full scale. Protect the
+        // delayed dry path too; the wet path is already limited per channel.
+        // Limiting each path once keeps the raised-cosine blend bounded without
+        // compressing the enhanced signal a second time.
+        self.dry_limiter.process_buffer(&mut self.dry_interleaved);
         self.gate.mix_interleaved_into(
             &self.dry_interleaved,
             &self.wet_interleaved,
@@ -534,6 +543,9 @@ impl SoundExProcessor {
             !info.bypassed,
             &mut self.hop_output,
         );
+        for sample in &mut self.hop_output {
+            *sample = sample.clamp(-self.config.limiter_ceiling, self.config.limiter_ceiling);
+        }
         self.last_info = info;
         Ok(info)
     }
