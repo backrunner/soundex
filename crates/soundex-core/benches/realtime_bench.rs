@@ -158,7 +158,7 @@ fn measure(
     let mut interior_count = 0;
     let mut last = [0.0_f32; 2];
     let mut noise = 42_u32;
-    let mut source = source::Input::new(sample_rate, channels)?;
+    let mut source = source::Input::new(sample_rate, channels, hops * HOP)?;
     let scheduling = producer::Scheduling::new(producer_rt, sample_rate, HOP as u32);
     let producer_rt_accepted = scheduling.accepted();
     let origin = Instant::now();

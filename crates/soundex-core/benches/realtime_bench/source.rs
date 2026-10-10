@@ -16,7 +16,7 @@ pub(super) struct Input {
 }
 
 impl Input {
-    pub fn new(rate: u32, channels: u16) -> Result<Self, Box<dyn Error>> {
+    pub fn new(rate: u32, channels: u16, required_frames: usize) -> Result<Self, Box<dyn Error>> {
         let Some(directory) = env::var_os("SOUNDEX_REALTIME_PCM_DIR") else {
             return Ok(Self {
                 reader: None,
@@ -30,6 +30,15 @@ impl Input {
         let size = file.metadata()?.len();
         if size % (4 * channels as u64) != 0 {
             return Err("PCM has an incomplete channel frame".into());
+        }
+        let available_frames = size / (4 * channels as u64);
+        if available_frames < required_frames as u64 {
+            return Err(format!(
+                "PCM has {available_frames} frames; benchmark requires {required_frames} \
+                 frames including complete hops and warmup: {}",
+                path.display()
+            )
+            .into());
         }
         let mut hash = Sha256::new();
         let mut buffer = [0_u8; 65536];
