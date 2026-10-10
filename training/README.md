@@ -118,6 +118,14 @@ Do not combine this migration with `--initialize-zero-interactions`.
 Resolve real source paths and audited sampling ratios before running either profile.
 See [the V5 methods and deployment evidence](../docs/goal-refinement-20261011.md).
 
+`deployment_continuation.yaml` adds objective v6: default MatchEdge gain before
+reconstruction and a reference-relative reconstructed temporal loss. It retains
+raw V5 terms, the legacy architecture, eight epochs and frozen BN. The cropped
+sequence gain uses a detached first-frame steady-state bootstrap; online cutoff,
+limiting and gating still need actual Rust validation. Pass the canonical parent
+data/ratios with `--initialize-generator-from`, not `--resume` with a changed loss.
+See [the V6 experiment and limitations](../docs/deployment-refinement-20261011.md).
+
 `checkpoints/best-validation.pth` is the export candidate;
 `checkpoints/final-resume.pth` is atomically updated every epoch for exact resume.
 Each schema-1.2 checkpoint stores the full validation vector, selected-row manifest

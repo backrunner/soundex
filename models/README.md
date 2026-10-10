@@ -53,6 +53,12 @@ independent test. Source data and parent lineage are unchanged. These artifacts 
 local experiments, pending broader quality and listening evidence.
 
 
+The [V6 deployment-aware experiment](../docs/deployment-refinement-20261011.md)
+adds MatchEdge gain and reconstructed temporal supervision in training, retaining
+the 806,276-parameter architecture and T=1 runtime contract. The eight-epoch run
+selected epoch 4; all 13 export parity cases passed. Its weights remain local and
+experimental; original baseline weights are retained.
+
 Official releases require reviewed source grants and initialization under
 [TRAINING_DATA.md](../legal/TRAINING_DATA.md). Source approval, restoration quality,
 listening and real-time runtime/continuity evidence are all required before release.
