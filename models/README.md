@@ -44,6 +44,14 @@ parity cases each. The control ONNX is 3.16 MiB (806,276 parameters); architectu
 Actual DSP comparisons and remaining quality tradeoffs keep these weights local
 and experimental; the original epoch-168 baseline is retained.
 
+The [V5 goal review](../docs/goal-refinement-20261011.md) compares reconstructed
+energy/phase-gradient supervision with optional circular phase features. Architecture
+1.2 adds 144 parameters (806,420 total), with unchanged T=1 I/O and no added context
+buffer. Candidate choice is frozen on development loss before the recording-held-out
+recheck; that recheck reuses historically diagnosed recordings and is not a fresh
+independent test. Source data and parent lineage are unchanged. These artifacts remain
+local experiments, pending broader quality and listening evidence.
+
 
 Official releases require reviewed source grants and initialization under
 [TRAINING_DATA.md](../legal/TRAINING_DATA.md). Source approval, restoration quality,

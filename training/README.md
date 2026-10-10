@@ -106,6 +106,18 @@ must be resolved from the existing native run, rather than using example paths/r
 See [the objective definitions](../docs/inpainting-objective.md#objective-v4复数重建与频谱一致性)
 and [measured follow-up results](../docs/optimization-20261011.md).
 
+`calibrated_continuation.yaml` and `circular_continuation.yaml` compare objective v5
+with and without circular phase input features. V5 supervises reconstructed high-band
+and subband energy plus reference-relative phase changes across frequency/time.
+Both profiles use eight epochs, unchanged independent T=1 deployment, and frozen BN.
+The architecture-1.2 variant expands the first phase convolution to raw/sin/cos
+channels, adding 144 parameters; migration explicitly requires
+`--initialize-phase-features --initialize-generator-from /path/to/parent.pth`.
+It preserves the parent raw channel and initializes the added channels to zero.
+Do not combine this migration with `--initialize-zero-interactions`.
+Resolve real source paths and audited sampling ratios before running either profile.
+See [the V5 methods and deployment evidence](../docs/goal-refinement-20261011.md).
+
 `checkpoints/best-validation.pth` is the export candidate;
 `checkpoints/final-resume.pth` is atomically updated every epoch for exact resume.
 Each schema-1.2 checkpoint stores the full validation vector, selected-row manifest
