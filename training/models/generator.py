@@ -198,11 +198,14 @@ class SoundExGenerator(nn.Module):
         # Zero initialization preserves a migrated parent's exact predictions.
         self.interactions = nn.ModuleList()
         if cross_stream_interactions:
-            for width in channels:
-                pair = nn.ModuleList([nn.Conv2d(width, width, 1, bias=False) for _ in range(2)])
-                for projection in pair:
-                    nn.init.zeros_(projection.weight)
-                self.interactions.append(pair)
+            # These projections start at zero; their discarded random initialization
+            # must not alter crop/sampler RNG relative to the legacy control model.
+            with torch.random.fork_rng(devices=[]):
+                for width in channels:
+                    pair = nn.ModuleList([nn.Conv2d(width, width, 1, bias=False) for _ in range(2)])
+                    for projection in pair:
+                        nn.init.zeros_(projection.weight)
+                    self.interactions.append(pair)
 
         # Fusion layer
         self.fusion = nn.Sequential(

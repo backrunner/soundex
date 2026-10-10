@@ -76,3 +76,18 @@ def test_export_builder_restores_trained_interactions(checkpoint_factory):
     model = _build_generator(interaction_checkpoint)
     assert model.interactions[0][0].weight[0, 0].item() == pytest.approx(0.012)
     assert model(torch.zeros(1, 2, 1, 129)).shape == (1, 2, 1, 129)
+
+
+def test_zero_projection_initialization_preserves_control_rng_and_base_parameters():
+    torch.manual_seed(17)
+    control = SoundExGenerator(channels=[4, 8, 16, 16], bottleneck_blocks=1)
+    control_rng = torch.get_rng_state()
+    crops = torch.randint(0, 600, (128,))
+    torch.manual_seed(17)
+    interacting = SoundExGenerator(
+        channels=[4, 8, 16, 16], bottleneck_blocks=1, cross_stream_interactions=True
+    )
+    assert torch.equal(torch.get_rng_state(), control_rng)
+    assert torch.equal(torch.randint(0, 600, (128,)), crops)
+    for key, value in control.state_dict().items():
+        torch.testing.assert_close(value, interacting.state_dict()[key], rtol=0, atol=0)
