@@ -312,8 +312,12 @@ class GeneratorLoss(nn.Module):
             high_relative_floor=float(objective.get("high_relative_floor", 0.01)),
             magnitude_relative_floor_db=float(objective.get("magnitude_relative_floor_db", -80.0)),
             magnitude_absolute_floor_db=float(objective.get("magnitude_absolute_floor_db", -120.0)),
-            reconstruction_high_complex_weight=float(objective.get("reconstruction_high_complex_weight", 0.2)),
-            reconstruction_low_complex_weight=float(objective.get("reconstruction_low_complex_weight", 1.0)),
+            reconstruction_high_complex_weight=float(
+                objective.get("reconstruction_high_complex_weight", 0.2)
+            ),
+            reconstruction_low_complex_weight=float(
+                objective.get("reconstruction_low_complex_weight", 1.0)
+            ),
             spectral_consistency_weight=float(objective.get("spectral_consistency_weight", 0.1)),
         )
 
@@ -455,8 +459,12 @@ class GeneratorLoss(nn.Module):
             )
         if self.objective_version == 4:
             consistency = reconstruction_complex_terms(
-                predicted, target, degraded, mask,
-                fft_size=self.fft_size, hop_size=self.hop_size,
+                predicted,
+                target,
+                degraded,
+                mask,
+                fft_size=self.fft_size,
+                hop_size=self.hop_size,
                 relative_floor=self.high_relative_floor,
                 absolute_floor=self.waveform_normalization_floor,
             )
@@ -601,7 +609,9 @@ def reconstruction_complex_terms(
     if desired.shape != spectra[0].shape:
         raise ValueError("complex reconstruction frame alignment differs")
 
-    def relative(delta: torch.Tensor, reference: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
+    def relative(
+        delta: torch.Tensor, reference: torch.Tensor, weight: torch.Tensor
+    ) -> torch.Tensor:
         error = (delta * weight.sqrt()).flatten(1).norm(dim=1)
         band = (reference * weight.sqrt()).flatten(1).norm(dim=1)
         full = reference.abs().square().mean(dim=(1, 2)).sqrt() * math.sqrt(reference[0].numel())
@@ -610,7 +620,9 @@ def reconstruction_complex_terms(
 
     return {
         "reconstruction_high_complex": relative(spectra[0] - spectra[1], spectra[1], aligned_mask),
-        "reconstruction_low_complex": relative(spectra[0] - spectra[2], spectra[2], 1.0 - aligned_mask),
+        "reconstruction_low_complex": relative(
+            spectra[0] - spectra[2], spectra[2], 1.0 - aligned_mask
+        ),
         "spectral_consistency": relative(spectra[0] - desired, spectra[1], aligned_mask),
     }
 

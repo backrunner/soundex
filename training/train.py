@@ -311,12 +311,15 @@ def initialize_generator_from_checkpoint(
             torch.count_nonzero(target_state[key]).item() for key in added_keys
         ):
             raise ValueError("interaction migration requires exactly zero new projections")
-        generator.load_state_dict({**state, **{key: target_state[key] for key in added_keys}}, strict=True)
+        generator.load_state_dict(
+            {**state, **{key: target_state[key] for key in added_keys}}, strict=True
+        )
     else:
         generator.load_state_dict(state, strict=True)
     return {
         "mode": "generator-only-warm-start-zero-interactions"
-        if initialize_zero_interactions else "generator-only-warm-start",
+        if initialize_zero_interactions
+        else "generator-only-warm-start",
         "zero_initialized_state_keys": added_keys,
         "parent_checkpoint_sha256": hashlib.sha256(payload).hexdigest(),
         "parent_epoch": int(parent["training_state"]["epoch"]),
@@ -675,7 +678,10 @@ def main() -> None:
     provenance["initialization"] = {"mode": "fresh-random"}
     if args.initialize_generator_from:
         provenance["initialization"] = initialize_generator_from_checkpoint(
-            args.initialize_generator_from, generator, config, data_provenance,
+            args.initialize_generator_from,
+            generator,
+            config,
+            data_provenance,
             initialize_zero_interactions=args.initialize_zero_interactions,
         )
         print(f"Generator initialization: {provenance['initialization']}")

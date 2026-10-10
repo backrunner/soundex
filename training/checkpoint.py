@@ -114,9 +114,11 @@ def build_checkpoint(
             "architecture": {
                 "name": MODEL_ARCHITECTURE_NAME,
                 "major": MODEL_ARCHITECTURE_MAJOR,
-                "minor": 1 if _mapping(model_config.get("generator"), "model.generator").get(
+                "minor": 1
+                if _mapping(model_config.get("generator"), "model.generator").get(
                     "cross_stream_interactions", False
-                ) else MODEL_ARCHITECTURE_MINOR,
+                )
+                else MODEL_ARCHITECTURE_MINOR,
             },
             "generator_config": to_plain(model_config.get("generator")),
             "discriminator_config": to_plain(model_config.get("discriminator")),

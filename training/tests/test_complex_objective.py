@@ -18,8 +18,14 @@ def valid_features():
 
 def terms(predicted, target, degraded, mask):
     return reconstruction_complex_terms(
-        predicted, target, degraded, mask, fft_size=256, hop_size=128,
-        relative_floor=0.01, absolute_floor=1e-4,
+        predicted,
+        target,
+        degraded,
+        mask,
+        fft_size=256,
+        hop_size=128,
+        relative_floor=0.01,
+        absolute_floor=1e-4,
     )
 
 
@@ -63,9 +69,14 @@ def test_silence_and_empty_missing_band_are_finite():
 
 def test_v4_does_not_reward_collapsing_missing_high_band():
     target, mask = valid_features()
-    objective = GeneratorLoss(objective_version=4, fft_size=256, hop_size=128,
-                              waveform_region="steady_state", adversarial_weight=0,
-                              feature_matching_weight=0)
+    objective = GeneratorLoss(
+        objective_version=4,
+        fft_size=256,
+        hop_size=128,
+        waveform_region="steady_state",
+        adversarial_weight=0,
+        feature_matching_weight=0,
+    )
     exact = objective(target, target, target, mask)
     collapsed = target.clone()
     collapsed[:, 0, :, 70:] = -120
