@@ -126,6 +126,16 @@ limiting and gating still need actual Rust validation. Pass the canonical parent
 data/ratios with `--initialize-generator-from`, not `--resume` with a changed loss.
 See [the V6 experiment and limitations](../docs/deployment-refinement-20261011.md).
 
+`scripts/prepare_architecture_study.py` derives matched control / polar-small /
+shape-small / shape-large configurations from a reviewed parent without changing
+its data paths or sampling. The optional `spectral_refiner` (architecture 1.3)
+uses 129-bin frame-local global encoding, a zero-initialized bounded correction
+head and widths 128/512. Explicit migration requires
+`--initialize-spectral-refiner --initialize-generator-from /path/to/parent.pth`.
+It adds no temporal context or runtime buffering. Keep the V6 objective and compare
+actual Rust audio, model size and runtime costs before promoting a candidate.
+See [the research and experiment protocol](../docs/architecture-research-20261011.md).
+
 `checkpoints/best-validation.pth` is the export candidate;
 `checkpoints/final-resume.pth` is atomically updated every epoch for exact resume.
 Each schema-1.2 checkpoint stores the full validation vector, selected-row manifest

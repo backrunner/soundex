@@ -45,12 +45,19 @@ development and recording-held-out comparisons, metric diagnostics, listening WA
 and resource receipts are under `data/reports/goal-refinement-20261011/`.
 The listening score sheet is unfilled; generated listening files are not listening evidence.
 
-The latest [V6 deployment-aware continuation](deployment-refinement-20261011.md)
+The [V6 deployment-aware continuation](deployment-refinement-20261011.md)
 uses `data/runs/deployment-continuation-20261011/` and
 `data/reports/deployment-refinement-20261011/`. These contain the frozen source,
 resolved configuration, local checkpoints/export, validation and stream comparisons,
 proxy diagnostics and resource receipts. Training audio and experimental weights
 remain outside Git.
+
+The [architecture study](architecture-research-20261011.md) keeps a frozen source
+under `data/runs/architecture-study-20261011/source/`, matched configs/checkpoints
+under `experiments/{polar-small,shape-small,shape-large}/`, and evidence under
+`data/reports/architecture-study-20261011/`. The matched V6 control is reused with
+a fresh CPU validation/export/parity check. `progress.json` tracks training/export;
+`delivery-progress.json` tracks the subsequent Rust quality and cost checks.
 
 Run the optional source audit before generating codec pairs:
 
