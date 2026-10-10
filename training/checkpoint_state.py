@@ -6,6 +6,7 @@ import hashlib
 import json
 import platform
 import random
+import re
 import shutil
 import subprocess
 import sys
@@ -148,9 +149,25 @@ def capture_provenance() -> dict[str, Any]:
             ffmpeg_version = result.stdout.splitlines()[0]
 
     source_sha: str | None = None
+    source_origin: str | None = None
+    source_receipt_sha256: str | None = None
+    repository = Path(__file__).resolve().parents[1]
+    receipt = repository.parent / "source-receipt.json"
+    archived_source = repository.name == "source" and not (repository / ".git").exists()
+    if archived_source and receipt.is_file():
+        # git rev-parse in an archive nested inside the live repository would
+        # otherwise report a later, unrelated HEAD. The runner freezes this
+        # committed archive and writes its receipt before starting train.py.
+        payload = receipt.read_bytes()
+        source_sha = json.loads(payload).get("code_commit")
+        if not isinstance(source_sha, str) or re.fullmatch(r"[0-9a-f]{40}", source_sha) is None:
+            raise ValueError("frozen source receipt requires a full code_commit SHA")
+        source_origin = "frozen-source-receipt"
+        source_receipt_sha256 = hashlib.sha256(payload).hexdigest()
+    elif archived_source:
+        source_origin = "unversioned-source-archive"
     git = shutil.which("git")
-    if git is not None:
-        repository = Path(__file__).resolve().parents[1]
+    if git is not None and source_origin is None:
         result = subprocess.run(
             [git, "rev-parse", "HEAD"],
             cwd=repository,
@@ -161,6 +178,7 @@ def capture_provenance() -> dict[str, Any]:
         )
         if result.returncode == 0:
             source_sha = result.stdout.strip() or None
+            source_origin = "git" if source_sha else None
     return {
         "python_version": platform.python_version(),
         "python_implementation": platform.python_implementation(),
@@ -169,5 +187,7 @@ def capture_provenance() -> dict[str, Any]:
         "pytorch_cuda_version": torch.version.cuda,
         "ffmpeg_version": ffmpeg_version,
         "source_git_sha": source_sha,
+        "source_git_sha_origin": source_origin,
+        "source_receipt_sha256": source_receipt_sha256,
         "platform": platform.platform(),
     }
