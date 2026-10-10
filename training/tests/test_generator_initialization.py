@@ -19,14 +19,16 @@ def _generator(config):
     )
 
 
-@pytest.mark.parametrize("change", ["objective", "statistics"])
+@pytest.mark.parametrize("change", ["objective", "statistics", "inpainting"])
 def test_new_objective_can_initialize_generator_but_cannot_resume(checkpoint_factory, change):
     path, parent = checkpoint_factory()
     config = deepcopy(parent["resolved_config"])
     if change == "objective":
         config["training"]["objective"]["version"] = 2
-    else:
+    elif change == "statistics":
         config["training"]["batch_norm_statistics"] = "frozen"
+    else:
+        config["training"]["objective"].update(version=3, high_band_spectral_weight=1.0)
     generator = _generator(config)
     receipt = initialize_generator_from_checkpoint(path, generator, config, parent["data"])
     for key, value in generator.state_dict().items():

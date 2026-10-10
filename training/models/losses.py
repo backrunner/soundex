@@ -204,6 +204,13 @@ class GeneratorLoss(nn.Module):
         magnitude_scale_db: float = 20.0,
         waveform_normalization_floor: float = 1e-4,
         waveform_relative_floor: float = 0.01,
+        high_spectral_weight: float = 1.0,
+        high_energy_weight: float = 0.5,
+        high_temporal_weight: float = 0.1,
+        reconstruction_high_weight: float = 0.5,
+        high_relative_floor: float = 0.01,
+        magnitude_relative_floor_db: float = -80.0,
+        magnitude_absolute_floor_db: float = -120.0,
     ) -> None:
         super().__init__()
         self.high_band_weight = high_band_weight
@@ -220,12 +227,13 @@ class GeneratorLoss(nn.Module):
         if waveform_region not in {"full", "steady_state"}:
             raise ValueError("waveform_region must be 'full' or 'steady_state'")
         self.waveform_region = waveform_region
-        if objective_version not in {1, 2}:
-            raise ValueError("objective_version must be 1 or 2")
+        if objective_version not in {1, 2, 3}:
+            raise ValueError("objective_version must be 1, 2 or 3")
         for name, value in {
             "magnitude_scale_db": magnitude_scale_db,
             "waveform_normalization_floor": waveform_normalization_floor,
             "waveform_relative_floor": waveform_relative_floor,
+            "high_relative_floor": high_relative_floor,
         }.items():
             if not math.isfinite(value) or value <= 0:
                 raise ValueError(f"{name} must be finite and positive")
@@ -237,6 +245,10 @@ class GeneratorLoss(nn.Module):
             "waveform_weight": waveform_weight,
             "adversarial_weight": adversarial_weight,
             "feature_matching_weight": feature_matching_weight,
+            "high_spectral_weight": high_spectral_weight,
+            "high_energy_weight": high_energy_weight,
+            "high_temporal_weight": high_temporal_weight,
+            "reconstruction_high_weight": reconstruction_high_weight,
         }.items():
             if not math.isfinite(value) or value < 0:
                 raise ValueError(f"{name} must be finite and non-negative")
@@ -244,6 +256,19 @@ class GeneratorLoss(nn.Module):
         self.magnitude_scale_db = magnitude_scale_db
         self.waveform_normalization_floor = waveform_normalization_floor
         self.waveform_relative_floor = waveform_relative_floor
+        self.high_spectral_weight = high_spectral_weight
+        self.high_energy_weight = high_energy_weight
+        self.high_temporal_weight = high_temporal_weight
+        self.reconstruction_high_weight = reconstruction_high_weight
+        self.high_relative_floor = high_relative_floor
+        for name, value in {
+            "magnitude_relative_floor_db": magnitude_relative_floor_db,
+            "magnitude_absolute_floor_db": magnitude_absolute_floor_db,
+        }.items():
+            if not math.isfinite(value) or value > 0:
+                raise ValueError(f"{name} must be finite and non-positive")
+        self.magnitude_relative_floor_db = magnitude_relative_floor_db
+        self.magnitude_absolute_floor_db = magnitude_absolute_floor_db
 
     @classmethod
     def from_config(
@@ -271,6 +296,13 @@ class GeneratorLoss(nn.Module):
             magnitude_scale_db=float(objective.get("magnitude_scale_db", 20.0)),
             waveform_normalization_floor=float(objective.get("waveform_normalization_floor", 1e-4)),
             waveform_relative_floor=float(objective.get("waveform_relative_floor", 0.01)),
+            high_spectral_weight=float(objective.get("high_band_spectral_weight", 1.0)),
+            high_energy_weight=float(objective.get("high_band_energy_weight", 0.5)),
+            high_temporal_weight=float(objective.get("high_band_temporal_weight", 0.1)),
+            reconstruction_high_weight=float(objective.get("reconstruction_high_weight", 0.5)),
+            high_relative_floor=float(objective.get("high_relative_floor", 0.01)),
+            magnitude_relative_floor_db=float(objective.get("magnitude_relative_floor_db", -80.0)),
+            magnitude_absolute_floor_db=float(objective.get("magnitude_absolute_floor_db", -120.0)),
         )
 
     def forward(
@@ -286,8 +318,20 @@ class GeneratorLoss(nn.Module):
         _validate_feature_pair(predicted, target)
         _validate_feature_pair(predicted, degraded)
         mask = _feature_weight(missing_band_mask, predicted[:, 0])
-        mean = _recording_weighted_mean if self.objective_version == 2 else _weighted_mean
+        mean = _recording_weighted_mean if self.objective_version >= 2 else _weighted_mean
         high_band_magnitude = mean((predicted[:, 0] - target[:, 0]).abs(), mask)
+        if self.objective_version == 3:
+            # The same detached reference floor is used on both spectra. Weak
+            # bins must not reward invented hiss merely for beating a -200 dB
+            # numerical floor. Linear spectral/energy losses supervise excess.
+            floor = (
+                (target[:, 0].amax(dim=-1, keepdim=True) + self.magnitude_relative_floor_db)
+                .clamp_min(self.magnitude_absolute_floor_db)
+                .detach()
+            )
+            high_band_magnitude = mean(
+                (predicted[:, 0].maximum(floor) - target[:, 0].maximum(floor)).abs(), mask
+            )
 
         target_magnitude = torch.pow(10.0, target[:, 0].clamp(-200.0, 100.0) / 20.0)
         peak = target_magnitude.amax(dim=-1, keepdim=True)
@@ -328,7 +372,7 @@ class GeneratorLoss(nn.Module):
                 normalization_floor=self.waveform_normalization_floor,
                 relative_floor=self.waveform_relative_floor,
             )
-            if self.objective_version == 2
+            if self.objective_version >= 2
             else waveform
         )
 
@@ -355,8 +399,8 @@ class GeneratorLoss(nn.Module):
                     feature_count += 1
             feature_matching = feature_matching / max(feature_count, 1)
 
-        db_scale = self.magnitude_scale_db if self.objective_version == 2 else 1.0
-        phase_scale = 2.0 if self.objective_version == 2 else 1.0
+        db_scale = self.magnitude_scale_db if self.objective_version >= 2 else 1.0
+        phase_scale = 2.0 if self.objective_version >= 2 else 1.0
         total = (
             self.high_band_weight * high_band_magnitude / db_scale
             + self.phase_weight * phase / phase_scale
@@ -376,9 +420,116 @@ class GeneratorLoss(nn.Module):
             "adversarial": adversarial,
             "feature_matching": feature_matching,
         }
-        if self.objective_version == 2:
+        if self.objective_version >= 2:
             result["waveform_relative"] = waveform_relative
+        if self.objective_version == 3:
+            inpainting = inpainting_fidelity_terms(
+                predicted,
+                target,
+                degraded,
+                mask,
+                fft_size=self.fft_size,
+                hop_size=self.hop_size,
+                relative_floor=self.high_relative_floor,
+                absolute_floor=self.waveform_normalization_floor,
+            )
+            result.update(inpainting)
+            result["total"] = total + (
+                self.high_spectral_weight * inpainting["high_band_spectral_convergence"]
+                + self.high_energy_weight * inpainting["high_band_energy"] / db_scale
+                + self.high_temporal_weight * inpainting["high_band_temporal"]
+                + self.reconstruction_high_weight
+                * inpainting["reconstruction_high_spectral_convergence"]
+            )
         return result
+
+
+def _relative_high_error(
+    predicted: torch.Tensor,
+    target: torch.Tensor,
+    mask: torch.Tensor,
+    reference: torch.Tensor,
+    relative_floor: float,
+    absolute_floor: float,
+) -> torch.Tensor:
+    dimensions = tuple(range(1, predicted.ndim))
+    error = ((predicted - target) * mask.sqrt()).flatten(1).norm(dim=1)
+    high = (target * mask.sqrt()).flatten(1).norm(dim=1)
+    full = reference.square().mean(dim=dimensions).sqrt() * math.sqrt(target[0].numel())
+    scale = high.maximum(full * relative_floor).clamp_min(absolute_floor).detach()
+    return (error / scale).mean()
+
+
+def inpainting_fidelity_terms(
+    predicted: torch.Tensor,
+    target: torch.Tensor,
+    degraded: torch.Tensor,
+    mask: torch.Tensor,
+    *,
+    fft_size: int,
+    hop_size: int,
+    relative_floor: float,
+    absolute_floor: float,
+) -> dict[str, torch.Tensor]:
+    """V3: high-band shape, energy, reference-relative dynamics and reconstruction.
+
+    All scales are per recording and detached. Signed frame differences preserve
+    real attacks/releases rather than encouraging a temporally constant output.
+    The reconstruction term measures *reanalysed* causal OLA after crossover and
+    phase blend. This proxy still excludes Rust's loudness, limiter and gate state.
+    """
+    if predicted.shape[2] < 2:
+        raise ValueError("inpainting objective requires at least two causal frames")
+    magnitude = torch.pow(10.0, predicted[:, 0].clamp(-200.0, 100.0) / 20.0)
+    reference = torch.pow(10.0, target[:, 0].clamp(-200.0, 100.0) / 20.0)
+    spectral = _relative_high_error(
+        magnitude, reference, mask, reference, relative_floor, absolute_floor
+    )
+    denominator = mask.sum(dim=-1).clamp_min(1e-12)
+    actual_power = (magnitude.square() * mask).sum(dim=-1) / denominator
+    reference_power = (reference.square() * mask).sum(dim=-1) / denominator
+    power_floor = (
+        (reference.square().mean(dim=-1) * relative_floor**2).clamp_min(absolute_floor**2).detach()
+    )
+    energy_delta = (
+        10.0
+        * ((actual_power + power_floor).log10() - (reference_power + power_floor).log10()).abs()
+    )
+    energy = (energy_delta * (mask.sum(dim=-1) > 0)).mean()
+    temporal = _relative_high_error(
+        magnitude[:, 1:] - magnitude[:, :-1],
+        reference[:, 1:] - reference[:, :-1],
+        torch.minimum(mask[:, 1:], mask[:, :-1]),
+        reference,
+        relative_floor,
+        absolute_floor,
+    )
+    blended = blend_deployment_features(degraded, predicted, mask)
+    waves = [
+        causal_overlap_add(value, fft_size=fft_size, hop_size=hop_size)
+        for value in (blended, target)
+    ]
+    edge = fft_size - hop_size
+    if edge:
+        waves = [value[:, edge:-edge] for value in waves]
+    if waves[0].shape[-1] < fft_size:
+        raise ValueError("inpainting reconstruction requires more fully supported causal frames")
+    window = torch.hann_window(
+        fft_size, periodic=True, device=predicted.device, dtype=predicted.dtype
+    )
+    spectra = [
+        torch.fft.rfft(value.unfold(-1, fft_size, hop_size) * window).abs() for value in waves
+    ]
+    reconstructed_mask = mask.mean(dim=1, keepdim=True).expand_as(spectra[0])
+    reconstruction = _relative_high_error(
+        spectra[0], spectra[1], reconstructed_mask, spectra[1], relative_floor, absolute_floor
+    )
+    return {
+        "high_band_spectral_convergence": spectral,
+        "high_band_energy": energy,
+        "high_band_temporal": temporal,
+        "reconstruction_high_spectral_convergence": reconstruction,
+    }
 
 
 class DiscriminatorLoss(nn.Module):
