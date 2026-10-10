@@ -188,3 +188,41 @@ cargo test --release -p soundex-core thirty_minutes_preserve -- --ignored --noca
 This last test advances 30 minutes of sample time faster than wall time. It
 checks signal/state continuity, and does not establish scheduling stability over
 30 minutes on an operating system or a physical audio device.
+
+## Neural / DSP / hybrid diagnostics
+
+The experimental extension paths are opt-in. `extension_bench` measures one mode
+and rate/channel case per process using real PCM, so external RSS does not inherit
+another mode's model. PCM reading and hashing are outside per-hop timing. The
+10-second default is **audio duration**, processed without pacing; this benchmark
+does not test the asynchronous callback, OS deadline availability, or an audio device.
+
+```bash
+SOUNDEX_BENCH_MODEL=/path/to/candidate.onnx \
+SOUNDEX_REALTIME_PCM_DIR=/path/to/pcm-directory \
+SOUNDEX_ENHANCEMENT_MODE=hybrid \
+SOUNDEX_EXTENSION_RATE=48000 SOUNDEX_EXTENSION_CHANNELS=2 \
+SOUNDEX_EXTENSION_SECONDS=10 SOUNDEX_EXTENSION_REPORT=target/hybrid-cost.json \
+cargo bench --locked -p soundex-core --bench extension_bench
+```
+
+Repeat in fresh processes with `neural`, `spectral`, `hybrid`, both sample rates
+and both channel counts. The comparison harness records the configured reference
+ONNX hash even for `spectral`; `model_loaded=false` and zero inference runs identify
+that path. The library and CLI do not require an ONNX file for spectral processing.
+Collect `/usr/bin/time -l` or an equivalent platform process monitor separately.
+RTF here is summed processing wall time / processed audio duration, not measured
+CPU utilization. Separate user/sys CPU time and peak process RSS belong to each
+fresh process, including its test harness.
+
+For paced comparisons use `SOUNDEX_ENHANCEMENT_MODE` with `realtime_bench` and
+the same model/PCM/duration. Reports bind the selected mode, model load status,
+worker processing and queue-wait p99 upper bounds, and the existing raw deadline
+and callback data. Worker histograms have fixed 25 µs bins; the reported p99 is
+an upper bound, not an exact percentile. They are recorded only by the worker,
+read from a control thread, and add no callback allocations or waits.
+
+`SOUNDEX_REALTIME_WORKER_RT=0` disables the macOS time-constraint request only
+for an explicit QoS comparison. The default remains `1`. Earlier short QoS-only
+and native-idle-spin trials did not pass availability checks; neither is a new
+default scheduling policy. See [the follow-up evidence](optimization-followup-20261010.md).

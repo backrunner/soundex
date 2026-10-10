@@ -2,9 +2,9 @@
 
 [English](README.md) · [CI](https://github.com/backrunner/soundex/actions/workflows/ci.yml) · [Apache-2.0](LICENSE)
 
-SoundEx 是实验性的音乐高频恢复库，使用 Rust 实现 DSP、ONNX 推理和实时流适配，
-同时提供文件处理 CLI 和 PyTorch 训练工程。它检测高频缺失，通过幅度/相位模型生成
-高频，再进行分频融合、响度匹配与限幅。
+SoundEx 是实验性的压缩音频恢复库，目标是对被裁减或损伤的高频频谱进行 inpainting，
+结合 DSP 融合和伪影抑制，让最终音频尽量接近原始无损参考。项目使用 Rust 实现
+DSP、ONNX 推理和实时流适配，同时提供文件处理 CLI 和 PyTorch 训练工程。
 
 **当前状态：**源码与接入 demo 可用，尚未发布合格的音质恢复权重。
 仓库附带的合成恒等测试模型只用于验证接入，不代表音质提升。
@@ -15,6 +15,8 @@ SoundEx 是实验性的音乐高频恢复库，使用 Rust 实现 DSP、ONNX 推
 保留在本地，仓库提供来源文档和可复现流程。
 原训练已完成 200 轮；当前开展[损失审计与短程续训](docs/loss-audit-20261010.md)，
 模型质量与发布资格仍以实际流处理验证为准。
+[高频 inpainting 目标与模型/DSP 协作](docs/inpainting-objective.md)明确了新版 loss 和
+三种对照路径；DSP 独立延展及组合模式目前仍为实验方案。
 
 ## 直接运行
 
