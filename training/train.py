@@ -261,6 +261,18 @@ def batch_missing_band_mask(
     )
 
 
+def batch_deployment_geometry(batch, audio_config, device, row_index=None):
+    """Pass static manifest geometry to the versioned deployment proxy."""
+    result = {
+        name: torch.as_tensor(batch["metadata"][name], dtype=torch.float32, device=device)
+        for name in ("cutoff_hz", "sample_rate")
+    }
+    if row_index is not None:
+        result = {name: value[row_index : row_index + 1] for name, value in result.items()}
+    result["crossover_width_hz"] = float(audio_config["crossover_width_hz"])
+    return result
+
+
 def set_requires_grad(module: torch.nn.Module, enabled: bool) -> None:
     """Enable or disable parameter gradients for a module."""
     for parameter in module.parameters():
@@ -477,6 +489,7 @@ def train_one_epoch(
                 missing_band_mask,
                 predicted_disc,
                 target_disc,
+                deployment_geometry=batch_deployment_geometry(batch, audio_config, device),
             )
         else:
             generator_losses = gen_loss_fn(
@@ -484,6 +497,7 @@ def train_one_epoch(
                 clean_features,
                 degraded_features,
                 missing_band_mask,
+                deployment_geometry=batch_deployment_geometry(batch, audio_config, device),
             )
 
         gen_optimizer.zero_grad(set_to_none=True)
@@ -558,6 +572,9 @@ def validate(
                 clean_features[row_index : row_index + 1],
                 degraded_features[row_index : row_index + 1],
                 missing_band_mask[row_index : row_index + 1],
+                deployment_geometry=batch_deployment_geometry(
+                    batch, audio_config, device, row_index
+                ),
             )
             codec_mode = str(_metadata_value(metadata, "codec_mode", row_index))
             codec_setting = float(_metadata_value(metadata, "codec_setting", row_index))
