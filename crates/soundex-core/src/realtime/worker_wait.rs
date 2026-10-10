@@ -81,20 +81,24 @@ pub(super) struct Scheduling {
 }
 
 impl Scheduling {
-    pub fn new(sample_rate: u32) -> Self {
+    pub fn new(sample_rate: u32, requested: bool) -> Self {
         #[cfg(target_os = "macos")]
         {
             Self {
-                handle: audio_thread_priority::promote_current_thread_to_real_time(
-                    super::transport::HOP as u32,
-                    sample_rate,
-                )
-                .ok(),
+                handle: requested
+                    .then(|| {
+                        audio_thread_priority::promote_current_thread_to_real_time(
+                            super::transport::HOP as u32,
+                            sample_rate,
+                        )
+                        .ok()
+                    })
+                    .flatten(),
             }
         }
         #[cfg(not(target_os = "macos"))]
         {
-            let _ = sample_rate;
+            let _ = (sample_rate, requested);
             Self {}
         }
     }
@@ -148,6 +152,11 @@ mod tests {
         );
         wait.submitted(None);
         assert_eq!(wait.action(at), Idle::Sleep(POLL));
+    }
+
+    #[test]
+    fn disabled_time_constraint_does_not_claim_acceptance() {
+        assert!(!Scheduling::new(48000, false).accepted());
     }
 
     #[test]
