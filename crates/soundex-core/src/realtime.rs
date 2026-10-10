@@ -10,6 +10,7 @@ use std::thread::JoinHandle;
 
 use crate::{Result, SoundExConfig, SoundExError, SoundExProcessor};
 
+mod latency;
 mod safety;
 mod state;
 mod transport;
@@ -55,6 +56,10 @@ pub struct RealtimeWorkerStats {
     pub max_queue_wait_ns: u64,
     /// Maximum worker processing wall time, in nanoseconds.
     pub max_processing_ns: u64,
+    /// Approximate queue-wait p99 upper bound, with 25us histogram resolution.
+    pub queue_wait_p99_upper_bound_ns: u64,
+    /// Approximate processing p99 upper bound, with 25us histogram resolution.
+    pub processing_p99_upper_bound_ns: u64,
     /// Processing calls exceeding one hop period (not presentation misses).
     pub processing_period_overruns: u64,
     /// macOS accepted the worker's USER_INITIATED QoS request.
@@ -99,6 +104,7 @@ impl RealtimeProcessor {
             Arc::clone(&control),
             HOP * config.channels as usize,
             config.sample_rate,
+            config.worker_time_constraint,
         )?;
         Ok(Self {
             state: AudioState::new(config.channels as usize, config.limiter_ceiling),
@@ -147,6 +153,8 @@ impl RealtimeProcessor {
             discarded_output_hops: self.control.discarded_outputs.load(Ordering::Relaxed),
             max_queue_wait_ns: self.control.max_queue_wait_ns.load(Ordering::Relaxed),
             max_processing_ns: self.control.max_processing_ns.load(Ordering::Relaxed),
+            queue_wait_p99_upper_bound_ns: self.control.queue_wait.p99_upper_bound_ns(),
+            processing_p99_upper_bound_ns: self.control.processing.p99_upper_bound_ns(),
             processing_period_overruns: self.control.processing_overruns.load(Ordering::Relaxed),
             macos_qos_applied: self.control.qos_applied.load(Ordering::Relaxed),
             macos_realtime_request_accepted: self.control.realtime_applied.load(Ordering::Relaxed),

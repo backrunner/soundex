@@ -15,19 +15,20 @@ pub(super) fn spawn(
     control: Arc<Control>,
     samples: usize,
     sample_rate: u32,
+    time_constraint: bool,
 ) -> Result<JoinHandle<()>> {
     thread::Builder::new()
         .name("soundex-inference".into())
         .spawn(move || {
             let result = catch_unwind(AssertUnwindSafe(|| {
                 control.qos_applied.store(apply_qos(), Ordering::Relaxed);
-                let scheduling = Scheduling::new(sample_rate);
+                let scheduling = Scheduling::new(sample_rate, time_constraint);
                 control
                     .realtime_applied
                     .store(scheduling.accepted(), Ordering::Relaxed);
                 let period =
                     Duration::from_secs_f64(super::transport::HOP as f64 / sample_rate as f64);
-                // Native RT uses a narrower idle window to preserve inference quota.
+                // Native RT preserves its quota; normal QoS uses bounded idle spin.
                 let mut wait = Wait::new(period, !scheduling.accepted());
                 let mut expected = Some(0);
                 while !control.stop.load(Ordering::Acquire) {
@@ -49,10 +50,11 @@ pub(super) fn spawn(
                     }
                     let started = Instant::now();
                     if let Some(at) = packet.submitted_at {
-                        control.max_queue_wait_ns.fetch_max(
-                            started.saturating_duration_since(at).as_nanos() as u64,
-                            Ordering::Relaxed,
-                        );
+                        let elapsed = started.saturating_duration_since(at).as_nanos() as u64;
+                        control.queue_wait.record(elapsed);
+                        control
+                            .max_queue_wait_ns
+                            .fetch_max(elapsed, Ordering::Relaxed);
                     }
                     let contiguous = expected == Some(packet.sequence);
                     if !contiguous {
@@ -68,6 +70,7 @@ pub(super) fn spawn(
                         &mut output.samples[..samples],
                     )?;
                     let elapsed = started.elapsed();
+                    control.processing.record(elapsed.as_nanos() as u64);
                     control.processed.fetch_add(1, Ordering::Relaxed);
                     control
                         .max_processing_ns

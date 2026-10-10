@@ -41,6 +41,8 @@ pub(super) struct Control {
     pub discarded_outputs: AtomicU64,
     pub max_queue_wait_ns: AtomicU64,
     pub max_processing_ns: AtomicU64,
+    pub queue_wait: super::latency::Histogram,
+    pub processing: super::latency::Histogram,
     pub processing_overruns: AtomicU64,
     pub qos_applied: AtomicBool,
     pub realtime_applied: AtomicBool,
