@@ -17,6 +17,7 @@ DSP、ONNX 推理和实时流适配，同时提供文件处理 CLI 和 PyTorch �
 模型质量与发布资格仍以实际流处理验证为准。
 [高频 inpainting 目标与模型/DSP 协作](docs/inpainting-objective.md)明确了新版 loss 和
 三种对照路径；DSP 独立延展及组合模式目前仍为实验方案。
+本轮[训练与结构对照](docs/optimization-20261011.md)验证复数重建、幅度/相位交互与实时启动预热。
 
 ## 直接运行
 
@@ -57,7 +58,8 @@ cargo run --locked -p soundex-cli -- target/demo/input.wav \
 
 ## 实时流接入
 
-在控制线程创建 `RealtimeProcessor`，音频回调仅调用 `process(input, output)`。
+在开始播放前于控制线程创建 `RealtimeProcessor`。默认先完成 worker 推理预热，
+仅构造线程等待就绪（最长 10 秒）；音频回调仅调用 `process(input, output)`。
 回调不执行推理、不分配堆内存、不加互斥锁；独立 worker 通过有界队列推理。
 结果超时或异常时使用时间对齐的原音回退，并通过双声道联动渐变、输入清理与最终限幅
 保持输出连续。创建、替换、销毁及 `shutdown` 必须放在控制线程。

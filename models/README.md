@@ -36,6 +36,15 @@ shape, energy, transient and reconstructed-spectrum supervision. Its new continu
 and [DSP comparisons](../docs/optimization-followup-20261010.md) remain local experiments;
 none establishes a released restoration model.
 
+The [V4 paired experiment](../docs/optimization-20261011.md) adds complex
+reconstruction/spectral consistency and optional encoder amplitude/phase
+interactions. Both six-epoch continuations are complete and pass 13 export
+parity cases each. The control ONNX is 3.16 MiB (806,276 parameters); architecture
+1.1 is 3.30 MiB (848,900 parameters), with unchanged causal input and buffering.
+Actual DSP comparisons and remaining quality tradeoffs keep these weights local
+and experimental; the original epoch-168 baseline is retained.
+
+
 Official releases require reviewed source grants and initialization under
 [TRAINING_DATA.md](../legal/TRAINING_DATA.md). Source approval, restoration quality,
 listening and real-time runtime/continuity evidence are all required before release.
