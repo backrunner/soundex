@@ -24,6 +24,8 @@ DSP、ONNX 推理和实时流适配，同时提供文件处理 CLI 和 PyTorch �
 [V6 部署对齐续训](docs/deployment-refinement-20261011.md)进一步把边缘增益和重建后的瞬态约束纳入训练代理，继续通过实际 Rust 输出验证。
 [架构调研与容量实验](docs/architecture-research-20261011.md)按实时预算筛选近期方法，
 通过全频带残差分支分别比较输入表示和模型容量，并验证实际输出与部署成本。
+三组新模型均完成 8 轮；[实测结果](docs/architecture-study-20261011.md)显示验证 loss
+略降，但尚未取得足以替换基线的综合音质收益。
 
 ## 直接运行
 

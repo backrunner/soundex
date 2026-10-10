@@ -135,6 +135,9 @@ head and widths 128/512. Explicit migration requires
 It adds no temporal context or runtime buffering. Keep the V6 objective and compare
 actual Rust audio, model size and runtime costs before promoting a candidate.
 See [the research and experiment protocol](../docs/architecture-research-20261011.md).
+The [completed eight-epoch comparison](../docs/architecture-study-20261011.md)
+separates development loss, Rust output quality and deployment cost; lower loss
+alone does not promote any of the new experimental weights.
 
 `checkpoints/best-validation.pth` is the export candidate;
 `checkpoints/final-resume.pth` is atomically updated every epoch for exact resume.

@@ -32,6 +32,15 @@ ONNX 为 `18ea464cfcc4c978b252f1b6ad04ce5e1fc427dc225b58759b6a8e69d2b57336`。
 数据配方与清单绑定保持一致，见 [V6 记录](../docs/deployment-refinement-20261011.md)。
 此处只更新派生关系，不增加授权结论；未发布正式权重。
 
+本轮[表示与容量实验](../docs/architecture-study-20261011.md)的三个新增分支也从
+同一 V4 epoch4 启动，冻结源码为 `7cfaf784`。各完成 8 轮，数据配方和清单不变；
+按固定 CPU 验证规则选中的 `shape-large` 检查点 SHA-256 为
+`8d5795cfe62a572e2221c657997951f6fb3b843911219087584e006b2218a53c`，
+ONNX 为 `a9a5096d1cc87eaf3c151ce9d25fc4dc1f4abe33db84b7a94076739c66fa78d3`。
+[论文调研](../docs/architecture-research-20261011.md)仅用于方法参考；新增分支为
+原创实现，没有导入所调研模型的代码、权重、训练音频或教师输出。新增结构不改变
+既有来源义务，也不构成权重发布授权结论；全部实验 artifact 仍保留在本地。
+
 原生 epoch168 的旧 checkpoint 源码元数据读到了主仓库后续版本 `dd0d15ab`；实际冻结训练收据为 `abe0e497`，其归档内 106 个训练文件与该版本逐个比较无差异。原文件与哈希保持不变，审查须同时使用冻结收据。新的归档运行已修正来源捕获，Objective v2 续训用独立 worktree，绑定版本为 `b4ed52c`。
 
 两个 MUSDB 实验的最佳 checkpoint SHA-256 分别为
