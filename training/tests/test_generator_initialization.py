@@ -16,6 +16,7 @@ def _generator(config):
         channels=c["channels"],
         bottleneck_blocks=c["bottleneck_blocks"],
         expand_ratio=c["expand_ratio"],
+        cross_stream_interactions=c.get("cross_stream_interactions", False),
     )
 
 

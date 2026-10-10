@@ -179,6 +179,7 @@ def _checkpoint_generator(checkpoint_path: Path) -> SoundExGenerator:
         channels=config["channels"],
         bottleneck_blocks=config["bottleneck_blocks"],
         expand_ratio=config["expand_ratio"],
+        cross_stream_interactions=config.get("cross_stream_interactions", False),
     )
     model.load_state_dict(checkpoint["model"]["generator_state"])
     model.eval()
@@ -296,3 +297,25 @@ def test_tampered_architecture_checkpoint_is_not_exported(
         export_onnx(checkpoint_path, output_path)
 
     assert not output_path.exists()
+
+
+def test_interacting_architecture_exports_with_dynamic_batch_and_parity(
+    tmp_path, checkpoint_factory, resolved_config
+):
+    config = copy.deepcopy(resolved_config)
+    config["model"]["generator"]["cross_stream_interactions"] = True
+    path, _ = checkpoint_factory("interacting-export.pth", config=config)
+    model_path = tmp_path / "interacting.onnx"
+    result = export_onnx(path, model_path)
+    assert result.parameter_count > 806276
+    graph = onnx.load(str(model_path), load_external_data=False)
+    metadata = {item.key: item.value for item in graph.metadata_props}
+    assert metadata["soundex.model_architecture_version"] == "1.1"
+    session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
+    with torch.no_grad():
+        model = _checkpoint_generator(path)
+        for batch in [1, 2]:
+            features = torch.randn(batch, 2, 1, 129)
+            expected = model(features).numpy()
+            actual = session.run([OUTPUT_NAME], {INPUT_NAME: features.numpy()})[0]
+            np.testing.assert_allclose(actual, expected, rtol=1e-4, atol=1e-5)
