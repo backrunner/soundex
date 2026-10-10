@@ -233,3 +233,37 @@ PYTHONPATH=training python training/train.py --config /path/to/resolved-circular
 `--initialize-phase-features` 仅允许这一首层从 1 扩为 3 通道；其他配置和参数形状
 必须兼容，新增通道必须全零，优化器重新初始化。此开关不能与交互结构迁移混用。
 实验决策和结果见[目标复核与改良记录](goal-refinement-20261011.md)。
+
+## V6 deployment-aware continuation (experimental)
+
+`training/configs/deployment_continuation.yaml` retains V5 raw-model terms and
+applies the default Neural/MatchEdge gain before every reconstructed waveform,
+complex, energy and spectral term. The proxy uses the manifest cutoff/rate and
+Rust's rounded edge-bin geometry, -6 dB target ratio, [0.25, 2] gain target, 0.1
+linear smoothing, and gain only where crossover weight is positive. This does
+not change the exported model architecture or Rust runtime.
+
+A cropped sequence has no prior stream gain. V6 initializes it from the first
+frame's **detached** target gain and then follows the causal recurrence. This is
+a steady-state approximation; it is not exact full-stream gain history. The
+online cutoff detector, enhancement gate, limiter, wet/dry ramp and async
+fallback remain outside the proxy. Static manifest cutoffs can disagree with
+the detector. Actual Rust audio remains decisive. An identity generator scored
+with V6 also passes through this DSP proxy and is not the untreated dry baseline.
+
+V6 adds `reconstruction_temporal_weight = 0.25`: signed adjacent-frame magnitude
+changes after causal OLA and reanalysis, compared with the clean reference.
+The denominator is the reference change norm, floored by 1% of reference
+full-band RMS times the square root of the difference-element count and an
+absolute 1e-4 floor; all scales are detached. Both attacks and decays are
+supervised. This is distinct from canonical evaluation's positive spectral flux.
+It cannot reward constant spectra when the reference changes. Raw and
+reconstructed temporal errors are reported separately. V1–V5 formulas remain
+unchanged; total losses from different versions must not be compared directly.
+
+The first controlled run uses the same V4 parent, 8 epochs/1,024 updates, frozen
+BatchNorm buffers, canonical data recipe/splits/ratios and 896 validation rows.
+Select its best checkpoint by fixed V6 validation total, then freeze its hash
+before the existing held-out recheck. Compare Rust output with dry input, original
+native baseline, V4 and V5; keep experimental unless gains are balanced across
+energy, shape, transients, fidelity and continuous output.

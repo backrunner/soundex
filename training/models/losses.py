@@ -69,6 +69,66 @@ def blend_deployment_features(
     return torch.stack((magnitude_db, phase), dim=1)
 
 
+def match_edge_features(
+    degraded: torch.Tensor,
+    predicted: torch.Tensor,
+    missing_band_mask: torch.Tensor,
+    *,
+    cutoff_hz: torch.Tensor,
+    sample_rate: torch.Tensor,
+    crossover_width_hz: float,
+    initial_gain: torch.Tensor | None = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Differentiable Rust MatchEdge recurrence on a cropped causal sequence.
+
+    With initial_gain supplied this matches the runtime recurrence. Without prior
+    stream state, bootstrap from the first frame's detached target gain; this is
+    an approximation of steady state, not the runtime detector or full history.
+    """
+    _validate_feature_pair(predicted, degraded)
+    batch, _, frames, bins = predicted.shape
+    if frames < 1:
+        raise ValueError("edge matching requires at least one frame")
+    cutoff = torch.as_tensor(cutoff_hz, device=predicted.device, dtype=predicted.dtype).reshape(-1)
+    rates = torch.as_tensor(sample_rate, device=predicted.device, dtype=predicted.dtype).reshape(-1)
+    if cutoff.numel() != batch or rates.numel() != batch:
+        raise ValueError("edge metadata must match the batch")
+    # Reuse the public geometry validation, including finite/Nyquist bounds.
+    build_missing_band_mask(
+        cutoff, rates, fft_size=2 * (bins - 1), crossover_width_hz=crossover_width_hz
+    )
+    resolution = rates / float(2 * (bins - 1))
+    # Rust f32::round is half-away-from-zero, unlike torch.round ties-to-even.
+    cutoff_bin = torch.floor(cutoff / resolution + 0.5).clamp(1, bins - 1)
+    reference_bins = torch.floor(crossover_width_hz / resolution + 0.5).clamp_min(1)
+    reference_bins = torch.minimum(reference_bins, cutoff_bin)
+    index = torch.arange(bins, device=predicted.device)[None, None, :]
+    low = (
+        (index >= (cutoff_bin - reference_bins)[:, None, None])
+        & (index < cutoff_bin[:, None, None])
+    ).to(predicted.dtype)
+    high = (index >= cutoff_bin[:, None, None]).to(predicted.dtype)
+    original = torch.pow(10.0, degraded[:, 0].clamp(-200.0, 100.0) / 20.0)
+    generated = torch.pow(10.0, predicted[:, 0].clamp(-200.0, 100.0) / 20.0)
+    low_rms = ((original.square() * low).sum(-1) / low.sum(-1)).clamp_min(1e-30).sqrt()
+    high_rms = ((generated.square() * high).sum(-1) / high.sum(-1)).clamp_min(1e-30).sqrt()
+    desired = (low_rms * (10.0 ** (-6.0 / 20.0)) / high_rms.clamp_min(1e-10)).clamp(0.25, 2.0)
+    current = desired[:, 0].detach() if initial_gain is None else initial_gain.reshape(batch)
+    gains = []
+    for frame in range(frames):
+        silent_low = low_rms[:, frame] < 1e-10
+        silent_high = high_rms[:, frame] < 1e-10
+        updated = 0.1 * desired[:, frame] + 0.9 * current
+        current = torch.where(
+            silent_low, torch.zeros_like(current), torch.where(silent_high, current, updated)
+        )
+        gains.append(torch.where(silent_high & ~silent_low, torch.ones_like(current), current))
+    gain = torch.stack(gains, dim=1)
+    mask = _feature_weight(missing_band_mask, predicted[:, 0])
+    magnitude = torch.where(mask > 0, generated * gain[..., None], generated)
+    return torch.stack((20.0 * magnitude.clamp_min(1e-10).log10(), predicted[:, 1]), dim=1), gain
+
+
 def _blend_phase_like_runtime(
     original: torch.Tensor,
     predicted: torch.Tensor,
@@ -147,8 +207,8 @@ def deployment_waveform_loss(
 ) -> torch.Tensor:
     """Return L1 for the differentiable crossover, phase blend, and causal OLA proxy.
 
-    Runtime loudness matching, limiting, and the sample-domain gate ramp are stateful
-    Rust stages and are intentionally not approximated here. Release quality is
+    V6 supplies gain-adjusted predictions; earlier objectives omit the matcher.
+    Limiting and the sample-domain gate ramp are not approximated here. Release quality is
     therefore decided by evaluation through the actual Rust causal stream.
     """
     blended = blend_deployment_features(degraded, predicted, missing_band_mask)
@@ -217,6 +277,7 @@ class GeneratorLoss(nn.Module):
         reconstruction_energy_weight: float = 1.0,
         phase_frequency_gradient_weight: float = 0.0025,
         phase_time_gradient_weight: float = 0.025,
+        reconstruction_temporal_weight: float = 0.25,
     ) -> None:
         super().__init__()
         self.high_band_weight = high_band_weight
@@ -233,8 +294,8 @@ class GeneratorLoss(nn.Module):
         if waveform_region not in {"full", "steady_state"}:
             raise ValueError("waveform_region must be 'full' or 'steady_state'")
         self.waveform_region = waveform_region
-        if objective_version not in {1, 2, 3, 4, 5}:
-            raise ValueError("objective_version must be 1, 2, 3, 4 or 5")
+        if objective_version not in {1, 2, 3, 4, 5, 6}:
+            raise ValueError("objective_version must be 1, 2, 3, 4, 5 or 6")
         for name, value in {
             "magnitude_scale_db": magnitude_scale_db,
             "waveform_normalization_floor": waveform_normalization_floor,
@@ -261,6 +322,7 @@ class GeneratorLoss(nn.Module):
             "reconstruction_energy_weight": reconstruction_energy_weight,
             "phase_frequency_gradient_weight": phase_frequency_gradient_weight,
             "phase_time_gradient_weight": phase_time_gradient_weight,
+            "reconstruction_temporal_weight": reconstruction_temporal_weight,
         }.items():
             if not math.isfinite(value) or value < 0:
                 raise ValueError(f"{name} must be finite and non-negative")
@@ -279,6 +341,7 @@ class GeneratorLoss(nn.Module):
         self.reconstruction_energy_weight = reconstruction_energy_weight
         self.phase_frequency_gradient_weight = phase_frequency_gradient_weight
         self.phase_time_gradient_weight = phase_time_gradient_weight
+        self.reconstruction_temporal_weight = reconstruction_temporal_weight
         for name, value in {
             "magnitude_relative_floor_db": magnitude_relative_floor_db,
             "magnitude_absolute_floor_db": magnitude_absolute_floor_db,
@@ -333,6 +396,9 @@ class GeneratorLoss(nn.Module):
                 objective.get("phase_frequency_gradient_weight", 0.0025)
             ),
             phase_time_gradient_weight=float(objective.get("phase_time_gradient_weight", 0.025)),
+            reconstruction_temporal_weight=float(
+                objective.get("reconstruction_temporal_weight", 0.25)
+            ),
         )
 
     def forward(
@@ -343,6 +409,8 @@ class GeneratorLoss(nn.Module):
         missing_band_mask: torch.Tensor,
         disc_pred_features: list[list[torch.Tensor]] | None = None,
         disc_target_features: list[list[torch.Tensor]] | None = None,
+        *,
+        deployment_geometry: dict | None = None,
     ) -> dict[str, torch.Tensor]:
         """Compute loss for aligned `[B, 2, T, F]` dB/phase features."""
         _validate_feature_pair(predicted, target)
@@ -380,8 +448,15 @@ class GeneratorLoss(nn.Module):
         transition = 4.0 * mask * (1.0 - mask)
         transition_edges = torch.maximum(transition[..., 1:], transition[..., :-1])
         crossover = mean(residual_gradient, transition_edges)
+        deployed = predicted
+        if self.objective_version >= 6:
+            if deployment_geometry is None:
+                raise ValueError("v6 requires deployment_geometry with cutoff and sample rate")
+            deployed, _ = match_edge_features(
+                degraded, predicted, missing_band_mask, **deployment_geometry
+            )
         waveform = deployment_waveform_loss(
-            predicted,
+            deployed,
             target,
             degraded,
             missing_band_mask,
@@ -391,7 +466,7 @@ class GeneratorLoss(nn.Module):
         )
         waveform_relative = (
             deployment_waveform_loss(
-                predicted,
+                deployed,
                 target,
                 degraded,
                 missing_band_mask,
@@ -462,6 +537,7 @@ class GeneratorLoss(nn.Module):
                 hop_size=self.hop_size,
                 relative_floor=self.high_relative_floor,
                 absolute_floor=self.waveform_normalization_floor,
+                reconstruction_prediction=deployed,
             )
             result.update(inpainting)
             result["total"] = total + (
@@ -473,7 +549,7 @@ class GeneratorLoss(nn.Module):
             )
         if self.objective_version >= 4:
             consistency = reconstruction_complex_terms(
-                predicted,
+                deployed,
                 target,
                 degraded,
                 mask,
@@ -490,7 +566,7 @@ class GeneratorLoss(nn.Module):
             )
         if self.objective_version >= 5:
             reconstruction_energy = reconstruction_energy_terms(
-                predicted,
+                deployed,
                 target,
                 degraded,
                 mask,
@@ -498,6 +574,7 @@ class GeneratorLoss(nn.Module):
                 hop_size=self.hop_size,
                 relative_floor=self.high_relative_floor,
                 absolute_floor=self.waveform_normalization_floor,
+                include_temporal=self.objective_version >= 6,
             )
             gradients = phase_gradient_terms(predicted[:, 1], target[:, 1], phase_weights)
             result.update(reconstruction_energy)
@@ -514,6 +591,10 @@ class GeneratorLoss(nn.Module):
                 / phase_scale
                 * gradients["phase_frequency_gradient"]
                 + self.phase_time_gradient_weight / phase_scale * gradients["phase_time_gradient"]
+            )
+        if self.objective_version >= 6:
+            result["total"] = result["total"] + (
+                self.reconstruction_temporal_weight * result["reconstruction_temporal"]
             )
         return result
 
@@ -545,12 +626,13 @@ def reconstruction_energy_terms(
     hop_size: int,
     relative_floor: float,
     absolute_floor: float,
+    include_temporal: bool = False,
 ) -> dict[str, torch.Tensor]:
     """V5: high-band and local envelope calibration after causal synthesis/reanalysis.
 
     Power floors come only from the clean reference. Frequency groups are eight
     bins (~1.4/1.5 kHz at FFT256); padded bins and empty high bands carry no weight.
-    This proxy still excludes the runtime edge-level matcher and online detector.
+    V6 supplies gain-adjusted predictions; the online detector remains excluded.
     """
     edge = fft_size - hop_size
     if predicted.shape[2] < 3:
@@ -586,7 +668,20 @@ def reconstruction_energy_terms(
         10.0 * ((bands[0] + floor[:, None]).log10() - (bands[1] + floor[:, None]).log10()).abs()
     )
     local = _recording_weighted_mean(difference, (band_count > 0).to(difference.dtype))
-    return {"reconstruction_high_energy": high, "reconstruction_subband_energy": local}
+    result = {"reconstruction_high_energy": high, "reconstruction_subband_energy": local}
+    if include_temporal:
+        # Signed magnitude changes retain both attacks and decays. Use reference
+        # change scale with a full-signal floor, never the prediction's energy.
+        amplitudes = [power.clamp_min(1e-30).sqrt() for power in powers]
+        result["reconstruction_temporal"] = _relative_high_error(
+            amplitudes[0][:, 1:] - amplitudes[0][:, :-1],
+            amplitudes[1][:, 1:] - amplitudes[1][:, :-1],
+            torch.minimum(aligned[:, 1:], aligned[:, :-1]),
+            amplitudes[1],
+            relative_floor,
+            absolute_floor,
+        )
+    return result
 
 
 def _relative_high_error(
@@ -615,13 +710,15 @@ def inpainting_fidelity_terms(
     hop_size: int,
     relative_floor: float,
     absolute_floor: float,
+    reconstruction_prediction: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
     """V3: high-band shape, energy, reference-relative dynamics and reconstruction.
 
     All scales are per recording and detached. Signed frame differences preserve
     real attacks/releases rather than encouraging a temporally constant output.
     The reconstruction term measures *reanalysed* causal OLA after crossover and
-    phase blend. This proxy still excludes Rust's loudness, limiter and gate state.
+    phase blend. V6 supplies gain-adjusted reconstruction predictions; runtime
+    limiter and gate state remain excluded.
     """
     if predicted.shape[2] < 2:
         raise ValueError("inpainting objective requires at least two causal frames")
@@ -649,7 +746,11 @@ def inpainting_fidelity_terms(
         relative_floor,
         absolute_floor,
     )
-    blended = blend_deployment_features(degraded, predicted, mask)
+    blended = blend_deployment_features(
+        degraded,
+        predicted if reconstruction_prediction is None else reconstruction_prediction,
+        mask,
+    )
     waves = [
         causal_overlap_add(value, fft_size=fft_size, hop_size=hop_size)
         for value in (blended, target)
@@ -693,7 +794,7 @@ def reconstruction_complex_terms(
     Compare matching fully supported STFT frames; never include artificial cropped
     Hann tails. Consistency follows the predicted complex spectrum, while its
     detached normalization always comes from the clean reference, not prediction.
-    This remains a crossover/phase/OLA proxy, excluding online detector and gain.
+    V6 supplies gain-adjusted predictions; the online detector remains excluded.
     """
     blended = blend_deployment_features(degraded, predicted, mask)
     edge = fft_size - hop_size
