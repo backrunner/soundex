@@ -9,7 +9,7 @@ use soundex_dsp::loudness::{rms, LoudnessMatcher};
 use soundex_dsp::phase::PhaseSmoother;
 use soundex_dsp::stft::{SpectralFrame, StftAnalyzer, StftSynthesizer};
 
-use crate::config::{EnhancementMode, SoundExConfig};
+use crate::config::{EnhancementMode, HighBandGain, SoundExConfig};
 use crate::error::{Result, SoundExError};
 use crate::processor::ProcessInfo;
 use crate::stream::StreamBuffer;
@@ -175,7 +175,9 @@ impl ChannelProcessor {
             .min(cutoff_bin);
         let low_rms = rms(&self.original_magnitude[cutoff_bin - reference_bins..cutoff_bin]);
         let high_rms = rms(&self.generated_magnitude[cutoff_bin..]);
-        let gain = if config.enhancement_mode == EnhancementMode::Spectral {
+        let gain = if config.enhancement_mode == EnhancementMode::Spectral
+            || config.high_band_gain == HighBandGain::Model
+        {
             1.0
         } else {
             self.loudness.compute_gain(low_rms, high_rms)

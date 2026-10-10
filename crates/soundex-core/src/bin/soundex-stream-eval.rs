@@ -71,7 +71,12 @@ fn run() -> Result<(), Box<dyn Error>> {
         .unwrap_or_else(|_| "neural".into())
         .parse()
         .map_err(|error: &str| error.to_string())?;
+    config.high_band_gain = std::env::var("SOUNDEX_EVAL_HIGH_BAND_GAIN")
+        .unwrap_or_else(|_| "match-edge".into())
+        .parse()
+        .map_err(|error: &str| error.to_string())?;
     let enhancement_mode = config.enhancement_mode.as_str();
+    let high_band_gain = config.high_band_gain.as_str();
     let analysis = analyze_buffer(&config, &audio.samples)?;
     let mut processor = SoundExProcessor::new(config)?;
     let latency = processor.latency_samples_per_channel();
@@ -110,6 +115,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             "  \"schema_version\": 1,\n",
             "  \"mode\": \"{}\",\n",
             "  \"enhancement_mode\": \"{}\",\n",
+            "  \"high_band_gain\": \"{}\",\n",
             "  \"sample_rate\": {},\n",
             "  \"channels\": {},\n",
             "  \"frames\": {},\n",
@@ -129,6 +135,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         ),
         mode_name,
         enhancement_mode,
+        high_band_gain,
         audio.sample_rate,
         audio.channels,
         audio.frames,
