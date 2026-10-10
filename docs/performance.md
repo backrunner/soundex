@@ -244,3 +244,22 @@ producer scheduling. The native-priority simulated producer option
 as an isolated preparation improvement over earlier ordinary-producer trials.
 Short paced trials are engineering diagnostics and do not meet the 30-minute
 physical-device release requirement.
+
+## V5 calibration and circular phase inputs
+
+The [goal-refinement experiment](goal-refinement-20261011.md) completed both
+eight-epoch continuations before benchmarking. On Apple M5 Max, 44.1/48 kHz,
+mono/stereo, ORT single-threaded, the selected calibrated model's synchronous
+whole-hop p99 was 0.973–1.677 ms; its ONNX is 3,309,786 bytes. The optional circular
+phase model adds 144 parameters and no audio context buffer.
+
+Eight paced cases (two models × four configurations, 30 seconds each) had zero
+worker deadline misses and zero queue overflows. Fixed delay plus worst callback
+was 5.340–5.817 ms, below the 8 ms target. Raw timings/miss bitmaps were independently
+recomputed. Peak paced-process RSS was 38.53 / 36.28 MiB, and whole-process CPU
+was 30.45% / 31.43% of one core for calibrated / circular respectively. These are
+single sequential trials including the harness and startup; they do not prove a
+memory/speed advantage for the larger variant or physical-device acceptance.
+
+Quality rechecks do not justify promoting either candidate. Low runtime cost and
+continuous finite output do not establish correct restored detail or listening quality.

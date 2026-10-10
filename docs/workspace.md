@@ -38,6 +38,13 @@ have been removed; their historical manifest and recipe receipts remain under
 `data/evidence/retired-corpora/`. Historical generated audio, duplicate periodic
 checkpoints and unused tool/cache copies are removed with deletion receipts.
 
+The latest [V5 experiments](goal-refinement-20261011.md) use
+`data/runs/{calibrated,circular}-continuation-20261011/`; their frozen source,
+resolved config, best/final checkpoints and logs remain local. Export/parity,
+development and recording-held-out comparisons, metric diagnostics, listening WAVs
+and resource receipts are under `data/reports/goal-refinement-20261011/`.
+The listening score sheet is unfilled; generated listening files are not listening evidence.
+
 Run the optional source audit before generating codec pairs:
 
 ```bash
