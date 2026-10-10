@@ -22,6 +22,9 @@ The [inpainting objective and neural/DSP paths](docs/inpainting-objective.md) ma
 high-band reconstruction the main training target; DSP-only and hybrid paths remain experimental.
 The [V4/architecture comparison](docs/optimization-20261011.md) evaluates complex
 reconstruction, amplitude/phase interactions and prepared real-time startup.
+The [V5 goal review](docs/goal-refinement-20261011.md) tests reconstructed energy
+calibration and circular phase features, with recording-held-out rechecks and
+explicit data-coverage limits. Experimental weights remain local.
 
 ## Quick start
 
