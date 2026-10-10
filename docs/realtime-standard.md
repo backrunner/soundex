@@ -92,6 +92,16 @@ scheduling for exactly 128 frames at the stream rate through Mozilla's safe
 change). The external library sets a preemptible period/deadline equal to a hop
 and computation allowance equal to half a hop. The handle is restored on the
 worker before model teardown, including error/panic exits.
+Before requesting time-constraint scheduling, the default worker prepares ORT
+with four inference calls for each possible active batch (four calls for mono,
+eight for stereo). These calls do not advance DSP or audio history. Construction
+waits on the control thread for readiness, up to 10 seconds; the callback never
+uses this readiness channel. Initialization failure preserves dry fallback; a
+readiness timeout returns an initialization error. `SoundExConfig::realtime_warmup`
+can explicitly disable this preparation for diagnosis. `startup_warmup_runs` and
+`startup_warmup_ns` are separate from stream hop counts and timing histograms.
+See [the prepared-startup comparison](optimization-20261011.md).
+
 `macos_realtime_request_accepted` records acceptance at startup, not a live policy
 query: macOS may subsequently demote an over-budget worker. The native audio
 integration still needs to join the device workgroup; this library has no device

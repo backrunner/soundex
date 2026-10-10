@@ -94,6 +94,18 @@ terms constrain fidelity alongside retained-band and seam preservation. It uses
 and an explicitly fresh optimizer trajectory. Initial weights were gradient-audited
 on 64 training draws; they are experimental. V1/V2 totals are not comparable to V3.
 See [the inpainting design and proxy limits](../docs/inpainting-objective.md).
+
+`consistent_continuation.yaml` and `interacting_continuation.yaml` provide a paired
+objective-v4 experiment: complex reconstruction, retained-band corruption and
+high-band STFT consistency. Only the second enables zero-initialized amplitude/phase
+encoder interactions (architecture 1.1). Both keep independent T=1 inference and
+six-epoch budgets. A legacy-parent architecture migration explicitly requires
+`--initialize-zero-interactions` with `--initialize-generator-from`; changed objectives
+or structure cannot directly resume old optimizer state. The data and sample ratios
+must be resolved from the existing native run, rather than using example paths/ratios.
+See [the objective definitions](../docs/inpainting-objective.md#objective-v4复数重建与频谱一致性)
+and [measured follow-up results](../docs/optimization-20261011.md).
+
 `checkpoints/best-validation.pth` is the export candidate;
 `checkpoints/final-resume.pth` is atomically updated every epoch for exact resume.
 Each schema-1.2 checkpoint stores the full validation vector, selected-row manifest

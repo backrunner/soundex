@@ -20,6 +20,8 @@ The original 200 epochs are complete; [loss auditing and controlled continuation
 address the remaining fidelity issues. Deployment validation still determines release qualification.
 The [inpainting objective and neural/DSP paths](docs/inpainting-objective.md) make
 high-band reconstruction the main training target; DSP-only and hybrid paths remain experimental.
+The [V4/architecture comparison](docs/optimization-20261011.md) evaluates complex
+reconstruction, amplitude/phase interactions and prepared real-time startup.
 
 ## Quick start
 
@@ -66,7 +68,9 @@ Use `cargo run -p soundex-cli -- --help` for options.
 
 ## Real-time integration
 
-Create `RealtimeProcessor` on a control thread before starting audio. Pass
+Create `RealtimeProcessor` on a control thread before starting audio. Its default
+worker preparation runs inference before playback and waits on this control
+thread only (up to 10 seconds). Pass
 matching interleaved input/output slices from the audio callback:
 
 ```rust,no_run

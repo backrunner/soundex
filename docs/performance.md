@@ -226,3 +226,21 @@ read from a control thread, and add no callback allocations or waits.
 for an explicit QoS comparison. The default remains `1`. Earlier short QoS-only
 and native-idle-spin trials did not pass availability checks; neither is a new
 default scheduling policy. See [the follow-up evidence](optimization-followup-20261010.md).
+
+
+## Prepared startup and architecture comparison
+
+The [2026-10-11 comparison](optimization-20261011.md) pairs V3, the V4 control
+and optional amplitude/phase interactions on the same real PCM.
+`SOUNDEX_REALTIME_WARMUP=1` is the default: model preparation completes on the
+worker before the adapter constructor returns. `0` is an explicit cold-start
+diagnostic. Reports record `startup_prewarm_requested`, `startup_warmup_runs`
+and `startup_warmup_ms`; preparation is excluded from input-hop timing. It adds
+control-thread startup time, not samples of algorithmic delay.
+
+Compare cold/warm startup with the same binary, model hash, PCM, duration and
+producer scheduling. The native-priority simulated producer option
+`SOUNDEX_REALTIME_PRODUCER_RT=1` remains explicit; its results cannot be treated
+as an isolated preparation improvement over earlier ordinary-producer trials.
+Short paced trials are engineering diagnostics and do not meet the 30-minute
+physical-device release requirement.
