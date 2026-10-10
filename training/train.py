@@ -274,6 +274,7 @@ def initialize_generator_from_checkpoint(
     data_provenance: dict[str, Any],
     *,
     initialize_zero_interactions: bool = False,
+    initialize_phase_features: bool = False,
 ) -> dict[str, Any]:
     """Start a new optimizer trajectory with explicit, compatible parent weights."""
     payload = Path(path).read_bytes()
@@ -283,6 +284,17 @@ def initialize_generator_from_checkpoint(
     )
     parent_architecture = dict(parent["model"]["generator_config"])
     architecture = dict(config["model"]["generator"])
+    if initialize_zero_interactions and initialize_phase_features:
+        raise ValueError("migrate one architecture feature at a time")
+    if initialize_phase_features:
+        if parent_architecture.get("circular_phase_features", False) or not architecture.get(
+            "circular_phase_features", False
+        ):
+            raise ValueError(
+                "phase-feature migration needs a legacy phase parent and enabled target"
+            )
+        parent_architecture.pop("circular_phase_features", None)
+        architecture.pop("circular_phase_features", None)
     if initialize_zero_interactions:
         if parent_architecture.get("cross_stream_interactions", False) or not architecture.get(
             "cross_stream_interactions", False
@@ -301,6 +313,20 @@ def initialize_generator_from_checkpoint(
         if isinstance(value, torch.Tensor) and (value.is_floating_point() or value.is_complex())
     ):
         raise ValueError("generator initialization contains non-finite parameters")
+    expanded_keys: list[str] = []
+    if initialize_phase_features:
+        key = "phase_stream.encoders.0.conv.0.weight"
+        target_state = generator.state_dict()
+        if set(state) != set(target_state):
+            raise ValueError("phase-feature migration has unexpected state keys")
+        original, expanded = state[key], target_state[key].clone()
+        if original.shape[1] != 1 or expanded.shape != (original.shape[0], 3, *original.shape[2:]):
+            raise ValueError("phase-feature migration has incompatible phase encoder shape")
+        if torch.count_nonzero(expanded[:, 1:]).item():
+            raise ValueError("phase-feature migration requires exactly zero added channels")
+        expanded[:, :1] = original
+        state = {**state, key: expanded}
+        expanded_keys = [key]
     added_keys: list[str] = []
     if initialize_zero_interactions:
         target_state = generator.state_dict()
@@ -317,10 +343,13 @@ def initialize_generator_from_checkpoint(
     else:
         generator.load_state_dict(state, strict=True)
     return {
-        "mode": "generator-only-warm-start-zero-interactions"
+        "mode": "generator-only-warm-start-phase-features"
+        if initialize_phase_features
+        else "generator-only-warm-start-zero-interactions"
         if initialize_zero_interactions
         else "generator-only-warm-start",
         "zero_initialized_state_keys": added_keys,
+        "expanded_zero_channel_state_keys": expanded_keys,
         "parent_checkpoint_sha256": hashlib.sha256(payload).hexdigest(),
         "parent_epoch": int(parent["training_state"]["epoch"]),
         "parent_recipe_sha256": parent["data"]["recipe_sha256"],
@@ -578,8 +607,17 @@ def main() -> None:
             "Also read from PATHS_MANIFEST env if unset."
         ),
     )
+    parser.add_argument(
+        "--initialize-phase-features",
+        action="store_true",
+        help="Warm-start a legacy phase encoder with zero sin/cos channels",
+    )
     args = parser.parse_args()
     config = load_config(args.config)
+    if args.initialize_phase_features and not args.initialize_generator_from:
+        parser.error("--initialize-phase-features requires --initialize-generator-from")
+    if args.initialize_phase_features and args.initialize_zero_interactions:
+        parser.error("migrate one architecture feature at a time")
     if args.initialize_zero_interactions and not args.initialize_generator_from:
         parser.error("--initialize-zero-interactions requires --initialize-generator-from")
     if int(config["training"].get("context_frames", 1)) != 1:
@@ -630,6 +668,7 @@ def main() -> None:
         bottleneck_blocks=model_config["bottleneck_blocks"],
         expand_ratio=model_config["expand_ratio"],
         cross_stream_interactions=model_config.get("cross_stream_interactions", False),
+        circular_phase_features=model_config.get("circular_phase_features", False),
     ).to(device)
     configure_generator_training_mode(
         generator, str(config["training"].get("batch_norm_statistics", "update"))
@@ -683,6 +722,7 @@ def main() -> None:
             config,
             data_provenance,
             initialize_zero_interactions=args.initialize_zero_interactions,
+            initialize_phase_features=args.initialize_phase_features,
         )
         print(f"Generator initialization: {provenance['initialization']}")
     last_validation_report: dict[str, Any] | None = None

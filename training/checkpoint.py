@@ -114,7 +114,11 @@ def build_checkpoint(
             "architecture": {
                 "name": MODEL_ARCHITECTURE_NAME,
                 "major": MODEL_ARCHITECTURE_MAJOR,
-                "minor": 1
+                "minor": 2
+                if _mapping(model_config.get("generator"), "model.generator").get(
+                    "circular_phase_features", False
+                )
+                else 1
                 if _mapping(model_config.get("generator"), "model.generator").get(
                     "cross_stream_interactions", False
                 )

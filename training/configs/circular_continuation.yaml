@@ -1,0 +1,218 @@
+# SPDX-License-Identifier: Apache-2.0
+# Eight-epoch V5 calibration experiment; resolve data from the native parent.
+audio:
+  crossover_width_hz: 1000.0
+  fft_size: 256
+  hop_size: 128
+  sample_rate: 44100
+data:
+  medleydb_path: null
+  musdb18_hq_path: null
+  music_library_path: /data/music-library
+  recipe:
+    alignment:
+      correlation_samples: 65536
+      max_offset_samples: 4096
+      residual_tolerance_samples: 1
+    channel_policy:
+      roles:
+        left: 0.2
+        mid: 0.4
+        mono: 1.0
+        right: 0.2
+        side: 0.2
+    codecs:
+    - codec: mp3
+      container: mp3
+      encoder: libmp3lame
+      held_out: false
+      id: mp3-cbr-64
+      mode: cbr
+      setting: 64
+      weight: 0.12
+    - codec: mp3
+      container: mp3
+      encoder: libmp3lame
+      held_out: false
+      id: mp3-cbr-128
+      mode: cbr
+      setting: 128
+      weight: 0.16
+    - codec: mp3
+      container: mp3
+      encoder: libmp3lame
+      held_out: false
+      id: mp3-cbr-320
+      mode: cbr
+      setting: 320
+      weight: 0.08
+    - codec: mp3
+      container: mp3
+      encoder: libmp3lame
+      held_out: false
+      id: mp3-vbr-q2
+      mode: vbr
+      setting: 2
+      weight: 0.12
+    - codec: mp3
+      container: mp3
+      encoder: libmp3lame
+      held_out: false
+      id: mp3-vbr-q6
+      mode: vbr
+      setting: 6
+      weight: 0.12
+    - codec: aac
+      container: m4a
+      encoder: aac
+      held_out: false
+      id: aac-lc-cbr-96
+      mode: cbr
+      setting: 96
+      weight: 0.12
+    - codec: aac
+      container: m4a
+      encoder: aac
+      held_out: false
+      id: aac-lc-cbr-192
+      mode: cbr
+      setting: 192
+      weight: 0.1
+    - codec: vorbis
+      container: ogg
+      encoder: libvorbis
+      held_out: false
+      id: vorbis-vbr-q3
+      mode: vbr
+      setting: 3
+      weight: 0.09
+    - codec: vorbis
+      container: ogg
+      encoder: libvorbis
+      held_out: false
+      id: vorbis-vbr-q7
+      mode: vbr
+      setting: 7
+      weight: 0.05
+    - codec: aac
+      container: m4a
+      encoder: aac
+      held_out: true
+      id: aac-lc-cbr-160-holdout
+      mode: cbr
+      setting: 160
+      weight: 0.04
+    recipe_version: soundex-native-lossless-multigenre-20261008-v1
+    sample_rates:
+    - 44100
+    - 48000
+    schema_version: 1
+    seed: 42
+    segment:
+      count_per_track: 4
+      duration_seconds:
+      - 2.0
+      - 4.0
+    splits:
+      medleydb:
+        test: 0.1
+        train: 0.8
+        validation: 0.1
+      musdb18_hq:
+        preserve_official_test: true
+        test: 0.0
+        train: 0.8
+        validation: 0.2
+      music_library:
+        test: 0.1
+        train: 0.8
+        validation: 0.1
+      slakh2100:
+        preserve_official: true
+        test: 0.1
+        train: 0.8
+        validation: 0.1
+      speech_library:
+        test: 0.1
+        train: 0.8
+        validation: 0.1
+  sampling:
+    max_train_samples:
+      music_library: null
+      speech_library: null
+    recording_balance: true
+    samples_per_epoch: 2048
+    strategy: weighted
+    train_ratios:
+      music_library: 0.95
+      speech_library: 0.05
+    val_ratios:
+      music_library: 0.95
+      speech_library: 0.05
+    validation_source_quotas:
+      music_library: 768
+      speech_library: 128
+  slakh2100_path: null
+  speech_library_path: /data/speech-library
+model:
+  discriminator:
+    scales:
+    - 1
+    - 2
+    - 4
+    type: multi_scale
+  generator:
+    bottleneck_blocks: 2
+    channels:
+    - 24
+    - 48
+    - 96
+    - 96
+    expand_ratio: 4
+    use_phase_stream: true
+    circular_phase_features: true
+training:
+  batch_norm_statistics: frozen
+  batch_size: 16
+  checkpoint_interval_epochs: 10
+  context_frames: 1
+  gradient_clip: 1.0
+  learning_rate: 2.0e-05
+  lr_scheduler: cosine
+  max_epochs: 8
+  objective:
+    adversarial_weight: 0.0
+    causal_sequence_frames: 8
+    crossover_continuity_weight: 0.05
+    feature_matching_weight: 0.0
+    high_band_energy_weight: 1.0
+    high_band_magnitude_weight: 1.0
+    high_band_spectral_weight: 1.0
+    high_band_temporal_weight: 0.25
+    high_relative_floor: 0.01
+    low_band_identity_weight: 0.1
+    magnitude_absolute_floor_db: -120.0
+    magnitude_relative_floor_db: -80.0
+    magnitude_scale_db: 20.0
+    phase_absolute_floor_db: -120.0
+    phase_relative_floor_db: -60.0
+    phase_weight: 0.05
+    reconstruction_high_complex_weight: 0.2
+    reconstruction_high_weight: 0.5
+    reconstruction_low_complex_weight: 8.0
+    spectral_consistency_weight: 0.1
+    version: 5
+    waveform_normalization_floor: 0.0001
+    waveform_region: steady_state
+    waveform_relative_floor: 0.01
+    waveform_weight: 0.25
+    reconstruction_energy_weight: 1.0
+    phase_frequency_gradient_weight: 0.0025
+    phase_time_gradient_weight: 0.025
+  seed: 42
+  validation_interval_epochs: 1
+  validation_selection:
+    primary_metric: total
+    tie_breaker_metric: high_band_magnitude
+  warmup_epochs: 0
+  warmup_steps: 128

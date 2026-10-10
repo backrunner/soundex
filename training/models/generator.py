@@ -182,10 +182,14 @@ class SoundExGenerator(nn.Module):
         bottleneck_blocks: int = 2,
         expand_ratio: int = 4,
         cross_stream_interactions: bool = False,
+        circular_phase_features: bool = False,
     ) -> None:
         super().__init__()
         if not isinstance(cross_stream_interactions, bool):
             raise ValueError("cross_stream_interactions must be a boolean")
+        if not isinstance(circular_phase_features, bool):
+            raise ValueError("circular_phase_features must be a boolean")
+        self.circular_phase_features = circular_phase_features
         if channels is None:
             channels = [24, 48, 96, 96]
 
@@ -193,6 +197,24 @@ class SoundExGenerator(nn.Module):
         self.amp_stream = SpectralStream(channels, bottleneck_blocks, expand_ratio)
         # Phase stream
         self.phase_stream = SpectralStream(channels, bottleneck_blocks, expand_ratio)
+
+        # Expose the unit phasor without removing the legacy raw-phase feature.
+        # Added channels start at zero influence and preserve the control RNG.
+        if circular_phase_features:
+            original = self.phase_stream.encoders[0].conv[0]
+            with torch.random.fork_rng(devices=[]):
+                expanded = nn.Conv2d(
+                    3,
+                    original.out_channels,
+                    original.kernel_size,
+                    stride=original.stride,
+                    padding=original.padding,
+                )
+            with torch.no_grad():
+                expanded.weight.zero_()
+                expanded.weight[:, :1].copy_(original.weight)
+                expanded.bias.copy_(original.bias)
+            self.phase_stream.encoders[0].conv[0] = expanded
 
         # Optional simultaneous amplitude/phase interactions at encoder scales.
         # Zero initialization preserves a migrated parent's exact predictions.
@@ -230,6 +252,8 @@ class SoundExGenerator(nn.Module):
         # Split input into amplitude and phase channels
         amp_in = x[:, 0:1, :, :]
         phase_in = x[:, 1:2, :, :]
+        if self.circular_phase_features:
+            phase_in = torch.cat((phase_in, torch.sin(phase_in), torch.cos(phase_in)), dim=1)
 
         # Dual-stream prediction
         if self.interactions:

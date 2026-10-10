@@ -177,6 +177,7 @@ def _build_generator(checkpoint: Mapping[str, Any]) -> SoundExGenerator:
         bottleneck_blocks=int(generator_config["bottleneck_blocks"]),
         expand_ratio=int(generator_config["expand_ratio"]),
         cross_stream_interactions=generator_config.get("cross_stream_interactions", False),
+        circular_phase_features=generator_config.get("circular_phase_features", False),
     )
     model.load_state_dict(checkpoint["model"]["generator_state"], strict=True)
     model.eval()
