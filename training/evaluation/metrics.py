@@ -67,6 +67,12 @@ def evaluate_signal_triplet(
         "enhanced_high_band_energy_error_db": _energy_error_db(
             enhanced_magnitude, clean_magnitude, high_mask
         ),
+        "baseline_high_energy_bias_db": _energy_bias_db(
+            degraded_magnitude, clean_magnitude, high_mask
+        ),
+        "enhanced_high_energy_bias_db": _energy_bias_db(
+            enhanced_magnitude, clean_magnitude, high_mask
+        ),
         "baseline_si_sdr_db": scale_invariant_sdr(degraded, clean),
         "enhanced_si_sdr_db": scale_invariant_sdr(enhanced, clean),
     }
@@ -199,9 +205,14 @@ def _spectral_convergence(
 
 
 def _energy_error_db(predicted: np.ndarray, target: np.ndarray, mask: np.ndarray) -> float:
+    return abs(_energy_bias_db(predicted, target, mask))
+
+
+def _energy_bias_db(predicted: np.ndarray, target: np.ndarray, mask: np.ndarray) -> float:
+    """Signed high-band power ratio; positive means excess generated energy."""
     predicted_energy = float(np.mean(np.square(predicted[:, mask])))
     target_energy = float(np.mean(np.square(target[:, mask])))
-    return abs(10.0 * math.log10((predicted_energy + 1e-20) / (target_energy + 1e-20)))
+    return 10.0 * math.log10((predicted_energy + 1e-20) / (target_energy + 1e-20))
 
 
 def _flux_error(predicted: np.ndarray, target: np.ndarray, mask: np.ndarray) -> float:
