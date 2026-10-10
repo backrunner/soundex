@@ -31,7 +31,7 @@ training:
   objective:
     causal_sequence_frames: 4
     high_band_magnitude_weight: 1.0
-    # Weighted gradient L2 on 64 training draws: high 2.83, phase 4.01, waveform 2.99.
+    # Initial eval-mode gradient audit on 64 training draws: high 2.83, phase 4.01, wave 2.99.
     phase_weight: 0.2
     low_band_identity_weight: 0.1
     crossover_continuity_weight: 0.05

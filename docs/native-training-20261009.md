@@ -10,6 +10,11 @@ implementation is frozen at commit `abe0e497eca5d72643c18f2929f1c7527c7143b6`;
 later documentation commits do not change the frozen code. Initialization is
 random, without a historical checkpoint or teacher. MUSDB and Slakh are disabled.
 
+The original 200 epochs are complete. A subsequent [loss audit and 8-epoch continuation](loss-audit-20261010.md)
+imports only its native epoch-168 generator with explicit lineage; it remains an
+experimental comparison and does not replace that baseline. The audit also identifies
+and fixes the archived-source Git metadata mismatch without rewriting original checkpoints.
+
 ## Data and model contract
 
 - Recipe SHA-256:

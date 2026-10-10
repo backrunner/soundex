@@ -15,6 +15,8 @@ The [current native-lossless run](docs/native-training-20261009.md) uses 300
 reviewed music works plus VCTK speech, from fresh initialization with MUSDB and
 Slakh disabled. Raw audio, prepared pairs and training checkpoints stay local;
 the repository publishes their source documentation and reproducible workflow.
+The original 200 epochs are complete; [loss auditing and controlled continuation](docs/loss-audit-20261010.md)
+address the remaining fidelity issues. Deployment validation still determines release qualification.
 
 ## Quick start
 

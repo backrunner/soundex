@@ -81,14 +81,24 @@ also supported by schema 1.3. Small-window training uses steady-state waveform l
 excluding cropped Hann overlap boundaries; older profiles retain the original full-region loss.
 
 Validation membership, crop positions, and source quotas are fixed. Checkpoint
-selection minimizes the missing-high-band validation loss, using low-band identity
-as the tie-breaker. `checkpoints/best-validation.pth` is the export candidate;
+selection defaults to missing-high-band validation loss, using low-band identity
+as the tie-breaker. The controlled `balanced_continuation.yaml` objective-v2 profile
+uses normalized total loss and high-band loss as the tie-breaker, with raw metrics
+retained for comparison. See [the loss audit](../docs/loss-audit-20261010.md).
+`checkpoints/best-validation.pth` is the export candidate;
 `checkpoints/final-resume.pth` is atomically updated every epoch for exact resume.
 Each schema-1.2 checkpoint stores the full validation vector, selected-row manifest
 hash, best-candidate state, and absolute validation schedule. The configured
 linear-warmup/cosine learning-rate schedules advance per optimizer update; the
 discriminator schedule starts only when adversarial training begins, and both
 scheduler states are restored on resume.
+
+Changing the objective starts a new run: use `--initialize-generator-from /path/to/parent.pth`
+with a compatible generator, feature contract, data manifests and validation membership.
+This imports only generator weights, resets optimizer/discriminator state and records
+the parent hash and initialization chain. `--resume` requires the original resolved config.
+Bind real dataset paths and the audited sampling ratios in your run config; template
+paths and ratios are examples.
 
 Each preprocessor stages a new immutable `<corpus>-<recipe-hash>` directory, validates its
 checksummed JSONL manifest, and atomically publishes it. Existing versions are never merged or

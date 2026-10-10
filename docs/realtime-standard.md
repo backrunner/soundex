@@ -99,10 +99,13 @@ handle. Other platforms report false and require their own scheduling validation
 See [Apple thread QoS guidance](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/EnergyGuide-iOS/PrioritizeWorkWithQoS.html)
 and [Mach soft real-time constraints](https://developer.apple.com/library/archive/documentation/Darwin/Conceptual/KernelProgramming/scheduler/scheduler.html).
 
-The worker sleeps until 150 microseconds before the next expected submission,
-then polls for a bounded window ending 50 microseconds after that prediction
-when using normal scheduling. Accepted real-time scheduling disables idle
-spinning so the computation quota is spent on inference.
+The worker sleeps until 500 microseconds before the next expected submission,
+then polls in 50-microsecond intervals. Under normal scheduling it spins only
+from 150 microseconds before to 50 microseconds after the predicted arrival.
+Accepted real-time scheduling disables idle spinning so the computation quota
+is spent on inference. The earlier coarse wakeup was selected by the
+[2026-10-10 diagnostic](loss-audit-20261010.md); it reduces stereo misses on the
+reference host but does not establish all-case/device qualification.
 Outside that window it sleeps; after a full idle period it backs off to 1 ms.
 The audio callback sends no OS wake signals and takes no locks. Predictions
 follow actual submission timestamps and do not add buffering or move deadlines.

@@ -26,6 +26,11 @@ does not establish restoration/release qualification; see
 [current training](../docs/native-training-20261009.md) and the hash-bound
 [current license review](../legal/WEIGHT_LICENSE_REVIEW.md).
 
+The [objective-v2 continuation](../docs/loss-audit-20261010.md) imports only that
+native epoch-168 generator, retains identical data/validation membership and starts
+a new optimizer trajectory with explicit parent hashes. Its experimental artifacts
+remain local and do not replace the baseline without comparative deployment evidence.
+
 Official releases require reviewed source grants and initialization under
 [TRAINING_DATA.md](../legal/TRAINING_DATA.md). Source approval, restoration quality,
 listening and real-time runtime/continuity evidence are all required before release.
