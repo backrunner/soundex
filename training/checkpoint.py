@@ -344,6 +344,18 @@ def validate_checkpoint(
     for key in ("python_version", "pytorch_version", "ffmpeg_version", "source_git_sha"):
         if key not in provenance:
             raise CheckpointSchemaError(f"checkpoint.provenance.{key}: required field is missing")
+    selection = _mapping(
+        _mapping(config["training"], "checkpoint.resolved_config.training").get(
+            "validation_selection",
+            {"primary_metric": "high_band_magnitude", "tie_breaker_metric": "low_band_identity"},
+        ),
+        "checkpoint.resolved_config.training.validation_selection",
+    )
+    best = _mapping(
+        training_state["validation"]["best"], "checkpoint.training_state.validation.best"
+    )
+    for key in ("primary_metric", "tie_breaker_metric"):
+        _compare(selection.get(key), best.get(key), f"checkpoint.validation_selection.{key}")
 
     if expected_config is not None:
         _compare(

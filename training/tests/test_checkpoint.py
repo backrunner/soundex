@@ -13,7 +13,7 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset, WeightedRandomSampler
 
 from checkpoint import CheckpointSchemaError, load_checkpoint, validate_checkpoint
-from checkpoint_state import capture_rng_state, restore_rng_state
+from checkpoint_state import canonical_sha256, capture_rng_state, restore_rng_state
 
 
 def _assert_nested_equal(expected: Any, actual: Any) -> None:
@@ -175,3 +175,14 @@ def test_current_schema_requires_matching_validation_state(checkpoint_factory) -
     mismatch["training_state"]["validation"]["manifest_sha256"] = "b" * 64
     with pytest.raises(CheckpointSchemaError, match="does not match checkpoint data"):
         validate_checkpoint(mismatch)
+
+
+def test_selection_policy_is_bound_to_resolved_config(checkpoint_factory) -> None:
+    _, checkpoint = checkpoint_factory()
+    checkpoint["resolved_config"]["training"]["validation_selection"] = {
+        "primary_metric": "total",
+        "tie_breaker_metric": "high_band_magnitude",
+    }
+    checkpoint["hashes"]["resolved_config_sha256"] = canonical_sha256(checkpoint["resolved_config"])
+    with pytest.raises(CheckpointSchemaError, match=r"validation_selection\.primary_metric"):
+        validate_checkpoint(checkpoint)

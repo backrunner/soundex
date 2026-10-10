@@ -1,6 +1,8 @@
 """Train SoundEx on paired degraded and clean audio."""
 
 import argparse
+import hashlib
+import io
 import os
 import random
 from collections import defaultdict
@@ -15,10 +17,12 @@ from torch.utils.tensorboard import SummaryWriter
 
 from checkpoint import (
     build_checkpoint,
+    feature_contract_from_config,
     load_checkpoint,
     save_checkpoint,
+    validate_checkpoint,
 )
-from checkpoint_state import build_dataset_provenance, restore_rng_state
+from checkpoint_state import build_dataset_provenance, capture_provenance, restore_rng_state
 from configuration import load_config
 from data.dataset import DatasetSourceSpec, create_balanced_dataloaders, set_dataset_epoch
 from data.protocol import MANIFEST_NAME, DataRecipe, validate_data_config
@@ -263,6 +267,42 @@ def set_requires_grad(module: torch.nn.Module, enabled: bool) -> None:
         parameter.requires_grad_(enabled)
 
 
+def initialize_generator_from_checkpoint(
+    path: str | Path,
+    generator: SoundExGenerator,
+    config: dict[str, Any],
+    data_provenance: dict[str, Any],
+) -> dict[str, Any]:
+    """Start a new optimizer trajectory with explicit, compatible parent weights."""
+    payload = Path(path).read_bytes()
+    parent = validate_checkpoint(
+        torch.load(io.BytesIO(payload), map_location="cpu", weights_only=True),
+        expected_data=data_provenance,
+    )
+    if parent["model"]["generator_config"] != config["model"]["generator"]:
+        raise ValueError("generator initialization architecture differs from parent")
+    if parent["feature_contract"] != feature_contract_from_config(config):
+        raise ValueError("generator initialization feature contract differs from parent")
+    state = parent["model"]["generator_state"]
+    if any(
+        not torch.isfinite(value).all().item()
+        for value in state.values()
+        if isinstance(value, torch.Tensor) and (value.is_floating_point() or value.is_complex())
+    ):
+        raise ValueError("generator initialization contains non-finite parameters")
+    generator.load_state_dict(state, strict=True)
+    return {
+        "mode": "generator-only-warm-start",
+        "parent_checkpoint_sha256": hashlib.sha256(payload).hexdigest(),
+        "parent_epoch": int(parent["training_state"]["epoch"]),
+        "parent_recipe_sha256": parent["data"]["recipe_sha256"],
+        "parent_manifest_set_sha256": parent["data"]["manifest_set_sha256"],
+        "parent_source_git_sha": parent["provenance"]["source_git_sha"],
+        "parent_initialization": parent["provenance"].get("initialization"),
+        "optimizers_and_discriminator": "fresh; parent state not imported",
+    }
+
+
 def build_lr_scheduler(
     optimizer: torch.optim.Optimizer,
     *,
@@ -320,7 +360,11 @@ def train_one_epoch(
     discriminator.train()
     generator_totals: defaultdict[str, float] = defaultdict(float)
     discriminator_total = 0.0
-    use_gan = epoch > int(training_config.get("warmup_epochs", 50))
+    objective = training_config["objective"]
+    use_gan = epoch > int(training_config.get("warmup_epochs", 50)) and (
+        float(objective["adversarial_weight"]) > 0
+        or float(objective["feature_matching_weight"]) > 0
+    )
 
     for batch_index, batch in enumerate(train_loader):
         degraded = batch["degraded"].to(device, non_blocking=True)
@@ -461,7 +505,13 @@ def main() -> None:
     """Parse configuration and run the complete training loop."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/default.yaml")
-    parser.add_argument("--resume")
+    initialization = parser.add_mutually_exclusive_group()
+    initialization.add_argument("--resume")
+    initialization.add_argument(
+        "--initialize-generator-from",
+        type=Path,
+        help="New run from compatible parent generator only; optimizer and discriminator reset",
+    )
     parser.add_argument(
         "--paths-manifest",
         type=Path,
@@ -559,7 +609,15 @@ def main() -> None:
         raise ValueError("validation and checkpoint intervals must be positive")
     start_epoch = 1
     global_step = 0
-    best_tracker = BestCheckpointTracker()
+    selection = config["training"].get("validation_selection", {})
+    best_tracker = BestCheckpointTracker(**selection)
+    provenance = capture_provenance()
+    provenance["initialization"] = {"mode": "fresh-random"}
+    if args.initialize_generator_from:
+        provenance["initialization"] = initialize_generator_from_checkpoint(
+            args.initialize_generator_from, generator, config, data_provenance
+        )
+        print(f"Generator initialization: {provenance['initialization']}")
     last_validation_report: dict[str, Any] | None = None
     last_validation_epoch = 0
     if args.resume:
@@ -590,6 +648,9 @@ def main() -> None:
         last_validation_report = dict(saved_validation["report"])
         last_validation_epoch = int(saved_validation["last_epoch"])
         restore_rng_state(checkpoint["rng_state"], train_loader)
+        provenance["initialization"] = checkpoint["provenance"].get(
+            "initialization", {"mode": "legacy-checkpoint-resume"}
+        )
 
     gen_loss_fn = GeneratorLoss.from_config(
         config["training"]["objective"],
@@ -665,6 +726,7 @@ def main() -> None:
             data_provenance=data_provenance,
             validation_state=validation_state,
             train_loader=train_loader,
+            provenance=provenance,
         )
         checkpoint_dir = Path("checkpoints")
         save_checkpoint(checkpoint, checkpoint_dir / "final-resume.pth")

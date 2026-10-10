@@ -108,6 +108,20 @@ def test_resume_keeps_absolute_validation_schedule() -> None:
     assert should_run_validation(10, 5)
 
 
+def test_balanced_selection_rejects_magnitude_gain_with_worse_total() -> None:
+    tracker = BestCheckpointTracker(
+        primary_metric="total", tie_breaker_metric="high_band_magnitude"
+    )
+    assert tracker.consider(1, {"total": 2.0, "high_band_magnitude": 10.0})
+    assert not tracker.consider(2, {"total": 2.1, "high_band_magnitude": 9.0})
+    assert tracker.consider(3, {"total": 1.9, "high_band_magnitude": 10.1})
+    assert tracker.consider(4, {"total": 1.9, "high_band_magnitude": 10.0})
+    assert not tracker.consider(5, {"total": 1.9, "high_band_magnitude": 10.0})
+    assert BestCheckpointTracker.from_state_dict(tracker.state_dict()).state_dict() == (
+        tracker.state_dict()
+    )
+
+
 def test_validation_state_binds_report_to_manifest() -> None:
     report = aggregate_validation_rows([_row("row-a", 1.0, 0.1, "musdb18_hq")])
     tracker = BestCheckpointTracker()

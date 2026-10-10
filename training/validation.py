@@ -76,24 +76,33 @@ def should_run_validation(epoch: int, interval_epochs: int) -> bool:
 
 @dataclass
 class BestCheckpointTracker:
-    """Select lower high-band loss, then lower low-band identity loss."""
+    """Select the configured metric pair, retaining the legacy default policy."""
 
     best_epoch: int | None = None
     best_metrics: dict[str, float] = field(default_factory=dict)
+    primary_metric: str = PRIMARY_METRIC
+    tie_breaker_metric: str = TIE_BREAKER_METRIC
+
+    def __post_init__(self) -> None:
+        if (self.primary_metric, self.tie_breaker_metric) not in {
+            (PRIMARY_METRIC, TIE_BREAKER_METRIC),
+            ("total", PRIMARY_METRIC),
+        }:
+            raise ValueError("unsupported validation selection policy")
 
     def consider(self, epoch: int, metrics: dict[str, Any]) -> bool:
         """Record a candidate and return whether it is the new best."""
         if epoch < 1:
             raise ValueError("epoch must be positive")
         candidate = _finite_metrics(metrics)
-        for name in (PRIMARY_METRIC, TIE_BREAKER_METRIC):
+        for name in (self.primary_metric, self.tie_breaker_metric):
             if name not in candidate:
                 raise ValueError(f"best checkpoint metric {name!r} is missing")
-        candidate_key = (candidate[PRIMARY_METRIC], candidate[TIE_BREAKER_METRIC])
+        candidate_key = (candidate[self.primary_metric], candidate[self.tie_breaker_metric])
         if self.best_epoch is not None:
             best_key = (
-                self.best_metrics[PRIMARY_METRIC],
-                self.best_metrics[TIE_BREAKER_METRIC],
+                self.best_metrics[self.primary_metric],
+                self.best_metrics[self.tie_breaker_metric],
             )
             if candidate_key >= best_key:
                 return False
@@ -104,8 +113,8 @@ class BestCheckpointTracker:
     def state_dict(self) -> dict[str, Any]:
         """Return a weights-only-safe state mapping."""
         return {
-            "primary_metric": PRIMARY_METRIC,
-            "tie_breaker_metric": TIE_BREAKER_METRIC,
+            "primary_metric": self.primary_metric,
+            "tie_breaker_metric": self.tie_breaker_metric,
             "best_epoch": self.best_epoch,
             "best_metrics": dict(self.best_metrics),
         }
@@ -113,18 +122,18 @@ class BestCheckpointTracker:
     @classmethod
     def from_state_dict(cls, state: dict[str, Any]) -> BestCheckpointTracker:
         """Restore and validate checkpointed selection state."""
-        if state.get("primary_metric") != PRIMARY_METRIC:
-            raise ValueError("checkpoint validation primary metric is incompatible")
-        if state.get("tie_breaker_metric") != TIE_BREAKER_METRIC:
-            raise ValueError("checkpoint validation tie-breaker metric is incompatible")
+        policy = {
+            "primary_metric": str(state.get("primary_metric")),
+            "tie_breaker_metric": str(state.get("tie_breaker_metric")),
+        }
+        tracker = cls(**policy)
         best_epoch = state.get("best_epoch")
         metrics = _finite_metrics(state.get("best_metrics", {}))
         if best_epoch is None:
             if metrics:
                 raise ValueError("checkpoint has best metrics without a best epoch")
-            return cls()
+            return tracker
         epoch = int(best_epoch)
-        tracker = cls()
         if not tracker.consider(epoch, metrics):
             raise ValueError("invalid best checkpoint state")
         return tracker

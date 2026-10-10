@@ -135,6 +135,9 @@ def deployment_waveform_loss(
     fft_size: int,
     hop_size: int,
     waveform_region: str = "full",
+    normalization: str = "none",
+    normalization_floor: float = 1e-4,
+    relative_floor: float = 0.01,
 ) -> torch.Tensor:
     """Return L1 for the differentiable crossover, phase blend, and causal OLA proxy.
 
@@ -156,7 +159,21 @@ def deployment_waveform_loss(
             target_waveform = target_waveform[:, edge:-edge]
     elif waveform_region != "full":
         raise ValueError("waveform_region must be 'full' or 'steady_state'")
-    return F.l1_loss(predicted_waveform, target_waveform)
+    if normalization == "none":
+        return F.l1_loss(predicted_waveform, target_waveform)
+    if normalization != "baseline_error":
+        raise ValueError("unsupported waveform normalization")
+    errors = (predicted_waveform - target_waveform).abs().mean(dim=-1)
+    # A value of one means the same waveform error as leaving this source dry.
+    # Detached per-recording scales cannot be gamed by the generator. Relative
+    # and absolute floors bound the gradient on near-identical and silent input.
+    baseline_waveform = causal_overlap_add(degraded, fft_size=fft_size, hop_size=hop_size)
+    if waveform_region == "steady_state" and edge:
+        baseline_waveform = baseline_waveform[:, edge:-edge]
+    baseline_error = (baseline_waveform - target_waveform).abs().mean(dim=-1)
+    target_rms = target_waveform.square().mean(dim=-1).sqrt()
+    scale = baseline_error.maximum(target_rms * relative_floor).clamp_min(normalization_floor)
+    return (errors / scale.detach()).mean()
 
 
 class GeneratorLoss(nn.Module):
@@ -177,6 +194,10 @@ class GeneratorLoss(nn.Module):
         fft_size: int = 1024,
         hop_size: int = 512,
         waveform_region: str = "full",
+        objective_version: int = 1,
+        magnitude_scale_db: float = 20.0,
+        waveform_normalization_floor: float = 1e-4,
+        waveform_relative_floor: float = 0.01,
     ) -> None:
         super().__init__()
         self.high_band_weight = high_band_weight
@@ -193,6 +214,30 @@ class GeneratorLoss(nn.Module):
         if waveform_region not in {"full", "steady_state"}:
             raise ValueError("waveform_region must be 'full' or 'steady_state'")
         self.waveform_region = waveform_region
+        if objective_version not in {1, 2}:
+            raise ValueError("objective_version must be 1 or 2")
+        for name, value in {
+            "magnitude_scale_db": magnitude_scale_db,
+            "waveform_normalization_floor": waveform_normalization_floor,
+            "waveform_relative_floor": waveform_relative_floor,
+        }.items():
+            if not math.isfinite(value) or value <= 0:
+                raise ValueError(f"{name} must be finite and positive")
+        for name, value in {
+            "high_band_weight": high_band_weight,
+            "phase_weight": phase_weight,
+            "low_band_identity_weight": low_band_identity_weight,
+            "crossover_weight": crossover_weight,
+            "waveform_weight": waveform_weight,
+            "adversarial_weight": adversarial_weight,
+            "feature_matching_weight": feature_matching_weight,
+        }.items():
+            if not math.isfinite(value) or value < 0:
+                raise ValueError(f"{name} must be finite and non-negative")
+        self.objective_version = objective_version
+        self.magnitude_scale_db = magnitude_scale_db
+        self.waveform_normalization_floor = waveform_normalization_floor
+        self.waveform_relative_floor = waveform_relative_floor
 
     @classmethod
     def from_config(
@@ -216,6 +261,10 @@ class GeneratorLoss(nn.Module):
             fft_size=fft_size,
             hop_size=hop_size,
             waveform_region=str(objective.get("waveform_region", "full")),
+            objective_version=int(objective.get("version", 1)),
+            magnitude_scale_db=float(objective.get("magnitude_scale_db", 20.0)),
+            waveform_normalization_floor=float(objective.get("waveform_normalization_floor", 1e-4)),
+            waveform_relative_floor=float(objective.get("waveform_relative_floor", 0.01)),
         )
 
     def forward(
@@ -231,7 +280,8 @@ class GeneratorLoss(nn.Module):
         _validate_feature_pair(predicted, target)
         _validate_feature_pair(predicted, degraded)
         mask = _feature_weight(missing_band_mask, predicted[:, 0])
-        high_band_magnitude = _weighted_mean((predicted[:, 0] - target[:, 0]).abs(), mask)
+        mean = _recording_weighted_mean if self.objective_version == 2 else _weighted_mean
+        high_band_magnitude = mean((predicted[:, 0] - target[:, 0]).abs(), mask)
 
         target_magnitude = torch.pow(10.0, target[:, 0].clamp(-200.0, 100.0) / 20.0)
         peak = target_magnitude.amax(dim=-1, keepdim=True)
@@ -242,14 +292,14 @@ class GeneratorLoss(nn.Module):
         )
         phase_weights = mask * relative_energy * meaningful.to(mask.dtype)
         phase_delta = predicted[:, 1] - target[:, 1]
-        phase = _weighted_mean(1.0 - torch.cos(phase_delta), phase_weights)
+        phase = mean(1.0 - torch.cos(phase_delta), phase_weights)
 
-        low_band_identity = _weighted_mean((predicted[:, 0] - degraded[:, 0]).abs(), 1.0 - mask)
+        low_band_identity = mean((predicted[:, 0] - degraded[:, 0]).abs(), 1.0 - mask)
         residual = predicted[:, 0] - degraded[:, 0]
         residual_gradient = (residual[..., 1:] - residual[..., :-1]).abs()
         transition = 4.0 * mask * (1.0 - mask)
         transition_edges = torch.maximum(transition[..., 1:], transition[..., :-1])
-        crossover = _weighted_mean(residual_gradient, transition_edges)
+        crossover = mean(residual_gradient, transition_edges)
         waveform = deployment_waveform_loss(
             predicted,
             target,
@@ -258,6 +308,22 @@ class GeneratorLoss(nn.Module):
             fft_size=self.fft_size,
             hop_size=self.hop_size,
             waveform_region=self.waveform_region,
+        )
+        waveform_relative = (
+            deployment_waveform_loss(
+                predicted,
+                target,
+                degraded,
+                missing_band_mask,
+                fft_size=self.fft_size,
+                hop_size=self.hop_size,
+                waveform_region=self.waveform_region,
+                normalization="baseline_error",
+                normalization_floor=self.waveform_normalization_floor,
+                relative_floor=self.waveform_relative_floor,
+            )
+            if self.objective_version == 2
+            else waveform
         )
 
         zero = predicted.new_zeros(())
@@ -283,16 +349,18 @@ class GeneratorLoss(nn.Module):
                     feature_count += 1
             feature_matching = feature_matching / max(feature_count, 1)
 
+        db_scale = self.magnitude_scale_db if self.objective_version == 2 else 1.0
+        phase_scale = 2.0 if self.objective_version == 2 else 1.0
         total = (
-            self.high_band_weight * high_band_magnitude
-            + self.phase_weight * phase
-            + self.low_band_identity_weight * low_band_identity
-            + self.crossover_weight * crossover
-            + self.waveform_weight * waveform
+            self.high_band_weight * high_band_magnitude / db_scale
+            + self.phase_weight * phase / phase_scale
+            + self.low_band_identity_weight * low_band_identity / db_scale
+            + self.crossover_weight * crossover / db_scale
+            + self.waveform_weight * waveform_relative
             + self.adversarial_weight * adversarial
             + self.feature_matching_weight * feature_matching
         )
-        return {
+        result = {
             "total": total,
             "high_band_magnitude": high_band_magnitude,
             "phase": phase,
@@ -302,6 +370,9 @@ class GeneratorLoss(nn.Module):
             "adversarial": adversarial,
             "feature_matching": feature_matching,
         }
+        if self.objective_version == 2:
+            result["waveform_relative"] = waveform_relative
+        return result
 
 
 class DiscriminatorLoss(nn.Module):
@@ -345,3 +416,11 @@ def _weighted_mean(value: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
     if float(denominator.detach()) == 0.0:
         return value.new_zeros(())
     return (value * weight).sum() / denominator
+
+
+def _recording_weighted_mean(value: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
+    """Normalize each source independently; band width must not alter draw mass."""
+    dimensions = tuple(range(1, value.ndim))
+    numerator = (value * weight).sum(dim=dimensions)
+    denominator = weight.sum(dim=dimensions)
+    return (numerator / denominator.clamp_min(1e-12)).mean()
