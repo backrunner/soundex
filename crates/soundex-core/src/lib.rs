@@ -36,7 +36,7 @@ pub mod realtime_policy;
 pub mod stream;
 
 pub use analysis::{analyze_buffer, AnalysisInfo};
-pub use config::SoundExConfig;
+pub use config::{EnhancementMode, SoundExConfig};
 pub use error::{Result, SoundExError};
 pub use processor::{ProcessInfo, SoundExProcessor, StreamProgress};
 pub use realtime::{RealtimeProcessor, RealtimeStats, RealtimeWorkerStats};

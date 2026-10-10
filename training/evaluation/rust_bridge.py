@@ -60,9 +60,12 @@ class RustStreamEvaluator:
         fft_size: int = 256,
         hop_size: int = 128,
         crossover_width_hz: float = 1000.0,
+        enhancement_mode: str = "neural",
     ) -> RustEvaluationOutput:
         """Run one offline or chunked evaluation and return aligned audio/report."""
         self.ensure_available()
+        if enhancement_mode not in {"neural", "spectral", "hybrid"}:
+            raise ValueError("enhancement_mode must be neural, spectral or hybrid")
         with tempfile.TemporaryDirectory(prefix="soundex-eval-") as directory:
             root = Path(directory)
             input_path = root / "input.sxa"
@@ -89,6 +92,7 @@ class RustStreamEvaluator:
                     "SOUNDEX_EVAL_FFT_SIZE": str(fft_size),
                     "SOUNDEX_EVAL_HOP_SIZE": str(hop_size),
                     "SOUNDEX_EVAL_CROSSOVER_WIDTH_HZ": str(crossover_width_hz),
+                    "SOUNDEX_EVAL_ENHANCEMENT_MODE": enhancement_mode,
                 }
             )
             result = subprocess.run(
@@ -112,6 +116,8 @@ class RustStreamEvaluator:
             )
         if int(report.get("schema_version", 0)) != 1 or report.get("mode") != mode:
             raise RuntimeError("Rust stream report schema or mode mismatch")
+        if report.get("enhancement_mode", "neural") != enhancement_mode:
+            raise RuntimeError("Rust stream report enhancement mode mismatch")
         if not bool(report.get("processor", {}).get("output_finite", False)):
             raise RuntimeError("Rust stream report did not certify finite output")
         return RustEvaluationOutput(audio=enhanced, report=report)

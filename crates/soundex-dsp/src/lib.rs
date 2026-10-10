@@ -12,6 +12,7 @@
 
 pub mod bandwidth;
 pub mod crossover;
+pub mod extension;
 pub mod limiter;
 pub mod loudness;
 pub mod phase;

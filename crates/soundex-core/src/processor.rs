@@ -4,7 +4,7 @@ use ndarray::{s, Array4};
 use soundex_dsp::limiter::Limiter;
 
 use crate::channel::ChannelProcessor;
-use crate::config::SoundExConfig;
+use crate::config::{EnhancementMode, SoundExConfig};
 use crate::error::{Result, SoundExError};
 use crate::inference::InferenceEngine;
 use crate::stream::{latency_hops, CausalHopIter};
@@ -12,7 +12,7 @@ use crate::stream::{latency_hops, CausalHopIter};
 /// Information about the most recently processed frame.
 #[derive(Debug, Clone, Copy)]
 pub struct ProcessInfo {
-    /// Whether all channels bypassed model enhancement for this frame.
+    /// Whether all channels bypassed spectral enhancement for this frame.
     pub bypassed: bool,
     /// Lowest detected effective bandwidth across channels, in Hz.
     pub detected_bandwidth_hz: f32,
@@ -151,7 +151,7 @@ impl GateMixer {
 /// Streaming-capable SoundEx audio enhancement processor.
 pub struct SoundExProcessor {
     config: SoundExConfig,
-    engine: InferenceEngine,
+    engine: Option<InferenceEngine>,
     channels: Vec<ChannelProcessor>,
     gate: GateMixer,
     dry_limiter: Limiter,
@@ -172,10 +172,15 @@ pub struct SoundExProcessor {
 }
 
 impl SoundExProcessor {
-    /// Create a processor and load the configured ONNX model.
+    /// Create a processor. Neural/hybrid modes load the configured ONNX model;
+    /// the experimental spectral mode needs no model or inference backend.
     pub fn new(config: SoundExConfig) -> Result<Self> {
         validate_config(&config)?;
-        let engine = InferenceEngine::load(&config.model_path, &config)?;
+        let engine = if config.enhancement_mode == EnhancementMode::Spectral {
+            None
+        } else {
+            Some(InferenceEngine::load(&config.model_path, &config)?)
+        };
         let channels = (0..config.channels)
             .map(|_| ChannelProcessor::new(&config))
             .collect();
@@ -432,9 +437,14 @@ impl SoundExProcessor {
     }
 
     /// Replace the model used for subsequent frames and reset stream state.
+    /// Spectral mode only stores the path and resets; it does not load a model.
     pub fn reload_model(&mut self, model_path: impl Into<std::path::PathBuf>) -> Result<()> {
         let path = model_path.into();
-        let engine = InferenceEngine::load(&path, &self.config)?;
+        let engine = if self.config.enhancement_mode == EnhancementMode::Spectral {
+            None
+        } else {
+            Some(InferenceEngine::load(&path, &self.config)?)
+        };
         self.engine = engine;
         self.config.model_path = path;
         self.reset();
@@ -455,7 +465,7 @@ impl SoundExProcessor {
         self.chunk_latency_to_discard = self.latency_samples_per_channel() * self.channel_count();
     }
 
-    /// Return whether the latest processed frame bypassed model enhancement.
+    /// Return whether the latest processed frame bypassed spectral enhancement.
     pub fn is_bypassed(&self) -> bool {
         self.last_info.bypassed
     }
@@ -482,7 +492,7 @@ impl SoundExProcessor {
 
     /// Number of ONNX Runtime runs issued since construction or model reload.
     pub fn inference_run_count(&self) -> u64 {
-        self.engine.run_count()
+        self.engine.as_ref().map_or(0, InferenceEngine::run_count)
     }
 
     fn process_hop_internal(&mut self, input: &[f32]) -> Result<ProcessInfo> {
@@ -499,7 +509,7 @@ impl SoundExProcessor {
 
         self.active_channels.clear();
         for (channel_index, channel) in self.channels.iter().enumerate() {
-            if channel.needs_enhancement() {
+            if channel.needs_enhancement() && self.engine.is_some() {
                 let batch_index = self.active_channels.len();
                 channel.write_model_input(&mut self.inference_input, batch_index);
                 self.active_channels.push(channel_index);
@@ -507,11 +517,14 @@ impl SoundExProcessor {
         }
         let active_count = self.active_channels.len();
         if active_count > 0 {
-            self.engine.infer_into(
-                self.inference_input.slice(s![..active_count, .., .., ..]),
-                self.inference_output
-                    .slice_mut(s![..active_count, .., .., ..]),
-            )?;
+            self.engine
+                .as_mut()
+                .expect("active channels require a model")
+                .infer_into(
+                    self.inference_input.slice(s![..active_count, .., .., ..]),
+                    self.inference_output
+                        .slice_mut(s![..active_count, .., .., ..]),
+                )?;
         }
 
         for channel_index in 0..channel_count {
@@ -745,7 +758,7 @@ mod tests {
             .hop_size(512)
             .channels(2);
         let mut processor = SoundExProcessor::new(config).unwrap();
-        processor.engine.fail_after_successes(0);
+        processor.engine.as_mut().unwrap().fail_after_successes(0);
         let input: Vec<f32> = (0..processor.hop_size())
             .flat_map(|sample| {
                 let value =

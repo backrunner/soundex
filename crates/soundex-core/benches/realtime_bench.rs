@@ -11,7 +11,7 @@ use std::{
 
 use serde_json::json;
 use sha2::{Digest, Sha256};
-use soundex_core::{realtime_policy as policy, RealtimeProcessor, SoundExConfig};
+use soundex_core::{realtime_policy as policy, EnhancementMode, RealtimeProcessor, SoundExConfig};
 
 const HOP: usize = policy::CALLBACK_FRAMES;
 
@@ -28,10 +28,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     let model = PathBuf::from(env::var("SOUNDEX_BENCH_MODEL")?).canonicalize()?;
     let report = PathBuf::from(env::var("SOUNDEX_REALTIME_REPORT")?);
     let selected_case = env::var("SOUNDEX_REALTIME_CASE").ok();
+    let enhancement_mode: EnhancementMode = env::var("SOUNDEX_ENHANCEMENT_MODE")
+        .unwrap_or_else(|_| "neural".into())
+        .parse()
+        .map_err(|error: &str| error.to_string())?;
     let producer_rt = match env::var("SOUNDEX_REALTIME_PRODUCER_RT").as_deref() {
         Ok("1") => true,
         Ok("0") | Err(_) => false,
         _ => return Err("SOUNDEX_REALTIME_PRODUCER_RT must be 0 or 1".into()),
+    };
+    let worker_rt = match env::var("SOUNDEX_REALTIME_WORKER_RT").as_deref() {
+        Ok("0") => false,
+        Ok("1") | Err(_) => true,
+        _ => return Err("SOUNDEX_REALTIME_WORKER_RT must be 0 or 1".into()),
     };
     if selected_case
         .as_deref()
@@ -60,7 +69,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             {
                 continue;
             }
-            let case = measure(&model, seconds, sample_rate, channels, producer_rt)?;
+            let case = measure(
+                &model,
+                seconds,
+                sample_rate,
+                channels,
+                producer_rt,
+                worker_rt,
+                enhancement_mode,
+            )?;
             println!(
                 "{} Hz / {} channels: {}",
                 sample_rate, channels, case.metadata["callback"]
@@ -70,6 +87,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "schema_version": 2,
                 "report_type": "soundex-paced-realtime-diagnostic",
                 "diagnostic": true,
+                "enhancement_mode": enhancement_mode.as_str(),
+                "model_loaded": enhancement_mode != EnhancementMode::Spectral,
                 "model_path": model,
                 "model_sha256": hash,
                 "model_size_bytes": fs::metadata(&model)?.len(),
@@ -78,6 +97,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "audio_device_tested": false,
                 "selected_case": selected_case,
                 "producer_audio_realtime_requested": producer_rt,
+                "worker_audio_realtime_requested": worker_rt,
                 "streaming_policy": {
                     "callback_frames": HOP,
                     "added_latency_target_ms": policy::ADDED_LATENCY_TARGET_MS,
@@ -100,11 +120,15 @@ fn measure(
     sample_rate: u32,
     channels: u16,
     producer_rt: bool,
+    worker_rt: bool,
+    enhancement_mode: EnhancementMode,
 ) -> Result<report::Case, Box<dyn Error>> {
     let mut config = SoundExConfig::with_model(model)
         .sample_rate(sample_rate)
         .channels(channels);
+    config.enhancement_mode = enhancement_mode;
     config.min_bandwidth_ratio = 1.0;
+    config.worker_time_constraint = worker_rt;
     let load_started = Instant::now();
     let mut processor = RealtimeProcessor::new(config)?;
     let load_ms = load_started.elapsed().as_secs_f64() * 1000.0;
@@ -228,6 +252,8 @@ fn measure(
                 "discarded_output_hops": worker.discarded_output_hops,
                 "max_queue_wait_us": worker.max_queue_wait_ns as f64 / 1000.0,
                 "max_processing_us": worker.max_processing_ns as f64 / 1000.0,
+                "queue_wait_p99_upper_bound_us": worker.queue_wait_p99_upper_bound_ns as f64 / 1000.0,
+                "processing_p99_upper_bound_us": worker.processing_p99_upper_bound_ns as f64 / 1000.0,
                 "processing_period_overruns": worker.processing_period_overruns,
             "macos_qos_applied": worker.macos_qos_applied,
             "macos_realtime_request_accepted": worker.macos_realtime_request_accepted,

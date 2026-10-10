@@ -12,8 +12,10 @@ import onnx
 import pytest
 
 import evaluation.performance as performance
+from evaluation.compare_extension import selected_rows
 from evaluation.gates import evaluate_release_gates, load_gate_config
 from evaluation.metrics import (
+    _flux_error,
     evaluate_signal_triplet,
     evaluate_stereo_image,
     scale_invariant_sdr,
@@ -34,6 +36,54 @@ from parity_metrics import PARITY_POLICY, POLICY_SHA256, REQUIRED_PARITY_CASES
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 GATE_CONFIG = Path(__file__).resolve().parents[1] / "evaluation" / "release_gates.v1.yaml"
+
+
+@pytest.mark.parametrize(
+    "selection",
+    [
+        {"split": "train", "row_ids": ["a"]},
+        {"split": "test", "row_ids": ["a"]},
+        {"split": "validation", "row_ids": []},
+        {"split": "validation", "row_ids": ["a", "a"]},
+    ],
+)
+def test_extension_diagnostic_requires_fixed_unique_validation_selection(
+    tmp_path: Path, selection: dict
+) -> None:
+    path = tmp_path / "selection.json"
+    path.write_text(json.dumps(selection))
+    with pytest.raises(ValueError, match="unique validation row_ids"):
+        selected_rows([], path)
+
+
+def test_high_flux_distinguishes_attacks_from_constant_high_band_energy() -> None:
+    reference = np.array([[0.0, 0.0], [0.0, 2.0], [0.0, 0.0], [0.0, 1.0]])
+    high = np.array([False, True])
+    assert _flux_error(reference, reference, high) == 0.0
+    assert _flux_error(np.ones_like(reference), reference, high) == pytest.approx(1.0)
+    assert _flux_error(np.zeros_like(reference), np.zeros_like(reference), high) == 0.0
+    assert _flux_error(reference, np.zeros_like(reference), high) == 1e6
+
+
+@pytest.mark.parametrize("enhancement_mode", ["spectral", "hybrid"])
+def test_rust_extension_bridge_binds_mode_and_keeps_chunks_aligned(enhancement_mode: str) -> None:
+    audio = np.sin(np.arange(5003, dtype=np.float32) * 0.17)[:, None] * 0.1
+    evaluator = RustStreamEvaluator()
+    model = REPOSITORY / "tests/fixtures/low-latency-identity.onnx"
+    offline = evaluator.process(
+        model, audio, 48000, mode="offline", enhancement_mode=enhancement_mode
+    )
+    chunked = evaluator.process(
+        model,
+        audio,
+        48000,
+        mode="chunked",
+        chunk_frames=(31, 128, 997),
+        enhancement_mode=enhancement_mode,
+    )
+    np.testing.assert_array_equal(offline.audio, chunked.audio)
+    assert offline.report["enhancement_mode"] == enhancement_mode
+    assert offline.report["processor"]["latency_samples_per_channel"] == 128
 
 
 def test_identical_and_silent_metrics_have_finite_expected_values() -> None:
