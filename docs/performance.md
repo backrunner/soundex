@@ -263,3 +263,28 @@ memory/speed advantage for the larger variant or physical-device acceptance.
 
 Quality rechecks do not justify promoting either candidate. Low runtime cost and
 continuous finite output do not establish correct restored detail or listening quality.
+
+
+## V6 deployment-aware continuation
+
+The [V6 experiment](deployment-refinement-20261011.md) retains the 806,276-parameter
+architecture and 3,309,786-byte ONNX. On this M5 Max, single-threaded ORT synchronous
+whole-hop p99 was 0.642–1.396 ms across 44.1/48 kHz mono/stereo, with peak RSS
+35.70 MiB. One sequential run does not establish a model-speed improvement.
+
+Four paced cases ran for **60 seconds each**, with real MP3-derived music PCM,
+startup prewarm and accepted producer/worker real-time scheduling. Added software
+latency was **5.3399–5.8129 ms**, callback p99 at most **2.500 µs**, callback maximum
+**7.917 µs**, with zero worker deadline misses and queue overflows. Output length,
+finite samples, continuity checks and enhancement availability passed. Raw timing
+and miss arrays were independently recomputed. Whole-process CPU was **32.08% of
+one core**, and peak RSS **41.11 MiB**, including the benchmark/report machinery.
+These are simulated callbacks, not physical-device or 30-minute release evidence.
+
+The first 60-second attempt stopped at EOF because the old PCM held only 31 seconds;
+it is archived and is not counted as a pass. The benchmark now checks available
+frames before measurement, including rounded hops and synchronous warmup. New
+61-second source crops match the old 31-second prefix byte for byte. Receipts live
+under `data/reports/deployment-refinement-20261011/{cost,realtime-pcm}/`;
+`cost-short-input-failed/` retains the failed attempt. The preflight fix changes
+the harness only, not SoundEx processing or callback behavior.

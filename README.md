@@ -25,6 +25,8 @@ reconstruction, amplitude/phase interactions and prepared real-time startup.
 The [V5 goal review](docs/goal-refinement-20261011.md) tests reconstructed energy
 calibration and circular phase features, with recording-held-out rechecks and
 explicit data-coverage limits. Experimental weights remain local.
+The [V6 deployment-aware continuation](docs/deployment-refinement-20261011.md)
+adds edge-gain matching and reconstructed transient supervision to the training proxy.
 
 ## Quick start
 

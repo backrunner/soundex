@@ -38,12 +38,19 @@ have been removed; their historical manifest and recipe receipts remain under
 `data/evidence/retired-corpora/`. Historical generated audio, duplicate periodic
 checkpoints and unused tool/cache copies are removed with deletion receipts.
 
-The latest [V5 experiments](goal-refinement-20261011.md) use
+The earlier [V5 experiments](goal-refinement-20261011.md) use
 `data/runs/{calibrated,circular}-continuation-20261011/`; their frozen source,
 resolved config, best/final checkpoints and logs remain local. Export/parity,
 development and recording-held-out comparisons, metric diagnostics, listening WAVs
 and resource receipts are under `data/reports/goal-refinement-20261011/`.
 The listening score sheet is unfilled; generated listening files are not listening evidence.
+
+The latest [V6 deployment-aware continuation](deployment-refinement-20261011.md)
+uses `data/runs/deployment-continuation-20261011/` and
+`data/reports/deployment-refinement-20261011/`. These contain the frozen source,
+resolved configuration, local checkpoints/export, validation and stream comparisons,
+proxy diagnostics and resource receipts. Training audio and experimental weights
+remain outside Git.
 
 Run the optional source audit before generating codec pairs:
 
