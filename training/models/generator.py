@@ -181,8 +181,11 @@ class SoundExGenerator(nn.Module):
         channels: list[int] | None = None,
         bottleneck_blocks: int = 2,
         expand_ratio: int = 4,
+        cross_stream_interactions: bool = False,
     ) -> None:
         super().__init__()
+        if not isinstance(cross_stream_interactions, bool):
+            raise ValueError("cross_stream_interactions must be a boolean")
         if channels is None:
             channels = [24, 48, 96, 96]
 
@@ -190,6 +193,18 @@ class SoundExGenerator(nn.Module):
         self.amp_stream = SpectralStream(channels, bottleneck_blocks, expand_ratio)
         # Phase stream
         self.phase_stream = SpectralStream(channels, bottleneck_blocks, expand_ratio)
+
+        # Optional simultaneous amplitude/phase interactions at encoder scales.
+        # Zero initialization preserves a migrated parent's exact predictions.
+        self.interactions = nn.ModuleList()
+        if cross_stream_interactions:
+            for width in channels:
+                pair = nn.ModuleList(
+                    [nn.Conv2d(width, width, 1, bias=False) for _ in range(2)]
+                )
+                for projection in pair:
+                    nn.init.zeros_(projection.weight)
+                self.interactions.append(pair)
 
         # Fusion layer
         self.fusion = nn.Sequential(
@@ -216,8 +231,11 @@ class SoundExGenerator(nn.Module):
         phase_in = x[:, 1:2, :, :]
 
         # Dual-stream prediction
-        amp_out = self.amp_stream(amp_in)
-        phase_out = self.phase_stream(phase_in)
+        if self.interactions:
+            amp_out, phase_out = self._interacting_streams(amp_in, phase_in)
+        else:
+            amp_out = self.amp_stream(amp_in)
+            phase_out = self.phase_stream(phase_in)
 
         # The streams are structurally identical and must remain shape-compatible.
         if amp_out.shape != phase_out.shape:
@@ -232,6 +250,29 @@ class SoundExGenerator(nn.Module):
         output = combined + residual
 
         return match_frequency_size(output, reference)
+
+    def _interacting_streams(
+        self, amplitude: torch.Tensor, phase: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        amplitude_skips, phase_skips = [], []
+        for amp_encoder, phase_encoder, pair in zip(
+            self.amp_stream.encoders, self.phase_stream.encoders, self.interactions, strict=True
+        ):
+            amp_encoded = amp_encoder(amplitude)
+            phase_encoded = phase_encoder(phase)
+            amplitude = amp_encoded + pair[0](phase_encoded)
+            phase = phase_encoded + pair[1](amp_encoded)
+            amplitude_skips.append(amplitude)
+            phase_skips.append(phase)
+        amplitude = self.amp_stream.bottleneck(amplitude)
+        phase = self.phase_stream.bottleneck(phase)
+        for index, (amp_decoder, phase_decoder) in enumerate(
+            zip(self.amp_stream.decoders, self.phase_stream.decoders, strict=True)
+        ):
+            skip_index = len(amplitude_skips) - 2 - index
+            amplitude = amp_decoder(amplitude, amplitude_skips[skip_index])
+            phase = phase_decoder(phase, phase_skips[skip_index])
+        return self.amp_stream.output_conv(amplitude), self.phase_stream.output_conv(phase)
 
     def count_parameters(self) -> int:
         """Count total trainable parameters."""

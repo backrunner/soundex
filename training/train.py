@@ -272,6 +272,8 @@ def initialize_generator_from_checkpoint(
     generator: SoundExGenerator,
     config: dict[str, Any],
     data_provenance: dict[str, Any],
+    *,
+    initialize_zero_interactions: bool = False,
 ) -> dict[str, Any]:
     """Start a new optimizer trajectory with explicit, compatible parent weights."""
     payload = Path(path).read_bytes()
@@ -279,7 +281,16 @@ def initialize_generator_from_checkpoint(
         torch.load(io.BytesIO(payload), map_location="cpu", weights_only=True),
         expected_data=data_provenance,
     )
-    if parent["model"]["generator_config"] != config["model"]["generator"]:
+    parent_architecture = dict(parent["model"]["generator_config"])
+    architecture = dict(config["model"]["generator"])
+    if initialize_zero_interactions:
+        if parent_architecture.get("cross_stream_interactions", False) or not architecture.get(
+            "cross_stream_interactions", False
+        ):
+            raise ValueError("zero-interaction migration needs a legacy parent and enabled target")
+        parent_architecture.pop("cross_stream_interactions", None)
+        architecture.pop("cross_stream_interactions", None)
+    if parent_architecture != architecture:
         raise ValueError("generator initialization architecture differs from parent")
     if parent["feature_contract"] != feature_contract_from_config(config):
         raise ValueError("generator initialization feature contract differs from parent")
@@ -290,9 +301,23 @@ def initialize_generator_from_checkpoint(
         if isinstance(value, torch.Tensor) and (value.is_floating_point() or value.is_complex())
     ):
         raise ValueError("generator initialization contains non-finite parameters")
-    generator.load_state_dict(state, strict=True)
+    added_keys: list[str] = []
+    if initialize_zero_interactions:
+        target_state = generator.state_dict()
+        added_keys = sorted(key for key in target_state if key.startswith("interactions."))
+        if not added_keys or set(target_state) - set(state) != set(added_keys):
+            raise ValueError("zero-interaction migration has unexpected state keys")
+        if set(state) - set(target_state) or any(
+            torch.count_nonzero(target_state[key]).item() for key in added_keys
+        ):
+            raise ValueError("interaction migration requires exactly zero new projections")
+        generator.load_state_dict({**state, **{key: target_state[key] for key in added_keys}}, strict=True)
+    else:
+        generator.load_state_dict(state, strict=True)
     return {
-        "mode": "generator-only-warm-start",
+        "mode": "generator-only-warm-start-zero-interactions"
+        if initialize_zero_interactions else "generator-only-warm-start",
+        "zero_initialized_state_keys": added_keys,
         "parent_checkpoint_sha256": hashlib.sha256(payload).hexdigest(),
         "parent_epoch": int(parent["training_state"]["epoch"]),
         "parent_recipe_sha256": parent["data"]["recipe_sha256"],
@@ -537,6 +562,11 @@ def main() -> None:
         help="New run from compatible parent generator only; optimizer and discriminator reset",
     )
     parser.add_argument(
+        "--initialize-zero-interactions",
+        action="store_true",
+        help="Explicitly migrate a legacy parent into zero-initialized cross-stream projections",
+    )
+    parser.add_argument(
         "--paths-manifest",
         type=Path,
         default=None,
@@ -547,6 +577,8 @@ def main() -> None:
     )
     args = parser.parse_args()
     config = load_config(args.config)
+    if args.initialize_zero_interactions and not args.initialize_generator_from:
+        parser.error("--initialize-zero-interactions requires --initialize-generator-from")
     if int(config["training"].get("context_frames", 1)) != 1:
         raise ValueError("training.context_frames must be 1 for stateless streaming inference")
     set_seed(int(config["training"].get("seed", 42)))
@@ -594,6 +626,7 @@ def main() -> None:
         channels=model_config["channels"],
         bottleneck_blocks=model_config["bottleneck_blocks"],
         expand_ratio=model_config["expand_ratio"],
+        cross_stream_interactions=model_config.get("cross_stream_interactions", False),
     ).to(device)
     configure_generator_training_mode(
         generator, str(config["training"].get("batch_norm_statistics", "update"))
@@ -642,7 +675,8 @@ def main() -> None:
     provenance["initialization"] = {"mode": "fresh-random"}
     if args.initialize_generator_from:
         provenance["initialization"] = initialize_generator_from_checkpoint(
-            args.initialize_generator_from, generator, config, data_provenance
+            args.initialize_generator_from, generator, config, data_provenance,
+            initialize_zero_interactions=args.initialize_zero_interactions,
         )
         print(f"Generator initialization: {provenance['initialization']}")
     last_validation_report: dict[str, Any] | None = None
