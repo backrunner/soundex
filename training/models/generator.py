@@ -199,9 +199,7 @@ class SoundExGenerator(nn.Module):
         self.interactions = nn.ModuleList()
         if cross_stream_interactions:
             for width in channels:
-                pair = nn.ModuleList(
-                    [nn.Conv2d(width, width, 1, bias=False) for _ in range(2)]
-                )
+                pair = nn.ModuleList([nn.Conv2d(width, width, 1, bias=False) for _ in range(2)])
                 for projection in pair:
                     nn.init.zeros_(projection.weight)
                 self.interactions.append(pair)

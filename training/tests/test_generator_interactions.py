@@ -26,7 +26,7 @@ def test_zero_interactions_preserve_parent_exactly_then_receive_gradients():
         for pair in model.interactions:
             for projection in pair:
                 projection.weight.add_(0.001)
-    independent = torch.cat([model(features[:, :, t:t+1]) for t in range(3)], dim=2)
+    independent = torch.cat([model(features[:, :, t : t + 1]) for t in range(3)], dim=2)
     torch.testing.assert_close(model(features), independent, rtol=1e-5, atol=1e-6)
     changed = features.clone()
     changed[:, :, 2] += 5
@@ -39,8 +39,10 @@ def test_interaction_migration_is_explicit_and_preserves_provenance(checkpoint_f
     config["model"]["generator"]["cross_stream_interactions"] = True
     c = config["model"]["generator"]
     model = SoundExGenerator(
-        channels=c["channels"], bottleneck_blocks=c["bottleneck_blocks"],
-        expand_ratio=c["expand_ratio"], cross_stream_interactions=True,
+        channels=c["channels"],
+        bottleneck_blocks=c["bottleneck_blocks"],
+        expand_ratio=c["expand_ratio"],
+        cross_stream_interactions=True,
     )
     with pytest.raises(ValueError, match="architecture"):
         initialize_generator_from_checkpoint(path, model, config, parent["data"])
