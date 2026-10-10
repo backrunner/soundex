@@ -6,7 +6,7 @@ use std::{
     path::PathBuf,
 };
 
-use soundex_core::{RealtimeProcessor, SoundExConfig, SoundExProcessor};
+use soundex_core::{EnhancementMode, RealtimeProcessor, SoundExConfig, SoundExProcessor};
 
 struct CountingAllocator;
 
@@ -121,4 +121,24 @@ fn realtime_callback_allocates_nothing_including_startup_and_saturated_fallback(
     assert_eq!(allocations, 0);
     assert!(output.iter().all(|sample| sample.is_finite()));
     processor.shutdown();
+}
+
+#[test]
+fn extension_paths_allocate_nothing_in_fixed_hop_processing() {
+    for mode in [EnhancementMode::Spectral, EnhancementMode::Hybrid] {
+        let mut config = SoundExConfig::with_model(model_path("low-latency-identity.onnx"))
+            .channels(2)
+            .enhancement_mode(mode);
+        config.min_bandwidth_ratio = 1.0;
+        let mut processor = SoundExProcessor::new(config).unwrap();
+        let input = stereo_tone(128);
+        let mut output = [0.0; 256];
+        for _ in 0..4 {
+            processor.process_frame(&input, &mut output).unwrap();
+        }
+        let (result, allocations) =
+            count_allocations(|| processor.process_frame(&input, &mut output));
+        result.unwrap();
+        assert_eq!(allocations, 0, "{mode:?}");
+    }
 }

@@ -67,6 +67,11 @@ fn run() -> Result<(), Box<dyn Error>> {
         .hop_size(env_value("SOUNDEX_EVAL_HOP_SIZE", 128_usize)?);
     let mut config = config;
     config.crossover_width_hz = env_value("SOUNDEX_EVAL_CROSSOVER_WIDTH_HZ", 1000.0_f32)?;
+    config.enhancement_mode = std::env::var("SOUNDEX_EVAL_ENHANCEMENT_MODE")
+        .unwrap_or_else(|_| "neural".into())
+        .parse()
+        .map_err(|error: &str| error.to_string())?;
+    let enhancement_mode = config.enhancement_mode.as_str();
     let analysis = analyze_buffer(&config, &audio.samples)?;
     let mut processor = SoundExProcessor::new(config)?;
     let latency = processor.latency_samples_per_channel();
@@ -104,6 +109,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             "{{\n",
             "  \"schema_version\": 1,\n",
             "  \"mode\": \"{}\",\n",
+            "  \"enhancement_mode\": \"{}\",\n",
             "  \"sample_rate\": {},\n",
             "  \"channels\": {},\n",
             "  \"frames\": {},\n",
@@ -122,6 +128,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             "}}\n"
         ),
         mode_name,
+        enhancement_mode,
         audio.sample_rate,
         audio.channels,
         audio.frames,

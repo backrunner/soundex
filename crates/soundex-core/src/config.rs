@@ -2,10 +2,47 @@
 
 use std::path::PathBuf;
 
+/// High-frequency candidate source. Every mode retains the common detection,
+/// crossover, causal overlap-add, wet/dry ramp and output safety stages.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EnhancementMode {
+    /// Existing neural candidate and DSP post-processing.
+    #[default]
+    Neural,
+    /// Experimental blind DSP extension; no model is loaded or invoked.
+    Spectral,
+    /// Experimental neural + broadband DSP candidate blend.
+    Hybrid,
+}
+
+impl EnhancementMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Neural => "neural",
+            Self::Spectral => "spectral",
+            Self::Hybrid => "hybrid",
+        }
+    }
+}
+
+impl std::str::FromStr for EnhancementMode {
+    type Err = &'static str;
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "neural" => Ok(Self::Neural),
+            "spectral" => Ok(Self::Spectral),
+            "hybrid" => Ok(Self::Hybrid),
+            _ => Err("enhancement mode must be neural, spectral or hybrid"),
+        }
+    }
+}
+
 /// Configuration for creating a [`SoundExProcessor`](crate::processor::SoundExProcessor).
 #[derive(Debug, Clone)]
 pub struct SoundExConfig {
-    /// Path to the ONNX model file.
+    /// Candidate path; experimental alternatives are opt-in.
+    pub enhancement_mode: EnhancementMode,
+    /// Path to the ONNX model file (unused in spectral mode).
     pub model_path: PathBuf,
 
     /// Audio sample rate in Hz (e.g., 44100, 48000).
@@ -49,6 +86,7 @@ pub struct SoundExConfig {
 impl Default for SoundExConfig {
     fn default() -> Self {
         Self {
+            enhancement_mode: EnhancementMode::Neural,
             model_path: PathBuf::from("soundex-v1.onnx"),
             sample_rate: 44100,
             channels: 1,
@@ -67,6 +105,10 @@ impl Default for SoundExConfig {
 }
 
 impl SoundExConfig {
+    pub fn enhancement_mode(mut self, mode: EnhancementMode) -> Self {
+        self.enhancement_mode = mode;
+        self
+    }
     /// Create a config with a specific model path, using defaults for everything else.
     pub fn with_model(path: impl Into<PathBuf>) -> Self {
         Self {

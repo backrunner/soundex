@@ -32,6 +32,10 @@ struct Args {
     #[arg(long, default_value = "models/soundex-v1.onnx")]
     model: PathBuf,
 
+    /// High-frequency candidate path (spectral and hybrid are experimental)
+    #[arg(long, default_value = "neural", value_parser = ["neural", "spectral", "hybrid"])]
+    enhancement_mode: String,
+
     /// Bypass detection threshold in dB
     #[arg(long, default_value_t = -60.0)]
     bypass_threshold: f32,
@@ -81,6 +85,7 @@ fn main() -> Result<()> {
     if args.verbose {
         eprintln!("Input:   {:?}", args.input);
         eprintln!("Model:   {:?}", args.model);
+        eprintln!("Mode:    {}", args.enhancement_mode);
         eprintln!("Output:  {:?}", output_path);
         eprintln!("Bits:    {}", args.bits);
         eprintln!(
@@ -115,6 +120,8 @@ fn main() -> Result<()> {
         .hop_size(args.hop_size)
         .crossover_width_hz(args.crossover_width_hz)
         .bypass_threshold_db(args.bypass_threshold);
+    let config =
+        config.enhancement_mode(args.enhancement_mode.parse().map_err(anyhow::Error::msg)?);
 
     if args.dry_run {
         let analysis = soundex_core::analyze_buffer(&config, &decoded.samples)?;
@@ -139,7 +146,7 @@ fn main() -> Result<()> {
     pb.set_message("Enhancing audio...");
 
     let mut processor = soundex_core::SoundExProcessor::new(config)
-        .with_context(|| format!("Failed to initialize model: {}", args.model.display()))?;
+        .with_context(|| format!("Failed to initialize {} processor", args.enhancement_mode))?;
     let enhanced_samples = processor.process_buffer(&decoded.samples)?;
 
     pb.finish_with_message("Enhancement complete.");

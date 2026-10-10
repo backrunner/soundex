@@ -53,6 +53,14 @@ def evaluate_signal_triplet(
         "enhanced_spectral_convergence": _spectral_convergence(
             enhanced_magnitude, clean_magnitude, None
         ),
+        "baseline_high_spectral_convergence": _spectral_convergence(
+            degraded_magnitude, clean_magnitude, high_mask
+        ),
+        "enhanced_high_spectral_convergence": _spectral_convergence(
+            enhanced_magnitude, clean_magnitude, high_mask
+        ),
+        "baseline_high_flux_error": _flux_error(degraded_magnitude, clean_magnitude, high_mask),
+        "enhanced_high_flux_error": _flux_error(enhanced_magnitude, clean_magnitude, high_mask),
         "baseline_high_band_energy_error_db": _energy_error_db(
             degraded_magnitude, clean_magnitude, high_mask
         ),
@@ -194,6 +202,22 @@ def _energy_error_db(predicted: np.ndarray, target: np.ndarray, mask: np.ndarray
     predicted_energy = float(np.mean(np.square(predicted[:, mask])))
     target_energy = float(np.mean(np.square(target[:, mask])))
     return abs(10.0 * math.log10((predicted_energy + 1e-20) / (target_energy + 1e-20)))
+
+
+def _flux_error(predicted: np.ndarray, target: np.ndarray, mask: np.ndarray) -> float:
+    """Relative error in positive high-band spectral flux (attack detail).
+
+    Compare adjacent-frame magnitude increases, not average energy: adding
+    constant hiss must not score as successful transient reconstruction. A
+    silent/steady reference has an explicit finite zero-or-mismatch convention.
+    """
+    actual = np.maximum(np.diff(predicted[:, mask], axis=0), 0.0)
+    reference = np.maximum(np.diff(target[:, mask], axis=0), 0.0)
+    error = float(np.linalg.norm(actual - reference))
+    scale = float(np.linalg.norm(reference))
+    if scale <= 1e-20:
+        return 0.0 if error <= 1e-20 else 1e6
+    return error / scale
 
 
 def _correlation(left: np.ndarray, right: np.ndarray) -> float:
