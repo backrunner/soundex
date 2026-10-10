@@ -214,6 +214,9 @@ class GeneratorLoss(nn.Module):
         reconstruction_high_complex_weight: float = 0.2,
         reconstruction_low_complex_weight: float = 1.0,
         spectral_consistency_weight: float = 0.1,
+        reconstruction_energy_weight: float = 1.0,
+        phase_frequency_gradient_weight: float = 0.0025,
+        phase_time_gradient_weight: float = 0.025,
     ) -> None:
         super().__init__()
         self.high_band_weight = high_band_weight
@@ -230,8 +233,8 @@ class GeneratorLoss(nn.Module):
         if waveform_region not in {"full", "steady_state"}:
             raise ValueError("waveform_region must be 'full' or 'steady_state'")
         self.waveform_region = waveform_region
-        if objective_version not in {1, 2, 3, 4}:
-            raise ValueError("objective_version must be 1, 2, 3 or 4")
+        if objective_version not in {1, 2, 3, 4, 5}:
+            raise ValueError("objective_version must be 1, 2, 3, 4 or 5")
         for name, value in {
             "magnitude_scale_db": magnitude_scale_db,
             "waveform_normalization_floor": waveform_normalization_floor,
@@ -255,6 +258,9 @@ class GeneratorLoss(nn.Module):
             "reconstruction_high_complex_weight": reconstruction_high_complex_weight,
             "reconstruction_low_complex_weight": reconstruction_low_complex_weight,
             "spectral_consistency_weight": spectral_consistency_weight,
+            "reconstruction_energy_weight": reconstruction_energy_weight,
+            "phase_frequency_gradient_weight": phase_frequency_gradient_weight,
+            "phase_time_gradient_weight": phase_time_gradient_weight,
         }.items():
             if not math.isfinite(value) or value < 0:
                 raise ValueError(f"{name} must be finite and non-negative")
@@ -270,6 +276,9 @@ class GeneratorLoss(nn.Module):
         self.reconstruction_high_complex_weight = reconstruction_high_complex_weight
         self.reconstruction_low_complex_weight = reconstruction_low_complex_weight
         self.spectral_consistency_weight = spectral_consistency_weight
+        self.reconstruction_energy_weight = reconstruction_energy_weight
+        self.phase_frequency_gradient_weight = phase_frequency_gradient_weight
+        self.phase_time_gradient_weight = phase_time_gradient_weight
         for name, value in {
             "magnitude_relative_floor_db": magnitude_relative_floor_db,
             "magnitude_absolute_floor_db": magnitude_absolute_floor_db,
@@ -319,6 +328,11 @@ class GeneratorLoss(nn.Module):
                 objective.get("reconstruction_low_complex_weight", 1.0)
             ),
             spectral_consistency_weight=float(objective.get("spectral_consistency_weight", 0.1)),
+            reconstruction_energy_weight=float(objective.get("reconstruction_energy_weight", 1.0)),
+            phase_frequency_gradient_weight=float(
+                objective.get("phase_frequency_gradient_weight", 0.0025)
+            ),
+            phase_time_gradient_weight=float(objective.get("phase_time_gradient_weight", 0.025)),
         )
 
     def forward(
@@ -457,7 +471,7 @@ class GeneratorLoss(nn.Module):
                 + self.reconstruction_high_weight
                 * inpainting["reconstruction_high_spectral_convergence"]
             )
-        if self.objective_version == 4:
+        if self.objective_version >= 4:
             consistency = reconstruction_complex_terms(
                 predicted,
                 target,
@@ -474,7 +488,105 @@ class GeneratorLoss(nn.Module):
                 + self.reconstruction_low_complex_weight * consistency["reconstruction_low_complex"]
                 + self.spectral_consistency_weight * consistency["spectral_consistency"]
             )
+        if self.objective_version >= 5:
+            reconstruction_energy = reconstruction_energy_terms(
+                predicted,
+                target,
+                degraded,
+                mask,
+                fft_size=self.fft_size,
+                hop_size=self.hop_size,
+                relative_floor=self.high_relative_floor,
+                absolute_floor=self.waveform_normalization_floor,
+            )
+            gradients = phase_gradient_terms(predicted[:, 1], target[:, 1], phase_weights)
+            result.update(reconstruction_energy)
+            result.update(gradients)
+            result["total"] = result["total"] + (
+                self.reconstruction_energy_weight
+                / db_scale
+                * (
+                    reconstruction_energy["reconstruction_high_energy"]
+                    + reconstruction_energy["reconstruction_subband_energy"]
+                )
+                / 2.0
+                + self.phase_frequency_gradient_weight
+                / phase_scale
+                * gradients["phase_frequency_gradient"]
+                + self.phase_time_gradient_weight / phase_scale * gradients["phase_time_gradient"]
+            )
         return result
+
+
+def phase_gradient_terms(
+    predicted: torch.Tensor, target: torch.Tensor, weight: torch.Tensor
+) -> dict[str, torch.Tensor]:
+    """Reference-relative circular phase differences; no penalty for real changes."""
+    delta = predicted - target
+    frequency = 1.0 - torch.cos(delta[..., 1:] - delta[..., :-1])
+    temporal = 1.0 - torch.cos(delta[:, 1:] - delta[:, :-1])
+    return {
+        "phase_frequency_gradient": _recording_weighted_mean(
+            frequency, torch.minimum(weight[..., 1:], weight[..., :-1])
+        ),
+        "phase_time_gradient": _recording_weighted_mean(
+            temporal, torch.minimum(weight[:, 1:], weight[:, :-1])
+        ),
+    }
+
+
+def reconstruction_energy_terms(
+    predicted: torch.Tensor,
+    target: torch.Tensor,
+    degraded: torch.Tensor,
+    mask: torch.Tensor,
+    *,
+    fft_size: int,
+    hop_size: int,
+    relative_floor: float,
+    absolute_floor: float,
+) -> dict[str, torch.Tensor]:
+    """V5: high-band and local envelope calibration after causal synthesis/reanalysis.
+
+    Power floors come only from the clean reference. Frequency groups are eight
+    bins (~1.4/1.5 kHz at FFT256); padded bins and empty high bands carry no weight.
+    This proxy still excludes the runtime edge-level matcher and online detector.
+    """
+    edge = fft_size - hop_size
+    if predicted.shape[2] < 3:
+        raise ValueError("reconstruction energy requires fully supported causal frames")
+    window = torch.hann_window(
+        fft_size, periodic=True, device=predicted.device, dtype=predicted.dtype
+    )
+    powers = []
+    for features in (blend_deployment_features(degraded, predicted, mask), target):
+        wave = causal_overlap_add(features, fft_size=fft_size, hop_size=hop_size)
+        if edge:
+            wave = wave[:, edge:-edge]
+        if wave.shape[-1] < fft_size:
+            raise ValueError("reconstruction energy requires more fully supported causal frames")
+        powers.append(torch.fft.rfft(wave.unfold(-1, fft_size, hop_size) * window).abs().square())
+    first = edge // hop_size
+    last = predicted.shape[2] - first if first else predicted.shape[2]
+    aligned = mask.expand_as(predicted[:, 0])[:, first:last]
+    floor = (powers[1].mean(dim=(1, 2)) * relative_floor**2).clamp_min(absolute_floor**2).detach()
+    count = aligned.sum(dim=(1, 2))
+    energy = [(power * aligned).sum(dim=(1, 2)) / count.clamp_min(1e-12) for power in powers]
+    high = (
+        10.0 * ((energy[0] + floor).log10() - (energy[1] + floor).log10()).abs() * (count > 0)
+    ).mean()
+    padding = (-aligned.shape[-1]) % 8
+    band_count = F.pad(aligned, (0, padding)).reshape(*aligned.shape[:2], -1, 8).sum(dim=(1, 3))
+    bands = [
+        F.pad(power * aligned, (0, padding)).reshape(*aligned.shape[:2], -1, 8).sum(dim=(1, 3))
+        / band_count.clamp_min(1e-12)
+        for power in powers
+    ]
+    difference = (
+        10.0 * ((bands[0] + floor[:, None]).log10() - (bands[1] + floor[:, None]).log10()).abs()
+    )
+    local = _recording_weighted_mean(difference, (band_count > 0).to(difference.dtype))
+    return {"reconstruction_high_energy": high, "reconstruction_subband_energy": local}
 
 
 def _relative_high_error(
