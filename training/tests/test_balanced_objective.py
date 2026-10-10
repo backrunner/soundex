@@ -5,7 +5,7 @@ import math
 import pytest
 import torch
 
-from models.losses import GeneratorLoss, deployment_waveform_loss
+from models.losses import GeneratorLoss, _blend_phase_like_runtime, deployment_waveform_loss
 from train import spectral_features
 
 
@@ -16,6 +16,20 @@ def _pair(gain: float = 1.0) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     target = spectral_features(clean[None], 256, 128)
     source = spectral_features(degraded[None], 256, 128)
     return source, target, torch.ones((1, 1, 1, 129))
+
+
+def test_antipodal_phase_fallback_has_finite_backward() -> None:
+    generator = torch.Generator().manual_seed(1)
+    original = (torch.rand(100_000, generator=generator) * 2 - 1) * torch.pi
+    predicted = (original + torch.pi).requires_grad_()
+    real = (original.cos() + predicted.detach().cos()) * 0.5
+    imag = (original.sin() + predicted.detach().sin()) * 0.5
+    assert ((real == 0) & (imag == 0)).any(), "exercise exact floating-point cancellation"
+    output = _blend_phase_like_runtime(original, predicted, torch.full_like(original, 0.5))
+    output.sum().backward()
+    assert torch.isfinite(output).all()
+    assert torch.isfinite(predicted.grad).all()
+    torch.testing.assert_close(predicted.grad, torch.full_like(original, 0.5), rtol=1e-5, atol=1e-6)
 
 
 def test_v2_band_width_cannot_change_another_recordings_draw_mass() -> None:

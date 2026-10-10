@@ -77,14 +77,20 @@ def _blend_phase_like_runtime(
     """Match Rust's unit-phasor interpolation, including its antipodal fallback."""
     blended_real = torch.cos(original) * (1.0 - weight) + torch.cos(predicted) * weight
     blended_imag = torch.sin(original) * (1.0 - weight) + torch.sin(predicted) * weight
-    phasor_phase = torch.atan2(blended_imag, blended_real)
+    norm_squared = blended_real.square() + blended_imag.square()
+    stable_phasor = norm_squared > torch.finfo(original.dtype).eps
+    # Keep the mathematically undefined zero-vector atan2 out of backward,
+    # rather than depending on the backend's zero-gradient convention.
+    phasor_phase = torch.atan2(
+        torch.where(stable_phasor, blended_imag, torch.zeros_like(blended_imag)),
+        torch.where(stable_phasor, blended_real, torch.ones_like(blended_real)),
+    )
 
     delta = torch.atan2(torch.sin(predicted - original), torch.cos(predicted - original))
     fallback = original + weight * delta
     fallback = torch.atan2(torch.sin(fallback), torch.cos(fallback))
-    norm_squared = blended_real.square() + blended_imag.square()
     intermediate = torch.where(
-        norm_squared > torch.finfo(original.dtype).eps,
+        stable_phasor,
         phasor_phase,
         fallback,
     )
