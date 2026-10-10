@@ -16,12 +16,23 @@ pub(super) fn spawn(
     samples: usize,
     sample_rate: u32,
     time_constraint: bool,
+    warmup: bool,
 ) -> Result<JoinHandle<()>> {
-    thread::Builder::new()
+    let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel(1);
+    let startup_control = Arc::clone(&control);
+    let worker = thread::Builder::new()
         .name("soundex-inference".into())
         .spawn(move || {
             let result = catch_unwind(AssertUnwindSafe(|| {
                 control.qos_applied.store(apply_qos(), Ordering::Relaxed);
+                if warmup {
+                    let started = Instant::now();
+                    let runs = processor.warm_up_inference()?;
+                    control.warmup_runs.store(runs, Ordering::Relaxed);
+                    control
+                        .warmup_ns
+                        .store(started.elapsed().as_nanos() as u64, Ordering::Relaxed);
+                }
                 let scheduling = Scheduling::new(sample_rate, time_constraint);
                 control
                     .realtime_applied
@@ -31,6 +42,8 @@ pub(super) fn spawn(
                 // Native RT preserves its quota; normal QoS uses bounded idle spin.
                 let mut wait = Wait::new(period, !scheduling.accepted());
                 let mut expected = Some(0);
+                // Control-thread construction rendezvous, never an audio callback wait.
+                let _ = ready_tx.send(());
                 while !control.stop.load(Ordering::Acquire) {
                     let Ok(mut packet) = queues.input.pop() else {
                         wait.idle();
@@ -90,8 +103,21 @@ pub(super) fn spawn(
             if !matches!(result, Ok(Ok(()))) {
                 control.failed.store(true, Ordering::Release);
             }
+            // Failed initialization also releases the constructor and leaves dry fallback live.
+            let _ = ready_tx.send(());
         })
-        .map_err(|error| SoundExError::ModelLoad(format!("cannot start inference worker: {error}")))
+        .map_err(|error| {
+            SoundExError::ModelLoad(format!("cannot start inference worker: {error}"))
+        })?;
+    if warmup {
+        if let Err(error) = ready_rx.recv_timeout(Duration::from_secs(10)) {
+            startup_control.stop.store(true, Ordering::Release);
+            return Err(SoundExError::ModelLoad(format!(
+                "inference worker initialization did not complete: {error}"
+            )));
+        }
+    }
+    Ok(worker)
 }
 
 fn expired(sequence: u64, control: &Control) -> bool {

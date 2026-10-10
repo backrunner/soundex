@@ -46,8 +46,12 @@ pub struct RealtimeStats {
 /// Worker scheduling diagnostics, read outside the audio callback.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct RealtimeWorkerStats {
-    /// Hops processed, including warmup and predictions that finished late.
+    /// Input hops processed, including DSP history warmup and late predictions.
     pub processed_hops: u64,
+    /// Inference-only initialization runs; excluded from input-hop timing/counters.
+    pub warmup_runs: u64,
+    /// Initialization inference wall time on the worker before real-time promotion.
+    pub warmup_ns: u64,
     /// Obsolete input hops skipped without spending inference time.
     pub discarded_input_hops: u64,
     /// Late predictions or predictions dropped from a full result queue.
@@ -82,7 +86,8 @@ pub struct RealtimeProcessor {
 }
 
 impl RealtimeProcessor {
-    /// Load and validate the model and start the worker outside the callback.
+    /// Load and validate the model, prewarm inference and await worker initialization.
+    /// All startup waits and allocations occur on this construction thread, outside callbacks.
     ///
     /// Returns an error for incompatible FFT/hop/sample rates, model failures,
     /// invalid configurations, or inability to create the worker thread.
@@ -105,6 +110,7 @@ impl RealtimeProcessor {
             HOP * config.channels as usize,
             config.sample_rate,
             config.worker_time_constraint,
+            config.realtime_warmup,
         )?;
         Ok(Self {
             state: AudioState::new(config.channels as usize, config.limiter_ceiling),
@@ -149,6 +155,8 @@ impl RealtimeProcessor {
     pub fn worker_stats(&self) -> RealtimeWorkerStats {
         RealtimeWorkerStats {
             processed_hops: self.control.processed.load(Ordering::Relaxed),
+            warmup_runs: self.control.warmup_runs.load(Ordering::Relaxed),
+            warmup_ns: self.control.warmup_ns.load(Ordering::Relaxed),
             discarded_input_hops: self.control.discarded_inputs.load(Ordering::Relaxed),
             discarded_output_hops: self.control.discarded_outputs.load(Ordering::Relaxed),
             max_queue_wait_ns: self.control.max_queue_wait_ns.load(Ordering::Relaxed),
