@@ -288,3 +288,30 @@ frames before measurement, including rounded hops and synchronous warmup. New
 under `data/reports/deployment-refinement-20261011/{cost,realtime-pcm}/`;
 `cost-short-input-failed/` retains the failed attempt. The preflight fix changes
 the harness only, not SoundEx processing or callback behavior.
+
+## Representation and capacity study
+
+The [architecture study](architecture-study-20261011.md) compares the unchanged
+806,276-parameter control with 905,734-parameter polar/gain-shape branches and a
+1,399,942-parameter gain-shape branch. The largest ONNX is 5,699,677 bytes (5.44 MiB),
+within the 2M / 8 MiB limits, and adds no lookahead or buffering.
+
+On the M5 Max with single-threaded CPU ORT, 48 synchronous runs interleaved four
+models across 44.1/48 kHz, mono/stereo and three repetitions. The selected large
+model's whole-hop p99 ranged from **0.710 to 1.501 ms**, versus **0.559 to 1.425 ms**
+for V6. These ranges span different cases; their endpoints are not a paired speed
+ratio. Peak process RSS was 44.16 versus 35.84 MiB.
+
+V6 and the selected candidate each completed four **60-second paced** cases using
+the same real MP3-derived PCM and startup prewarm. The candidate's conservative
+added software latency was **5.3417–5.8170 ms**, callback p99 at most **2.708 µs**,
+maximum **12.042 µs**, with zero worker deadline misses. All eight cases met latency,
+callback and enhancement-availability budgets; raw timings, miss bitmaps, hashes,
+finite output and frame counts were independently recomputed.
+
+Whole-process mean CPU was **37.97% of one core** for the candidate versus **29.53%**
+for V6; peak RSS was **48.55 versus 36.20 MiB**. This includes ORT/DSP, harness and
+report buffers. Project training/evaluation had ended, but other desktop apps were
+active; environment receipts are retained. These short simulations do not qualify
+physical devices, x86_64 or 30-minute operation. The quality tradeoffs keep all
+new weights experimental despite meeting this host's measured performance budgets.

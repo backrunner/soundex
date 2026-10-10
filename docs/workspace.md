@@ -58,6 +58,10 @@ under `experiments/{polar-small,shape-small,shape-large}/`, and evidence under
 `data/reports/architecture-study-20261011/`. The matched V6 control is reused with
 a fresh CPU validation/export/parity check. `progress.json` tracks training/export;
 `delivery-progress.json` tracks the subsequent Rust quality and cost checks.
+The [completed study report](architecture-study-20261011.md) records the selected
+hash, quality tradeoffs and measured budgets. Local blind-listening materials are
+under `data/reports/architecture-study-20261011/listening/`; their score sheet is
+unfilled and does not establish a listening pass.
 
 Run the optional source audit before generating codec pairs:
 

@@ -59,6 +59,14 @@ the 806,276-parameter architecture and T=1 runtime contract. The eight-epoch run
 selected epoch 4; all 13 export parity cases passed. Its weights remain local and
 experimental; original baseline weights are retained.
 
+The [representation/capacity study](../docs/architecture-study-20261011.md)
+adds an original bounded global spectral residual branch, with matched polar and
+circular gain/shape encodings. Three eight-epoch arms are complete, all passing
+13 export parity cases. Small variants have 905,734 parameters (3.55 MiB ONNX);
+the selected large variant has 1,399,942 parameters (5.44 MiB). The lower validation
+loss does not establish an overall quality win. These are local experimental
+weights, with unchanged data/parent lineage and no external pretrained teacher.
+
 Official releases require reviewed source grants and initialization under
 [TRAINING_DATA.md](../legal/TRAINING_DATA.md). Source approval, restoration quality,
 listening and real-time runtime/continuity evidence are all required before release.

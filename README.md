@@ -30,6 +30,8 @@ adds edge-gain matching and reconstructed transient supervision to the training 
 The [architecture research and capacity study](docs/architecture-research-20261011.md)
 reviews recent restoration methods against the streaming budget and tests bounded
 global spectral refinement with matched representation and capacity comparisons.
+All three new arms completed eight epochs; the [measured results](docs/architecture-study-20261011.md)
+show a lower validation loss, but no balanced quality win that warrants promotion.
 
 ## Quick start
 
