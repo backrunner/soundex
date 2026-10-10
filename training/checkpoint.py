@@ -114,7 +114,11 @@ def build_checkpoint(
             "architecture": {
                 "name": MODEL_ARCHITECTURE_NAME,
                 "major": MODEL_ARCHITECTURE_MAJOR,
-                "minor": 2
+                "minor": 3
+                if _mapping(model_config.get("generator"), "model.generator").get(
+                    "spectral_refiner"
+                )
+                else 2
                 if _mapping(model_config.get("generator"), "model.generator").get(
                     "circular_phase_features", False
                 )
