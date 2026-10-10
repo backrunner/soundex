@@ -113,6 +113,10 @@ pub struct SoundExConfig {
     /// Request macOS audio time-constraint scheduling for the inference worker.
     /// QoS is requested independently. Other platforms ignore this flag.
     pub worker_time_constraint: bool,
+
+    /// Prewarm inference and await worker initialization on the construction thread.
+    /// Disable only for startup diagnostics; this never waits in the callback.
+    pub realtime_warmup: bool,
 }
 
 impl Default for SoundExConfig {
@@ -133,6 +137,7 @@ impl Default for SoundExConfig {
             ort_inter_threads: 1,
             ort_parallel_execution: false,
             worker_time_constraint: true,
+            realtime_warmup: true,
         }
     }
 }

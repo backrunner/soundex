@@ -495,6 +495,32 @@ impl SoundExProcessor {
         self.engine.as_ref().map_or(0, InferenceEngine::run_count)
     }
 
+    /// Prepare both possible active-channel batches without advancing DSP history.
+    /// Only called by worker initialization, before real-time promotion and playback.
+    pub(crate) fn warm_up_inference(&mut self) -> Result<u64> {
+        let Some(engine) = &mut self.engine else {
+            return Ok(0);
+        };
+        self.inference_input
+            .slice_mut(s![.., 0, .., ..])
+            .fill(-60.0);
+        self.inference_input
+            .slice_mut(s![.., 1, .., ..])
+            .fill(0.125);
+        let before = engine.run_count();
+        for batch in 1..=self.config.channels as usize {
+            for _ in 0..4 {
+                engine.infer_into(
+                    self.inference_input.slice(s![..batch, .., .., ..]),
+                    self.inference_output.slice_mut(s![..batch, .., .., ..]),
+                )?;
+            }
+        }
+        self.inference_input.fill(0.0);
+        self.inference_output.fill(0.0);
+        Ok(engine.run_count() - before)
+    }
+
     fn process_hop_internal(&mut self, input: &[f32]) -> Result<ProcessInfo> {
         debug_assert_eq!(input.len(), self.hop_samples());
         let channel_count = self.channel_count();
@@ -710,6 +736,27 @@ mod tests {
             .map(|pair| (pair[1] - pair[0]).abs())
             .fold(0.0, f32::max);
         assert!(release_max_step <= theoretical_step_bound + 1e-6);
+    }
+
+    #[cfg(feature = "ort-backend")]
+    #[test]
+    fn inference_prewarm_does_not_advance_audio_or_dsp_history() {
+        let model = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/low-latency-identity.onnx");
+        let config = SoundExConfig::with_model(model).channels(2);
+        let mut warmed = SoundExProcessor::new(config.clone()).unwrap();
+        let mut cold = SoundExProcessor::new(config).unwrap();
+        assert_eq!(warmed.warm_up_inference().unwrap(), 8);
+        let input: Vec<f32> = (0..2048)
+            .flat_map(|frame| {
+                let signal = 0.2 * (frame as f32 * 0.057).sin();
+                [signal, -signal]
+            })
+            .collect();
+        assert_eq!(
+            warmed.process_buffer(&input).unwrap(),
+            cold.process_buffer(&input).unwrap()
+        );
     }
 
     #[test]

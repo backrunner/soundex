@@ -114,3 +114,22 @@ fn silence_clears_detector_hangover_and_stops_generator_runs() {
     assert_eq!(output, [0.0; 256]);
     assert!(processor.is_bypassed());
 }
+
+#[test]
+fn construction_prepares_both_batches_before_accepting_audio() {
+    let processor = RealtimeProcessor::new(config("low-latency-identity.onnx")).unwrap();
+    let worker = processor.worker_stats();
+    assert_eq!(worker.warmup_runs, 8);
+    assert!(worker.warmup_ns > 0);
+    assert_eq!(worker.processed_hops, 0);
+    assert_eq!(worker.max_processing_ns, 0);
+    assert_eq!(processor.stats().output_frames, 0);
+    assert!(!processor.stats().worker_failed);
+    processor.shutdown();
+
+    let mut cold = config("low-latency-identity.onnx");
+    cold.realtime_warmup = false;
+    let processor = RealtimeProcessor::new(cold).unwrap();
+    assert_eq!(processor.worker_stats().warmup_runs, 0);
+    processor.shutdown();
+}

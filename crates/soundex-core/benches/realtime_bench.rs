@@ -98,6 +98,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "selected_case": selected_case,
                 "producer_audio_realtime_requested": producer_rt,
                 "worker_audio_realtime_requested": worker_rt,
+                "startup_prewarm_requested": env::var("SOUNDEX_REALTIME_WARMUP")
+                    .unwrap_or_else(|_| "1".into()) == "1",
                 "streaming_policy": {
                     "callback_frames": HOP,
                     "added_latency_target_ms": policy::ADDED_LATENCY_TARGET_MS,
@@ -129,6 +131,13 @@ fn measure(
     config.enhancement_mode = enhancement_mode;
     config.min_bandwidth_ratio = 1.0;
     config.worker_time_constraint = worker_rt;
+    config.realtime_warmup = env::var("SOUNDEX_REALTIME_WARMUP")
+        .map(|value| match value.as_str() {
+            "0" => Ok(false),
+            "1" => Ok(true),
+            _ => Err("SOUNDEX_REALTIME_WARMUP must be 0 or 1"),
+        })
+        .unwrap_or(Ok(true))?;
     let load_started = Instant::now();
     let mut processor = RealtimeProcessor::new(config)?;
     let load_ms = load_started.elapsed().as_secs_f64() * 1000.0;
@@ -216,6 +225,20 @@ fn measure(
     let assessment = policy::assess(stats, sample_rate, percentile(0.99), maximum_us, 0)
         .ok_or("invalid real-time policy measurement")?;
     let redline_met = assessment.latency_limit_met;
+    let worker_metadata = json!({
+        "processed_hops": worker.processed_hops,
+        "startup_warmup_runs": worker.warmup_runs,
+        "startup_warmup_ms": worker.warmup_ns as f64 / 1e6,
+        "discarded_input_hops": worker.discarded_input_hops,
+        "discarded_output_hops": worker.discarded_output_hops,
+        "max_queue_wait_us": worker.max_queue_wait_ns as f64 / 1000.0,
+        "max_processing_us": worker.max_processing_ns as f64 / 1000.0,
+        "queue_wait_p99_upper_bound_us": worker.queue_wait_p99_upper_bound_ns as f64 / 1000.0,
+        "processing_p99_upper_bound_us": worker.processing_p99_upper_bound_ns as f64 / 1000.0,
+        "processing_period_overruns": worker.processing_period_overruns,
+    "macos_qos_applied": worker.macos_qos_applied,
+    "macos_realtime_request_accepted": worker.macos_realtime_request_accepted,
+        });
     Ok(report::Case {
         metadata: json!({
             "sample_rate_hz": sample_rate, "channels": channels,
@@ -246,18 +269,7 @@ fn measure(
             "invalid_samples": stats.invalid_samples,
             "rejected_results": stats.rejected_results,
             "worker_failed": stats.worker_failed,
-            "worker": {
-                "processed_hops": worker.processed_hops,
-                "discarded_input_hops": worker.discarded_input_hops,
-                "discarded_output_hops": worker.discarded_output_hops,
-                "max_queue_wait_us": worker.max_queue_wait_ns as f64 / 1000.0,
-                "max_processing_us": worker.max_processing_ns as f64 / 1000.0,
-                "queue_wait_p99_upper_bound_us": worker.queue_wait_p99_upper_bound_ns as f64 / 1000.0,
-                "processing_p99_upper_bound_us": worker.processing_p99_upper_bound_ns as f64 / 1000.0,
-                "processing_period_overruns": worker.processing_period_overruns,
-            "macos_qos_applied": worker.macos_qos_applied,
-            "macos_realtime_request_accepted": worker.macos_realtime_request_accepted,
-            },
+            "worker": worker_metadata,
             "nonfinite_output_samples": nonfinite, "output_peak": peak,
             "boundary_delta_rms": boundary_rms,
             "interior_delta_rms": interior_rms,
