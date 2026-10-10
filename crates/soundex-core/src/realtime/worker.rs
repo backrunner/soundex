@@ -27,7 +27,7 @@ pub(super) fn spawn(
                     .store(scheduling.accepted(), Ordering::Relaxed);
                 let period =
                     Duration::from_secs_f64(super::transport::HOP as f64 / sample_rate as f64);
-                // Real-time computation quota belongs to inference, not idle spinning.
+                // Native RT uses a narrower idle window to preserve inference quota.
                 let mut wait = Wait::new(period, !scheduling.accepted());
                 let mut expected = Some(0);
                 while !control.stop.load(Ordering::Acquire) {

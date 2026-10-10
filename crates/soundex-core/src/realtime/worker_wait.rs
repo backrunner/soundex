@@ -5,22 +5,33 @@ use std::{
     time::{Duration, Instant},
 };
 
-const LEAD: Duration = Duration::from_micros(150);
-const GRACE: Duration = Duration::from_micros(50);
-const POLL: Duration = Duration::from_micros(100);
+const LEAD: Duration = Duration::from_micros(500);
+const POLL: Duration = Duration::from_micros(50);
+
+#[derive(Debug, PartialEq, Eq)]
+enum Idle {
+    Sleep(Duration),
+    Spin,
+}
 
 pub(super) struct Wait {
     arrival: Option<Instant>,
     period: Duration,
     spin: bool,
+    spin_lead: Duration,
+    spin_grace: Duration,
 }
 
 impl Wait {
-    pub fn new(period: Duration, spin: bool) -> Self {
+    pub fn new(period: Duration, wide_spin: bool) -> Self {
         Self {
             arrival: None,
             period,
-            spin,
+            // Native RT preserves its computation quota for inference; only
+            // normal scheduling uses the bounded 200us spin window.
+            spin: wide_spin,
+            spin_lead: Duration::from_micros(if wide_spin { 150 } else { 50 }),
+            spin_grace: Duration::from_micros(if wide_spin { 50 } else { 25 }),
         }
     }
 
@@ -29,17 +40,25 @@ impl Wait {
     }
 
     pub fn idle(&self) {
-        let now = Instant::now();
+        match self.action(Instant::now()) {
+            Idle::Sleep(duration) => thread::sleep(duration),
+            Idle::Spin => hint::spin_loop(),
+        }
+    }
+
+    fn action(&self, now: Instant) -> Idle {
         match self.arrival {
-            Some(at) if at > now + LEAD => thread::sleep(at - now - LEAD),
-            // At most 200us per predicted arrival. Each caller iteration checks
-            // both the bounded queue and shutdown; no unbounded busy loop.
-            Some(at) if now <= at + GRACE && self.spin => hint::spin_loop(),
+            Some(at) if at > now + LEAD => Idle::Sleep(at - now - LEAD),
+            // Each iteration checks the bounded queue and shutdown. An absent
+            // input cannot extend this fixed prediction window.
+            Some(at) if self.spin && now + self.spin_lead >= at && now <= at + self.spin_grace => {
+                Idle::Spin
+            }
             Some(at) if now.saturating_duration_since(at) > self.period => {
                 // No incoming stream: don't keep polling at 10k wakeups/sec.
-                thread::sleep(Duration::from_millis(1));
+                Idle::Sleep(Duration::from_millis(1))
             }
-            _ => thread::sleep(POLL),
+            _ => Idle::Sleep(POLL),
         }
     }
 }
@@ -98,5 +117,55 @@ impl Drop for Scheduling {
         if let Some(handle) = self.handle.take() {
             let _ = audio_thread_priority::demote_current_thread_from_real_time(handle);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn native_wait_preserves_quota_and_idle_backoff() {
+        let origin = Instant::now();
+        let period = Duration::from_micros(2667);
+        let mut wait = Wait::new(period, false);
+        assert_eq!(wait.action(origin), Idle::Sleep(POLL));
+        wait.submitted(Some(origin));
+        let at = origin + period;
+        assert_eq!(
+            wait.action(at - LEAD - Duration::from_micros(1)),
+            Idle::Sleep(Duration::from_micros(1))
+        );
+        for offset in [0, 25, 50, 100, 250, 500] {
+            assert_eq!(
+                wait.action(at - Duration::from_micros(offset)),
+                Idle::Sleep(POLL)
+            );
+        }
+        assert_eq!(
+            wait.action(at + period + Duration::from_micros(1)),
+            Idle::Sleep(Duration::from_millis(1))
+        );
+        wait.submitted(None);
+        assert_eq!(wait.action(at), Idle::Sleep(POLL));
+    }
+
+    #[test]
+    fn normal_spin_is_bounded() {
+        let origin = Instant::now();
+        let period = Duration::from_micros(2667);
+        let mut wait = Wait::new(period, true);
+        wait.submitted(Some(origin));
+        let at = origin + period;
+        assert_eq!(
+            wait.action(at - Duration::from_micros(151)),
+            Idle::Sleep(POLL)
+        );
+        assert_eq!(wait.action(at - Duration::from_micros(150)), Idle::Spin);
+        assert_eq!(wait.action(at + Duration::from_micros(50)), Idle::Spin);
+        assert_eq!(
+            wait.action(at + Duration::from_micros(51)),
+            Idle::Sleep(POLL)
+        );
     }
 }
