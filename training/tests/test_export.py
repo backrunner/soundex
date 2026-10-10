@@ -181,6 +181,7 @@ def _checkpoint_generator(checkpoint_path: Path) -> SoundExGenerator:
         expand_ratio=config["expand_ratio"],
         cross_stream_interactions=config.get("cross_stream_interactions", False),
         circular_phase_features=config.get("circular_phase_features", False),
+        spectral_refiner=config.get("spectral_refiner"),
     )
     model.load_state_dict(checkpoint["model"]["generator_state"])
     model.eval()

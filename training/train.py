@@ -287,6 +287,7 @@ def initialize_generator_from_checkpoint(
     *,
     initialize_zero_interactions: bool = False,
     initialize_phase_features: bool = False,
+    initialize_spectral_refiner: bool = False,
 ) -> dict[str, Any]:
     """Start a new optimizer trajectory with explicit, compatible parent weights."""
     payload = Path(path).read_bytes()
@@ -296,8 +297,18 @@ def initialize_generator_from_checkpoint(
     )
     parent_architecture = dict(parent["model"]["generator_config"])
     architecture = dict(config["model"]["generator"])
-    if initialize_zero_interactions and initialize_phase_features:
+    if (
+        sum((initialize_zero_interactions, initialize_phase_features, initialize_spectral_refiner))
+        > 1
+    ):
         raise ValueError("migrate one architecture feature at a time")
+    if initialize_spectral_refiner:
+        if parent_architecture.get("spectral_refiner") is not None or not architecture.get(
+            "spectral_refiner"
+        ):
+            raise ValueError("spectral-refiner migration needs a legacy parent and enabled target")
+        parent_architecture.pop("spectral_refiner", None)
+        architecture.pop("spectral_refiner")
     if initialize_phase_features:
         if parent_architecture.get("circular_phase_features", False) or not architecture.get(
             "circular_phase_features", False
@@ -340,7 +351,26 @@ def initialize_generator_from_checkpoint(
         state = {**state, key: expanded}
         expanded_keys = [key]
     added_keys: list[str] = []
-    if initialize_zero_interactions:
+    if initialize_spectral_refiner:
+        target_state = generator.state_dict()
+        added_keys = sorted(key for key in target_state if key.startswith("spectral_refiner."))
+        if (
+            not added_keys
+            or set(target_state) - set(state) != set(added_keys)
+            or set(state) - set(target_state)
+        ):
+            raise ValueError("spectral-refiner migration has unexpected state keys")
+        if any(not torch.isfinite(target_state[key]).all().item() for key in added_keys):
+            raise ValueError("spectral-refiner migration has non-finite state")
+        if any(
+            torch.count_nonzero(target_state[key]).item()
+            for key in ("spectral_refiner.head.weight", "spectral_refiner.head.bias")
+        ):
+            raise ValueError("spectral-refiner migration requires exactly zero output head")
+        generator.load_state_dict(
+            {**state, **{key: target_state[key] for key in added_keys}}, strict=True
+        )
+    elif initialize_zero_interactions:
         target_state = generator.state_dict()
         added_keys = sorted(key for key in target_state if key.startswith("interactions."))
         if not added_keys or set(target_state) - set(state) != set(added_keys):
@@ -355,12 +385,17 @@ def initialize_generator_from_checkpoint(
     else:
         generator.load_state_dict(state, strict=True)
     return {
-        "mode": "generator-only-warm-start-phase-features"
+        "mode": "generator-only-warm-start-spectral-refiner"
+        if initialize_spectral_refiner
+        else "generator-only-warm-start-phase-features"
         if initialize_phase_features
         else "generator-only-warm-start-zero-interactions"
         if initialize_zero_interactions
         else "generator-only-warm-start",
-        "zero_initialized_state_keys": added_keys,
+        "zero_initialized_state_keys": [key for key in added_keys if ".head." in key]
+        if initialize_spectral_refiner
+        else added_keys,
+        "added_state_keys": added_keys,
         "expanded_zero_channel_state_keys": expanded_keys,
         "parent_checkpoint_sha256": hashlib.sha256(payload).hexdigest(),
         "parent_epoch": int(parent["training_state"]["epoch"]),
@@ -629,6 +664,11 @@ def main() -> None:
         action="store_true",
         help="Warm-start a legacy phase encoder with zero sin/cos channels",
     )
+    parser.add_argument(
+        "--initialize-spectral-refiner",
+        action="store_true",
+        help="Warm-start an original spectral refiner with an exactly zero output head",
+    )
     args = parser.parse_args()
     config = load_config(args.config)
     if args.initialize_phase_features and not args.initialize_generator_from:
@@ -637,6 +677,12 @@ def main() -> None:
         parser.error("migrate one architecture feature at a time")
     if args.initialize_zero_interactions and not args.initialize_generator_from:
         parser.error("--initialize-zero-interactions requires --initialize-generator-from")
+    if args.initialize_spectral_refiner and not args.initialize_generator_from:
+        parser.error("--initialize-spectral-refiner requires --initialize-generator-from")
+    if args.initialize_spectral_refiner and (
+        args.initialize_phase_features or args.initialize_zero_interactions
+    ):
+        parser.error("migrate one architecture feature at a time")
     if int(config["training"].get("context_frames", 1)) != 1:
         raise ValueError("training.context_frames must be 1 for stateless streaming inference")
     set_seed(int(config["training"].get("seed", 42)))
@@ -686,6 +732,7 @@ def main() -> None:
         expand_ratio=model_config["expand_ratio"],
         cross_stream_interactions=model_config.get("cross_stream_interactions", False),
         circular_phase_features=model_config.get("circular_phase_features", False),
+        spectral_refiner=model_config.get("spectral_refiner"),
     ).to(device)
     configure_generator_training_mode(
         generator, str(config["training"].get("batch_norm_statistics", "update"))
@@ -740,6 +787,7 @@ def main() -> None:
             data_provenance,
             initialize_zero_interactions=args.initialize_zero_interactions,
             initialize_phase_features=args.initialize_phase_features,
+            initialize_spectral_refiner=args.initialize_spectral_refiner,
         )
         print(f"Generator initialization: {provenance['initialization']}")
     last_validation_report: dict[str, Any] | None = None

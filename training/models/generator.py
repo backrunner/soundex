@@ -10,6 +10,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from models.spectral_refiner import SpectralRefiner
+
 
 class DepthwiseSeparableConv(nn.Module):
     """Depthwise separable convolution block (from UL-UNAS)."""
@@ -183,6 +185,7 @@ class SoundExGenerator(nn.Module):
         expand_ratio: int = 4,
         cross_stream_interactions: bool = False,
         circular_phase_features: bool = False,
+        spectral_refiner: dict | None = None,
     ) -> None:
         super().__init__()
         if not isinstance(cross_stream_interactions, bool):
@@ -235,6 +238,11 @@ class SoundExGenerator(nn.Module):
             nn.GELU(),
             nn.Conv2d(16, 2, (1, 3), padding=(0, 1)),
         )
+        # Preserve legacy initialization and the crop/sampling RNG across arms.
+        self.spectral_refiner = None
+        if spectral_refiner is not None:
+            with torch.random.fork_rng(devices=[]):
+                self.spectral_refiner = SpectralRefiner(**spectral_refiner)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass.
@@ -274,7 +282,10 @@ class SoundExGenerator(nn.Module):
         residual = self.fusion(combined)
         output = combined + residual
 
-        return match_frequency_size(output, reference)
+        output = match_frequency_size(output, reference)
+        if self.spectral_refiner is not None:
+            output = output + self.spectral_refiner(reference)
+        return output
 
     def _interacting_streams(
         self, amplitude: torch.Tensor, phase: torch.Tensor

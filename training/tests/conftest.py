@@ -40,6 +40,7 @@ def checkpoint_factory(tmp_path: Path, resolved_config: dict[str, Any]):
                 expand_ratio=generator_config["expand_ratio"],
                 cross_stream_interactions=generator_config.get("cross_stream_interactions", False),
                 circular_phase_features=generator_config.get("circular_phase_features", False),
+                spectral_refiner=generator_config.get("spectral_refiner"),
             )
         recipe = checkpoint_config["data"]["recipe"]
         recipe_sha256 = canonical_sha256(recipe)
