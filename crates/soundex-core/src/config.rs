@@ -37,11 +37,43 @@ impl std::str::FromStr for EnhancementMode {
     }
 }
 
+/// Neural high-band level policy. Model levels are experimental and opt-in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum HighBandGain {
+    /// Match the candidate to the retained edge band with the legacy -6 dB ratio.
+    #[default]
+    MatchEdge,
+    /// Preserve the model's calibrated high-band level; output safety still applies.
+    Model,
+}
+
+impl HighBandGain {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::MatchEdge => "match-edge",
+            Self::Model => "model",
+        }
+    }
+}
+
+impl std::str::FromStr for HighBandGain {
+    type Err = &'static str;
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "match-edge" => Ok(Self::MatchEdge),
+            "model" => Ok(Self::Model),
+            _ => Err("high-band gain must be match-edge or model"),
+        }
+    }
+}
+
 /// Configuration for creating a [`SoundExProcessor`](crate::processor::SoundExProcessor).
 #[derive(Debug, Clone)]
 pub struct SoundExConfig {
     /// Candidate path; experimental alternatives are opt-in.
     pub enhancement_mode: EnhancementMode,
+    /// Experimental model level preservation; the default retains legacy matching.
+    pub high_band_gain: HighBandGain,
     /// Path to the ONNX model file (unused in spectral mode).
     pub model_path: PathBuf,
 
@@ -87,6 +119,7 @@ impl Default for SoundExConfig {
     fn default() -> Self {
         Self {
             enhancement_mode: EnhancementMode::Neural,
+            high_band_gain: HighBandGain::MatchEdge,
             model_path: PathBuf::from("soundex-v1.onnx"),
             sample_rate: 44100,
             channels: 1,
@@ -109,6 +142,11 @@ impl SoundExConfig {
         self.enhancement_mode = mode;
         self
     }
+    pub fn high_band_gain(mut self, policy: HighBandGain) -> Self {
+        self.high_band_gain = policy;
+        self
+    }
+
     /// Create a config with a specific model path, using defaults for everything else.
     pub fn with_model(path: impl Into<PathBuf>) -> Self {
         Self {
@@ -164,5 +202,23 @@ impl SoundExConfig {
     pub fn ort_parallel_execution(mut self, enabled: bool) -> Self {
         self.ort_parallel_execution = enabled;
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn experimental_gain_policy_is_strict_and_default_remains_legacy() {
+        assert_eq!(
+            SoundExConfig::default().high_band_gain,
+            HighBandGain::MatchEdge
+        );
+        assert_eq!(
+            "model".parse::<HighBandGain>().unwrap(),
+            HighBandGain::Model
+        );
+        assert!("typo".parse::<HighBandGain>().is_err());
     }
 }

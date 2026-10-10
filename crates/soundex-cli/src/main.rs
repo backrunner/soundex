@@ -36,6 +36,10 @@ struct Args {
     #[arg(long, default_value = "neural", value_parser = ["neural", "spectral", "hybrid"])]
     enhancement_mode: String,
 
+    /// High-band gain policy (model preserves predicted levels; experimental)
+    #[arg(long, default_value = "match-edge", value_parser = ["match-edge", "model"])]
+    high_band_gain: String,
+
     /// Bypass detection threshold in dB
     #[arg(long, default_value_t = -60.0)]
     bypass_threshold: f32,
@@ -120,8 +124,9 @@ fn main() -> Result<()> {
         .hop_size(args.hop_size)
         .crossover_width_hz(args.crossover_width_hz)
         .bypass_threshold_db(args.bypass_threshold);
-    let config =
-        config.enhancement_mode(args.enhancement_mode.parse().map_err(anyhow::Error::msg)?);
+    let config = config
+        .enhancement_mode(args.enhancement_mode.parse().map_err(anyhow::Error::msg)?)
+        .high_band_gain(args.high_band_gain.parse().map_err(anyhow::Error::msg)?);
 
     if args.dry_run {
         let analysis = soundex_core::analyze_buffer(&config, &decoded.samples)?;
