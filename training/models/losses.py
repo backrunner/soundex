@@ -211,6 +211,9 @@ class GeneratorLoss(nn.Module):
         high_relative_floor: float = 0.01,
         magnitude_relative_floor_db: float = -80.0,
         magnitude_absolute_floor_db: float = -120.0,
+        reconstruction_high_complex_weight: float = 0.2,
+        reconstruction_low_complex_weight: float = 1.0,
+        spectral_consistency_weight: float = 0.1,
     ) -> None:
         super().__init__()
         self.high_band_weight = high_band_weight
@@ -227,8 +230,8 @@ class GeneratorLoss(nn.Module):
         if waveform_region not in {"full", "steady_state"}:
             raise ValueError("waveform_region must be 'full' or 'steady_state'")
         self.waveform_region = waveform_region
-        if objective_version not in {1, 2, 3}:
-            raise ValueError("objective_version must be 1, 2 or 3")
+        if objective_version not in {1, 2, 3, 4}:
+            raise ValueError("objective_version must be 1, 2, 3 or 4")
         for name, value in {
             "magnitude_scale_db": magnitude_scale_db,
             "waveform_normalization_floor": waveform_normalization_floor,
@@ -249,6 +252,9 @@ class GeneratorLoss(nn.Module):
             "high_energy_weight": high_energy_weight,
             "high_temporal_weight": high_temporal_weight,
             "reconstruction_high_weight": reconstruction_high_weight,
+            "reconstruction_high_complex_weight": reconstruction_high_complex_weight,
+            "reconstruction_low_complex_weight": reconstruction_low_complex_weight,
+            "spectral_consistency_weight": spectral_consistency_weight,
         }.items():
             if not math.isfinite(value) or value < 0:
                 raise ValueError(f"{name} must be finite and non-negative")
@@ -261,6 +267,9 @@ class GeneratorLoss(nn.Module):
         self.high_temporal_weight = high_temporal_weight
         self.reconstruction_high_weight = reconstruction_high_weight
         self.high_relative_floor = high_relative_floor
+        self.reconstruction_high_complex_weight = reconstruction_high_complex_weight
+        self.reconstruction_low_complex_weight = reconstruction_low_complex_weight
+        self.spectral_consistency_weight = spectral_consistency_weight
         for name, value in {
             "magnitude_relative_floor_db": magnitude_relative_floor_db,
             "magnitude_absolute_floor_db": magnitude_absolute_floor_db,
@@ -303,6 +312,9 @@ class GeneratorLoss(nn.Module):
             high_relative_floor=float(objective.get("high_relative_floor", 0.01)),
             magnitude_relative_floor_db=float(objective.get("magnitude_relative_floor_db", -80.0)),
             magnitude_absolute_floor_db=float(objective.get("magnitude_absolute_floor_db", -120.0)),
+            reconstruction_high_complex_weight=float(objective.get("reconstruction_high_complex_weight", 0.2)),
+            reconstruction_low_complex_weight=float(objective.get("reconstruction_low_complex_weight", 1.0)),
+            spectral_consistency_weight=float(objective.get("spectral_consistency_weight", 0.1)),
         )
 
     def forward(
@@ -320,7 +332,7 @@ class GeneratorLoss(nn.Module):
         mask = _feature_weight(missing_band_mask, predicted[:, 0])
         mean = _recording_weighted_mean if self.objective_version >= 2 else _weighted_mean
         high_band_magnitude = mean((predicted[:, 0] - target[:, 0]).abs(), mask)
-        if self.objective_version == 3:
+        if self.objective_version >= 3:
             # The same detached reference floor is used on both spectra. Weak
             # bins must not reward invented hiss merely for beating a -200 dB
             # numerical floor. Linear spectral/energy losses supervise excess.
@@ -422,7 +434,7 @@ class GeneratorLoss(nn.Module):
         }
         if self.objective_version >= 2:
             result["waveform_relative"] = waveform_relative
-        if self.objective_version == 3:
+        if self.objective_version >= 3:
             inpainting = inpainting_fidelity_terms(
                 predicted,
                 target,
@@ -440,6 +452,19 @@ class GeneratorLoss(nn.Module):
                 + self.high_temporal_weight * inpainting["high_band_temporal"]
                 + self.reconstruction_high_weight
                 * inpainting["reconstruction_high_spectral_convergence"]
+            )
+        if self.objective_version == 4:
+            consistency = reconstruction_complex_terms(
+                predicted, target, degraded, mask,
+                fft_size=self.fft_size, hop_size=self.hop_size,
+                relative_floor=self.high_relative_floor,
+                absolute_floor=self.waveform_normalization_floor,
+            )
+            result.update(consistency)
+            result["total"] = result["total"] + (
+                self.reconstruction_high_complex_weight * consistency["reconstruction_high_complex"]
+                + self.reconstruction_low_complex_weight * consistency["reconstruction_low_complex"]
+                + self.spectral_consistency_weight * consistency["spectral_consistency"]
             )
         return result
 
@@ -529,6 +554,64 @@ def inpainting_fidelity_terms(
         "high_band_energy": energy,
         "high_band_temporal": temporal,
         "reconstruction_high_spectral_convergence": reconstruction,
+    }
+
+
+def reconstruction_complex_terms(
+    predicted: torch.Tensor,
+    target: torch.Tensor,
+    degraded: torch.Tensor,
+    mask: torch.Tensor,
+    *,
+    fft_size: int,
+    hop_size: int,
+    relative_floor: float,
+    absolute_floor: float,
+) -> dict[str, torch.Tensor]:
+    """V4: supervise actual complex reconstruction and retained-band corruption.
+
+    Compare matching fully supported STFT frames; never include artificial cropped
+    Hann tails. Consistency follows the predicted complex spectrum, while its
+    detached normalization always comes from the clean reference, not prediction.
+    This remains a crossover/phase/OLA proxy, excluding online detector and gain.
+    """
+    blended = blend_deployment_features(degraded, predicted, mask)
+    edge = fft_size - hop_size
+    if edge == 0:
+        first, last = 0, predicted.shape[2]
+    else:
+        first = edge // hop_size
+        last = predicted.shape[2] - first
+    if last <= first:
+        raise ValueError("complex reconstruction requires fully supported causal frames")
+    window = torch.hann_window(
+        fft_size, periodic=True, device=predicted.device, dtype=predicted.dtype
+    )
+    spectra = []
+    for features in (blended, target, degraded):
+        wave = causal_overlap_add(features, fft_size=fft_size, hop_size=hop_size)
+        if edge:
+            wave = wave[:, edge:-edge]
+        if wave.shape[-1] < fft_size:
+            raise ValueError("complex reconstruction requires more causal frames")
+        spectra.append(torch.fft.rfft(wave.unfold(-1, fft_size, hop_size) * window))
+    amplitude = torch.pow(10.0, blended[:, 0, first:last].clamp(-200.0, 100.0) / 20.0)
+    desired = torch.polar(amplitude, blended[:, 1, first:last])
+    aligned_mask = mask.expand_as(predicted[:, 0])[:, first:last]
+    if desired.shape != spectra[0].shape:
+        raise ValueError("complex reconstruction frame alignment differs")
+
+    def relative(delta: torch.Tensor, reference: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
+        error = (delta * weight.sqrt()).flatten(1).norm(dim=1)
+        band = (reference * weight.sqrt()).flatten(1).norm(dim=1)
+        full = reference.abs().square().mean(dim=(1, 2)).sqrt() * math.sqrt(reference[0].numel())
+        scale = band.maximum(full * relative_floor).clamp_min(absolute_floor).detach()
+        return (error / scale).mean()
+
+    return {
+        "reconstruction_high_complex": relative(spectra[0] - spectra[1], spectra[1], aligned_mask),
+        "reconstruction_low_complex": relative(spectra[0] - spectra[2], spectra[2], 1.0 - aligned_mask),
+        "spectral_consistency": relative(spectra[0] - desired, spectra[1], aligned_mask),
     }
 
 
