@@ -44,6 +44,10 @@ The [phase reconstruction study](docs/phase-reconstruction-20261011.md) retains
 model magnitudes while anchoring phase to surviving input power. Waveform fidelity
 and some high-band metrics improve, but music remains short of balanced restoration;
 the new DSP policy is opt-in and no weights are promoted.
+The [architecture reset review](docs/architecture-reset-20261011.md) broadens the
+research to complex spectral generation, causal temporal models, differentiable
+DSP and generative training. It proposes fresh backbone experiments with explicit
+quality and streaming gates; these experiments have not started.
 
 ## Quick start
 
