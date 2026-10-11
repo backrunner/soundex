@@ -60,7 +60,7 @@ def verify_stateful_export(model: CausalRestorer, path: Path) -> None:
 
 def export_causal(checkpoint_path: Path, output_path: Path) -> dict[str, str]:
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
-    if checkpoint["format"] != "soundex-causal-study-v1":
+    if checkpoint["format"] not in {"soundex-causal-study-v1", "soundex-p2-v1"}:
         raise ValueError("unsupported causal checkpoint")
     model = CausalRestorer(checkpoint["kind"], checkpoint["width"]).eval()
     model.load_state_dict(checkpoint["model"], strict=True)
