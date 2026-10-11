@@ -32,6 +32,8 @@ reviews recent restoration methods against the streaming budget and tests bounde
 global spectral refinement with matched representation and capacity comparisons.
 All three new arms completed eight epochs; the [measured results](docs/architecture-study-20261011.md)
 show a lower validation loss, but no balanced quality win that warrants promotion.
+The [causal follow-up](docs/causal-context-20261011.md) implements eight past frames
+with unchanged output delay and two matched eight-epoch runs; it remains experimental.
 
 ## Quick start
 
@@ -128,6 +130,9 @@ The default model uses FP32 `[batch, 2, 1, 129]` input/output, dynamic batch onl
 checkpoint schema 1.2 and artifact schema 1.3. Export binds preprocessing and provenance to
 the checkpoint and publishes atomically only after mandatory ONNX/ORT validation.
 Rust validates tensor and `soundex.*` metadata before processing.
+The optional [finite causal context](docs/causal-context-20261011.md) uses artifact
+1.4: nine observed input frames and one output frame, with no lookahead. The host
+retains per-channel history; eight-hop enhancement warmup keeps aligned dry output.
 
 [Parity budgets](docs/parity.md) · [Held-out evaluation](training/evaluation/README.md) ·
 [Model card](models/MODEL_CARD.template.md) · [Weight release checklist](legal/MODEL_RELEASE_CHECKLIST.md)

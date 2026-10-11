@@ -12,7 +12,7 @@
 | **Artifact file(s)** | e.g. `soundex-v1.onnx` |
 | **SHA-256** | *(hex digest)* |
 | **Format** | ONNX / PyTorch checkpoint / other |
-| **Checkpoint / artifact schema** | `soundex-checkpoint 1.2` / `soundex artifact 1.3` (default 256/128 profile) |
+| **Checkpoint / artifact schema** | `soundex-checkpoint 1.2` / `soundex artifact 1.3` (frame-local) or `1.4` (nine-frame causal context); record exact I/O and history warmup |
 | **Source checkpoint SHA-256** | *(from ONNX metadata)* |
 | **Resolved config / manifest-set SHA-256** | *(from ONNX metadata)* |
 | **Software commit** | `git` SHA |

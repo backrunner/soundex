@@ -26,6 +26,8 @@ DSP、ONNX 推理和实时流适配，同时提供文件处理 CLI 和 PyTorch �
 通过全频带残差分支分别比较输入表示和模型容量，并验证实际输出与部署成本。
 三组新模型均完成 8 轮；[实测结果](docs/architecture-study-20261011.md)显示验证 loss
 略降，但尚未取得足以替换基线的综合音质收益。
+[因果上下文续轮](docs/causal-context-20261011.md)已实现过去八帧输入，保持输出延迟，
+并完成两组各八轮的匹配训练；权重继续处于实验状态。
 
 ## 直接运行
 
@@ -88,6 +90,8 @@ cargo run --locked -p soundex-cli -- target/demo/input.wav \
 与导出命令。默认模型契约为 FP32 `[batch, 2, 1, 129]`，仅 batch 动态，
 checkpoint schema 为 1.2，artifact schema 为 1.3。导出必须通过 ONNX 与 ORT 一致性检查；
 Rust 在处理前验证模型元数据与张量契约。
+可选[因果上下文](docs/causal-context-20261011.md)使用 artifact 1.4：九帧历史/当前输入、
+一帧输出，不读取未来；host 保存每声道历史，八个 hop 的增强预热期间保持对齐原音。
 
 [一致性误差预算](docs/parity.md) · [评估流程](training/evaluation/README.md) · [模型卡](models/MODEL_CARD.template.md) ·
 [权重发布清单](legal/MODEL_RELEASE_CHECKLIST.md)

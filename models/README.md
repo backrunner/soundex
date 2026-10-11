@@ -67,6 +67,21 @@ the selected large variant has 1,399,942 parameters (5.44 MiB). The lower valida
 loss does not establish an overall quality win. These are local experimental
 weights, with unchanged data/parent lineage and no external pretrained teacher.
 
+The [finite causal context study](../docs/causal-context-20261011.md) adds eight
+past observations to the small refiner, retaining a current-frame U-Net and no
+lookahead. Both matched arms completed eight epochs; the causal model has 923,526
+parameters and a 3.62 MiB local ONNX. Its CPU loss is only 0.05% below the continued
+frame control and 0.20% above the parent on matched crops. The 13 fixed cases pass
+for the causal model, but broader numerical checks still contain out-of-budget
+validation batches; the frame control also fails a fixed case. Both remain local
+diagnostic artifacts. Existing Apache release goals and source obligations remain
+unchanged; no external weights, teacher outputs or new audio were introduced.
+A separate two-epoch pilot freezes every parent tensor and trains only the 17,792
+temporal parameters at a higher learning rate. It reduces matched CPU loss by
+about 0.013% versus the parent, while the history-ablation effect remains tiny;
+this is a development-only diagnostic with no promotion or per-artifact realtime
+qualification.
+
 Official releases require reviewed source grants and initialization under
 [TRAINING_DATA.md](../legal/TRAINING_DATA.md). Source approval, restoration quality,
 listening and real-time runtime/continuity evidence are all required before release.

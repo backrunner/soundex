@@ -123,6 +123,14 @@ Obsolete input is skipped; a gap resets model history and invalidates warmup.
 Predictions finishing after presentation are discarded. Fallback/recovery and
 the fixed delay remain unchanged.
 
+Artifact 1.4 can carry a finite nine-frame causal input window. The host keeps
+this raw spectral history per physical channel, even while bypassed or silent;
+a gap/reset/reload clears it. Enhancement stays dry for the first eight observed
+hops and then enters the existing fade. This history warmup is separate from ORT
+prewarming and worker presentation misses: it delays the availability of enhancement,
+not the aligned output clock or the fixed 256-frame adapter delay. See the
+[causal context experiment](causal-context-20261011.md).
+
 Worker diagnostics record processed/dropped hops, maximum submission queue wait,
 maximum processing wall time, and processing calls exceeding a hop period.
 Read them on a control thread. Processing overruns, queue waits and callback
