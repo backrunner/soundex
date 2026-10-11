@@ -23,7 +23,10 @@ high-band reconstruction the main training target; DSP-only and hybrid paths rem
 The [P2 matched training study](docs/causal-training-20261012.md) is now running locally:
 fresh legacy, GRU and TCN backbones, 4096 updates each across two seeds, with a
 shared reconstruction objective and production DSP validation. Results are pending;
-experimental weights have not replaced the default model.
+experimental weights have not replaced the default model. The
+[first-seed review](docs/causal-p2-review-20261012.md) finds gains over the matched
+fresh control, but no overall win over the previous checkpoint and excess
+generation on naturally weak high bands.
 
 The [V4/architecture comparison](docs/optimization-20261011.md) evaluates complex
 reconstruction, amplitude/phase interactions and prepared real-time startup.
