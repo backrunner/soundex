@@ -52,6 +52,7 @@ jobs:
         run: |
           cargo build --locked -p soundex-core --bin soundex-model-parity
           cargo build --locked -p soundex-core --bin soundex-stream-eval
+          cargo build --locked -p soundex-core --bin soundex-state-parity
       - name: Lint Python
         working-directory: training
         run: |
