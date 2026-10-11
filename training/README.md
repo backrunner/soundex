@@ -259,3 +259,13 @@ long sequences and DSP warmup; only multiresolution loss weights differ. Final
 checkpoints are rescored with one common CPU objective, so their differently
 weighted training totals are not compared directly. See the
 [protocol and results](../docs/multires-reconstruction-20261011.md).
+
+### Input-conditioned gain calibration (experimental)
+
+`scripts/fit_gain_calibration.py` fits ten bounded DSP coefficients using the
+production Rust channel analyzer via `soundex-gain-data`. It accepts reviewed
+music/speech manifests, excludes non-train recordings, chooses regularization on
+a recording-disjoint inner split, and freezes an artifact before Rust development
+scoring. The neural ONNX stays unchanged. The current regression target improves
+while actual high-band recovery worsens; do not enable the fitted JSON by default.
+See the [protocol and measured limits](../docs/gain-calibration-20261011.md).

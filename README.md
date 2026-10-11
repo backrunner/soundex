@@ -37,6 +37,9 @@ with unchanged output delay and two matched eight-epoch runs; it remains experim
 The [V7 reconstruction study](docs/multires-reconstruction-20261011.md) adds real DSP
 warmup and multiresolution waveform supervision. Two four-epoch runs are complete;
 measured improvements remain mixed, so neither candidate replaces the baseline.
+A [bounded DSP gain calibration study](docs/gain-calibration-20261011.md) fits ten
+coefficients from production analyzer observations. Its regression improves but
+actual high-band recovery regresses, so the default gain policy remains unchanged.
 
 ## Quick start
 

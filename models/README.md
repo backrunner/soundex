@@ -90,6 +90,12 @@ objective. Both pass 13 fixed export cases; broader real-frame checks still fail
 6/256 control and 4/256 multiresolution batches. Quality gains remain mixed, so
 both artifacts stay local and diagnostic, with unchanged source obligations.
 
+The [input-conditioned gain study](../docs/gain-calibration-20261011.md) fits a
+455-byte JSON with ten bounded DSP coefficients using only training recordings.
+It leaves the 905,734-parameter shape-small ONNX unchanged. Despite lower internal
+regression error, actual high-band energy and spectral convergence regress. The
+coefficients remain local diagnostics and are not enabled by default.
+
 Official releases require reviewed source grants and initialization under
 [TRAINING_DATA.md](../legal/TRAINING_DATA.md). Source approval, restoration quality,
 listening and real-time runtime/continuity evidence are all required before release.
