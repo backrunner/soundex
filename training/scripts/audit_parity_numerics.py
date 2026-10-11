@@ -87,6 +87,8 @@ def audit(checkpoint_path: Path, output: Path) -> dict[str, object]:
                 rows.append(
                     {
                         "case": name,
+                        "torch_fp32_vs_fp64": compare_features(reference64, expected),
+                        "ort_vs_fp64": compare_features(reference64, actual),
                         "metrics": metrics,
                         "policy_passed": outcome,
                         "inverse_fft_peak_error": float(np.abs(difference).max()),

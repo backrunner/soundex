@@ -149,3 +149,17 @@ def test_context_contract_and_rng_budget(resolved_config):
     assert temporal.count_parameters() <= 2_000_000
     for name, value in frame.state_dict().items():
         torch.testing.assert_close(temporal.state_dict()[name], value, rtol=0, atol=0)
+
+
+def test_validation_audit_uses_real_history_without_future_or_cold_padding():
+    from scripts.audit_validation_parity import observed_windows
+
+    features = torch.arange(20 * 2 * 129).reshape(20, 2, 1, 129).float()
+    positions = np.array([8, 19])
+    windows = observed_windows(features, positions, 9)
+    assert windows.shape == (2, 2, 9, 129)
+    torch.testing.assert_close(windows[0], features[:9, :, 0].permute(1, 0, 2))
+    torch.testing.assert_close(windows[1], features[11:, :, 0].permute(1, 0, 2))
+    torch.testing.assert_close(observed_windows(features, positions, 1), features[positions])
+    with pytest.raises(ValueError, match="complete observed history"):
+        observed_windows(features, np.array([7]), 9)

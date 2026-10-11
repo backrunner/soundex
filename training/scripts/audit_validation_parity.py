@@ -25,6 +25,17 @@ from export_onnx import _build_generator, artifact_metadata, sha256_file, valida
 from parity_metrics import PARITY_POLICY, POLICY_SHA256, compare_features, validate_features
 
 
+def observed_windows(features: torch.Tensor, positions: np.ndarray, context: int) -> torch.Tensor:
+    """Build real oldest-to-current windows for a numerical audit of streaming input."""
+    if context not in (1, 9) or features.ndim != 4 or features.shape[1:3] != (2, 1):
+        raise ValueError("expected frame features [T,2,1,F] and context 1 or 9")
+    if any(p < context - 1 or p >= len(features) for p in positions):
+        raise ValueError("audit positions require complete observed history")
+    return torch.stack(
+        [features[p - context + 1 : p + 1, :, 0].permute(1, 0, 2) for p in positions]
+    ).contiguous()
+
+
 def audit(checkpoint_path: Path, model_path: Path, output: Path) -> dict[str, object]:
     """Sample 32 frames per validation track, eight tracks per sample rate."""
     checkpoint = load_checkpoint(checkpoint_path)
@@ -32,6 +43,7 @@ def audit(checkpoint_path: Path, model_path: Path, output: Path) -> dict[str, ob
     validate_onnx_contract(model_path, artifact_metadata(checkpoint, checkpoint_hash))
     model = _build_generator(checkpoint)
     binary = _resolve_rust_binary(None)
+    context = int(checkpoint["feature_contract"]["context_frames"])
     fft_size = int(checkpoint["feature_contract"]["fft_size"])
     hop_size = int(checkpoint["feature_contract"]["hop_size"])
     options = ort.SessionOptions()
@@ -83,11 +95,11 @@ def audit(checkpoint_path: Path, model_path: Path, output: Path) -> dict[str, ob
             features = torch.stack(
                 (20 * spectrum.abs().clamp_min(1e-10).log10(), torch.angle(spectrum)), 0
             ).permute(2, 0, 1)[:, :, None, :]
-            if len(features) < 32:
+            if len(features) < 32 + context - 1:
                 continue
-            positions = np.linspace(0, len(features) - 1, 32, dtype=int)
+            positions = np.linspace(context - 1, len(features) - 1, 32, dtype=int)
             for index in range(0, 32, 2):
-                tensor = features[positions[index : index + 2]].contiguous()
+                tensor = observed_windows(features, positions[index : index + 2], context)
                 with torch.no_grad():
                     expected = model(tensor).numpy()
                 actual = session.run(None, {"input_features": tensor.numpy()})[0]
@@ -135,6 +147,8 @@ def audit(checkpoint_path: Path, model_path: Path, output: Path) -> dict[str, ob
         "unique_track_count": len(set().union(*tracks.values())),
         "frame_count": frame_count,
         "batch_size": 2,
+        "context_frames": context,
+        "history": "Observed contiguous past frames only; no zero padding or future frames",
         "failed_batches": failed_batches,
         "failure_examples": failures[:5],
         "max_metrics": {key: max(row[key] for row in measurements) for key in measurements[0]},
