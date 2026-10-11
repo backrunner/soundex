@@ -267,6 +267,27 @@ def infer_independent_frames(
     return predicted.reshape(batch, frames - warmup_frames, channels, bins).permute(0, 2, 1, 3)
 
 
+def infer_loss_sequence(
+    generator: SoundExGenerator,
+    features: torch.Tensor,
+    *,
+    warmup_frames: int,
+    reconstruction_warmup_frames: int,
+) -> torch.Tensor:
+    """Separate real model history, detached DSP history, and supervised outputs."""
+    if not reconstruction_warmup_frames:
+        return infer_independent_frames(generator, features, warmup_frames=warmup_frames)
+    if any(isinstance(m, torch.nn.BatchNorm2d) and m.training for m in generator.modules()):
+        raise ValueError("reconstruction warmup requires frozen BN statistics")
+    boundary = warmup_frames + reconstruction_warmup_frames
+    with torch.no_grad():
+        prefix = infer_independent_frames(
+            generator, features[:, :, :boundary], warmup_frames=warmup_frames
+        )
+    supervised = infer_independent_frames(generator, features, warmup_frames=boundary)
+    return torch.cat((prefix, supervised), dim=2)
+
+
 def batch_missing_band_mask(
     batch: dict[str, Any],
     audio_config: dict[str, Any],
@@ -607,14 +628,19 @@ def train_one_epoch(
         combined = torch.cat((degraded_features, clean_features), dim=1)
         combined = select_causal_sequence(
             combined,
-            int(training_config["objective"]["causal_sequence_frames"]) + warmup_frames,
+            int(training_config["objective"]["causal_sequence_frames"])
+            + warmup_frames
+            + gen_loss_fn.reconstruction_warmup_frames,
         )
         degraded_features, clean_features = combined[:, :2], combined[:, 2:]
         missing_band_mask = batch_missing_band_mask(batch, audio_config, device)
 
         set_requires_grad(discriminator, False)
-        predicted_features = infer_independent_frames(
-            generator, degraded_features, warmup_frames=warmup_frames
+        predicted_features = infer_loss_sequence(
+            generator,
+            degraded_features,
+            warmup_frames=warmup_frames,
+            reconstruction_warmup_frames=gen_loss_fn.reconstruction_warmup_frames,
         )
         degraded_features = degraded_features[:, :, warmup_frames:]
         clean_features = clean_features[:, :, warmup_frames:]
@@ -703,7 +729,7 @@ def validate(
         )
         combined = select_causal_sequence(
             torch.cat((degraded_features, clean_features), dim=1),
-            int(context_frames) + warmup_frames,
+            int(context_frames) + warmup_frames + loss_fn.reconstruction_warmup_frames,
             randomize=False,
         )
         degraded_features, clean_features = combined[:, :2], combined[:, 2:]

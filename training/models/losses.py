@@ -278,6 +278,11 @@ class GeneratorLoss(nn.Module):
         phase_frequency_gradient_weight: float = 0.0025,
         phase_time_gradient_weight: float = 0.025,
         reconstruction_temporal_weight: float = 0.25,
+        reconstruction_warmup_frames: int = 0,
+        multires_spectral_weight: float = 0.5,
+        multires_energy_weight: float = 1.0,
+        multires_temporal_weight: float = 0.25,
+        multires_low_weight: float = 1.0,
     ) -> None:
         super().__init__()
         self.high_band_weight = high_band_weight
@@ -294,8 +299,8 @@ class GeneratorLoss(nn.Module):
         if waveform_region not in {"full", "steady_state"}:
             raise ValueError("waveform_region must be 'full' or 'steady_state'")
         self.waveform_region = waveform_region
-        if objective_version not in {1, 2, 3, 4, 5, 6}:
-            raise ValueError("objective_version must be 1, 2, 3, 4, 5 or 6")
+        if objective_version not in {1, 2, 3, 4, 5, 6, 7}:
+            raise ValueError("objective_version must be 1, 2, 3, 4, 5, 6 or 7")
         for name, value in {
             "magnitude_scale_db": magnitude_scale_db,
             "waveform_normalization_floor": waveform_normalization_floor,
@@ -323,6 +328,10 @@ class GeneratorLoss(nn.Module):
             "phase_frequency_gradient_weight": phase_frequency_gradient_weight,
             "phase_time_gradient_weight": phase_time_gradient_weight,
             "reconstruction_temporal_weight": reconstruction_temporal_weight,
+            "multires_spectral_weight": multires_spectral_weight,
+            "multires_energy_weight": multires_energy_weight,
+            "multires_temporal_weight": multires_temporal_weight,
+            "multires_low_weight": multires_low_weight,
         }.items():
             if not math.isfinite(value) or value < 0:
                 raise ValueError(f"{name} must be finite and non-negative")
@@ -342,6 +351,27 @@ class GeneratorLoss(nn.Module):
         self.phase_frequency_gradient_weight = phase_frequency_gradient_weight
         self.phase_time_gradient_weight = phase_time_gradient_weight
         self.reconstruction_temporal_weight = reconstruction_temporal_weight
+        if (
+            type(reconstruction_warmup_frames) is not int
+            or not 0 <= reconstruction_warmup_frames <= 64
+        ):
+            raise ValueError("reconstruction_warmup_frames must be an integer in 0..64")
+        if objective_version >= 7:
+            if reconstruction_warmup_frames < 1 or waveform_region != "steady_state":
+                raise ValueError(
+                    "v7 requires real reconstruction warmup and steady_state waveforms"
+                )
+            if adversarial_weight or feature_matching_weight:
+                raise ValueError(
+                    "v7 reconstruction warmup currently requires GAN weights to be zero"
+                )
+        elif reconstruction_warmup_frames:
+            raise ValueError("reconstruction warmup requires objective v7")
+        self.reconstruction_warmup_frames = reconstruction_warmup_frames
+        self.multires_spectral_weight = multires_spectral_weight
+        self.multires_energy_weight = multires_energy_weight
+        self.multires_temporal_weight = multires_temporal_weight
+        self.multires_low_weight = multires_low_weight
         for name, value in {
             "magnitude_relative_floor_db": magnitude_relative_floor_db,
             "magnitude_absolute_floor_db": magnitude_absolute_floor_db,
@@ -399,6 +429,11 @@ class GeneratorLoss(nn.Module):
             reconstruction_temporal_weight=float(
                 objective.get("reconstruction_temporal_weight", 0.25)
             ),
+            reconstruction_warmup_frames=objective.get("reconstruction_warmup_frames", 0),
+            multires_spectral_weight=float(objective.get("multires_spectral_weight", 0.5)),
+            multires_energy_weight=float(objective.get("multires_energy_weight", 1.0)),
+            multires_temporal_weight=float(objective.get("multires_temporal_weight", 0.25)),
+            multires_low_weight=float(objective.get("multires_low_weight", 1.0)),
         )
 
     def forward(
@@ -416,6 +451,28 @@ class GeneratorLoss(nn.Module):
         _validate_feature_pair(predicted, target)
         _validate_feature_pair(predicted, degraded)
         mask = _feature_weight(missing_band_mask, predicted[:, 0])
+        deployed_with_history = None
+        if self.objective_version >= 7:
+            prefix = self.reconstruction_warmup_frames
+            if predicted.shape[2] <= prefix:
+                raise ValueError("reconstruction warmup must leave supervised frames")
+            if deployment_geometry is None or "initial_gain" in deployment_geometry:
+                raise ValueError("v7 requires deployment_geometry without an injected initial_gain")
+            # Observe real preceding predictions without optimizing unsupervised
+            # history. Reset gain=1 is the Rust initial state; the remaining
+            # finite-prefix approximation is explicit, not claimed full-stream parity.
+            observed = torch.cat((predicted[:, :, :prefix].detach(), predicted[:, :, prefix:]), 2)
+            deployed_with_history, _ = match_edge_features(
+                degraded,
+                observed,
+                missing_band_mask,
+                initial_gain=predicted.new_ones(predicted.shape[0]),
+                **deployment_geometry,
+            )
+            predicted, target, degraded = (v[:, :, prefix:] for v in (predicted, target, degraded))
+            deployed_with_history = deployed_with_history[:, :, prefix:]
+            mask = mask[:, prefix:]
+            missing_band_mask = mask[:, None]
         mean = _recording_weighted_mean if self.objective_version >= 2 else _weighted_mean
         high_band_magnitude = mean((predicted[:, 0] - target[:, 0]).abs(), mask)
         if self.objective_version >= 3:
@@ -449,7 +506,9 @@ class GeneratorLoss(nn.Module):
         transition_edges = torch.maximum(transition[..., 1:], transition[..., :-1])
         crossover = mean(residual_gradient, transition_edges)
         deployed = predicted
-        if self.objective_version >= 6:
+        if deployed_with_history is not None:
+            deployed = deployed_with_history
+        elif self.objective_version >= 6:
             if deployment_geometry is None:
                 raise ValueError("v6 requires deployment_geometry with cutoff and sample rate")
             deployed, _ = match_edge_features(
@@ -596,7 +655,116 @@ class GeneratorLoss(nn.Module):
             result["total"] = result["total"] + (
                 self.reconstruction_temporal_weight * result["reconstruction_temporal"]
             )
+        if self.objective_version >= 7:
+            multi = multiresolution_reconstruction_terms(
+                deployed,
+                target,
+                degraded,
+                fft_size=self.fft_size,
+                hop_size=self.hop_size,
+                cutoff_hz=deployment_geometry["cutoff_hz"],
+                sample_rate=deployment_geometry["sample_rate"],
+                crossover_width_hz=deployment_geometry["crossover_width_hz"],
+                relative_floor=self.high_relative_floor,
+                absolute_floor=self.waveform_normalization_floor,
+            )
+            result.update(multi)
+            result["total"] = result["total"] + (
+                self.multires_spectral_weight * multi["multires_high_spectral"]
+                + self.multires_energy_weight * multi["multires_high_energy"] / db_scale
+                + self.multires_temporal_weight * multi["multires_high_temporal"]
+                + self.multires_low_weight * multi["multires_low_complex"]
+            )
         return result
+
+
+def multiresolution_reconstruction_terms(
+    predicted: torch.Tensor,
+    target: torch.Tensor,
+    degraded: torch.Tensor,
+    *,
+    fft_size: int,
+    hop_size: int,
+    cutoff_hz: torch.Tensor,
+    sample_rate: torch.Tensor,
+    crossover_width_hz: float,
+    relative_floor: float,
+    absolute_floor: float,
+) -> dict[str, torch.Tensor]:
+    """V7: longer-window HF shape/envelope/dynamics and retained-band fidelity.
+
+    All spectra come from the same fully supported continuous waveform region.
+    Linear spectral error penalizes invented energy; reference-relative signed
+    temporal differences preserve real attacks rather than reward smoothing.
+    Normalizers depend only on reference/input, never on the prediction.
+    """
+    mask = build_missing_band_mask(
+        cutoff_hz, sample_rate, fft_size=fft_size, crossover_width_hz=crossover_width_hz
+    )
+    blended = blend_deployment_features(degraded, predicted, mask)
+    waves = [
+        causal_overlap_add(v, fft_size=fft_size, hop_size=hop_size)
+        for v in (blended, target, degraded)
+    ]
+    edge = fft_size - hop_size
+    if edge:
+        waves = [w[:, edge:-edge] for w in waves]
+    values = {
+        k: []
+        for k in (
+            "multires_high_spectral",
+            "multires_high_energy",
+            "multires_high_temporal",
+            "multires_low_complex",
+        )
+    }
+    for size in (fft_size * 2, fft_size * 4, fft_size * 8):
+        step = size // 4
+        if waves[0].shape[-1] < size + step:
+            raise ValueError(
+                "multiresolution loss needs at least two complete longest-window frames"
+            )
+        window = torch.hann_window(
+            size, periodic=True, device=predicted.device, dtype=predicted.dtype
+        )
+        spectra = [torch.fft.rfft(w.unfold(-1, size, step) * window) for w in waves]
+        amplitudes = [v.abs() for v in spectra]
+        weights = build_missing_band_mask(
+            cutoff_hz, sample_rate, fft_size=size, crossover_width_hz=crossover_width_hz
+        )[:, 0]
+        weights = weights.expand_as(amplitudes[0])
+        values["multires_high_spectral"].append(
+            _relative_high_error(
+                amplitudes[0], amplitudes[1], weights, amplitudes[1], relative_floor, absolute_floor
+            )
+        )
+        # Per-window energy catches envelope mismatches hidden by clip-wide RMS.
+        floor = (
+            (amplitudes[1].square().mean(-1) * relative_floor**2)
+            .clamp_min(absolute_floor**2)
+            .detach()
+        )
+        powers = [(a.square() * weights).mean(-1).clamp_min(floor) for a in amplitudes[:2]]
+        values["multires_high_energy"].append(
+            (10 * torch.log10(powers[0] / powers[1])).abs().mean()
+        )
+        differences = [a[:, 1:] - a[:, :-1] for a in amplitudes[:2]]
+        values["multires_high_temporal"].append(
+            _relative_high_error(
+                differences[0],
+                differences[1],
+                weights[:, 1:],
+                amplitudes[1][:, 1:],
+                relative_floor,
+                absolute_floor,
+            )
+        )
+        delta = ((spectra[0] - spectra[2]) * (1 - weights).sqrt()).flatten(1).norm(dim=1)
+        band = (spectra[2] * (1 - weights).sqrt()).flatten(1).norm(dim=1)
+        full = amplitudes[2].flatten(1).norm(dim=1)
+        scale = band.maximum(full * relative_floor).clamp_min(absolute_floor).detach()
+        values["multires_low_complex"].append((delta / scale).mean())
+    return {k: torch.stack(v).mean() for k, v in values.items()}
 
 
 def phase_gradient_terms(

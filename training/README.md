@@ -232,3 +232,30 @@ artifact-bound rights review and all [release checks](../legal/MODEL_RELEASE_CHE
 pass. No application-ready learned weights have been published yet.
 
 See [regional music acquisition](../docs/dataset-curation.md) for the current free-first, native-lossless regional run and its optional source/coverage audit.
+
+
+### Long reconstruction objective (v7, experimental)
+
+Objective v7 adds an explicit `reconstruction_warmup_frames` prefix after real model
+history. `causal_sequence_frames` still counts supervised frames only. The runner
+infers the DSP prefix without gradients and frozen BN, initializes MatchEdge gain
+at the Rust reset value of 1, advances it through the prefix, and excludes that
+prefix from every supervised term. Gain history is finite and uses manifest cutoff;
+this does not reproduce the online detector, gate ramp or limiter.
+
+V7 requires `waveform_region: steady_state`, frozen BN and zero GAN weights.
+The new observable terms reanalyse the fully supported OLA region at 2x/4x/8x the
+model FFT size: `multires_high_spectral`, `multires_high_energy`,
+`multires_high_temporal`, and `multires_low_complex`. They compare against the clean
+reference (retained-band complex error compares against input), use detached
+reference scales/floors, and penalize deviations from true temporal changes.
+At FFT256/hop128 at least 21 supervised frames are needed for two longest-window
+frames; the experiment uses 32 supervised + 32 DSP warmup + 8 model warmup frames.
+No extra window is added to deployment inference or playback buffering.
+
+`python scripts/prepare_reconstruction_study.py --parent <frame-refiner.pth>
+--output-dir <new-study>` prepares two fixed four-epoch arms. Both use identical
+long sequences and DSP warmup; only multiresolution loss weights differ. Final
+checkpoints are rescored with one common CPU objective, so their differently
+weighted training totals are not compared directly. See the
+[protocol and results](../docs/multires-reconstruction-20261011.md).
