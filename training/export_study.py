@@ -37,7 +37,10 @@ def export_study(checkpoint_path, output_path):
     state = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
     if state["format"] != "soundex-p2-v1":
         raise ValueError("not a P2 checkpoint")
-    if state["config"]["objective_version"] != "causal-reconstruction-v1":
+    if state["config"]["objective_version"] not in {
+        "causal-reconstruction-v1",
+        "causal-weak-band-v1",
+    }:
         raise ValueError("unknown objective")
     if state["kind"] != "legacy":
         return export_causal(checkpoint_path, output_path)

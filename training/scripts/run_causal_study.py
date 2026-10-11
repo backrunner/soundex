@@ -60,14 +60,14 @@ def atomic_save(value, path):
         staged.unlink(missing_ok=True)
 
 
-def validation(model, kind, clips, specs, device):
+def validation(model, kind, clips, specs, device, objective_fn=objective):
     model.eval()
     rows = []
     with torch.no_grad():
         for spec in specs:
             batch = clips.batch([spec], device)
             values = {
-                k: float(v) for k, v in objective(prediction(model, kind, batch), batch).items()
+                k: float(v) for k, v in objective_fn(prediction(model, kind, batch), batch).items()
             }
             if not all(math.isfinite(v) for v in values.values()):
                 raise RuntimeError("nonfinite validation")
@@ -93,16 +93,22 @@ def validation(model, kind, clips, specs, device):
     return {"score": score, "corpora": groups, "rows": rows}
 
 
-def actual_score(model_path, clips, specs, binary):
+def actual_score(model_path, clips, specs, binary, *, sample_count=SAMPLES):
     evaluator = RustStreamEvaluator(binary)
     metrics = []
     for spec in specs:
         row = clips.rows[spec["row_id"]]
+        count = sample_count if sample_count is not None else row["length_samples"] - spec["start"]
+        if count <= (BURN + 8) * 128 + 512:
+            raise ValueError("scoring region too short")
         waves = []
         for role in ("clean", "degraded"):
-            wave, rate = sf.read(Path(row["_root"]) / row[f"{role}_path"], dtype="float32")
-            wave = wave[spec["start"] : spec["start"] + SAMPLES]
-            waves.append(np.pad(wave, (0, SAMPLES - len(wave))))
+            path = Path(row["_root"]) / row[f"{role}_path"]
+            if sha256_file(path) != row[f"{role}_checksum"]:
+                raise ValueError("scoring PCM changed")
+            wave, rate = sf.read(path, dtype="float32")
+            wave = wave[spec["start"] : spec["start"] + count]
+            waves.append(np.pad(wave, (0, count - len(wave))))
         clean, degraded = waves
         result = evaluator.process(
             model_path, degraded, rate, mode="offline", high_band_gain="model"
@@ -115,7 +121,7 @@ def actual_score(model_path, clips, specs, binary):
             cutoff_hz=row["measured_cutoff_hz"],
         )
         # Same fully observed region for the legacy C1 and new 64-hop warmup models.
-        start, stop = (BURN + 8) * 128, SAMPLES - 256
+        start, stop = (BURN + 8) * 128, count - 256
         steady = evaluate_signal_triplet(
             clean[start:stop],
             degraded[start:stop],
@@ -131,11 +137,27 @@ def actual_score(model_path, clips, specs, binary):
         "independent_test": False,
         "listening_performed": False,
         "rows": metrics,
-        "aggregates": aggregate_metric_rows(metrics, samples=1000, seed=20261012, confidence=0.95),
+        "aggregates": aggregate_metric_rows(
+            metrics, samples=1000, seed=20261012, confidence=0.95, cluster_field="track_id"
+        ),
     }
 
 
-def run_arm(kind, seed, config, provenance, schedule, clips, val_specs, root, device):
+def run_arm(
+    kind,
+    seed,
+    config,
+    provenance,
+    schedule,
+    clips,
+    val_specs,
+    root,
+    device,
+    *,
+    objective_fn=objective,
+    validation_fn=validation,
+    initial_checkpoint=None,
+):
     root.mkdir(parents=True, exist_ok=True)
     last = root / "last.pth"
     if (root / "complete.json").exists():
@@ -150,6 +172,13 @@ def run_arm(kind, seed, config, provenance, schedule, clips, val_specs, root, de
         return receipt
     torch.manual_seed(seed)
     model = make_model(kind).to(device)
+    if initial_checkpoint is not None:
+        if sha256_file(initial_checkpoint) != config["parent_checkpoint_sha256"]:
+            raise ValueError("parent checkpoint changed")
+        parent = torch.load(initial_checkpoint, map_location="cpu", weights_only=True)
+        if parent["kind"] != kind or parent["seed"] != seed:
+            raise ValueError("parent kind/seed mismatch")
+        model.load_state_dict(parent["model"], strict=True)
     optimizer = torch.optim.AdamW(model.parameters(), lr=config["learning_rate"], weight_decay=1e-4)
     step, best, seconds = 0, float("inf"), 0.0
     if last.exists():
@@ -180,7 +209,7 @@ def run_arm(kind, seed, config, provenance, schedule, clips, val_specs, root, de
         for group in optimizer.param_groups:
             group["lr"] = lr
         optimizer.zero_grad(set_to_none=True)
-        values = objective(prediction(model, kind, batch), batch)
+        values = objective_fn(prediction(model, kind, batch), batch)
         if not torch.isfinite(values["total"]):
             raise RuntimeError(f"nonfinite train loss at {kind}/{seed}/{step}")
         values["total"].backward()
@@ -188,6 +217,7 @@ def run_arm(kind, seed, config, provenance, schedule, clips, val_specs, root, de
         optimizer.step()
         if step % 32 == 0 or step == 1:
             record = {
+                "arm": config.get("arm", kind),
                 "step": step,
                 "loss": float(values["total"].detach()),
                 "gradient_norm": float(norm),
@@ -200,7 +230,7 @@ def run_arm(kind, seed, config, provenance, schedule, clips, val_specs, root, de
             print(json.dumps({"kind": kind, "seed": seed, **record}), flush=True)
             write_json_report({"kind": kind, "seed": seed, **record}, root.parent / "progress.json")
         if step % config["validation_interval"] == 0 or step == config["steps"]:
-            report = validation(model, kind, clips, val_specs, device)
+            report = validation_fn(model, kind, clips, val_specs, device)
             improved = report["score"] < best
             best = min(best, report["score"])
             state = {
