@@ -152,6 +152,13 @@ Both experiment arms use `sequence_warmup_frames: 8` followed by eight supervise
 frames, so CPU validation must pass `warmup_frames=8` too. Keep loss and crop protocol
 matched; totals from the earlier eight-frame-only study are not direct comparisons.
 See [the causal experiment contract](../docs/causal-context-20261011.md).
+`training.trainable_scope: temporal_only` freezes all parent parameters and trains
+only the four new temporal tensors. It requires nine-frame context, frozen BN,
+no GAN and a warm-started nonzero refiner head; a zero frozen head cannot propagate
+learning into history. The default `all` retains normal training. Changing scope
+requires a fresh optimizer trajectory; it is bound into the resolved checkpoint
+configuration. This supports isolated learning-rate diagnostics, not automatic
+quality promotion.
 
 `checkpoints/best-validation.pth` is the export candidate;
 `checkpoints/final-resume.pth` is atomically updated every epoch for exact resume.

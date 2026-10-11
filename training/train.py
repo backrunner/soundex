@@ -303,6 +303,27 @@ def set_requires_grad(module: torch.nn.Module, enabled: bool) -> None:
         parameter.requires_grad_(enabled)
 
 
+def generator_trainable_parameters(
+    generator: SoundExGenerator, training_config: dict[str, Any]
+) -> list[torch.nn.Parameter]:
+    """Choose a reproducible optimization scope without changing the forward model."""
+    scope = training_config.get("trainable_scope", "all")
+    if scope not in ("all", "temporal_only"):
+        raise ValueError("training.trainable_scope must be all or temporal_only")
+    if scope == "temporal_only":
+        objective = training_config["objective"]
+        if (
+            generator.context_frames != 9
+            or training_config.get("batch_norm_statistics") != "frozen"
+            or float(objective.get("adversarial_weight", 0)) != 0
+            or float(objective.get("feature_matching_weight", 0)) != 0
+        ):
+            raise ValueError("temporal_only requires causal history, frozen BN and no GAN")
+    for name, parameter in generator.named_parameters():
+        parameter.requires_grad_(scope == "all" or name.startswith("spectral_refiner.temporal_"))
+    return [parameter for parameter in generator.parameters() if parameter.requires_grad]
+
+
 def initialize_generator_from_checkpoint(
     path: str | Path,
     generator: SoundExGenerator,
@@ -667,6 +688,8 @@ def validate(
     warmup_frames: int = 0,
 ) -> dict[str, Any]:
     """Compute deterministic row-level and per-stratum validation metrics."""
+    if warmup_frames < getattr(generator, "context_frames", 1) - 1:
+        raise ValueError("validation requires real warmup for the full model history")
     generator.eval()
     rows: list[dict[str, Any]] = []
     for batch in val_loader:
@@ -851,7 +874,9 @@ def main() -> None:
     )
 
     learning_rate = float(config["training"]["learning_rate"])
-    gen_optimizer = torch.optim.AdamW(generator.parameters(), lr=learning_rate, betas=(0.5, 0.9))
+    trainable = generator_trainable_parameters(generator, config["training"])
+    print(f"Trainable generator params: {sum(p.numel() for p in trainable):,}")
+    gen_optimizer = torch.optim.AdamW(trainable, lr=learning_rate, betas=(0.5, 0.9))
     disc_optimizer = torch.optim.AdamW(
         discriminator.parameters(), lr=learning_rate, betas=(0.5, 0.9)
     )
@@ -929,6 +954,11 @@ def main() -> None:
         provenance["initialization"] = checkpoint["provenance"].get(
             "initialization", {"mode": "legacy-checkpoint-resume"}
         )
+
+    if config["training"].get("trainable_scope") == "temporal_only":
+        refiner = generator.spectral_refiner
+        if refiner is None or not torch.count_nonzero(refiner.head.weight).item():
+            raise ValueError("temporal_only requires a parent with a learned nonzero refiner head")
 
     gen_loss_fn = GeneratorLoss.from_config(
         config["training"]["objective"],

@@ -65,6 +65,11 @@ def feature_contract_from_config(config: Mapping[str, Any]) -> dict[str, Any]:
         raise CheckpointSchemaError("context_frames must match spectral refiner history (1 or 9)")
     if context_frames > 1 and (fft_size, hop_size) != (256, 128):
         raise CheckpointSchemaError("temporal context requires FFT256/hop128")
+    warmup = training.get("sequence_warmup_frames", 0)
+    if type(warmup) is not int or not history <= warmup <= 64:
+        raise CheckpointSchemaError(
+            "sequence_warmup_frames must supply the full observed history and be <=64"
+        )
     sample_rates = sorted(int(rate) for rate in recipe.get("sample_rates", []))
     return {
         "schema_version": 1,

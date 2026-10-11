@@ -139,6 +139,10 @@ def test_context_contract_and_rng_budget(resolved_config):
     config["training"]["context_frames"] = 1
     with pytest.raises(CheckpointSchemaError, match="context_frames"):
         feature_contract_from_config(config)
+    config = config_with_history(resolved_config, 8)
+    config["training"]["sequence_warmup_frames"] = 7
+    with pytest.raises(CheckpointSchemaError, match="full observed history"):
+        feature_contract_from_config(config)
     kwargs = dict(bins=129, width=128, representation="gain_shape")
     torch.manual_seed(9)
     frame = SoundExGenerator(spectral_refiner=kwargs)
@@ -163,3 +167,51 @@ def test_validation_audit_uses_real_history_without_future_or_cold_padding():
     torch.testing.assert_close(observed_windows(features, positions, 1), features[positions])
     with pytest.raises(ValueError, match="complete observed history"):
         observed_windows(features, np.array([7]), 9)
+
+
+def test_temporal_validation_rejects_missing_warmup_before_reading_audio():
+    from train import validate
+
+    class Temporal(torch.nn.Identity):
+        context_frames = 9
+
+    with pytest.raises(ValueError, match="real warmup"):
+        validate(Temporal(), None, None, torch.device("cpu"), {}, 8)
+
+
+def test_temporal_only_optimization_preserves_every_parent_parameter_and_buffer():
+    from train import generator_trainable_parameters
+
+    model = SoundExGenerator(
+        channels=[4, 8, 16, 16],
+        bottleneck_blocks=1,
+        spectral_refiner=dict(bins=129, width=32, representation="gain_shape", history_frames=8),
+    ).eval()
+    with torch.no_grad():
+        model.spectral_refiner.head.weight.normal_(std=0.03)
+    config = {
+        "trainable_scope": "temporal_only",
+        "batch_norm_statistics": "frozen",
+        "objective": {},
+    }
+    parameters = generator_trainable_parameters(model, config)
+    assert len(parameters) == 4
+    before = {k: v.clone() for k, v in model.state_dict().items()}
+    x = torch.randn(2, 2, 9, 129)
+    x[:, 0] = x[:, 0] * 15 - 40
+    optimizer = torch.optim.AdamW(parameters, lr=1e-3)
+    for _ in range(2):
+        optimizer.zero_grad()
+        model(x).square().mean().backward()
+        optimizer.step()
+    for name, value in model.state_dict().items():
+        if not name.startswith("spectral_refiner.temporal_"):
+            torch.testing.assert_close(value, before[name], atol=0, rtol=0)
+    assert not torch.equal(
+        model.spectral_refiner.temporal_mix.weight, before["spectral_refiner.temporal_mix.weight"]
+    )
+    assert model.spectral_refiner.temporal_filter.weight.grad.abs().sum() > 0
+    with pytest.raises(ValueError, match="frozen BN"):
+        generator_trainable_parameters(model, {**config, "batch_norm_statistics": "update"})
+    all_parameters = generator_trainable_parameters(model, {"trainable_scope": "all"})
+    assert len(all_parameters) == len(list(model.parameters()))
