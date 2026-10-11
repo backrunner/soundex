@@ -313,3 +313,30 @@ New artifacts require Model gain/phase and 64 observed warmup hops with aligned 
 audio. Benchmarks accept `SOUNDEX_HIGH_BAND_GAIN=model` and record this setting.
 State warmup counters are separate from deadline availability; a timely dry packet
 does not prove that enhancement was available. No raw audio/checkpoints are published.
+
+
+## P2 matched training
+
+`run_causal_study.py` trains fresh legacy/GRU/TCN models using the same frozen
+paired draws, native-rate crops, 64-hop burn-in and `causal-reconstruction-v1`.
+The registered comparison is 4096 updates × batch 4 × two seeds per backbone.
+See [methods, numerical validation and limits](../docs/causal-training-20261012.md).
+
+Build `soundex-gain-data`, `soundex-prediction-replay` and `soundex-stream-eval`
+before running. From this directory, the active study can be resumed with:
+
+```sh
+PYTHONPATH=. .venv/bin/python scripts/run_causal_study.py \
+  --manifest ../data/processed/music_library/processed/music_library-7fda9e58ab583617/manifest.jsonl \
+  --manifest ../data/processed/speech_library/processed/speech_library-7fda9e58ab583617/manifest.jsonl \
+  --selection ../data/reports/optimization-followup-20261010/inpainting/stream-selection.json \
+  --detector ../target/release/soundex-gain-data \
+  --stream-binary ../target/release/soundex-stream-eval \
+  --output ../data/runs/causal-p2-20261012
+```
+
+The file lock rejects duplicate processes. Resume requires identical configuration,
+training source hash and binaries. Checkpoints retain optimizer and RNG state;
+`export_study.py` understands the separate `soundex-p2-v1` checkpoint format.
+Every completed arm exports its validation-selected checkpoint and records actual
+Rust output metrics. No checkpoint is automatically promoted or uploaded.
