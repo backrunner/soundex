@@ -96,6 +96,12 @@ It leaves the 905,734-parameter shape-small ONNX unchanged. Despite lower intern
 regression error, actual high-band energy and spectral convergence regress. The
 coefficients remain local diagnostics and are not enabled by default.
 
+The [phase reconstruction study](../docs/phase-reconstruction-20261011.md) uses the
+same frozen shape-small ONNX with an experimental `surviving-power` phase policy.
+No neural weights or fitted parameters were added. Partial quality improvements
+remain insufficient for release; the default phase policy is still `model`.
+
+
 Official releases require reviewed source grants and initialization under
 [TRAINING_DATA.md](../legal/TRAINING_DATA.md). Source approval, restoration quality,
 listening and real-time runtime/continuity evidence are all required before release.

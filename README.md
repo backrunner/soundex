@@ -40,6 +40,10 @@ measured improvements remain mixed, so neither candidate replaces the baseline.
 A [bounded DSP gain calibration study](docs/gain-calibration-20261011.md) fits ten
 coefficients from production analyzer observations. Its regression improves but
 actual high-band recovery regresses, so the default gain policy remains unchanged.
+The [phase reconstruction study](docs/phase-reconstruction-20261011.md) retains
+model magnitudes while anchoring phase to surviving input power. Waveform fidelity
+and some high-band metrics improve, but music remains short of balanced restoration;
+the new DSP policy is opt-in and no weights are promoted.
 
 ## Quick start
 

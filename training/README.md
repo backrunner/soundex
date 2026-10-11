@@ -269,3 +269,29 @@ a recording-disjoint inner split, and freezes an artifact before Rust developmen
 scoring. The neural ONNX stays unchanged. The current regression target improves
 while actual high-band recovery worsens; do not enable the fitted JSON by default.
 See the [protocol and measured limits](../docs/gain-calibration-20261011.md).
+
+### Phase reconstruction ablation (experimental)
+
+`evaluation.compare_phase` fixes the model, detector, magnitude crossover and
+MatchEdge recurrence while comparing `model`, `observed` and `surviving-power`
+phase policies through the complete Rust stream. The last policy reduces the
+model phase weight by the squared ratio of observed magnitude to the post-gain
+candidate, capped at one. It is a heuristic and does not change model magnitude.
+
+From `training/`, after rebuilding the release evaluator:
+
+```bash
+.venv/bin/python -m evaluation.compare_phase \
+  --model /path/to/model.onnx \
+  --manifest /path/to/music/manifest.jsonl \
+  --manifest /path/to/speech/manifest.jsonl \
+  --selection /path/to/frozen-validation-selection.json \
+  --binary ../target/release/soundex-stream-eval \
+  --output ../data/reports/phase-comparison.json
+```
+
+The bridge explicitly sets and verifies `SOUNDEX_EVAL_PHASE_POLICY`; benchmark
+executables accept `SOUNDEX_PHASE_POLICY` and record the loaded policy. Both
+experimental policies require Neural mode. The training loss proxy has not been
+changed to use this policy; this is a DSP-only study with fixed ONNX weights.
+See [results and limitations](../docs/phase-reconstruction-20261011.md).
