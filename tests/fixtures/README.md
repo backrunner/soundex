@@ -25,3 +25,9 @@ python tests/fixtures/generate_identity.py
 
 Learned restoration weights have separate terms and release gates; see
 [models/README.md](../../models/README.md).
+
+`stateful-probe.onnx` is a schema-2.0 analytic leaky-memory graph used to expose
+state order, physical-channel isolation, gap/reset/reload and allocation bugs.
+Its synthetic `temporal_kind=gru` exercises the new interface, not a learned GRU.
+It requires `HighBandGain::Model` and returns aligned dry audio during the first
+64 observed hops. No training data or learned restoration weights are included.

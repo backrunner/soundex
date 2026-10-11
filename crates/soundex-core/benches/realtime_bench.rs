@@ -129,6 +129,11 @@ fn measure(
         .sample_rate(sample_rate)
         .channels(channels);
     config.enhancement_mode = enhancement_mode;
+    config.high_band_gain = env::var("SOUNDEX_HIGH_BAND_GAIN")
+        .unwrap_or_else(|_| "match-edge".into())
+        .parse()
+        .map_err(|error: &str| error.to_string())?;
+    let high_band_gain = config.high_band_gain.as_str();
     if let Some(path) = env::var_os("SOUNDEX_GAIN_CALIBRATION") {
         config.gain_calibration = Some(soundex_core::calibration::read_gain_calibration(path)?);
     }
@@ -239,6 +244,8 @@ fn measure(
     let redline_met = assessment.latency_limit_met;
     let worker_metadata = json!({
         "processed_hops": worker.processed_hops,
+        "state_history_warmup_hops": worker.state_history_warmup_hops,
+        "state_history_warmup_ratio": worker.state_history_warmup_hops as f64 / worker.processed_hops.max(1) as f64,
         "startup_warmup_runs": worker.warmup_runs,
         "startup_warmup_ms": worker.warmup_ns as f64 / 1e6,
         "discarded_input_hops": worker.discarded_input_hops,
@@ -253,7 +260,7 @@ fn measure(
         });
     Ok(report::Case {
         metadata: json!({
-            "phase_policy": phase_policy, "gain_calibration_coefficients": gain_calibration_coefficients,
+            "phase_policy": phase_policy, "high_band_gain": high_band_gain, "gain_calibration_coefficients": gain_calibration_coefficients,
             "sample_rate_hz": sample_rate, "channels": channels,
             "construction_ms": load_ms, "hops": hops,
             "source": source.evidence(),
@@ -268,6 +275,7 @@ fn measure(
             "target_8ms_met": assessment.latency_target_met,
             "callback_budget_met": assessment.callback_budget_met,
             "enhancement_availability_met": assessment.enhancement_availability_met,
+            "availability_scope": "deadline availability; explicit-state dry warmup reported separately",
             "worker_miss_ratio": assessment.worker_miss_ratio,
             "worker_miss_burst_ms": assessment.worker_miss_burst_ms,
             "max_consecutive_worker_misses": stats.max_consecutive_deadline_misses,

@@ -29,6 +29,7 @@ mod inference_contract;
 pub mod analysis;
 pub mod calibration;
 pub mod config;
+pub mod diagnostics;
 pub mod error;
 pub mod inference;
 pub mod processor;

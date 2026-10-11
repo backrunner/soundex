@@ -11,6 +11,7 @@ const INPUT_NAME: &str = "input_features";
 const OUTPUT_NAME: &str = "output_features";
 const CHANNELS: i64 = 2;
 mod numbers;
+mod stateful;
 use numbers::{parse_float, parse_number, parse_numbers};
 
 const LEGACY_FRAME_CONTRACT: (usize, usize) = (2048, 512);
@@ -50,12 +51,23 @@ const REQUIRED_METADATA: &[&str] = &[
 pub(crate) struct ModelFrameContract {
     pub(crate) frequency_bins: usize,
     pub(crate) context_frames: usize,
+    pub(crate) state_size: usize,
+    pub(crate) warmup_frames: usize,
 }
 
 pub(crate) fn validate_session_contract(
     session: &ort::session::Session,
     config: &SoundExConfig,
 ) -> Result<ModelFrameContract> {
+    if session
+        .metadata()
+        .map_err(|e| SoundExError::ModelLoad(e.to_string()))?
+        .custom("soundex.artifact_schema")
+        .as_deref()
+        == Some("2.0")
+    {
+        return stateful::validate(session, config);
+    }
     if session.inputs().len() != 1 || session.outputs().len() != 1 {
         return contract_error(format!(
             "expected one input and one output, got {} inputs and {} outputs",
@@ -249,6 +261,8 @@ fn validate_metadata(
     Ok(ModelFrameContract {
         frequency_bins,
         context_frames,
+        state_size: 0,
+        warmup_frames: 0,
     })
 }
 

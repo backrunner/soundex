@@ -2,7 +2,8 @@
 //!
 //! SoundEx models consume `[B, 2, C, F]` and emit `[B, 2, 1, F]`, where
 //! C is 1 or 9 observed oldest-to-current frames and
-//! channel 0 is magnitude in dB and channel 1 is phase in radians.
+//! channel 0 is magnitude in dB and channel 1 is phase in radians. Schema 2.0
+//! additionally has explicit state and sample-rate inputs; it is not a C9 graph.
 
 #[cfg(not(feature = "ort-backend"))]
 use ndarray::{Array4, ArrayView4, ArrayViewMut4};
@@ -29,6 +30,12 @@ mod inner {
     struct InferenceBuffers {
         input: Tensor<f32>,
         run_options: RunOptions<HasSelectedOutputs>,
+        state: Option<StateBuffers>,
+    }
+
+    struct StateBuffers {
+        input: Tensor<f32>,
+        sample_rate: Tensor<f32>,
     }
 
     impl InferenceBuffers {
@@ -38,6 +45,8 @@ mod inner {
             batch_size: usize,
             frequency_bins: usize,
             context_frames: usize,
+            state_size: usize,
+            sample_rate: u32,
         ) -> Result<Self> {
             let shape = [batch_size, 2, 1, frequency_bins];
             let input = Tensor::<f32>::new(
@@ -47,10 +56,32 @@ mod inner {
             .map_err(|error| SoundExError::ModelLoad(error.to_string()))?;
             let output = Tensor::<f32>::new(session.allocator(), shape)
                 .map_err(|error| SoundExError::ModelLoad(error.to_string()))?;
+            let mut selector = OutputSelector::default().preallocate(output_name, output);
+            let state = if state_size > 0 {
+                let mut input = Tensor::<f32>::new(session.allocator(), [batch_size, state_size])
+                    .map_err(|e| SoundExError::ModelLoad(e.to_string()))?;
+                input.extract_tensor_mut().1.fill(0.0);
+                let output = Tensor::<f32>::new(session.allocator(), [batch_size, state_size])
+                    .map_err(|e| SoundExError::ModelLoad(e.to_string()))?;
+                let mut rate = Tensor::<f32>::new(session.allocator(), [batch_size, 1])
+                    .map_err(|e| SoundExError::ModelLoad(e.to_string()))?;
+                rate.extract_tensor_mut().1.fill(sample_rate as f32);
+                selector = selector.preallocate("output_state", output);
+                Some(StateBuffers {
+                    input,
+                    sample_rate: rate,
+                })
+            } else {
+                None
+            };
             let run_options = RunOptions::new()
                 .map_err(|error| SoundExError::ModelLoad(error.to_string()))?
-                .with_outputs(OutputSelector::default().preallocate(output_name, output));
-            Ok(Self { input, run_options })
+                .with_outputs(selector);
+            Ok(Self {
+                input,
+                run_options,
+                state,
+            })
         }
     }
 
@@ -62,6 +93,8 @@ mod inner {
         batch_two: InferenceBuffers,
         frequency_bins: usize,
         context_frames: usize,
+        state_size: usize,
+        warmup_frames: usize,
         run_count: u64,
         #[cfg(test)]
         fail_after_successes: Option<usize>,
@@ -89,6 +122,16 @@ mod inner {
                 .commit_from_file(model_path)
                 .map_err(|error| SoundExError::ModelLoad(error.to_string()))?;
             let frame_contract = validate_session_contract(&session, config)?;
+            if frame_contract.state_size > 0
+                && std::fs::metadata(model_path)
+                    .map_err(|e| SoundExError::ModelLoad(e.to_string()))?
+                    .len()
+                    >= 8 * 1024 * 1024
+            {
+                return Err(SoundExError::ModelContract(
+                    "stateful artifact exceeds 8 MiB".into(),
+                ));
+            }
 
             let output_name = session.outputs()[0].name().to_owned();
             let batch_one = InferenceBuffers::new(
@@ -97,6 +140,8 @@ mod inner {
                 1,
                 frame_contract.frequency_bins,
                 frame_contract.context_frames,
+                frame_contract.state_size,
+                config.sample_rate,
             )?;
             let batch_two = InferenceBuffers::new(
                 &session,
@@ -104,6 +149,8 @@ mod inner {
                 2,
                 frame_contract.frequency_bins,
                 frame_contract.context_frames,
+                frame_contract.state_size,
+                config.sample_rate,
             )?;
 
             Ok(Self {
@@ -112,6 +159,8 @@ mod inner {
                 batch_two,
                 frequency_bins: frame_contract.frequency_bins,
                 context_frames: frame_contract.context_frames,
+                state_size: frame_contract.state_size,
+                warmup_frames: frame_contract.warmup_frames,
                 session,
                 run_count: 0,
                 #[cfg(test)]
@@ -120,6 +169,8 @@ mod inner {
         }
 
         /// Run inference on one or two artifact-bound `[B, 2, C, F]` channel windows.
+        /// Stateful batch-one and batch-two histories are independent. Keep the
+        /// batch/physical-channel order fixed for a stream; reset before reuse.
         pub fn infer(&mut self, input: &Array4<f32>) -> Result<Array4<f32>> {
             let mut output = Array4::zeros((input.shape()[0], 2, 1, self.frequency_bins));
             self.infer_into(input.view(), output.view_mut())?;
@@ -175,10 +226,16 @@ mod inner {
                 .1
                 .copy_from_slice(input_values);
             self.run_count += 1;
-            let outputs = self
-                .session
-                .run_with_options(ort::inputs![&buffers.input], &buffers.run_options)
-                .map_err(|error| SoundExError::Inference(error.to_string()))?;
+            let outputs = if let Some(state) = &buffers.state {
+                self.session.run_with_options(
+                    ort::inputs![&buffers.input, &state.input, &state.sample_rate],
+                    &buffers.run_options,
+                )
+            } else {
+                self.session
+                    .run_with_options(ort::inputs![&buffers.input], &buffers.run_options)
+            }
+            .map_err(|error| SoundExError::Inference(error.to_string()))?;
             let runtime_output = outputs
                 .get(&self.output_name)
                 .ok_or_else(|| SoundExError::Inference("model output not found".into()))?;
@@ -201,8 +258,40 @@ mod inner {
                 ));
             }
 
+            if let Some(state) = &mut buffers.state {
+                let next = outputs
+                    .get("output_state")
+                    .ok_or_else(|| SoundExError::Inference("missing next state".into()))?;
+                let (shape, state_values) = next
+                    .try_extract_tensor::<f32>()
+                    .map_err(|e| SoundExError::Inference(e.to_string()))?;
+                if shape.as_ref() != [expected_shape[0] as i64, self.state_size as i64]
+                    || state_values.iter().any(|x| !x.is_finite())
+                {
+                    return Err(SoundExError::Inference("invalid next state".into()));
+                }
+                state
+                    .input
+                    .extract_tensor_mut()
+                    .1
+                    .copy_from_slice(state_values);
+            }
             output_values.copy_from_slice(values);
             Ok(())
+        }
+
+        pub fn is_stateful(&self) -> bool {
+            self.state_size > 0
+        }
+        pub fn warmup_frames(&self) -> usize {
+            self.warmup_frames
+        }
+        pub fn reset_state(&mut self) {
+            for buffer in [&mut self.batch_one, &mut self.batch_two] {
+                if let Some(state) = &mut buffer.state {
+                    state.input.extract_tensor_mut().1.fill(0.0);
+                }
+            }
         }
 
         /// Return the fixed frequency size declared by the SoundEx contract.
@@ -236,6 +325,13 @@ pub struct InferenceEngine;
 
 #[cfg(not(feature = "ort-backend"))]
 impl InferenceEngine {
+    pub fn is_stateful(&self) -> bool {
+        false
+    }
+    pub fn warmup_frames(&self) -> usize {
+        0
+    }
+    pub fn reset_state(&mut self) {}
     /// Return an error because no inference backend is enabled.
     pub fn load(_model_path: &std::path::Path, _config: &SoundExConfig) -> Result<Self> {
         Err(SoundExError::ModelLoad(

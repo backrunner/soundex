@@ -305,6 +305,10 @@ impl ChannelProcessor {
         self.needs_enhancement
     }
 
+    pub(crate) fn suppress_enhancement(&mut self) {
+        self.needs_enhancement = false;
+    }
+
     pub(crate) fn dry(&self) -> &[f32] {
         &self.dry
     }

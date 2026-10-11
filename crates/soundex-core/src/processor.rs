@@ -1,6 +1,6 @@
 //! Public streaming and offline audio enhancement processor.
 
-use ndarray::{s, Array4};
+use ndarray::{s, Array4, ArrayView4};
 use soundex_dsp::limiter::Limiter;
 
 use crate::channel::ChannelProcessor;
@@ -169,6 +169,7 @@ pub struct SoundExProcessor {
     dry_interleaved: Vec<f32>,
     wet_interleaved: Vec<f32>,
     hop_output: Vec<f32>,
+    observed_hops: usize,
 }
 
 impl SoundExProcessor {
@@ -213,6 +214,7 @@ impl SoundExProcessor {
             dry_interleaved: vec![0.0; hop_samples],
             wet_interleaved: vec![0.0; hop_samples],
             hop_output: vec![0.0; hop_samples],
+            observed_hops: 0,
         })
     }
 
@@ -222,6 +224,38 @@ impl SoundExProcessor {
     /// Startup samples, including zeros, are returned directly; call
     /// [`finalize`](Self::finalize) once to retrieve the delayed tail.
     pub fn process_frame(&mut self, input: &[f32], output: &mut [f32]) -> Result<ProcessInfo> {
+        self.process_frame_impl(input, output, None)
+    }
+
+    /// Offline diagnostic seam: replace inference only, retaining the production DSP.
+    pub(crate) fn process_oracle_frame(
+        &mut self,
+        input: &[f32],
+        output: &mut [f32],
+        prediction: ArrayView4<'_, f32>,
+    ) -> Result<ProcessInfo> {
+        if self.config.enhancement_mode != EnhancementMode::Neural
+            || self
+                .engine
+                .as_ref()
+                .is_some_and(InferenceEngine::is_stateful)
+            || self.inference_input.shape()[2] != 1
+            || prediction.shape() != [self.channel_count(), 2, 1, self.config.fft_size / 2 + 1]
+            || prediction.iter().any(|value| !value.is_finite())
+        {
+            return Err(SoundExError::InvalidInput(
+                "oracle requires finite physical-channel C1 predictions in neural mode".into(),
+            ));
+        }
+        self.process_frame_impl(input, output, Some(prediction))
+    }
+
+    fn process_frame_impl(
+        &mut self,
+        input: &[f32],
+        output: &mut [f32],
+        prediction: Option<ArrayView4<'_, f32>>,
+    ) -> Result<ProcessInfo> {
         self.ensure_usable()?;
         let expected = self.hop_samples();
         if input.len() != expected || output.len() != expected {
@@ -238,7 +272,7 @@ impl SoundExProcessor {
             StreamMode::Finalized | StreamMode::Poisoned => unreachable!(),
         }
 
-        match self.process_hop_internal(input) {
+        match self.process_hop_with_prediction(input, prediction) {
             Ok(info) => {
                 output.copy_from_slice(&self.hop_output);
                 Ok(info)
@@ -464,6 +498,10 @@ impl SoundExProcessor {
 
     /// Reset all channel, gate, overlap-add, and stream lifecycle state.
     pub fn reset(&mut self) {
+        self.observed_hops = 0;
+        if let Some(engine) = &mut self.engine {
+            engine.reset_state();
+        }
         for channel in &mut self.channels {
             channel.reset();
         }
@@ -529,12 +567,37 @@ impl SoundExProcessor {
         }
         self.inference_input.fill(0.0);
         self.inference_output.fill(0.0);
+        engine.reset_state();
         Ok(engine.run_count() - before)
     }
 
+    /// Whether the next hop will use aligned dry output while explicit state warms.
+    pub(crate) fn state_history_warming(&self) -> bool {
+        self.engine
+            .as_ref()
+            .is_some_and(|e| self.observed_hops < e.warmup_frames())
+    }
+
     fn process_hop_internal(&mut self, input: &[f32]) -> Result<ProcessInfo> {
+        self.process_hop_with_prediction(input, None)
+    }
+
+    fn process_hop_with_prediction(
+        &mut self,
+        input: &[f32],
+        prediction: Option<ArrayView4<'_, f32>>,
+    ) -> Result<ProcessInfo> {
         debug_assert_eq!(input.len(), self.hop_samples());
         let channel_count = self.channel_count();
+        self.observed_hops = self.observed_hops.saturating_add(1);
+        let stateful = self
+            .engine
+            .as_ref()
+            .is_some_and(InferenceEngine::is_stateful);
+        let warmup = self
+            .engine
+            .as_ref()
+            .map_or(0, InferenceEngine::warmup_frames);
         for channel_index in 0..channel_count {
             for sample in 0..self.config.hop_size {
                 self.channel_inputs[channel_index][sample] =
@@ -542,11 +605,14 @@ impl SoundExProcessor {
             }
             self.channels[channel_index]
                 .analyze_hop(&self.channel_inputs[channel_index], &self.config)?;
+            if self.observed_hops <= warmup {
+                self.channels[channel_index].suppress_enhancement();
+            }
         }
 
         self.active_channels.clear();
         for (channel_index, channel) in self.channels.iter().enumerate() {
-            if channel.needs_enhancement() && self.engine.is_some() {
+            if (stateful || channel.needs_enhancement()) && self.engine.is_some() {
                 let batch_index = self.active_channels.len();
                 channel.write_model_input(&mut self.inference_input, batch_index);
                 self.active_channels.push(channel_index);
@@ -554,14 +620,22 @@ impl SoundExProcessor {
         }
         let active_count = self.active_channels.len();
         if active_count > 0 {
-            self.engine
-                .as_mut()
-                .expect("active channels require a model")
-                .infer_into(
-                    self.inference_input.slice(s![..active_count, .., .., ..]),
+            if let Some(prediction) = prediction {
+                for (batch, &physical_channel) in self.active_channels.iter().enumerate() {
                     self.inference_output
-                        .slice_mut(s![..active_count, .., .., ..]),
-                )?;
+                        .slice_mut(s![batch, .., .., ..])
+                        .assign(&prediction.slice(s![physical_channel, .., .., ..]));
+                }
+            } else {
+                self.engine
+                    .as_mut()
+                    .expect("active channels require a model")
+                    .infer_into(
+                        self.inference_input.slice(s![..active_count, .., .., ..]),
+                        self.inference_output
+                            .slice_mut(s![..active_count, .., .., ..]),
+                    )?;
+            }
         }
 
         for channel_index in 0..channel_count {
@@ -770,22 +844,26 @@ mod tests {
     #[cfg(feature = "ort-backend")]
     #[test]
     fn inference_prewarm_does_not_advance_audio_or_dsp_history() {
-        let model = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tests/fixtures/low-latency-identity.onnx");
-        let config = SoundExConfig::with_model(model).channels(2);
-        let mut warmed = SoundExProcessor::new(config.clone()).unwrap();
-        let mut cold = SoundExProcessor::new(config).unwrap();
-        assert_eq!(warmed.warm_up_inference().unwrap(), 8);
-        let input: Vec<f32> = (0..2048)
-            .flat_map(|frame| {
-                let signal = 0.2 * (frame as f32 * 0.057).sin();
-                [signal, -signal]
-            })
-            .collect();
-        assert_eq!(
-            warmed.process_buffer(&input).unwrap(),
-            cold.process_buffer(&input).unwrap()
-        );
+        for name in ["low-latency-identity.onnx", "stateful-probe.onnx"] {
+            let model = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join(format!("../../tests/fixtures/{name}"));
+            let mut config = SoundExConfig::with_model(model).channels(2);
+            config.high_band_gain = crate::HighBandGain::Model;
+            config.min_bandwidth_ratio = 1.0;
+            let mut warmed = SoundExProcessor::new(config.clone()).unwrap();
+            let mut cold = SoundExProcessor::new(config).unwrap();
+            assert_eq!(warmed.warm_up_inference().unwrap(), 8);
+            let input: Vec<f32> = (0..128 * 100)
+                .flat_map(|frame| {
+                    let signal = 0.2 * (frame as f32 * 0.057).sin();
+                    [signal, -signal]
+                })
+                .collect();
+            assert_eq!(
+                warmed.process_buffer(&input).unwrap(),
+                cold.process_buffer(&input).unwrap()
+            );
+        }
     }
 
     #[test]

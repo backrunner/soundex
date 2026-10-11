@@ -37,6 +37,7 @@ pub(super) struct Control {
     pub failed: AtomicBool,
     pub presentation_sequence: AtomicU64,
     pub processed: AtomicU64,
+    pub state_warmup: AtomicU64,
     pub warmup_runs: AtomicU64,
     pub warmup_ns: AtomicU64,
     pub discarded_inputs: AtomicU64,

@@ -73,6 +73,7 @@ pub(super) fn spawn(
                     if !contiguous {
                         processor.reset();
                     }
+                    let state_warming = processor.state_history_warming();
                     let mut output = Packet {
                         sequence: packet.sequence,
                         valid: contiguous && packet.sequence != 0,
@@ -85,6 +86,9 @@ pub(super) fn spawn(
                     let elapsed = started.elapsed();
                     control.processing.record(elapsed.as_nanos() as u64);
                     control.processed.fetch_add(1, Ordering::Relaxed);
+                    if state_warming {
+                        control.state_warmup.fetch_add(1, Ordering::Relaxed);
+                    }
                     control
                         .max_processing_ns
                         .fetch_max(elapsed.as_nanos() as u64, Ordering::Relaxed);
@@ -129,6 +133,62 @@ fn expired(sequence: u64, control: &Control) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "ort-backend")]
+    #[test]
+    fn sequence_gap_clears_model_memory_and_counts_dry_state_warmup() {
+        let mut config = crate::SoundExConfig::with_model(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures/stateful-probe.onnx"),
+        );
+        config.high_band_gain = crate::HighBandGain::Model;
+        config.min_bandwidth_ratio = 1.0;
+        let mut fresh = SoundExProcessor::new(config.clone()).unwrap();
+        let processor = SoundExProcessor::new(config).unwrap();
+        let (mut audio, worker_queues) = super::super::transport::queues();
+        let control = Arc::clone(&audio.control);
+        let handle = spawn(
+            processor,
+            worker_queues,
+            Arc::clone(&control),
+            128,
+            44100,
+            false,
+            true,
+        )
+        .unwrap();
+        for index in 0..140 {
+            let sequence = if index < 70 { index } else { index + 10 };
+            let mut packet = Packet {
+                sequence,
+                ..Packet::default()
+            };
+            for (n, value) in packet.samples[..128].iter_mut().enumerate() {
+                *value = 0.1 * ((index * 128 + n as u64) as f32 * 0.13).sin();
+            }
+            assert!(audio.input.push(packet).is_ok());
+            let deadline = Instant::now() + Duration::from_secs(5);
+            let result = loop {
+                if let Ok(result) = audio.output.pop() {
+                    break result;
+                }
+                assert!(Instant::now() < deadline, "worker did not respond");
+                thread::yield_now();
+            };
+            if index >= 70 {
+                let mut expected = [0.0; 128];
+                fresh
+                    .process_frame(&packet.samples[..128], &mut expected)
+                    .unwrap();
+                assert_eq!(result.samples[..128], expected);
+                assert_eq!(result.valid, index != 70);
+            }
+        }
+        control.stop.store(true, Ordering::Release);
+        handle.join().unwrap();
+        assert_eq!(control.state_warmup.load(Ordering::Relaxed), 128);
+        assert!(!control.failed.load(Ordering::Relaxed));
+    }
 
     #[test]
     fn deadline_is_presentation_hop_not_age_or_queue_length() {

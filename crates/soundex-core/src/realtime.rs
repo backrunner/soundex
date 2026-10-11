@@ -48,6 +48,9 @@ pub struct RealtimeStats {
 pub struct RealtimeWorkerStats {
     /// Input hops processed, including DSP history warmup and late predictions.
     pub processed_hops: u64,
+    /// Processed hops suppressed for explicit-state history, including gap recovery.
+    /// These can be accepted on time while carrying dry audio; not a deadline miss.
+    pub state_history_warmup_hops: u64,
     /// Inference-only initialization runs; excluded from input-hop timing/counters.
     pub warmup_runs: u64,
     /// Initialization inference wall time on the worker before real-time promotion.
@@ -155,6 +158,7 @@ impl RealtimeProcessor {
     pub fn worker_stats(&self) -> RealtimeWorkerStats {
         RealtimeWorkerStats {
             processed_hops: self.control.processed.load(Ordering::Relaxed),
+            state_history_warmup_hops: self.control.state_warmup.load(Ordering::Relaxed),
             warmup_runs: self.control.warmup_runs.load(Ordering::Relaxed),
             warmup_ns: self.control.warmup_ns.load(Ordering::Relaxed),
             discarded_input_hops: self.control.discarded_inputs.load(Ordering::Relaxed),

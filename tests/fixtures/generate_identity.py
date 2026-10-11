@@ -105,7 +105,51 @@ def generate_temporal() -> None:
     onnx.save(model, Path(__file__).with_name("temporal-probe.onnx"))
 
 
+def generate_stateful() -> None:
+    """Analytic leaky memory, not trained weights. History affects magnitude only."""
+    graph = helper.make_graph([
+        helper.make_node("ReduceMean", ["input_features"], ["mean"], axes=[1, 2, 3], keepdims=0),
+        helper.make_node("Unsqueeze", ["mean", "axis1"], ["current"]),
+        helper.make_node("Mul", ["input_state", "decay"], ["past"]),
+        helper.make_node("Mul", ["current", "step"], ["increment"]),
+        helper.make_node("Add", ["past", "increment"], ["output_state"]),
+        helper.make_node("Unsqueeze", ["input_state", "axes23"], ["history"]),
+        helper.make_node("Mul", ["history", "mag_only"], ["correction"]),
+        helper.make_node("Add", ["input_features", "correction"], ["output_features"]),
+    ], "soundex_stateful_probe", [
+        helper.make_tensor_value_info("input_features", TensorProto.FLOAT, ["batch", 2, 1, 129]),
+        helper.make_tensor_value_info("input_state", TensorProto.FLOAT, ["batch", 1]),
+        helper.make_tensor_value_info("sample_rate_hz", TensorProto.FLOAT, ["batch", 1]),
+    ], [
+        helper.make_tensor_value_info("output_features", TensorProto.FLOAT, ["batch", 2, 1, 129]),
+        helper.make_tensor_value_info("output_state", TensorProto.FLOAT, ["batch", 1]),
+    ], initializer=[
+        helper.make_tensor("axis1", TensorProto.INT64, [1], [1]),
+        helper.make_tensor("axes23", TensorProto.INT64, [2], [2, 3]),
+        helper.make_tensor("decay", TensorProto.FLOAT, [], [0.9]),
+        helper.make_tensor("step", TensorProto.FLOAT, [], [0.01]),
+        helper.make_tensor("mag_only", TensorProto.FLOAT, [1, 2, 1, 1], [1, 0]),
+    ])
+    model = helper.make_model(graph, producer_name="SoundEx synthetic state test",
+                              opset_imports=[helper.make_opsetid("", 17)], ir_version=9)
+    metadata = dict(METADATA)
+    metadata.update({
+        "soundex.artifact_schema": "2.0", "soundex.model_architecture": "soundex-causal-complex",
+        "soundex.input_shape": "batch,2,1,129", "soundex.output_shape": "batch,2,1,129",
+        "soundex.fft_size": "256", "soundex.hop_size": "128", "soundex.stateless": "false",
+        "soundex.state_size": "1", "soundex.state_layout": "batch,state",
+        "soundex.state_reset": "zeros", "soundex.temporal_kind": "gru",
+        "soundex.warmup_frames": "64", "soundex.high_band_gain": "model",
+        "soundex.phase_policy": "model", "soundex.parameter_count": "1",
+        "soundex.sample_rate_input_units": "Hz",
+    })
+    helper.set_model_props(model, metadata)
+    onnx.checker.check_model(model)
+    onnx.save(model, Path(__file__).with_name("stateful-probe.onnx"))
+
+
 if __name__ == "__main__":
+    generate_stateful()
     generate_temporal()
     generate(1024, 512, "identity.onnx")
     generate(256, 128, "low-latency-identity.onnx")

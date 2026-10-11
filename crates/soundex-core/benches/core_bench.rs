@@ -89,6 +89,7 @@ fn run() -> Result<bool, Box<dyn Error>> {
         report_type: "soundex-performance",
         generated_unix_seconds: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
         diagnostic,
+        high_band_gain: env::var("SOUNDEX_HIGH_BAND_GAIN").unwrap_or_else(|_| "match-edge".into()),
         artifact,
         protocol: FrameProtocol {
             fft_size: FFT_SIZE,
@@ -134,6 +135,10 @@ fn run_case(
         .ort_threads(1, 1)
         .ort_parallel_execution(false);
     config.min_bandwidth_ratio = 1.0;
+    config.high_band_gain = env::var("SOUNDEX_HIGH_BAND_GAIN")
+        .unwrap_or_else(|_| "match-edge".into())
+        .parse()
+        .map_err(|error: &str| error.to_string())?;
     let construction_started = Instant::now();
     let mut processor = SoundExProcessor::new(config)?;
     let processor_construction_ms = construction_started.elapsed().as_secs_f64() * 1_000.0;
@@ -143,12 +148,13 @@ fn run_case(
     let first_started = Instant::now();
     let first_info = processor.process_frame(black_box(&input), black_box(&mut output))?;
     let first_frame_ns = duration_ns(first_started.elapsed());
-    if first_info.bypassed {
+    if first_info.bypassed && processor.inference_run_count() != 1 {
         return Err("benchmark stimulus unexpectedly bypassed inference".into());
     }
     for _ in 0..warmup_hops {
+        let before = processor.inference_run_count();
         let info = processor.process_frame(black_box(&input), black_box(&mut output))?;
-        if info.bypassed {
+        if info.bypassed && processor.inference_run_count() != before + 1 {
             return Err("benchmark stimulus bypassed inference during warm-up".into());
         }
     }

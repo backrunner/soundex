@@ -77,6 +77,9 @@ fn processor(enhance: bool, name: &str, fft_size: usize, hop_size: usize) -> Sou
         .fft_size(fft_size)
         .hop_size(hop_size)
         .channels(2);
+    if name == "stateful-probe.onnx" {
+        config.high_band_gain = soundex_core::HighBandGain::Model;
+    }
     config.min_bandwidth_ratio = if enhance { 1.0 } else { 0.0 };
     SoundExProcessor::new(config).unwrap()
 }
@@ -87,12 +90,13 @@ fn warmed_process_frame_has_no_rust_heap_allocations() {
         ("identity.onnx", 1024, 512),
         ("low-latency-identity.onnx", 256, 128),
         ("temporal-probe.onnx", 256, 128),
+        ("stateful-probe.onnx", 256, 128),
     ] {
         let input = stereo_tone(hop_size);
         let mut output = vec![0.0; input.len()];
         for enhance in [true, false] {
             let mut processor = processor(enhance, name, fft_size, hop_size);
-            for _ in 0..12 {
+            for _ in 0..72 {
                 processor.process_frame(&input, &mut output).unwrap();
             }
             // Rust allocator only; ORT C/C++ allocations require the RSS stress run.
@@ -106,15 +110,22 @@ fn warmed_process_frame_has_no_rust_heap_allocations() {
 
 #[test]
 fn realtime_callback_allocates_nothing_including_startup_and_saturated_fallback() {
-    for name in ["low-latency-identity.onnx", "temporal-probe.onnx"] {
+    for name in [
+        "low-latency-identity.onnx",
+        "temporal-probe.onnx",
+        "stateful-probe.onnx",
+    ] {
         for mode in [
             EnhancementMode::Neural,
             EnhancementMode::Spectral,
             EnhancementMode::Hybrid,
         ] {
-            let config = SoundExConfig::with_model(model_path(name))
+            let mut config = SoundExConfig::with_model(model_path(name))
                 .channels(2)
                 .enhancement_mode(mode);
+            if name == "stateful-probe.onnx" {
+                config.high_band_gain = soundex_core::HighBandGain::Model;
+            }
             let mut processor = RealtimeProcessor::new(config).unwrap();
             let mut output = [0.0; 256];
             let mut input = [0.125; 256];
@@ -165,7 +176,7 @@ fn phase_policies_allocate_nothing_in_active_worker_hops() {
         let mut processor = SoundExProcessor::new(config).unwrap();
         let input = stereo_tone(128);
         let mut output = [0.0; 256];
-        for _ in 0..12 {
+        for _ in 0..72 {
             processor.process_frame(&input, &mut output).unwrap();
         }
         let previous_runs = processor.inference_run_count();
