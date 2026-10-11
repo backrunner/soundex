@@ -253,8 +253,8 @@ At FFT256/hop128 at least 21 supervised frames are needed for two longest-window
 frames; the experiment uses 32 supervised + 32 DSP warmup + 8 model warmup frames.
 No extra window is added to deployment inference or playback buffering.
 
-`python scripts/prepare_reconstruction_study.py --parent <frame-refiner.pth>
---output-dir <new-study>` prepares two fixed four-epoch arms. Both use identical
+`scripts/prepare_reconstruction_study.py` prepares two fixed four-epoch arms
+with `--parent <frame-refiner.pth> --output-dir <new-study>`. Both use identical
 long sequences and DSP warmup; only multiresolution loss weights differ. Final
 checkpoints are rescored with one common CPU objective, so their differently
 weighted training totals are not compared directly. See the

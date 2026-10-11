@@ -34,6 +34,9 @@ All three new arms completed eight epochs; the [measured results](docs/architect
 show a lower validation loss, but no balanced quality win that warrants promotion.
 The [causal follow-up](docs/causal-context-20261011.md) implements eight past frames
 with unchanged output delay and two matched eight-epoch runs; it remains experimental.
+The [V7 reconstruction study](docs/multires-reconstruction-20261011.md) adds real DSP
+warmup and multiresolution waveform supervision. Two four-epoch runs are complete;
+measured improvements remain mixed, so neither candidate replaces the baseline.
 
 ## Quick start
 

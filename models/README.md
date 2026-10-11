@@ -82,6 +82,14 @@ about 0.013% versus the parent, while the history-ablation effect remains tiny;
 this is a development-only diagnostic with no promotion or per-artifact realtime
 qualification.
 
+The [V7 reconstruction study](../docs/multires-reconstruction-20261011.md) keeps the
+923,526-parameter causal graph and compares two four-epoch runs with real DSP
+warmup and longer reconstruction supervision. The multiresolution arm scores
+0.35% below its matched control but 1.21% above the parent on the common CPU
+objective. Both pass 13 fixed export cases; broader real-frame checks still fail
+6/256 control and 4/256 multiresolution batches. Quality gains remain mixed, so
+both artifacts stay local and diagnostic, with unchanged source obligations.
+
 Official releases require reviewed source grants and initialization under
 [TRAINING_DATA.md](../legal/TRAINING_DATA.md). Source approval, restoration quality,
 listening and real-time runtime/continuity evidence are all required before release.
