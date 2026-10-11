@@ -181,8 +181,9 @@ impl SoundExProcessor {
         } else {
             Some(InferenceEngine::load(&config.model_path, &config)?)
         };
+        let context_frames = engine.as_ref().map_or(1, InferenceEngine::context_frames);
         let channels = (0..config.channels)
-            .map(|_| ChannelProcessor::new(&config))
+            .map(|_| ChannelProcessor::new(&config, context_frames))
             .collect();
         let latency = config.fft_size - config.hop_size;
         let interleaved_latency = latency * config.channels as usize;
@@ -207,7 +208,7 @@ impl SoundExProcessor {
             channel_inputs: vec![vec![0.0; hop_size]; channel_count],
             channel_infos: vec![ProcessInfo::default(); channel_count],
             active_channels: Vec::with_capacity(channel_count),
-            inference_input: Array4::zeros((channel_count, 2, 1, frequency_bins)),
+            inference_input: Array4::zeros((channel_count, 2, context_frames, frequency_bins)),
             inference_output: Array4::zeros((channel_count, 2, 1, frequency_bins)),
             dry_interleaved: vec![0.0; hop_samples],
             wet_interleaved: vec![0.0; hop_samples],
@@ -445,6 +446,16 @@ impl SoundExProcessor {
         } else {
             Some(InferenceEngine::load(&path, &self.config)?)
         };
+        let context_frames = engine.as_ref().map_or(1, InferenceEngine::context_frames);
+        self.channels = (0..self.config.channels)
+            .map(|_| ChannelProcessor::new(&self.config, context_frames))
+            .collect();
+        self.inference_input = Array4::zeros((
+            self.channel_count(),
+            2,
+            context_frames,
+            self.config.fft_size / 2 + 1,
+        ));
         self.engine = engine;
         self.config.model_path = path;
         self.reset();

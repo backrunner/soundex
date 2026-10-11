@@ -53,7 +53,7 @@ class ExportValidationError(RuntimeError):
     """An exported graph failed the deployable artifact contract."""
 
 
-def tensor_shape(fft_size: int, hop_size: int) -> tuple[int, int, int]:
+def tensor_shape(fft_size: int, hop_size: int, context_frames: int = 1) -> tuple[int, int, int]:
     """Return the fixed non-batch tensor shape for a supported frame contract."""
     contract = (int(fft_size), int(hop_size))
     if contract not in SUPPORTED_FRAME_CONTRACTS:
@@ -61,7 +61,11 @@ def tensor_shape(fft_size: int, hop_size: int) -> tuple[int, int, int]:
             f"unsupported FFT/hop contract {contract}; expected one of "
             f"{sorted(SUPPORTED_FRAME_CONTRACTS)}"
         )
-    return (2, 1, contract[0] // 2 + 1)
+    if type(context_frames) is not int or context_frames not in (1, 9):
+        raise ExportValidationError("context_frames must be 1 or 9")
+    if context_frames > 1 and contract != (256, 128):
+        raise ExportValidationError("temporal context requires FFT256/hop128")
+    return (2, context_frames, contract[0] // 2 + 1)
 
 
 def frame_contract_from_metadata(metadata: Mapping[str, str]) -> tuple[int, int]:
@@ -84,7 +88,24 @@ def frame_contract_from_metadata(metadata: Mapping[str, str]) -> tuple[int, int]
         hop_size = int(metadata["soundex.hop_size"])
     except (KeyError, TypeError, ValueError) as error:
         raise ExportValidationError("artifact FFT/hop metadata is missing or malformed") from error
-    static_shape = tensor_shape(fft_size, hop_size)
+    try:
+        # Historical frame-only reports may carry just the FFT/hop subset.
+        # Actual ONNX loaders separately require the full metadata key set.
+        context = int(metadata.get("soundex.context_frames", "1" if minor < 4 else ""))
+    except (KeyError, ValueError) as error:
+        raise ExportValidationError("missing or malformed context_frames") from error
+    static_shape = tensor_shape(fft_size, hop_size, context)
+    if context > 1 and minor < 4:
+        raise ExportValidationError("temporal context requires artifact schema 1.4 or newer")
+    if context > 1:
+        try:
+            arch_major, arch_minor = map(
+                int, metadata["soundex.model_architecture_version"].split(".")
+            )
+        except (KeyError, ValueError) as error:
+            raise ExportValidationError("malformed temporal architecture version") from error
+        if arch_major != 1 or arch_minor < 4:
+            raise ExportValidationError("temporal context requires architecture 1.4 or newer")
     if minor < 3 and (fft_size, hop_size) in {(256, 128), (512, 256)}:
         raise ExportValidationError("small-window contracts require artifact schema 1.3 or newer")
     if minor < 2 and (fft_size, hop_size) != LEGACY_FRAME_CONTRACT:
@@ -94,6 +115,8 @@ def frame_contract_from_metadata(metadata: Mapping[str, str]) -> tuple[int, int]
 
     expected_shape = f"batch,{','.join(str(value) for value in static_shape)}"
     for key in ("soundex.input_shape", "soundex.output_shape"):
+        if key == "soundex.output_shape":
+            expected_shape = f"batch,2,1,{fft_size // 2 + 1}"
         if metadata.get(key) != expected_shape:
             raise ExportValidationError(
                 f"{key} does not match FFT/hop contract {fft_size}/{hop_size}"

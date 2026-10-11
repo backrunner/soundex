@@ -37,7 +37,9 @@ def audit(checkpoint_path: Path, output: Path) -> dict[str, object]:
     reference_model = _build_generator(checkpoint).double()
     feature = checkpoint["feature_contract"]
     fft_size, hop_size = int(feature["fft_size"]), int(feature["hop_size"])
-    cases = deterministic_parity_inputs(fft_size=fft_size, hop_size=hop_size)
+    cases = deterministic_parity_inputs(
+        fft_size=fft_size, hop_size=hop_size, context_frames=int(feature["context_frames"])
+    )
     references = []
     for name, tensor in cases:
         with torch.no_grad():
@@ -47,7 +49,7 @@ def audit(checkpoint_path: Path, output: Path) -> dict[str, object]:
     levels = {}
     with tempfile.TemporaryDirectory(prefix="soundex-numerical-audit-") as directory:
         graph = Path(directory) / "diagnostic.onnx"
-        _export_graph(model, graph, (2, 1, fft_size // 2 + 1))
+        _export_graph(model, graph, (2, int(feature["context_frames"]), fft_size // 2 + 1))
         _embed_metadata(graph, artifact_metadata(checkpoint, checkpoint_hash))
         artifact_hash = sha256_file(graph)
         for level in (

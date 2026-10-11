@@ -48,26 +48,28 @@ fn actual_model_failure_leaves_continuous_aligned_dry_audio() {
 
 #[test]
 fn actual_worker_rejoins_after_saturation_without_changing_dry_delay() {
-    let mut settings = config("low-latency-identity.onnx");
-    settings.min_bandwidth_ratio = 0.0;
-    let mut processor = RealtimeProcessor::new(settings).unwrap();
-    let input = [0.125; 256];
-    let mut output = [f32::NAN; 256];
-    // Saturate deliberately; the callback must not wait for the worker.
-    for n in 0..2000 {
-        processor.process(&input, &mut output).unwrap();
-        assert_eq!(output, [if n < 2 { 0.0 } else { 0.125 }; 256]);
+    for name in ["low-latency-identity.onnx", "temporal-probe.onnx"] {
+        let mut settings = config(name);
+        settings.min_bandwidth_ratio = 0.0;
+        let mut processor = RealtimeProcessor::new(settings).unwrap();
+        let input = [0.125; 256];
+        let mut output = [f32::NAN; 256];
+        // Saturate deliberately; the callback must not wait for the worker.
+        for n in 0..2000 {
+            processor.process(&input, &mut output).unwrap();
+            assert_eq!(output, [if n < 2 { 0.0 } else { 0.125 }; 256]);
+        }
+        let before = processor.stats().accepted_hops;
+        // Control-thread pacing, not part of callback processing.
+        for _ in 0..40 {
+            thread::sleep(Duration::from_millis(5));
+            processor.process(&input, &mut output).unwrap();
+            assert_eq!(output, input);
+        }
+        assert!(processor.stats().accepted_hops > before + 20);
+        assert!(!processor.stats().worker_failed);
+        processor.shutdown();
     }
-    let before = processor.stats().accepted_hops;
-    // Control-thread pacing, not part of callback processing.
-    for _ in 0..40 {
-        thread::sleep(Duration::from_millis(5));
-        processor.process(&input, &mut output).unwrap();
-        assert_eq!(output, input);
-    }
-    assert!(processor.stats().accepted_hops > before + 20);
-    assert!(!processor.stats().worker_failed);
-    processor.shutdown();
 }
 
 #[test]

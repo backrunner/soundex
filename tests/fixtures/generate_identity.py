@@ -70,7 +70,43 @@ def generate(fft_size: int, hop_size: int, filename: str) -> None:
     onnx.save(model, Path(__file__).with_name(filename))
 
 
+def generate_temporal() -> None:
+    """Synthetic history-sensitive graph, not a trained/restoration model."""
+    graph = helper.make_graph(
+        [
+            helper.make_node("Gather", ["input_features", "old_index"], ["old"], axis=2),
+            helper.make_node("Gather", ["input_features", "now_index"], ["now"], axis=2),
+            helper.make_node("Mul", ["old", "old_weight"], ["old_part"]),
+            helper.make_node("Mul", ["now", "now_weight"], ["now_part"]),
+            helper.make_node("Add", ["old_part", "now_part"], ["output_features"]),
+        ],
+        "soundex_temporal_probe_fixture",
+        [helper.make_tensor_value_info("input_features", TensorProto.FLOAT, ["batch", 2, 9, 129])],
+        [helper.make_tensor_value_info("output_features", TensorProto.FLOAT, ["batch", 2, 1, 129])],
+        initializer=[
+            helper.make_tensor("old_index", TensorProto.INT64, [1], [0]),
+            helper.make_tensor("now_index", TensorProto.INT64, [1], [8]),
+            helper.make_tensor("old_weight", TensorProto.FLOAT, [], [0.1]),
+            helper.make_tensor("now_weight", TensorProto.FLOAT, [], [0.9]),
+        ],
+    )
+    model = helper.make_model(
+        graph, producer_name="SoundEx synthetic history test", domain="soundex.audio",
+        model_version=1, opset_imports=[helper.make_opsetid("", 17)], ir_version=9,
+    )
+    metadata = dict(METADATA)
+    metadata.update({
+        "soundex.artifact_schema": "1.4", "soundex.model_architecture_version": "1.4",
+        "soundex.input_shape": "batch,2,9,129", "soundex.output_shape": "batch,2,1,129",
+        "soundex.fft_size": "256", "soundex.hop_size": "128", "soundex.context_frames": "9",
+    })
+    helper.set_model_props(model, metadata)
+    onnx.checker.check_model(model)
+    onnx.save(model, Path(__file__).with_name("temporal-probe.onnx"))
+
+
 if __name__ == "__main__":
+    generate_temporal()
     generate(1024, 512, "identity.onnx")
     generate(256, 128, "low-latency-identity.onnx")
     # A valid contract with deliberately invalid inference results. Never deploy.

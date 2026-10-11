@@ -86,12 +86,13 @@ fn warmed_process_frame_has_no_rust_heap_allocations() {
     for (name, fft_size, hop_size) in [
         ("identity.onnx", 1024, 512),
         ("low-latency-identity.onnx", 256, 128),
+        ("temporal-probe.onnx", 256, 128),
     ] {
         let input = stereo_tone(hop_size);
         let mut output = vec![0.0; input.len()];
         for enhance in [true, false] {
             let mut processor = processor(enhance, name, fft_size, hop_size);
-            for _ in 0..4 {
+            for _ in 0..12 {
                 processor.process_frame(&input, &mut output).unwrap();
             }
             // Rust allocator only; ORT C/C++ allocations require the RSS stress run.
@@ -105,29 +106,31 @@ fn warmed_process_frame_has_no_rust_heap_allocations() {
 
 #[test]
 fn realtime_callback_allocates_nothing_including_startup_and_saturated_fallback() {
-    for mode in [
-        EnhancementMode::Neural,
-        EnhancementMode::Spectral,
-        EnhancementMode::Hybrid,
-    ] {
-        let config = SoundExConfig::with_model(model_path("low-latency-identity.onnx"))
-            .channels(2)
-            .enhancement_mode(mode);
-        let mut processor = RealtimeProcessor::new(config).unwrap();
-        let mut output = [0.0; 256];
-        let mut input = [0.125; 256];
-        input[9] = f32::NAN;
-        input[12] = f32::INFINITY;
-        let (result, allocations) = count_allocations(|| {
-            for _ in 0..1000 {
-                processor.process(&input, &mut output)?;
-            }
-            Ok::<_, soundex_core::SoundExError>(())
-        });
-        result.unwrap();
-        assert_eq!(allocations, 0, "{mode:?}");
-        assert!(output.iter().all(|sample| sample.is_finite()));
-        processor.shutdown();
+    for name in ["low-latency-identity.onnx", "temporal-probe.onnx"] {
+        for mode in [
+            EnhancementMode::Neural,
+            EnhancementMode::Spectral,
+            EnhancementMode::Hybrid,
+        ] {
+            let config = SoundExConfig::with_model(model_path(name))
+                .channels(2)
+                .enhancement_mode(mode);
+            let mut processor = RealtimeProcessor::new(config).unwrap();
+            let mut output = [0.0; 256];
+            let mut input = [0.125; 256];
+            input[9] = f32::NAN;
+            input[12] = f32::INFINITY;
+            let (result, allocations) = count_allocations(|| {
+                for _ in 0..1000 {
+                    processor.process(&input, &mut output)?;
+                }
+                Ok::<_, soundex_core::SoundExError>(())
+            });
+            result.unwrap();
+            assert_eq!(allocations, 0, "{mode:?}");
+            assert!(output.iter().all(|sample| sample.is_finite()));
+            processor.shutdown();
+        }
     }
 }
 

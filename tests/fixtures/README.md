@@ -8,11 +8,14 @@ under [Apache-2.0](../../LICENSE). They are stored directly in Git (no LFS downl
 |------|---------|
 | identity.onnx | Legacy 1024/512 identity contract |
 | low-latency-identity.onnx | Default 256/128 identity contract; runnable demos |
+| temporal-probe.onnx | Synthetic 9-frame causal contract and history/reset tests |
 | nonfinite-output.onnx | Deliberately invalid output for rejection/fallback tests |
 
 An identity graph copies features; it does not reconstruct missing high-band
 content. Processing still exercises the surrounding DSP. The invalid-output
-fixture must never be used for normal audio processing.
+fixture must never be used for normal audio processing. The temporal probe mixes
+10% oldest and 90% current features solely to reveal history/order mistakes; it is
+not a learned restoration model or a listening demo.
 
 Regenerate from the repository root with the training dependencies installed:
 

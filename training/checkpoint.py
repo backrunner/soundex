@@ -59,11 +59,17 @@ def feature_contract_from_config(config: Mapping[str, Any]) -> dict[str, Any]:
     fft_size = int(audio.get("fft_size", 0))
     hop_size = int(audio.get("hop_size", 0))
     context_frames = int(training.get("context_frames", 0))
+    generator = _mapping(config.get("model"), "resolved_config.model").get("generator", {})
+    history = (generator.get("spectral_refiner") or {}).get("history_frames", 0)
+    if type(history) is not int or history not in (0, 8) or context_frames != history + 1:
+        raise CheckpointSchemaError("context_frames must match spectral refiner history (1 or 9)")
+    if context_frames > 1 and (fft_size, hop_size) != (256, 128):
+        raise CheckpointSchemaError("temporal context requires FFT256/hop128")
     sample_rates = sorted(int(rate) for rate in recipe.get("sample_rates", []))
     return {
         "schema_version": 1,
         "tensor_layout": "BCTF",
-        "input_shape": ["batch", 2, 1, fft_size // 2 + 1],
+        "input_shape": ["batch", 2, context_frames, fft_size // 2 + 1],
         "output_shape": ["batch", 2, 1, fft_size // 2 + 1],
         "input_channels": ["log_magnitude_db", "phase_radians"],
         "output_channels": ["log_magnitude_db", "phase_radians"],
@@ -114,7 +120,9 @@ def build_checkpoint(
             "architecture": {
                 "name": MODEL_ARCHITECTURE_NAME,
                 "major": MODEL_ARCHITECTURE_MAJOR,
-                "minor": 3
+                "minor": 4
+                if feature_contract_from_config(config)["context_frames"] > 1
+                else 3
                 if _mapping(model_config.get("generator"), "model.generator").get(
                     "spectral_refiner"
                 )
@@ -264,6 +272,8 @@ def validate_checkpoint(
     derived_feature = feature_contract_from_config(config)
     _compare(derived_feature, feature, "checkpoint.feature_contract")
     _validate_runtime_contract(feature)
+    if feature["context_frames"] > 1 and int(architecture["minor"]) < 4:
+        raise CheckpointSchemaError("temporal context requires architecture 1.4 or newer")
 
     training_state = _mapping(checkpoint["training_state"], "checkpoint.training_state")
     for key in ("epoch", "global_step", "optimizers", "schedulers", "scaler"):
@@ -395,10 +405,13 @@ def _validate_runtime_contract(feature: Mapping[str, Any]) -> None:
             f"{fft_size}/{hop_size}; expected one of {sorted(SUPPORTED_FRAME_CONTRACTS)}"
         )
     tensor_shape = ["batch", 2, 1, fft_size // 2 + 1]
+    context = feature.get("context_frames")
+    if type(context) is not int or context not in (1, 9):
+        raise CheckpointSchemaError("checkpoint context_frames must be 1 or 9")
     expected = {
-        "context_frames": 1,
+        "context_frames": context,
         "supported_sample_rates": [44_100, 48_000],
-        "input_shape": tensor_shape,
+        "input_shape": ["batch", 2, context, fft_size // 2 + 1],
         "output_shape": tensor_shape,
         "causal": True,
         "stateless": True,

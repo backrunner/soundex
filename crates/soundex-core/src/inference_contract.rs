@@ -10,7 +10,6 @@ use crate::SoundExConfig;
 const INPUT_NAME: &str = "input_features";
 const OUTPUT_NAME: &str = "output_features";
 const CHANNELS: i64 = 2;
-const FRAMES: i64 = 1;
 mod numbers;
 use numbers::{parse_float, parse_number, parse_numbers};
 
@@ -50,6 +49,7 @@ const REQUIRED_METADATA: &[&str] = &[
 
 pub(crate) struct ModelFrameContract {
     pub(crate) frequency_bins: usize,
+    pub(crate) context_frames: usize,
 }
 
 pub(crate) fn validate_session_contract(
@@ -85,21 +85,28 @@ pub(crate) fn validate_session_contract(
         session.inputs()[0].dtype(),
         "input",
         frame_contract.frequency_bins,
+        frame_contract.context_frames,
     )?;
     validate_tensor_type(
         session.outputs()[0].dtype(),
         "output",
         frame_contract.frequency_bins,
+        1,
     )?;
     Ok(frame_contract)
 }
 
-fn validate_tensor_type(value_type: &ValueType, label: &str, frequency_bins: usize) -> Result<()> {
+fn validate_tensor_type(
+    value_type: &ValueType,
+    label: &str,
+    frequency_bins: usize,
+    frames: usize,
+) -> Result<()> {
     match value_type {
         ValueType::Tensor { ty, shape, .. }
             if *ty == TensorElementType::Float32 && shape.len() == 4 =>
         {
-            validate_dimensions(shape, label, frequency_bins)
+            validate_dimensions(shape, label, frequency_bins, frames)
         }
         _ => contract_error(format!(
             "{label} must be a rank-4 float32 tensor, got {value_type:?}"
@@ -107,7 +114,12 @@ fn validate_tensor_type(value_type: &ValueType, label: &str, frequency_bins: usi
     }
 }
 
-fn validate_dimensions(shape: &[i64], label: &str, frequency_bins: usize) -> Result<()> {
+fn validate_dimensions(
+    shape: &[i64],
+    label: &str,
+    frequency_bins: usize,
+    frames: usize,
+) -> Result<()> {
     if shape[0] != -1 {
         return contract_error(format!(
             "{label} batch dimension must be dynamic so one artifact supports batch 1 and 2; got {}",
@@ -116,10 +128,10 @@ fn validate_dimensions(shape: &[i64], label: &str, frequency_bins: usize) -> Res
     }
     let frequency_bins = i64::try_from(frequency_bins)
         .map_err(|_| SoundExError::ModelContract("frequency-bin count exceeds i64".into()))?;
-    let expected = [CHANNELS, FRAMES, frequency_bins];
+    let expected = [CHANNELS, frames as i64, frequency_bins];
     if shape[1..] != expected {
         return contract_error(format!(
-            "{label} shape must be [B, 2, 1, {frequency_bins}], got {shape:?}"
+            "{label} shape must be [B, 2, {frames}, {frequency_bins}], got {shape:?}"
         ));
     }
     Ok(())
@@ -145,7 +157,6 @@ fn validate_metadata(
         ("soundex.db_floor", "-200.0"),
         ("soundex.phase_units", "radians"),
         ("soundex.phase_range", "[-pi,pi]"),
-        ("soundex.context_frames", "1"),
         ("soundex.causal", "true"),
         ("soundex.stateless", "true"),
     ] {
@@ -184,8 +195,20 @@ fn validate_metadata(
         );
     }
     let frequency_bins = fft_size / 2 + 1;
+    let context_frames = usize::try_from(parse_number(metadata, "soundex.context_frames")?)
+        .map_err(|_| SoundExError::ModelContract("invalid context frame count".into()))?;
+    if !matches!(context_frames, 1 | 9) {
+        return contract_error("context_frames must be 1 or 9".into());
+    }
+    if context_frames > 1 {
+        if artifact_minor < 4 || (fft_size, hop_size) != (256, 128) {
+            return contract_error("temporal context requires schema 1.4 and FFT256/hop128".into());
+        }
+        expect_version_at_least(metadata, "soundex.model_architecture_version", 1, 4)?;
+    }
     let shape = format!("batch,2,1,{frequency_bins}");
-    expect_value(metadata, "soundex.input_shape", &shape)?;
+    let input_shape = format!("batch,2,{context_frames},{frequency_bins}");
+    expect_value(metadata, "soundex.input_shape", &input_shape)?;
     expect_value(metadata, "soundex.output_shape", &shape)?;
     if fft_size != config.fft_size {
         return contract_error(format!(
@@ -223,7 +246,10 @@ fn validate_metadata(
             return contract_error(format!("metadata {key} is not a lowercase SHA-256"));
         }
     }
-    Ok(ModelFrameContract { frequency_bins })
+    Ok(ModelFrameContract {
+        frequency_bins,
+        context_frames,
+    })
 }
 
 fn expect_value(metadata: &HashMap<String, String>, key: &str, expected: &str) -> Result<()> {

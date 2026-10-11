@@ -1,4 +1,4 @@
-"""Frame-local, globally connected spectral correction with bounded outputs.
+"""Globally connected spectral correction with optional finite causal context.
 
 This is an original small-model experiment, not an implementation of Apollo or
 UniverSR. It keeps the existing polar deployment protocol and exposes either
@@ -12,9 +12,11 @@ from torch import nn
 
 
 class SpectralRefiner(nn.Module):
-    """Mix every frequency bin without adding temporal buffering or lookahead."""
+    """Mix every frequency bin, optionally using eight past frames and no lookahead."""
 
-    def __init__(self, *, bins: int, width: int, representation: str) -> None:
+    def __init__(
+        self, *, bins: int, width: int, representation: str, history_frames: int = 0
+    ) -> None:
         super().__init__()
         if type(bins) is not int or bins < 2:
             raise ValueError("spectral_refiner.bins must be an integer >=2")
@@ -24,12 +26,23 @@ class SpectralRefiner(nn.Module):
             raise ValueError("spectral_refiner.representation must be polar or gain_shape")
         self.bins = bins
         self.representation = representation
+        if type(history_frames) is not int or history_frames not in (0, 8):
+            raise ValueError("spectral_refiner.history_frames must be 0 or 8")
+        self.history_frames = history_frames
         self.encoder = nn.Sequential(
             nn.Linear(3 * bins, width), nn.GELU(), nn.Linear(width, width), nn.GELU()
         )
         self.head = nn.Linear(width, 2 * bins)
         nn.init.zeros_(self.head.weight)
         nn.init.zeros_(self.head.bias)
+        if history_frames:
+            # Finite causal TCN: encode nine observed frames, emit only the last.
+            # Zero mixing preserves the parent's mapping up to FP32 GEMM rounding.
+            with torch.random.fork_rng(devices=[]):
+                self.temporal_filter = nn.Conv1d(width, width, history_frames + 1, groups=width)
+                self.temporal_mix = nn.Linear(width, width)
+            nn.init.zeros_(self.temporal_mix.weight)
+            nn.init.zeros_(self.temporal_mix.bias)
 
     def encode_features(self, features: torch.Tensor) -> torch.Tensor:
         magnitude, phase = features[:, 0], features[:, 1]
@@ -49,8 +62,14 @@ class SpectralRefiner(nn.Module):
     def forward(self, features: torch.Tensor) -> torch.Tensor:
         if features.shape[-1] != self.bins:
             raise ValueError("spectral_refiner.bins differs from the input FFT geometry")
-        correction = self.head(self.encoder(self.encode_features(features)))
-        correction = correction.reshape(features.shape[0], features.shape[2], 2, self.bins)
+        encoded = self.encoder(self.encode_features(features))
+        if self.history_frames:
+            if features.shape[2] != self.history_frames + 1:
+                raise ValueError("temporal refiner requires exactly nine oldest-to-current frames")
+            temporal = self.temporal_filter(encoded.transpose(1, 2)).transpose(1, 2)
+            encoded = encoded[:, -1:] + self.temporal_mix(torch.nn.functional.gelu(temporal))
+        correction = self.head(encoded)
+        correction = correction.reshape(features.shape[0], encoded.shape[1], 2, self.bins)
         correction = correction.permute(0, 2, 1, 3).tanh()
         # Finite, interpretable ranges; DSP still owns the retained-band mask.
         return torch.cat((12.0 * correction[:, :1], 0.5 * correction[:, 1:]), dim=1)

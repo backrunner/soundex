@@ -48,11 +48,11 @@ fn tensor_contract_rejects_wrong_channel_time_and_frequency() {
         [-1, 2, 1, 257],
     ] {
         assert!(matches!(
-            validate_dimensions(&shape, "input", 513),
+            validate_dimensions(&shape, "input", 513, 1),
             Err(SoundExError::ModelContract(_))
         ));
     }
-    validate_dimensions(&[-1, 2, 1, 513], "input", 513).unwrap();
+    validate_dimensions(&[-1, 2, 1, 513], "input", 513, 1).unwrap();
 }
 
 #[test]
@@ -107,4 +107,39 @@ fn metadata_contract_rejects_semantic_and_config_mismatches() {
         validate_metadata(&legacy, &config),
         Err(SoundExError::ModelContract(_))
     ));
+}
+
+#[test]
+fn causal_history_requires_explicit_version_and_asymmetric_shapes() {
+    let mut metadata = valid_metadata();
+    for (key, value) in [
+        ("soundex.artifact_schema", "1.4"),
+        ("soundex.model_architecture_version", "1.4"),
+        ("soundex.fft_size", "256"),
+        ("soundex.hop_size", "128"),
+        ("soundex.input_shape", "batch,2,9,129"),
+        ("soundex.output_shape", "batch,2,1,129"),
+        ("soundex.context_frames", "9"),
+    ] {
+        metadata.insert(key.into(), value.into());
+    }
+    let config = SoundExConfig::default();
+    assert_eq!(
+        validate_metadata(&metadata, &config)
+            .unwrap()
+            .context_frames,
+        9
+    );
+    validate_dimensions(&[-1, 2, 9, 129], "input", 129, 9).unwrap();
+    assert!(validate_dimensions(&[-1, 2, 1, 129], "input", 129, 9).is_err());
+    for (key, value) in [
+        ("soundex.artifact_schema", "1.3"),
+        ("soundex.model_architecture_version", "1.3"),
+        ("soundex.context_frames", "2"),
+        ("soundex.output_shape", "batch,2,9,129"),
+    ] {
+        let mut bad = metadata.clone();
+        bad.insert(key.into(), value.into());
+        assert!(validate_metadata(&bad, &config).is_err());
+    }
 }

@@ -1,6 +1,6 @@
 //! Per-channel streaming DSP around one shared batched inference call.
 
-use ndarray::{Array4, ArrayView3};
+use ndarray::{s, Array3, Array4, ArrayView3};
 use soundex_dsp::bandwidth::{BandwidthDetector, BandwidthDetectorConfig};
 use soundex_dsp::crossover::CrossoverBlend;
 use soundex_dsp::extension::SpectralExtension;
@@ -25,6 +25,8 @@ pub(crate) struct ChannelProcessor {
     limiter: Limiter,
     input: StreamBuffer,
     original: SpectralFrame,
+    history: Array3<f32>,
+    history_observed: usize,
     synthesis: SpectralFrame,
     original_magnitude: Vec<f32>,
     generated_magnitude: Vec<f32>,
@@ -39,13 +41,15 @@ pub(crate) struct ChannelProcessor {
 }
 
 impl ChannelProcessor {
-    pub(crate) fn new(config: &SoundExConfig) -> Self {
+    pub(crate) fn new(config: &SoundExConfig, context_frames: usize) -> Self {
         let detector = BandwidthDetector::new(BandwidthDetectorConfig {
             threshold_db: config.bypass_threshold_db,
             min_bandwidth_ratio: config.min_bandwidth_ratio,
             ..Default::default()
         });
         let bins = config.fft_size / 2 + 1;
+        let mut history = Array3::zeros((2, context_frames, bins));
+        history.slice_mut(s![0, .., ..]).fill(-200.0);
         Self {
             analyzer: StftAnalyzer::new(config.fft_size, config.hop_size),
             synthesizer: StftSynthesizer::new(config.fft_size, config.hop_size),
@@ -62,6 +66,8 @@ impl ChannelProcessor {
             limiter: Limiter::new(config.limiter_ceiling, 10.0),
             input: StreamBuffer::with_latency_padding(config.fft_size, config.hop_size),
             original: SpectralFrame::zeros(bins),
+            history,
+            history_observed: 0,
             synthesis: SpectralFrame::zeros(bins),
             original_magnitude: vec![0.0; bins],
             generated_magnitude: vec![0.0; bins],
@@ -90,6 +96,21 @@ impl ChannelProcessor {
         let frame = self.input.current_frame();
         self.dry.copy_from_slice(&frame[..config.hop_size]);
         self.analyzer.analyze_into(frame, &mut self.original);
+        // Advance for every observed hop, even when enhancement is bypassed.
+        // History belongs to the physical channel, never to an active batch row.
+        let bins = self.original.log_magnitude.len();
+        for feature in 0..2 {
+            let mut plane = self.history.slice_mut(s![feature, .., ..]);
+            let values = plane.as_slice_mut().expect("history plane is contiguous");
+            values.copy_within(bins.., 0);
+            let last = values.len() - bins;
+            values[last..].copy_from_slice(if feature == 0 {
+                &self.original.log_magnitude
+            } else {
+                &self.original.phase
+            });
+        }
+        self.history_observed = (self.history_observed + 1).min(self.history.shape()[1]);
         self.detected_bandwidth_hz = self
             .detector
             .detect(&self.original.log_magnitude, config.sample_rate);
@@ -102,7 +123,8 @@ impl ChannelProcessor {
         } else {
             self.needs_enhancement = self
                 .detector
-                .needs_enhancement(self.detected_bandwidth_hz, config.sample_rate as f32 / 2.0);
+                .needs_enhancement(self.detected_bandwidth_hz, config.sample_rate as f32 / 2.0)
+                && self.history_observed == self.history.shape()[1];
         }
         self.enhancement_gain_db = 0.0;
         self.input.advance();
@@ -110,10 +132,9 @@ impl ChannelProcessor {
     }
 
     pub(crate) fn write_model_input(&self, input: &mut Array4<f32>, batch_index: usize) {
-        for bin in 0..self.original.log_magnitude.len() {
-            input[[batch_index, 0, 0, bin]] = self.original.log_magnitude[bin];
-            input[[batch_index, 1, 0, bin]] = self.original.phase[bin];
-        }
+        input
+            .slice_mut(s![batch_index, .., .., ..])
+            .assign(&self.history);
     }
 
     pub(crate) fn finish_hop(
@@ -274,6 +295,9 @@ impl ChannelProcessor {
             extension.reset();
         }
         self.input.reset_with_latency_padding();
+        self.history.fill(0.0);
+        self.history_observed = 0;
+        self.history.slice_mut(s![0, .., ..]).fill(-200.0);
         self.needs_enhancement = false;
         self.detected_bandwidth_hz = 0.0;
         self.enhancement_gain_db = 0.0;
@@ -329,6 +353,36 @@ fn apply_generated_gain(generated_magnitude: &mut [f32], weights: &[f32], gain: 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn observed_history_advances_during_bypass_and_reset_clears_it() {
+        let config = SoundExConfig {
+            min_bandwidth_ratio: 0.0,
+            ..Default::default()
+        };
+        let mut channel = ChannelProcessor::new(&config, 9);
+        let mut expected = Vec::new();
+        for n in 0..12 {
+            channel
+                .analyze_hop(&vec![0.01 * (n + 1) as f32; 128], &config)
+                .unwrap();
+            assert!(!channel.needs_enhancement());
+            expected.push(channel.original.log_magnitude.clone());
+        }
+        let mut input = Array4::zeros((1, 2, 9, 129));
+        channel.write_model_input(&mut input, 0);
+        for t in 0..9 {
+            assert_eq!(
+                input.slice(s![0, 0, t, ..]).as_slice().unwrap(),
+                expected[t + 3]
+            );
+        }
+        channel.reset();
+        channel.write_model_input(&mut input, 0);
+        assert!(input.slice(s![0, 0, .., ..]).iter().all(|&v| v == -200.0));
+        assert!(input.slice(s![0, 1, .., ..]).iter().all(|&v| v == 0.0));
+        assert_eq!(channel.history_observed, 0);
+    }
 
     #[test]
     fn hybrid_texture_preserves_coarse_energy_budget_and_retained_bins() {

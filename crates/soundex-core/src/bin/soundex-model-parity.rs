@@ -38,7 +38,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let model_path = PathBuf::from(&arguments[1]);
     let input = read_tensor(Path::new(&arguments[2]))?;
     let expected = read_tensor(Path::new(&arguments[3]))?;
-    if input.shape != expected.shape {
+    if expected.shape != [input.shape[0], 2, 1, input.shape[3]] {
         return Err(format!(
             "input shape {:?} does not match expected shape {:?}",
             input.shape, expected.shape
@@ -55,9 +55,9 @@ fn run() -> Result<(), Box<dyn Error>> {
         ),
         input.values,
     )?;
-    if input.shape[1] != 2 || input.shape[2] != 1 || input.shape[3] < 2 {
+    if input.shape[1] != 2 || !matches!(input.shape[2], 1 | 9) || input.shape[3] < 2 {
         return Err(format!(
-            "input shape {:?} is not a SoundEx [B, 2, 1, F] tensor",
+            "input shape {:?} is not a SoundEx [B, 2, T, F] tensor with T=1 or 9",
             input.shape
         )
         .into());

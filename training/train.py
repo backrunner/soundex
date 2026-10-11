@@ -233,14 +233,38 @@ def select_causal_sequence(
 def infer_independent_frames(
     generator: SoundExGenerator,
     features: torch.Tensor,
+    *,
+    warmup_frames: int = 0,
 ) -> torch.Tensor:
-    """Run a sequence as independent fixed-`T=1` deployment calls."""
+    """Run deployment windows, retaining past observations but no future input.
+
+    Missing startup history is silence (-200 dB, zero phase), matching Rust.
+    warmup_frames observations are real history excluded from the supervised output.
+    """
     if features.ndim != 4 or features.shape[1] != 2:
         raise ValueError("features must have shape [B, 2, T, F]")
     batch, channels, frames, bins = features.shape
-    flattened = features.permute(0, 2, 1, 3).reshape(batch * frames, channels, 1, bins)
+    if type(warmup_frames) is not int or not 0 <= warmup_frames < frames:
+        raise ValueError("warmup_frames must leave at least one output frame")
+    # Identity/reference modules used by diagnostics remain frame-local.
+    context = getattr(generator, "context_frames", 1)
+    if type(context) is not int or context not in (1, 9):
+        raise ValueError("generator context_frames must be 1 or 9")
+    if context == 1:
+        windows = features[:, :, warmup_frames:]
+        flattened = windows.permute(0, 2, 1, 3).reshape(
+            batch * (frames - warmup_frames), channels, 1, bins
+        )
+    else:
+        padding = features.new_zeros((batch, channels, context - 1, bins))
+        padding[:, 0] = -200.0
+        padded = torch.cat((padding, features), dim=2)
+        windows = padded.unfold(2, context, 1)[:, :, warmup_frames:]
+        flattened = windows.permute(0, 2, 1, 4, 3).reshape(
+            batch * (frames - warmup_frames), channels, context, bins
+        )
     predicted = generator(flattened)
-    return predicted.reshape(batch, frames, channels, bins).permute(0, 2, 1, 3)
+    return predicted.reshape(batch, frames - warmup_frames, channels, bins).permute(0, 2, 1, 3)
 
 
 def batch_missing_band_mask(
@@ -288,6 +312,7 @@ def initialize_generator_from_checkpoint(
     initialize_zero_interactions: bool = False,
     initialize_phase_features: bool = False,
     initialize_spectral_refiner: bool = False,
+    initialize_temporal_refiner: bool = False,
 ) -> dict[str, Any]:
     """Start a new optimizer trajectory with explicit, compatible parent weights."""
     payload = Path(path).read_bytes()
@@ -298,10 +323,30 @@ def initialize_generator_from_checkpoint(
     parent_architecture = dict(parent["model"]["generator_config"])
     architecture = dict(config["model"]["generator"])
     if (
-        sum((initialize_zero_interactions, initialize_phase_features, initialize_spectral_refiner))
+        sum(
+            (
+                initialize_zero_interactions,
+                initialize_phase_features,
+                initialize_spectral_refiner,
+                initialize_temporal_refiner,
+            )
+        )
         > 1
     ):
         raise ValueError("migrate one architecture feature at a time")
+    if initialize_temporal_refiner:
+        before = dict(parent_architecture.get("spectral_refiner") or {})
+        after = dict(architecture.get("spectral_refiner") or {})
+        if (
+            not before
+            or before.pop("history_frames", 0) != 0
+            or after.pop("history_frames", 0) != 8
+        ):
+            raise ValueError(
+                "temporal migration needs a frame refiner parent and eight-frame history"
+            )
+        parent_architecture["spectral_refiner"] = before
+        architecture["spectral_refiner"] = after
     if initialize_spectral_refiner:
         if parent_architecture.get("spectral_refiner") is not None or not architecture.get(
             "spectral_refiner"
@@ -327,7 +372,19 @@ def initialize_generator_from_checkpoint(
         architecture.pop("cross_stream_interactions", None)
     if parent_architecture != architecture:
         raise ValueError("generator initialization architecture differs from parent")
-    if parent["feature_contract"] != feature_contract_from_config(config):
+    target_feature = feature_contract_from_config(config)
+    if initialize_temporal_refiner:
+        if (
+            parent["feature_contract"]["context_frames"] != 1
+            or target_feature["context_frames"] != 9
+        ):
+            raise ValueError("temporal migration requires context 1 to 9")
+        target_feature = {
+            **target_feature,
+            "context_frames": 1,
+            "input_shape": ["batch", 2, 1, target_feature["fft_size"] // 2 + 1],
+        }
+    if parent["feature_contract"] != target_feature:
         raise ValueError("generator initialization feature contract differs from parent")
     state = parent["model"]["generator_state"]
     if any(
@@ -351,7 +408,25 @@ def initialize_generator_from_checkpoint(
         state = {**state, key: expanded}
         expanded_keys = [key]
     added_keys: list[str] = []
-    if initialize_spectral_refiner:
+    if initialize_temporal_refiner:
+        target_state = generator.state_dict()
+        added_keys = sorted(k for k in target_state if k.startswith("spectral_refiner.temporal_"))
+        zero_keys = [k for k in added_keys if k.startswith("spectral_refiner.temporal_mix.")]
+        if (
+            not added_keys
+            or len(zero_keys) != 2
+            or set(target_state) - set(state) != set(added_keys)
+            or set(state) - set(target_state)
+        ):
+            raise ValueError("temporal migration has unexpected state keys")
+        if any(not torch.isfinite(target_state[k]).all().item() for k in added_keys):
+            raise ValueError("temporal migration contains non-finite state")
+        if any(torch.count_nonzero(target_state[k]).item() for k in zero_keys):
+            raise ValueError("temporal migration requires exactly zero mixing projection")
+        generator.load_state_dict(
+            {**state, **{k: target_state[k] for k in added_keys}}, strict=True
+        )
+    elif initialize_spectral_refiner:
         target_state = generator.state_dict()
         added_keys = sorted(key for key in target_state if key.startswith("spectral_refiner."))
         if (
@@ -385,14 +460,18 @@ def initialize_generator_from_checkpoint(
     else:
         generator.load_state_dict(state, strict=True)
     return {
-        "mode": "generator-only-warm-start-spectral-refiner"
+        "mode": "generator-only-warm-start-temporal-refiner"
+        if initialize_temporal_refiner
+        else "generator-only-warm-start-spectral-refiner"
         if initialize_spectral_refiner
         else "generator-only-warm-start-phase-features"
         if initialize_phase_features
         else "generator-only-warm-start-zero-interactions"
         if initialize_zero_interactions
         else "generator-only-warm-start",
-        "zero_initialized_state_keys": [key for key in added_keys if ".head." in key]
+        "zero_initialized_state_keys": [key for key in added_keys if ".temporal_mix." in key]
+        if initialize_temporal_refiner
+        else [key for key in added_keys if ".head." in key]
         if initialize_spectral_refiner
         else added_keys,
         "added_state_keys": added_keys,
@@ -489,6 +568,7 @@ def train_one_epoch(
     generator_totals: defaultdict[str, float] = defaultdict(float)
     discriminator_total = 0.0
     objective = training_config["objective"]
+    warmup_frames = int(training_config.get("sequence_warmup_frames", 0))
     use_gan = epoch > int(training_config.get("warmup_epochs", 50)) and (
         float(objective["adversarial_weight"]) > 0
         or float(objective["feature_matching_weight"]) > 0
@@ -506,13 +586,17 @@ def train_one_epoch(
         combined = torch.cat((degraded_features, clean_features), dim=1)
         combined = select_causal_sequence(
             combined,
-            int(training_config["objective"]["causal_sequence_frames"]),
+            int(training_config["objective"]["causal_sequence_frames"]) + warmup_frames,
         )
         degraded_features, clean_features = combined[:, :2], combined[:, 2:]
         missing_band_mask = batch_missing_band_mask(batch, audio_config, device)
 
         set_requires_grad(discriminator, False)
-        predicted_features = infer_independent_frames(generator, degraded_features)
+        predicted_features = infer_independent_frames(
+            generator, degraded_features, warmup_frames=warmup_frames
+        )
+        degraded_features = degraded_features[:, :, warmup_frames:]
+        clean_features = clean_features[:, :, warmup_frames:]
         if use_gan:
             predicted_disc = discriminator(predicted_features[:, :1])
             with torch.no_grad():
@@ -579,6 +663,8 @@ def validate(
     device: torch.device,
     audio_config: dict[str, Any],
     context_frames: int,
+    *,
+    warmup_frames: int = 0,
 ) -> dict[str, Any]:
     """Compute deterministic row-level and per-stratum validation metrics."""
     generator.eval()
@@ -594,11 +680,15 @@ def validate(
         )
         combined = select_causal_sequence(
             torch.cat((degraded_features, clean_features), dim=1),
-            int(context_frames),
+            int(context_frames) + warmup_frames,
             randomize=False,
         )
         degraded_features, clean_features = combined[:, :2], combined[:, 2:]
-        predicted = infer_independent_frames(generator, degraded_features)
+        predicted = infer_independent_frames(
+            generator, degraded_features, warmup_frames=warmup_frames
+        )
+        degraded_features = degraded_features[:, :, warmup_frames:]
+        clean_features = clean_features[:, :, warmup_frames:]
         missing_band_mask = batch_missing_band_mask(batch, audio_config, device)
         metadata = batch["metadata"]
         for row_index in range(predicted.shape[0]):
@@ -665,12 +755,25 @@ def main() -> None:
         help="Warm-start a legacy phase encoder with zero sin/cos channels",
     )
     parser.add_argument(
+        "--initialize-temporal-refiner",
+        action="store_true",
+        help="Warm-start a frame refiner with an exactly zero temporal mixing projection",
+    )
+    parser.add_argument(
         "--initialize-spectral-refiner",
         action="store_true",
         help="Warm-start an original spectral refiner with an exactly zero output head",
     )
     args = parser.parse_args()
     config = load_config(args.config)
+    if args.initialize_temporal_refiner and not args.initialize_generator_from:
+        parser.error("--initialize-temporal-refiner requires --initialize-generator-from")
+    if args.initialize_temporal_refiner and (
+        args.initialize_phase_features
+        or args.initialize_zero_interactions
+        or args.initialize_spectral_refiner
+    ):
+        parser.error("migrate one architecture feature at a time")
     if args.initialize_phase_features and not args.initialize_generator_from:
         parser.error("--initialize-phase-features requires --initialize-generator-from")
     if args.initialize_phase_features and args.initialize_zero_interactions:
@@ -683,8 +786,10 @@ def main() -> None:
         args.initialize_phase_features or args.initialize_zero_interactions
     ):
         parser.error("migrate one architecture feature at a time")
-    if int(config["training"].get("context_frames", 1)) != 1:
-        raise ValueError("training.context_frames must be 1 for stateless streaming inference")
+    feature_contract_from_config(config)
+    warmup_frames = config["training"].get("sequence_warmup_frames", 0)
+    if type(warmup_frames) is not int or not 0 <= warmup_frames <= 64:
+        raise ValueError("training.sequence_warmup_frames must be an integer in 0..64")
     set_seed(int(config["training"].get("seed", 42)))
     device = get_device()
     print(f"Device: {device}")
@@ -788,6 +893,7 @@ def main() -> None:
             initialize_zero_interactions=args.initialize_zero_interactions,
             initialize_phase_features=args.initialize_phase_features,
             initialize_spectral_refiner=args.initialize_spectral_refiner,
+            initialize_temporal_refiner=args.initialize_temporal_refiner,
         )
         print(f"Generator initialization: {provenance['initialization']}")
     last_validation_report: dict[str, Any] | None = None
@@ -857,6 +963,7 @@ def main() -> None:
                 device,
                 config["audio"],
                 int(config["training"]["objective"]["causal_sequence_frames"]),
+                warmup_frames=warmup_frames,
             )
             last_validation_epoch = epoch
             validation_metrics = last_validation_report["overall"]

@@ -71,7 +71,7 @@ derives every model and feature setting from the checkpoint; `--config` is optio
 input and never overrides checkpoint semantics. A successful export is atomically published only
 after ONNX checker and mandatory PyTorch/CPU-ORT [unit-aware parity](../docs/parity.md) pass, and prints the artifact SHA-256.
 
-Runtime artifacts use artifact schema 1.3, opset 17, dynamic batch only, and fixed float32
+Frame-local runtime artifacts use artifact schema 1.3, opset 17, dynamic batch only, and fixed float32
 input/output `[batch, 2, 1, 129]` for the default 256/128 contract. Rust validates all
 `soundex.*` metadata, feature semantics, FFT/hop, supported sample rate, crossover width, tensor
 names, and shapes before processing the first frame. Schema-1.1 artifacts remain loadable only
@@ -138,6 +138,20 @@ See [the research and experiment protocol](../docs/architecture-research-2026101
 The [completed eight-epoch comparison](../docs/architecture-study-20261011.md)
 separates development loss, Rust output quality and deployment cost; lower loss
 alone does not promote any of the new experimental weights.
+
+`scripts/prepare_temporal_study.py` derives matched frame-control / causal
+continuations from a frame-refiner parent. The causal arm adds a depthwise temporal
+filter and zero-initialized mixing on nine encoded observations; the U-Net processes
+only the current frame. Explicit migration requires `--initialize-temporal-refiner`
+with `--initialize-generator-from`. Artifact/architecture 1.4 declares input
+`[B,2,9,129]`, output `[B,2,1,129]`; the ONNX graph has no hidden recurrent state.
+The Rust host retains independent oldest-to-current spectral histories per physical
+channel, including bypass/silence, and resets them on gaps/reloads. First eight hops
+stay aligned dry while history fills; this enhancement warmup adds no output delay.
+Both experiment arms use `sequence_warmup_frames: 8` followed by eight supervised
+frames, so CPU validation must pass `warmup_frames=8` too. Keep loss and crop protocol
+matched; totals from the earlier eight-frame-only study are not direct comparisons.
+See [the causal experiment contract](../docs/causal-context-20261011.md).
 
 `checkpoints/best-validation.pth` is the export candidate;
 `checkpoints/final-resume.pth` is atomically updated every epoch for exact resume.

@@ -1,6 +1,7 @@
 //! ONNX model inference engine and deployable artifact validation.
 //!
-//! SoundEx models exchange fixed-width spectral frames as `[B, 2, 1, F]`, where
+//! SoundEx models consume `[B, 2, C, F]` and emit `[B, 2, 1, F]`, where
+//! C is 1 or 9 observed oldest-to-current frames and
 //! channel 0 is magnitude in dB and channel 1 is phase in radians.
 
 #[cfg(not(feature = "ort-backend"))]
@@ -36,10 +37,14 @@ mod inner {
             output_name: &str,
             batch_size: usize,
             frequency_bins: usize,
+            context_frames: usize,
         ) -> Result<Self> {
             let shape = [batch_size, 2, 1, frequency_bins];
-            let input = Tensor::<f32>::new(session.allocator(), shape)
-                .map_err(|error| SoundExError::ModelLoad(error.to_string()))?;
+            let input = Tensor::<f32>::new(
+                session.allocator(),
+                [batch_size, 2, context_frames, frequency_bins],
+            )
+            .map_err(|error| SoundExError::ModelLoad(error.to_string()))?;
             let output = Tensor::<f32>::new(session.allocator(), shape)
                 .map_err(|error| SoundExError::ModelLoad(error.to_string()))?;
             let run_options = RunOptions::new()
@@ -56,6 +61,7 @@ mod inner {
         batch_one: InferenceBuffers,
         batch_two: InferenceBuffers,
         frequency_bins: usize,
+        context_frames: usize,
         run_count: u64,
         #[cfg(test)]
         fail_after_successes: Option<usize>,
@@ -85,16 +91,27 @@ mod inner {
             let frame_contract = validate_session_contract(&session, config)?;
 
             let output_name = session.outputs()[0].name().to_owned();
-            let batch_one =
-                InferenceBuffers::new(&session, &output_name, 1, frame_contract.frequency_bins)?;
-            let batch_two =
-                InferenceBuffers::new(&session, &output_name, 2, frame_contract.frequency_bins)?;
+            let batch_one = InferenceBuffers::new(
+                &session,
+                &output_name,
+                1,
+                frame_contract.frequency_bins,
+                frame_contract.context_frames,
+            )?;
+            let batch_two = InferenceBuffers::new(
+                &session,
+                &output_name,
+                2,
+                frame_contract.frequency_bins,
+                frame_contract.context_frames,
+            )?;
 
             Ok(Self {
                 output_name,
                 batch_one,
                 batch_two,
                 frequency_bins: frame_contract.frequency_bins,
+                context_frames: frame_contract.context_frames,
                 session,
                 run_count: 0,
                 #[cfg(test)]
@@ -102,9 +119,9 @@ mod inner {
             })
         }
 
-        /// Run inference on one or two artifact-bound `[B, 2, 1, F]` frames.
+        /// Run inference on one or two artifact-bound `[B, 2, C, F]` channel windows.
         pub fn infer(&mut self, input: &Array4<f32>) -> Result<Array4<f32>> {
-            let mut output = Array4::zeros(input.raw_dim());
+            let mut output = Array4::zeros((input.shape()[0], 2, 1, self.frequency_bins));
             self.infer_into(input.view(), output.view_mut())?;
             Ok(output)
         }
@@ -117,16 +134,17 @@ mod inner {
         ) -> Result<()> {
             let expected_shape = input.shape();
             if !matches!(expected_shape[0], 1 | 2)
-                || expected_shape[1..] != [2, 1, self.frequency_bins]
+                || expected_shape[1..] != [2, self.context_frames, self.frequency_bins]
             {
                 return Err(SoundExError::InvalidInput(format!(
-                    "model input must have shape [B, 2, 1, {}] with B in 1..=2, got {expected_shape:?}",
-                    self.frequency_bins
+                    "model input must have shape [B, 2, {}, {}] with B in 1..=2, got {expected_shape:?}",
+                    self.context_frames, self.frequency_bins
                 )));
             }
-            if output.shape() != expected_shape {
+            let expected_output_shape = [expected_shape[0], 2, 1, self.frequency_bins];
+            if output.shape() != expected_output_shape {
                 return Err(SoundExError::InvalidInput(format!(
-                    "model output buffer shape {:?} does not match input shape {expected_shape:?}",
+                    "model output buffer shape {:?} does not match {expected_output_shape:?}",
                     output.shape()
                 )));
             }
@@ -170,11 +188,11 @@ mod inner {
             let shape_matches = shape.len() == expected_shape.len()
                 && shape
                     .iter()
-                    .zip(expected_shape)
-                    .all(|(actual, expected)| usize::try_from(*actual) == Ok(*expected));
+                    .zip(expected_output_shape)
+                    .all(|(actual, expected)| usize::try_from(*actual) == Ok(expected));
             if !shape_matches {
                 return Err(SoundExError::Inference(format!(
-                    "model output shape {shape:?} does not match input shape {expected_shape:?}"
+                    "model output shape {shape:?} does not match {expected_output_shape:?}"
                 )));
             }
             if values.iter().any(|value| !value.is_finite()) {
@@ -190,6 +208,11 @@ mod inner {
         /// Return the fixed frequency size declared by the SoundEx contract.
         pub fn input_freq_bins(&self) -> Option<usize> {
             Some(self.frequency_bins)
+        }
+
+        /// Number of observed frames, oldest to current, explicitly supplied per call.
+        pub fn context_frames(&self) -> usize {
+            self.context_frames
         }
 
         /// Number of ONNX Runtime session runs issued by this engine.
@@ -241,6 +264,11 @@ impl InferenceEngine {
     /// No model shape is available without an inference backend.
     pub fn input_freq_bins(&self) -> Option<usize> {
         None
+    }
+
+    /// No temporal context is used without an inference backend.
+    pub fn context_frames(&self) -> usize {
+        1
     }
 
     /// No session runs are possible without an inference backend.

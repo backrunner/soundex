@@ -1,4 +1,4 @@
-"""Export a schema-1.2 SoundEx checkpoint to the artifact-schema-1.3 ONNX contract."""
+"""Export a SoundEx checkpoint to a versioned frame or causal-window ONNX contract."""
 
 from __future__ import annotations
 
@@ -77,7 +77,9 @@ def artifact_metadata(checkpoint: Mapping[str, Any], checkpoint_sha256: str) -> 
     input_shape = ",".join(str(value) for value in feature["input_shape"])
     output_shape = ",".join(str(value) for value in feature["output_shape"])
     return {
-        "soundex.artifact_schema": ARTIFACT_SCHEMA_VERSION,
+        "soundex.artifact_schema": "1.4"
+        if feature["context_frames"] > 1
+        else ARTIFACT_SCHEMA_VERSION,
         "soundex.model_architecture": str(architecture["name"]),
         "soundex.model_architecture_version": (
             f"{int(architecture['major'])}.{int(architecture['minor'])}"
@@ -124,7 +126,9 @@ def export_onnx(
     model = _build_generator(checkpoint)
     metadata = artifact_metadata(checkpoint, checkpoint_sha256)
     feature = checkpoint["feature_contract"]
-    static_shape = tensor_shape(int(feature["fft_size"]), int(feature["hop_size"]))
+    static_shape = tensor_shape(
+        int(feature["fft_size"]), int(feature["hop_size"]), int(feature["context_frames"])
+    )
 
     destination = Path(output_path)
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -197,7 +201,7 @@ def _export_graph(
     static_shape: tuple[int, int, int],
 ) -> None:
     dummy_input = torch.zeros((1, *static_shape), dtype=torch.float32)
-    export_model = _RuntimeContract(model, static_shape).eval()
+    export_model = _RuntimeContract(model, (2, 1, static_shape[-1])).eval()
     export_options: dict[str, Any] = {}
     if "dynamo" in inspect.signature(torch.onnx.export).parameters:
         export_options["dynamo"] = False
@@ -225,7 +229,7 @@ def _embed_metadata(output_path: Path, metadata: Mapping[str, str]) -> None:
         item.key = key
         item.value = value
     graph.producer_name = "SoundEx"
-    graph.producer_version = ARTIFACT_SCHEMA_VERSION
+    graph.producer_version = metadata["soundex.artifact_schema"]
     graph.domain = "soundex.audio"
     graph.model_version = 1
     onnx.save_model(graph, str(output_path), save_as_external_data=False)
@@ -243,9 +247,10 @@ def validate_onnx_contract(path: str | Path, expected_metadata: Mapping[str, str
     expected_shape = tensor_shape(
         int(expected_metadata["soundex.fft_size"]),
         int(expected_metadata["soundex.hop_size"]),
+        int(expected_metadata["soundex.context_frames"]),
     )
     _validate_value_info(graph.graph.input[0], INPUT_NAME, expected_shape)
-    _validate_value_info(graph.graph.output[0], OUTPUT_NAME, expected_shape)
+    _validate_value_info(graph.graph.output[0], OUTPUT_NAME, (2, 1, expected_shape[-1]))
 
     actual_metadata = {item.key: item.value for item in graph.metadata_props}
     missing = sorted(REQUIRED_METADATA_KEYS - set(actual_metadata))

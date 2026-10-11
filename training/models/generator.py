@@ -244,6 +244,11 @@ class SoundExGenerator(nn.Module):
             with torch.random.fork_rng(devices=[]):
                 self.spectral_refiner = SpectralRefiner(**spectral_refiner)
 
+    @property
+    def context_frames(self) -> int:
+        """Explicit oldest-to-current input window; no hidden recurrent state."""
+        return 1 + (self.spectral_refiner.history_frames if self.spectral_refiner else 0)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass.
 
@@ -251,11 +256,15 @@ class SoundExGenerator(nn.Module):
             x: Full degraded features [B, 2, T, F] (log-mag + phase)
 
         Returns:
-            Candidate clean features [B, 2, T, F] (log-mag + phase)
+            Candidate clean features [B, 2, T, F]; causal context emits T=1 only.
         """
         if x.ndim != 4 or x.shape[1] != 2:
             raise ValueError(f"Expected input shape [B, 2, T, F], got {tuple(x.shape)}")
         reference = x
+        if self.context_frames > 1:
+            if x.shape[2] != self.context_frames:
+                raise ValueError("generator input differs from its causal context contract")
+            x = x[:, :, -1:, :]
 
         # Split input into amplitude and phase channels
         amp_in = x[:, 0:1, :, :]
@@ -282,7 +291,7 @@ class SoundExGenerator(nn.Module):
         residual = self.fusion(combined)
         output = combined + residual
 
-        output = match_frequency_size(output, reference)
+        output = match_frequency_size(output, x)
         if self.spectral_refiner is not None:
             output = output + self.spectral_refiner(reference)
         return output

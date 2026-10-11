@@ -43,6 +43,7 @@ def generate_parity_evidence(
     parity_inputs = deterministic_parity_inputs(
         fft_size=int(feature["fft_size"]),
         hop_size=int(feature["hop_size"]),
+        context_frames=int(feature["context_frames"]),
     )
     binary = _resolve_rust_binary(rust_binary)
     cases: list[dict[str, object]] = []

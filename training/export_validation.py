@@ -58,6 +58,7 @@ def validate_ort_parity(
     for case_name, input_tensor in deterministic_parity_inputs(
         fft_size=fft_size,
         hop_size=hop_size,
+        context_frames=int(metadata["soundex.context_frames"]),
     ):
         input_array = input_tensor.numpy()
         with torch.no_grad():
@@ -80,7 +81,7 @@ def validate_ort_parity(
 
 
 def deterministic_parity_inputs(
-    *, fft_size: int = DEFAULT_FFT_SIZE, hop_size: int = DEFAULT_HOP_SIZE
+    *, fft_size: int = DEFAULT_FFT_SIZE, hop_size: int = DEFAULT_HOP_SIZE, context_frames: int = 1
 ) -> list[tuple[str, torch.Tensor]]:
     """Cover silence, real STFT, random spectra, floor, and phase wrapping."""
     floor = -200.0
@@ -148,4 +149,17 @@ def deterministic_parity_inputs(
                 (20 * spectrum.abs().clamp_min(1e-10).log10(), torch.angle(spectrum))
             )[None, :, None, :]
             cases.append((f"{name}_{sample_rate}", features.contiguous()))
+    if context_frames != 1:
+        tensor_shape(fft_size, hop_size, context_frames)
+        expanded = []
+        for name, current in cases:
+            # Distinct histories expose order/layout errors, not only repeated frames.
+            history = torch.empty((current.shape[0], 2, context_frames - 1, frequency_bins))
+            history[:, 0].uniform_(-120, 6, generator=generator)
+            history[:, 1].uniform_(-math.pi, math.pi, generator=generator)
+            if name in {"silence", "db_floor"}:
+                history[:, 0] = floor
+                history[:, 1] = 0
+            expanded.append((name, torch.cat((history, current), dim=2)))
+        return expanded
     return cases
