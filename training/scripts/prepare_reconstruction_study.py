@@ -30,7 +30,7 @@ def prepare(parent_path: Path, destination: Path) -> dict:
         raise FileExistsError(f"refusing to overwrite {destination}")
     spec["history_frames"] = 8
     config["training"].update(
-        batch_size=8,
+        batch_size=16,
         max_epochs=4,
         learning_rate=2e-5,
         warmup_steps=64,
@@ -40,7 +40,7 @@ def prepare(parent_path: Path, destination: Path) -> dict:
         batch_norm_statistics="frozen",
         validation_interval_epochs=1,
     )
-    config["data"]["sampling"]["samples_per_epoch"] = 1024
+    config["data"]["sampling"]["samples_per_epoch"] = 2048
     config["training"]["objective"].update(
         version=7,
         causal_sequence_frames=32,
@@ -74,7 +74,7 @@ def prepare(parent_path: Path, destination: Path) -> dict:
         "manifest_set_sha256": parent["data"]["manifest_set_sha256"],
         "epochs": 4,
         "updates": 512,
-        "supervised_frames_per_arm": 131072,
+        "supervised_frames_per_arm": 262144,
         "model_warmup_frames": 8,
         "dsp_warmup_frames": 32,
         "supervised_frames": 32,

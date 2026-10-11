@@ -21,8 +21,8 @@
 
 从同一shape-small父检查点 `a5166a6f56239a31a48986725188aa19c1c199c565904c76aca0f160a19f393a`
 迁移零初始化时间分支。原生无损数据、划分、音乐/语音比例和来源义务保持不变。
-两个arm均冻结BN、无GAN，batch8、每轮1024draws、4轮/512updates、LR2e-5、
-64step warmup/cosine，共131,072监督帧。两组观察相同长度、使用同一采样种子。
+两个arm均冻结BN、无GAN，batch16、每轮2048draws、4轮/512updates、LR2e-5、
+64step warmup/cosine，共262,144监督帧。两组观察相同长度、使用同一采样种子。
 
 - `long-control`：长序列与DSP历史，multires四项权重为0。
 - `multires`：在此基础上使用0.5谱收敛、1.0能量（除以20dB尺度）、0.25时间误差、
