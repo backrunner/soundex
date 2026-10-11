@@ -2,21 +2,13 @@
 
 use std::error::Error;
 use std::fs;
-use std::io::{Error as IoError, ErrorKind};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use soundex_core::{analyze_buffer, SoundExConfig, SoundExProcessor};
 
-const MAGIC: &[u8; 4] = b"SXA1";
-const HEADER_BYTES: usize = 20;
-
-struct BinaryAudio {
-    sample_rate: u32,
-    channels: u16,
-    frames: usize,
-    samples: Vec<f32>,
-}
+mod audio_io;
+use audio_io::{read_audio, write_audio, BinaryAudio};
 
 enum ProcessingMode {
     Offline,
@@ -75,9 +67,16 @@ fn run() -> Result<(), Box<dyn Error>> {
         .unwrap_or_else(|_| "match-edge".into())
         .parse()
         .map_err(|error: &str| error.to_string())?;
+    if let Some(path) = std::env::var_os("SOUNDEX_EVAL_GAIN_CALIBRATION") {
+        config.gain_calibration = Some(soundex_core::calibration::read_gain_calibration(path)?);
+    }
     let enhancement_mode = config.enhancement_mode.as_str();
     let high_band_gain = config.high_band_gain.as_str();
     let analysis = analyze_buffer(&config, &audio.samples)?;
+    let gain_calibration = config
+        .gain_calibration
+        .as_ref()
+        .map(|c| c.coefficients().to_vec());
     let mut processor = SoundExProcessor::new(config)?;
     let latency = processor.latency_samples_per_channel();
     let output = match &mode {
@@ -151,7 +150,9 @@ fn run() -> Result<(), Box<dyn Error>> {
         latency,
         clipped_samples,
     );
-    fs::write(report_path, report)?;
+    let mut report: serde_json::Value = serde_json::from_str(&report)?;
+    report["gain_calibration_coefficients"] = serde_json::json!(gain_calibration);
+    fs::write(report_path, serde_json::to_vec_pretty(&report)?)?;
     Ok(())
 }
 
@@ -205,76 +206,6 @@ where
         Err(std::env::VarError::NotPresent) => Ok(default),
         Err(error) => Err(error.into()),
     }
-}
-
-fn read_audio(path: &Path) -> Result<BinaryAudio, Box<dyn Error>> {
-    let bytes = fs::read(path)?;
-    if bytes.len() < HEADER_BYTES || &bytes[..4] != MAGIC {
-        return Err(invalid_data(path, "missing SXA1 header").into());
-    }
-    let sample_rate = u32::from_le_bytes(bytes[4..8].try_into()?);
-    let channels = u16::from_le_bytes(bytes[8..10].try_into()?);
-    let flags = u16::from_le_bytes(bytes[10..12].try_into()?);
-    let frame_count = u64::from_le_bytes(bytes[12..20].try_into()?);
-    if !matches!(sample_rate, 44_100 | 48_000) {
-        return Err(invalid_data(path, "sample rate must be 44100 or 48000").into());
-    }
-    if !matches!(channels, 1 | 2) {
-        return Err(invalid_data(path, "channel count must be 1 or 2").into());
-    }
-    if flags != 0 {
-        return Err(invalid_data(path, "unsupported SXA1 flags").into());
-    }
-    let frames = usize::try_from(frame_count)
-        .map_err(|_| invalid_data(path, "frame count does not fit this platform"))?;
-    let sample_count = frames
-        .checked_mul(usize::from(channels))
-        .ok_or_else(|| invalid_data(path, "sample count overflows usize"))?;
-    let payload_bytes = sample_count
-        .checked_mul(4)
-        .ok_or_else(|| invalid_data(path, "payload size overflows usize"))?;
-    if bytes.len() != HEADER_BYTES + payload_bytes {
-        return Err(invalid_data(path, "payload length does not match header").into());
-    }
-    let samples: Vec<f32> = bytes[HEADER_BYTES..]
-        .as_chunks::<4>()
-        .0
-        .iter()
-        .map(|chunk| f32::from_le_bytes(*chunk))
-        .collect();
-    if samples.iter().any(|sample| !sample.is_finite()) {
-        return Err(invalid_data(path, "payload contains non-finite samples").into());
-    }
-    Ok(BinaryAudio {
-        sample_rate,
-        channels,
-        frames,
-        samples,
-    })
-}
-
-fn write_audio(path: &Path, audio: &BinaryAudio) -> Result<(), Box<dyn Error>> {
-    if audio.samples.len() != audio.frames * usize::from(audio.channels) {
-        return Err("output sample count does not match audio shape".into());
-    }
-    let mut bytes = Vec::with_capacity(HEADER_BYTES + audio.samples.len() * 4);
-    bytes.extend_from_slice(MAGIC);
-    bytes.extend_from_slice(&audio.sample_rate.to_le_bytes());
-    bytes.extend_from_slice(&audio.channels.to_le_bytes());
-    bytes.extend_from_slice(&0_u16.to_le_bytes());
-    bytes.extend_from_slice(&(audio.frames as u64).to_le_bytes());
-    for sample in &audio.samples {
-        bytes.extend_from_slice(&sample.to_le_bytes());
-    }
-    fs::write(path, bytes)?;
-    Ok(())
-}
-
-fn invalid_data(path: &Path, message: &str) -> IoError {
-    IoError::new(
-        ErrorKind::InvalidData,
-        format!("{}: {message}", path.display()),
-    )
 }
 
 #[cfg(test)]

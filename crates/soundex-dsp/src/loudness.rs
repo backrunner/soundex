@@ -28,6 +28,16 @@ impl LoudnessMatcher {
     ///
     /// Returns a linear gain factor clamped to [0.25, 2.0] (-12dB..+6dB).
     pub fn compute_gain(&mut self, low_band_rms: f32, high_band_rms: f32) -> f32 {
+        self.compute_gain_with_ratio(low_band_rms, high_band_rms, self.target_ratio_db)
+    }
+
+    /// Use an input-conditioned target while retaining the same state and bounds.
+    pub fn compute_gain_with_ratio(
+        &mut self,
+        low_band_rms: f32,
+        high_band_rms: f32,
+        target_ratio_db: f32,
+    ) -> f32 {
         if low_band_rms < 1e-10 {
             self.current_gain = 0.0;
             return 0.0;
@@ -36,7 +46,7 @@ impl LoudnessMatcher {
             return 1.0;
         }
 
-        let target_rms = low_band_rms * 10.0f32.powf(self.target_ratio_db / 20.0);
+        let target_rms = low_band_rms * 10.0f32.powf(target_ratio_db / 20.0);
         let gain = target_rms / high_band_rms;
         let gain = gain.clamp(0.25, 2.0);
 

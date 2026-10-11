@@ -13,6 +13,7 @@
 pub mod bandwidth;
 pub mod crossover;
 pub mod extension;
+pub mod gain_calibration;
 pub mod limiter;
 pub mod loudness;
 pub mod phase;

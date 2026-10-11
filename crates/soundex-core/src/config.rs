@@ -74,6 +74,8 @@ pub struct SoundExConfig {
     pub enhancement_mode: EnhancementMode,
     /// Experimental model level preservation; the default retains legacy matching.
     pub high_band_gain: HighBandGain,
+    /// Experimental input-conditioned edge target, loaded on the control thread.
+    pub gain_calibration: Option<soundex_dsp::gain_calibration::GainCalibration>,
     /// Path to the ONNX model file (unused in spectral mode).
     pub model_path: PathBuf,
 
@@ -124,6 +126,7 @@ impl Default for SoundExConfig {
         Self {
             enhancement_mode: EnhancementMode::Neural,
             high_band_gain: HighBandGain::MatchEdge,
+            gain_calibration: None,
             model_path: PathBuf::from("soundex-v1.onnx"),
             sample_rate: 44100,
             channels: 1,

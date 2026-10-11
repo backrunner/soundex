@@ -675,6 +675,17 @@ pub(crate) fn validate_config(config: &SoundExConfig) -> Result<()> {
             "limiter_ceiling must be in 0..=1".into(),
         ));
     }
+    if config.gain_calibration.is_some()
+        && (config.fft_size != 256
+            || config.hop_size != 128
+            || config.crossover_width_hz != 1000.0
+            || config.high_band_gain != crate::config::HighBandGain::MatchEdge
+            || config.enhancement_mode != crate::config::EnhancementMode::Neural)
+    {
+        return Err(SoundExError::InvalidInput(
+            "gain calibration requires neural MatchEdge FFT256/hop128/crossover1000".into(),
+        ));
+    }
     if config.ort_intra_threads == 0 || config.ort_inter_threads == 0 {
         return Err(SoundExError::InvalidInput(
             "ORT thread counts must be positive".into(),

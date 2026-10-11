@@ -47,6 +47,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         .sample_rate(rate)
         .channels(channels)
         .enhancement_mode(mode);
+    if let Some(path) = env::var_os("SOUNDEX_GAIN_CALIBRATION") {
+        config.gain_calibration = Some(soundex_core::calibration::read_gain_calibration(path)?);
+    }
+    let gain_calibration_coefficients = config
+        .gain_calibration
+        .as_ref()
+        .map(|c| c.coefficients().to_vec());
     config.min_bandwidth_ratio = 1.0;
     let start = Instant::now();
     let mut processor = SoundExProcessor::new(config)?;
@@ -76,7 +83,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let percentile = |p: f64| {
         times[((times.len() as f64 * p).ceil() as usize).saturating_sub(1)] as f64 / 1000.0
     };
-    let report = json!({"schema_version": 1, "diagnostic": true, "audio_device_tested": false,
+    let report = json!({"gain_calibration_coefficients": gain_calibration_coefficients,"schema_version": 1, "diagnostic": true, "audio_device_tested": false,
         "enhancement_mode": mode.as_str(), "model_sha256": model_sha256,
         "ort_backend_compiled": cfg!(feature = "ort-backend"),
         "model_loaded": mode != EnhancementMode::Spectral, "source": source.evidence(),

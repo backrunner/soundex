@@ -62,6 +62,7 @@ class RustStreamEvaluator:
         crossover_width_hz: float = 1000.0,
         enhancement_mode: str = "neural",
         high_band_gain: str = "match-edge",
+        gain_calibration: str | Path | None = None,
     ) -> RustEvaluationOutput:
         """Run one offline or chunked evaluation and return aligned audio/report."""
         self.ensure_available()
@@ -99,6 +100,9 @@ class RustStreamEvaluator:
                     "SOUNDEX_EVAL_HIGH_BAND_GAIN": high_band_gain,
                 }
             )
+            environment.pop("SOUNDEX_EVAL_GAIN_CALIBRATION", None)
+            if gain_calibration is not None:
+                environment["SOUNDEX_EVAL_GAIN_CALIBRATION"] = str(Path(gain_calibration).resolve())
             result = subprocess.run(
                 command,
                 capture_output=True,
@@ -126,6 +130,16 @@ class RustStreamEvaluator:
             raise RuntimeError("Rust stream report high-band gain mismatch")
         if not bool(report.get("processor", {}).get("output_finite", False)):
             raise RuntimeError("Rust stream report did not certify finite output")
+        if gain_calibration is not None:
+            expected_coefficients = json.loads(Path(gain_calibration).read_text())["coefficients"]
+            actual = report.get("gain_calibration_coefficients")
+            if actual is None or not np.array_equal(
+                np.asarray(actual, dtype=np.float32),
+                np.asarray(expected_coefficients, dtype=np.float32),
+            ):
+                raise RuntimeError("Rust stream gain calibration mismatch")
+        elif report.get("gain_calibration_coefficients") is not None:
+            raise RuntimeError("unexpected Rust stream gain calibration")
         return RustEvaluationOutput(audio=enhanced, report=report)
 
 

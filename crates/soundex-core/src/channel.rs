@@ -201,7 +201,21 @@ impl ChannelProcessor {
         {
             1.0
         } else {
-            self.loudness.compute_gain(low_rms, high_rms)
+            if let Some(calibration) = &config.gain_calibration {
+                let features = soundex_dsp::gain_calibration::gain_features(
+                    &self.original_magnitude,
+                    cutoff_bin,
+                    reference_bins,
+                    config.sample_rate,
+                );
+                self.loudness.compute_gain_with_ratio(
+                    low_rms,
+                    high_rms,
+                    calibration.target_ratio_db(&features),
+                )
+            } else {
+                self.loudness.compute_gain(low_rms, high_rms)
+            }
         };
         self.crossover.compute_weights_into(
             self.detected_bandwidth_hz,
@@ -265,6 +279,11 @@ impl ChannelProcessor {
         }
         self.enhancement_gain_db = 20.0 * gain.max(1e-10).log10();
         Ok(())
+    }
+
+    /// Offline diagnostic access to the exact observed frame, not a second detector.
+    pub(crate) fn observed_spectrum(&self) -> &SpectralFrame {
+        &self.original
     }
 
     pub(crate) fn needs_enhancement(&self) -> bool {

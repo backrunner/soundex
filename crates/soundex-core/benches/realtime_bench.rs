@@ -129,6 +129,13 @@ fn measure(
         .sample_rate(sample_rate)
         .channels(channels);
     config.enhancement_mode = enhancement_mode;
+    if let Some(path) = env::var_os("SOUNDEX_GAIN_CALIBRATION") {
+        config.gain_calibration = Some(soundex_core::calibration::read_gain_calibration(path)?);
+    }
+    let gain_calibration_coefficients = config
+        .gain_calibration
+        .as_ref()
+        .map(|c| c.coefficients().to_vec());
     config.min_bandwidth_ratio = 1.0;
     config.worker_time_constraint = worker_rt;
     config.realtime_warmup = env::var("SOUNDEX_REALTIME_WARMUP")
@@ -241,6 +248,7 @@ fn measure(
         });
     Ok(report::Case {
         metadata: json!({
+            "gain_calibration_coefficients": gain_calibration_coefficients,
             "sample_rate_hz": sample_rate, "channels": channels,
             "construction_ms": load_ms, "hops": hops,
             "source": source.evidence(),

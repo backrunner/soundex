@@ -27,6 +27,7 @@ mod channel;
 mod inference_contract;
 
 pub mod analysis;
+pub mod calibration;
 pub mod config;
 pub mod error;
 pub mod inference;
