@@ -295,3 +295,21 @@ executables accept `SOUNDEX_PHASE_POLICY` and record the loaded policy. Both
 experimental policies require Neural mode. The training loss proxy has not been
 changed to use this policy; this is a DSP-only study with fixed ONNX weights.
 See [results and limitations](../docs/phase-reconstruction-20261011.md).
+
+## Original causal backbone probes
+
+The [P0/P1 study](../docs/causal-prototypes-20261011.md) implements original GRU/TCN
+complex-residual models with an [explicit-state 2.0 contract](../docs/causal-state-contract.md).
+`export_causal.py` checks sequential ORT parity before publishing local artifacts;
+`scripts/probe_causal_core.py` also checks Rust parity and irregular chunking.
+`scripts/fit_causal_tiny.py` fits identity, ideal lowpass and real MP3 training clips,
+using 64 burn-in hops and the production input detector trajectory. These are
+learnability probes, not production weights or full-library training. The six runs
+finished; matched-budget fresh training, independent testing and listening remain pending.
+
+Build `soundex-state-parity`, `soundex-stream-eval` and `soundex-gain-data` first.
+Run either script with `PYTHONPATH=. .venv/bin/python scripts/<name>.py --help`.
+New artifacts require Model gain/phase and 64 observed warmup hops with aligned dry
+audio. Benchmarks accept `SOUNDEX_HIGH_BAND_GAIN=model` and record this setting.
+State warmup counters are separate from deadline availability; a timely dry packet
+does not prove that enhancement was available. No raw audio/checkpoints are published.

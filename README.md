@@ -47,7 +47,10 @@ the new DSP policy is opt-in and no weights are promoted.
 The [architecture reset review](docs/architecture-reset-20261011.md) broadens the
 research to complex spectral generation, causal temporal models, differentiable
 DSP and generative training. It proposes fresh backbone experiments with explicit
-quality and streaming gates; these experiments have not started.
+quality and streaming gates. The [first implementation stage](docs/causal-prototypes-20261011.md)
+now includes original GRU/TCN prototypes, an explicit-state Rust/ONNX contract,
+production-DSP oracle diagnostics and six completed tiny-set learning probes.
+Full-library matched training and qualification remain pending.
 
 ## Quick start
 
