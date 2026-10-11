@@ -235,10 +235,6 @@ impl SoundExProcessor {
         prediction: ArrayView4<'_, f32>,
     ) -> Result<ProcessInfo> {
         if self.config.enhancement_mode != EnhancementMode::Neural
-            || self
-                .engine
-                .as_ref()
-                .is_some_and(InferenceEngine::is_stateful)
             || self.inference_input.shape()[2] != 1
             || prediction.shape() != [self.channel_count(), 2, 1, self.config.fft_size / 2 + 1]
             || prediction.iter().any(|value| !value.is_finite())

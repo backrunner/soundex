@@ -23,6 +23,42 @@ pub struct OracleOutput {
     pub hops: Vec<ProcessInfo>,
 }
 
+/// Offline replay of externally supplied current-frame spectra, without inference.
+/// Returns the raw delayed hop timeline (no tail or trimming), for training-proxy
+/// validation. Stateful artifacts still enforce their production dry warmup.
+pub fn replay_predictions(
+    config: SoundExConfig,
+    degraded: &[f32],
+    predictions: &[f32],
+) -> Result<Vec<f32>> {
+    validate_config(&config)?;
+    let hop_samples = config.hop_size * config.channels as usize;
+    let frame_values = config.channels as usize * 2 * (config.fft_size / 2 + 1);
+    if !degraded.len().is_multiple_of(hop_samples)
+        || predictions.len() != degraded.len() / hop_samples * frame_values
+        || degraded.iter().chain(predictions).any(|v| !v.is_finite())
+    {
+        return Err(SoundExError::InvalidInput(
+            "invalid prediction replay".into(),
+        ));
+    }
+    let mut processor = SoundExProcessor::new(config.clone())?;
+    let mut output = vec![0.0; degraded.len()];
+    for ((input, prediction), result) in degraded
+        .chunks(hop_samples)
+        .zip(predictions.chunks(frame_values))
+        .zip(output.chunks_mut(hop_samples))
+    {
+        let view = ndarray::ArrayView4::from_shape(
+            (config.channels as usize, 2, 1, config.fft_size / 2 + 1),
+            prediction,
+        )
+        .map_err(|e| SoundExError::InvalidInput(e.to_string()))?;
+        processor.process_oracle_frame(input, result, view)?;
+    }
+    Ok(output)
+}
+
 /// Same input and reference sample clock, padding and tail; no reference-based gates.
 pub fn process_oracle(
     config: SoundExConfig,
