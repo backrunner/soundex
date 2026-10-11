@@ -67,6 +67,41 @@ impl std::str::FromStr for HighBandGain {
     }
 }
 
+/// Experimental phase-only ablations. Magnitude prediction and gain are unchanged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PhasePolicy {
+    /// Legacy crossover between observed and model unit phasors.
+    #[default]
+    Model,
+    /// Use observed phase everywhere, including bins with little surviving signal.
+    Observed,
+    /// Reduce model phase weight by the surviving input-to-candidate power ratio.
+    /// This is a heuristic, not a calibrated estimate of phase reliability.
+    SurvivingPower,
+}
+
+impl PhasePolicy {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Model => "model",
+            Self::Observed => "observed",
+            Self::SurvivingPower => "surviving-power",
+        }
+    }
+}
+
+impl std::str::FromStr for PhasePolicy {
+    type Err = &'static str;
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "model" => Ok(Self::Model),
+            "observed" => Ok(Self::Observed),
+            "surviving-power" => Ok(Self::SurvivingPower),
+            _ => Err("phase policy must be model, observed or surviving-power"),
+        }
+    }
+}
+
 /// Configuration for creating a [`SoundExProcessor`](crate::processor::SoundExProcessor).
 #[derive(Debug, Clone)]
 pub struct SoundExConfig {
@@ -74,6 +109,8 @@ pub struct SoundExConfig {
     pub enhancement_mode: EnhancementMode,
     /// Experimental model level preservation; the default retains legacy matching.
     pub high_band_gain: HighBandGain,
+    /// Experimental phase-only policy; supported on the neural path.
+    pub phase_policy: PhasePolicy,
     /// Experimental input-conditioned edge target, loaded on the control thread.
     pub gain_calibration: Option<soundex_dsp::gain_calibration::GainCalibration>,
     /// Path to the ONNX model file (unused in spectral mode).
@@ -126,6 +163,7 @@ impl Default for SoundExConfig {
         Self {
             enhancement_mode: EnhancementMode::Neural,
             high_band_gain: HighBandGain::MatchEdge,
+            phase_policy: PhasePolicy::Model,
             gain_calibration: None,
             model_path: PathBuf::from("soundex-v1.onnx"),
             sample_rate: 44100,

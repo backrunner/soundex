@@ -675,6 +675,13 @@ pub(crate) fn validate_config(config: &SoundExConfig) -> Result<()> {
             "limiter_ceiling must be in 0..=1".into(),
         ));
     }
+    if config.phase_policy != crate::config::PhasePolicy::Model
+        && config.enhancement_mode != EnhancementMode::Neural
+    {
+        return Err(SoundExError::InvalidInput(
+            "experimental phase policies require neural enhancement".into(),
+        ));
+    }
     if config.gain_calibration.is_some()
         && (config.fft_size != 256
             || config.hop_size != 128

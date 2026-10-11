@@ -1,4 +1,4 @@
-//! Phase smoothing and consistency repair.
+//! Within-frame phase blending. This does not enforce temporal STFT consistency.
 //!
 //! Blends original and generated unit phasors with the same weights used for
 //! magnitude crossover, preserving the low band exactly.
@@ -6,6 +6,25 @@
 use rustfft::num_complex::Complex;
 
 use crate::crossover::{validate_blend_inputs, BlendError};
+
+/// Experimental model phase weight from surviving input power.
+///
+/// `w * (1 - min(original / generated, 1)^2)` leaves retained bins unchanged,
+/// uses the model at a missing bin, and uses observed phase when observed power
+/// meets/exceeds the post-gain candidate. Magnitudes must be finite/nonnegative,
+/// and crossover must be in [0, 1]. This is a heuristic, not phase confidence.
+/// No history, allocation, lookahead or magnitude attenuation is introduced.
+pub fn surviving_power_weight(crossover: f32, original: f32, generated: f32) -> f32 {
+    debug_assert!(crossover.is_finite() && (0.0..=1.0).contains(&crossover));
+    debug_assert!(original.is_finite() && original >= 0.0);
+    debug_assert!(generated.is_finite() && generated >= 0.0);
+    if crossover == 0.0 || generated <= original {
+        0.0
+    } else {
+        let ratio = original / generated;
+        crossover * (1.0 - ratio * ratio)
+    }
+}
 
 /// Smooths phase between original and generated spectral content.
 pub struct PhaseSmoother;
@@ -89,6 +108,18 @@ fn circular_lerp(original: f32, predicted: f32, weight: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn surviving_power_anchors_observed_bins_without_hiding_missing_bins() {
+        assert_eq!(surviving_power_weight(1.0, 0.0, 1.0), 1.0);
+        assert_eq!(surviving_power_weight(1.0, 1.0, 1.0), 0.0);
+        assert_eq!(surviving_power_weight(1.0, 2.0, 1.0), 0.0);
+        assert_eq!(surviving_power_weight(1.0, 0.0, 0.0), 0.0);
+        assert_eq!(surviving_power_weight(0.0, 0.0, 1.0), 0.0);
+        for scale in [1e-20, 1e-6, 1.0, 1e10, 1e20] {
+            assert!((surviving_power_weight(0.5, scale, 2.0 * scale) - 0.375).abs() < 1e-6);
+        }
+    }
 
     #[test]
     fn zero_and_one_weights_select_phases_exactly() {

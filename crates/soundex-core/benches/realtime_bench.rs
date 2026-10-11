@@ -132,6 +132,11 @@ fn measure(
     if let Some(path) = env::var_os("SOUNDEX_GAIN_CALIBRATION") {
         config.gain_calibration = Some(soundex_core::calibration::read_gain_calibration(path)?);
     }
+    config.phase_policy = env::var("SOUNDEX_PHASE_POLICY")
+        .unwrap_or_else(|_| "model".into())
+        .parse()
+        .map_err(|error: &str| error.to_string())?;
+    let phase_policy = config.phase_policy.as_str();
     let gain_calibration_coefficients = config
         .gain_calibration
         .as_ref()
@@ -248,7 +253,7 @@ fn measure(
         });
     Ok(report::Case {
         metadata: json!({
-            "gain_calibration_coefficients": gain_calibration_coefficients,
+            "phase_policy": phase_policy, "gain_calibration_coefficients": gain_calibration_coefficients,
             "sample_rate_hz": sample_rate, "channels": channels,
             "construction_ms": load_ms, "hops": hops,
             "source": source.evidence(),

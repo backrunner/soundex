@@ -70,6 +70,11 @@ fn run() -> Result<(), Box<dyn Error>> {
     if let Some(path) = std::env::var_os("SOUNDEX_EVAL_GAIN_CALIBRATION") {
         config.gain_calibration = Some(soundex_core::calibration::read_gain_calibration(path)?);
     }
+    config.phase_policy = std::env::var("SOUNDEX_EVAL_PHASE_POLICY")
+        .unwrap_or_else(|_| "model".into())
+        .parse()
+        .map_err(|error: &str| error.to_string())?;
+    let phase_policy = config.phase_policy.as_str();
     let enhancement_mode = config.enhancement_mode.as_str();
     let high_band_gain = config.high_band_gain.as_str();
     let analysis = analyze_buffer(&config, &audio.samples)?;
@@ -151,6 +156,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         clipped_samples,
     );
     let mut report: serde_json::Value = serde_json::from_str(&report)?;
+    report["phase_policy"] = serde_json::json!(phase_policy);
     report["gain_calibration_coefficients"] = serde_json::json!(gain_calibration);
     fs::write(report_path, serde_json::to_vec_pretty(&report)?)?;
     Ok(())

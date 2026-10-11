@@ -856,3 +856,22 @@ def test_energy_bias_distinguishes_under_and_over_reconstruction():
     assert metrics["baseline_high_energy_bias_db"] == pytest.approx(-expected)
     assert metrics["enhanced_high_energy_bias_db"] == pytest.approx(expected)
     assert metrics["enhanced_high_band_energy_error_db"] == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("policy", ["model", "observed", "surviving-power"])
+def test_phase_policy_bridge_is_explicit_and_chunk_invariant(policy, monkeypatch) -> None:
+    # A stale environment choice must not silently contaminate an ablation.
+    monkeypatch.setenv("SOUNDEX_EVAL_PHASE_POLICY", "invalid-ambient-value")
+    evaluator = RustStreamEvaluator()
+    model = REPOSITORY / "tests/fixtures/low-latency-identity.onnx"
+    time = np.arange(5003, dtype=np.float32) / 48000
+    audio = np.column_stack((0.1 * np.sin(2 * np.pi * 997 * time), np.zeros_like(time)))
+    offline = evaluator.process(model, audio, 48000, mode="offline", phase_policy=policy)
+    chunk = evaluator.process(
+        model, audio, 48000, mode="chunked", chunk_frames=(1, 127, 509), phase_policy=policy
+    )
+    assert offline.report["phase_policy"] == policy
+    np.testing.assert_array_equal(offline.audio, chunk.audio)
+    np.testing.assert_array_equal(offline.audio[:, 1], 0.0)
+    with pytest.raises(ValueError, match="phase_policy"):
+        evaluator.process(model, audio, 48000, mode="offline", phase_policy="typo")

@@ -153,3 +153,26 @@ fn extension_paths_allocate_nothing_in_fixed_hop_processing() {
         assert_eq!(allocations, 0, "{mode:?}");
     }
 }
+
+#[test]
+fn phase_policies_allocate_nothing_in_active_worker_hops() {
+    use soundex_core::PhasePolicy;
+    for policy in [PhasePolicy::Observed, PhasePolicy::SurvivingPower] {
+        let mut config =
+            SoundExConfig::with_model(model_path("low-latency-identity.onnx")).channels(2);
+        config.phase_policy = policy;
+        config.min_bandwidth_ratio = 1.0;
+        let mut processor = SoundExProcessor::new(config).unwrap();
+        let input = stereo_tone(128);
+        let mut output = [0.0; 256];
+        for _ in 0..12 {
+            processor.process_frame(&input, &mut output).unwrap();
+        }
+        let previous_runs = processor.inference_run_count();
+        let (result, allocations) =
+            count_allocations(|| processor.process_frame(&input, &mut output));
+        result.unwrap();
+        assert_eq!(processor.inference_run_count(), previous_runs + 1);
+        assert_eq!(allocations, 0, "{policy:?}");
+    }
+}

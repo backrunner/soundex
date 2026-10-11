@@ -9,7 +9,7 @@ use soundex_dsp::loudness::{rms, LoudnessMatcher};
 use soundex_dsp::phase::PhaseSmoother;
 use soundex_dsp::stft::{SpectralFrame, StftAnalyzer, StftSynthesizer};
 
-use crate::config::{EnhancementMode, HighBandGain, SoundExConfig};
+use crate::config::{EnhancementMode, HighBandGain, PhasePolicy, SoundExConfig};
 use crate::error::{Result, SoundExError};
 use crate::processor::ProcessInfo;
 use crate::stream::StreamBuffer;
@@ -33,6 +33,7 @@ pub(crate) struct ChannelProcessor {
     blended_magnitude: Vec<f32>,
     predicted_phase: Vec<f32>,
     crossover_weights: Vec<f32>,
+    phase_weights: Vec<f32>,
     dry: Vec<f32>,
     wet: Vec<f32>,
     needs_enhancement: bool,
@@ -74,6 +75,7 @@ impl ChannelProcessor {
             blended_magnitude: vec![0.0; bins],
             predicted_phase: vec![0.0; bins],
             crossover_weights: vec![0.0; bins],
+            phase_weights: vec![0.0; bins],
             dry: vec![0.0; config.hop_size],
             wet: vec![0.0; config.hop_size],
             needs_enhancement: false,
@@ -262,11 +264,24 @@ impl ChannelProcessor {
                 &mut self.blended_magnitude,
             )
             .map_err(|error| SoundExError::Dsp(error.to_string()))?;
+        match config.phase_policy {
+            PhasePolicy::Model => self.phase_weights.copy_from_slice(&self.crossover_weights),
+            PhasePolicy::Observed => self.phase_weights.fill(0.0),
+            PhasePolicy::SurvivingPower => {
+                for (bin, weight) in self.phase_weights.iter_mut().enumerate() {
+                    *weight = soundex_dsp::phase::surviving_power_weight(
+                        self.crossover_weights[bin],
+                        self.original_magnitude[bin],
+                        self.generated_magnitude[bin],
+                    );
+                }
+            }
+        }
         self.phase_smoother
             .smooth_into(
                 &self.original.phase,
                 &self.predicted_phase,
-                &self.crossover_weights,
+                &self.phase_weights,
                 &mut self.synthesis.phase,
             )
             .map_err(|error| SoundExError::Dsp(error.to_string()))?;
@@ -372,6 +387,56 @@ fn apply_generated_gain(generated_magnitude: &mut [f32], weights: &[f32], gain: 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn phase_ablation_preserves_candidate_magnitude_gain_and_retained_bins() {
+        let mut spectra = Vec::new();
+        for phase_policy in [
+            PhasePolicy::Model,
+            PhasePolicy::Observed,
+            PhasePolicy::SurvivingPower,
+        ] {
+            let config = SoundExConfig {
+                phase_policy,
+                min_bandwidth_ratio: 1.0,
+                ..Default::default()
+            };
+            let mut channel = ChannelProcessor::new(&config, 1);
+            let prediction = Array3::from_shape_fn((2, 1, 129), |(feature, _, bin)| {
+                if feature == 0 {
+                    -25.0
+                } else {
+                    (bin as f32 * 0.13).sin()
+                }
+            });
+            for hop in 0..20 {
+                let input: Vec<_> = (0..128)
+                    .map(|i| 0.2 * (((hop * 128 + i) as f32) * 0.14).sin())
+                    .collect();
+                channel.analyze_hop(&input, &config).unwrap();
+                if hop == 19 {
+                    assert!(channel.needs_enhancement());
+                }
+                channel
+                    .finish_hop(Some(prediction.view()), &config)
+                    .unwrap();
+            }
+            for bin in 0..129 {
+                if channel.crossover_weights[bin] == 0.0 {
+                    assert_eq!(channel.original.phase[bin], channel.synthesis.phase[bin]);
+                }
+                if phase_policy == PhasePolicy::Observed {
+                    assert_eq!(channel.original.phase[bin], channel.synthesis.phase[bin]);
+                }
+            }
+            spectra.push((channel.synthesis.clone(), channel.enhancement_gain_db));
+        }
+        for (frame, gain) in &spectra[1..] {
+            assert_eq!(frame.log_magnitude, spectra[0].0.log_magnitude);
+            assert_eq!(*gain, spectra[0].1);
+            assert_ne!(frame.phase, spectra[0].0.phase);
+        }
+    }
 
     #[test]
     fn observed_history_advances_during_bypass_and_reset_clears_it() {

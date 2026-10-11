@@ -50,6 +50,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     if let Some(path) = env::var_os("SOUNDEX_GAIN_CALIBRATION") {
         config.gain_calibration = Some(soundex_core::calibration::read_gain_calibration(path)?);
     }
+    config.phase_policy = env::var("SOUNDEX_PHASE_POLICY")
+        .unwrap_or_else(|_| "model".into())
+        .parse()
+        .map_err(|error: &str| error.to_string())?;
+    let phase_policy = config.phase_policy.as_str();
     let gain_calibration_coefficients = config
         .gain_calibration
         .as_ref()
@@ -83,7 +88,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let percentile = |p: f64| {
         times[((times.len() as f64 * p).ceil() as usize).saturating_sub(1)] as f64 / 1000.0
     };
-    let report = json!({"gain_calibration_coefficients": gain_calibration_coefficients,"schema_version": 1, "diagnostic": true, "audio_device_tested": false,
+    let report = json!({"phase_policy": phase_policy, "gain_calibration_coefficients": gain_calibration_coefficients,"schema_version": 1, "diagnostic": true, "audio_device_tested": false,
         "enhancement_mode": mode.as_str(), "model_sha256": model_sha256,
         "ort_backend_compiled": cfg!(feature = "ort-backend"),
         "model_loaded": mode != EnhancementMode::Spectral, "source": source.evidence(),
