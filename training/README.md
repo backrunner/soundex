@@ -340,3 +340,14 @@ training source hash and binaries. Checkpoints retain optimizer and RNG state;
 `export_study.py` understands the separate `soundex-p2-v1` checkpoint format.
 Every completed arm exports its validation-selected checkpoint and records actual
 Rust output metrics. No checkpoint is automatically promoted or uploaded.
+
+
+## P3 weak-band and generalization controls
+
+`run_weak_band_study.py` registers three matched TCN continuations per seed:
+v1 control, reference-conditioned excess-energy supervision, and the same loss
+with 12.5% native-lossless identity controls. All arms select checkpoints using
+the same new objective, with separate train-domain probes and post-selection
+held-out recording review. See [the protocol and limits](../docs/weak-band-study-20261012.md).
+It requires completed P2 parents, freezes scoring binaries, and never promotes a
+model automatically. Passing loss/shape tests does not establish generalization.

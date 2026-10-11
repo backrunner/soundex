@@ -17,11 +17,14 @@ DSP、ONNX 推理和实时流适配，同时提供文件处理 CLI 和 PyTorch �
 模型质量与发布资格仍以实际流处理验证为准。
 [高频 inpainting 目标与模型/DSP 协作](docs/inpainting-objective.md)明确了新版 loss 和
 三种对照路径；DSP 独立延展及组合模式目前仍为实验方案。
-[P2 统一训练对照](docs/causal-training-20261012.md)已在本地启动：旧主干、GRU、TCN
-各训练两个种子，每组 4096 步，共用重建目标与实际 DSP 验证。六组结果尚未完成，
+[P2 统一训练对照](docs/causal-training-20261012.md)六组已全部完成：旧主干、GRU、TCN
+各训练两个种子，每组 4096 步，共用重建目标与实际 DSP 验证。
 实验权重未替换默认模型。
 [首种子复核](docs/causal-p2-review-20261012.md)：新主干优于同预算重训控制，
 尚未全面超过原权重；原生弱高频材料仍存在多余生成能量的反例。
+[P3 受控续训](docs/weak-band-study-20261012.md)已加入经过数值验证的过量能量约束、
+恒等控制及泛化检查。[基线复核](docs/baseline-generalization-20261012.md)确认了增益策略的取舍
+及恒等 DSP 路径的限幅失真，目前不足以把旧基线的问题直接归因为过拟合。
 
 本轮[训练与结构对照](docs/optimization-20261011.md)验证复数重建、幅度/相位交互与实时启动预热。
 后续 [V5 目标复核](docs/goal-refinement-20261011.md)验证重建能量校准和圆周相位输入，
