@@ -96,3 +96,59 @@ fits this subset, global representational impossibility becomes less plausible;
 full-library optimization and generalization remain unresolved. If it cannot,
 inspect the input-relative head and optimization before merely adding parameters.
 A loss reduction must also be checked for per-example fidelity tradeoffs.
+
+
+## Completed results
+
+All eight registered runs and all 90 native replays completed. Initial score is
+0.30649558. All comparisons below use the same fixed-set score; none are held-out
+quality results. Best checkpoints are step 256 except complex `1e-3` (step 192).
+
+| Representation | Learning rate | Seed | Best score | Reduction vs initial | Identity preservation error |
+|---|---:|---:|---:|---:|---:|
+| amplitude | 0.0001 | deterministic | 0.179141 | 41.55% | 0.000000 |
+| amplitude | 0.001 | deterministic | 0.165654 | 45.95% | 0.000000 |
+| complex | 0.0001 | deterministic | 0.146024 | 52.36% | 0.000000 |
+| complex | 0.001 | deterministic | 0.151636 | 50.53% | 0.000000 |
+| network | 0.0001 | 20261012 | 0.272360 | 11.14% | 0.005700 |
+| network | 0.001 | 20261012 | 0.233003 | 23.98% | 0.004223 |
+| network | 0.0001 | 20261013 | 0.271464 | 11.43% | 0.004311 |
+| network | 0.001 | 20261013 | 0.234346 | 23.54% | 0.005094 |
+
+Every selected run improves native high-band spectral convergence on each of the
+five compressed clips. The maximum proxy/native sample discrepancy is 1.699e-6.
+For the shared networks at `1e-3`, mean high-band SC changes versus input DSP are
+-0.172717 / -0.170991; high-band energy errors change by -7.528955 / -7.637991 dB.
+These are tiny fitted-set means, with large gains concentrated in particular
+clips, not estimates of library-wide performance. Native identity high-band SC
+still worsens by +0.004493 / +0.005534, and low-band errors have small regressions.
+Thus even successful small-set fitting does not satisfy preservation acceptance.
+
+Free identity coefficients remain exactly unchanged because they are independent
+variables with a zero-loss starting point. This is expected and does not prove an
+input-conditioned predictor can distinguish all clean from compressed material.
+
+The findings narrow the next step:
+
+1. Keeping input phase still permits about 42–46% fitting-score improvement through
+   the current DSP. DSP restrictions or fixed phase alone cannot explain P10's
+   near-zero gains on these cases.
+2. Complex fitting adds room (about 51–52% total improvement), but the experiment
+   does not show that a lightweight causal network can predict those complex
+   coefficients on new audio.
+3. All four shared-network runs learn useful corrections (11–24% score improvement),
+   so a universal inability to fit these targets is disproved. This does not prove
+   adequate capacity for all music. Higher learning rate helps this small set;
+   simply copying it to full-library training is not justified.
+4. Prioritize how corrections are learned as dataset diversity grows: a controlled
+   subset-size/optimization study, keeping objective, sampling, initialization and
+   evaluation fixed within each comparison, followed by a separate head-coordinate
+   intervention. A synthesis-aware amplitude teacher is another testable training
+   route; its target-fitted advantage must not be counted as student generalization.
+   Phase-aware architecture remains a separate experiment, not a simultaneous change.
+
+No new full-library continuation was started from these fitted weights. The model
+size, runtime and default weights remain unchanged. No blind listening, independent
+quality test or realtime deployment qualification is claimed. Local
+`results-audit.json` records per-clip native metric changes and verified selected
+checkpoint/native-report hashes.
