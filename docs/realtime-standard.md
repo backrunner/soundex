@@ -136,3 +136,16 @@ maximum processing wall time, and processing calls exceeding a hop period.
 Read them on a control thread. Processing overruns, queue waits and callback
 presentation misses are distinct metrics; maxima alone cannot identify the
 cause of every miss. Benchmark schema 2 includes these optional worker fields.
+
+
+## Experimental smooth output protection
+
+`SoundExConfig.limiter_mode = LimiterMode::SmoothKnee` selects a memoryless
+smooth shoulder with the same 0.9*ceiling onset and configured safety ceiling.
+It adds no lookahead or buffers. Its callback protects dry once, accepts the
+worker's already-protected wet output, and retains the final clamp during
+recovery, avoiding a second soft compression. Legacy remains the default.
+This does not guarantee intersample true-peak bounds or unchanged stereo level
+ratios above the knee. See [the matched limiter study](limiter-study-20261012.md)
+for audio, callback, and resource evidence; ordinary model/real-device gates
+still apply independently.

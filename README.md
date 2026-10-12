@@ -27,7 +27,10 @@ Experimental weights have not replaced the default model. The
 [first-seed review](docs/causal-p2-review-20261012.md) finds gains over the matched
 fresh control, but no overall win over the previous checkpoint and excess
 generation on naturally weak high bands. The [P3 controlled continuation](docs/weak-band-study-20261012.md)
-adds verified excess-energy supervision and identity/generalization controls.
+has completed both seeds with excess-energy supervision and identity/generalization controls.
+It reduces excess generation but retains restoration tradeoffs. The optional
+[smooth limiter](docs/limiter-study-20261012.md) reduces DSP distortion and avoids
+recompressing worker output in the callback; the default remains unchanged.
 The [baseline audit](docs/baseline-generalization-20261012.md) identifies gain-policy tradeoffs
 and limiter distortion even with an identity model; baseline overfitting is not established.
 

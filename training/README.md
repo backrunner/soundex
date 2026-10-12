@@ -351,3 +351,19 @@ the same new objective, with separate train-domain probes and post-selection
 held-out recording review. See [the protocol and limits](../docs/weak-band-study-20261012.md).
 It requires completed P2 parents, freezes scoring binaries, and never promotes a
 model automatically. Passing loss/shape tests does not establish generalization.
+
+
+## Frozen-model limiter ablation
+
+`run_limiter_study.py --study <completed-P3> --output <new-report-dir>
+--binary <release-stream-eval> --baseline <old-shape-small.onnx>
+--identity <identity-fixture.onnx>` compares the registered P3 controls, both
+seeds' excess/identity candidates, the old gain policies, and identity DSP under
+legacy and smooth-knee protection. It freezes the binary, checks PCM/model
+hashes and reports recording-clustered metrics. The historical held-out review
+is not an independent test and never promotes a model.
+
+`models.causal_objective.render(..., limiter_mode="smooth-knee")` is covered by
+Rust replay parity. Completed P2/P3 training used the default legacy limiter;
+changing their objective after training is not a valid loss comparison. See
+[the DSP study and remaining limits](../docs/limiter-study-20261012.md).
