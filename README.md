@@ -47,6 +47,9 @@ matched runs and 890 native DSP replays. Additive energy prediction improves ave
 recovery but regresses spectral and transient errors; no candidate is promoted.
 The [objective audit](docs/energy-objective-audit.md) locates the main regression in excess
 energy on naturally weak bands and documents loss-ranking and aggregate-score tradeoffs.
+The [P8 reconstruction-objective study](docs/linear-reconstruction-study.md) keeps the model
+fixed and compares direct amplitude/dynamics supervision, with separate weak-band and identity
+guards. It is an experiment; overall audio-quality gains remain to be established.
 The [baseline audit](docs/baseline-generalization-20261012.md) identifies gain-policy tradeoffs
 and limiter distortion even with an identity model; baseline overfitting is not established.
 
