@@ -367,3 +367,12 @@ is not an independent test and never promotes a model.
 Rust replay parity. Completed P2/P3 training used the default legacy limiter;
 changing their objective after training is not a valid loss comparison. See
 [the DSP study and remaining limits](../docs/limiter-study-20261012.md).
+
+## P4 smooth-DSP restoration study
+
+`scripts/run_balanced_study.py` continues completed P3 control parents with three
+matched arms: smooth DSP control, reference-aware peaks, and bidirectional band
+energy. Two seeds, identical identity-mixed draws, 1024 updates per arm and one
+common selection objective isolate the changes. Raw references remain unlimited;
+Rust output metrics and historical held-out review remain separate from selection.
+See [the frozen protocol and run status](../docs/balanced-restoration-study-20261012.md).

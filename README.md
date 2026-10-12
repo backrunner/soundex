@@ -31,6 +31,8 @@ has completed both seeds with excess-energy supervision and identity/generalizat
 It reduces excess generation but retains restoration tradeoffs. The optional
 [smooth limiter](docs/limiter-study-20261012.md) reduces DSP distortion and avoids
 recompressing worker output in the callback; the default remains unchanged.
+The [P4 matched continuation](docs/balanced-restoration-study-20261012.md) trains against
+the smooth DSP, with reference-aware peak and bidirectional high-band energy ablations.
 The [baseline audit](docs/baseline-generalization-20261012.md) identifies gain-policy tradeoffs
 and limiter distortion even with an identity model; baseline overfitting is not established.
 
