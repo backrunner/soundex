@@ -11,6 +11,7 @@ from models.conditioned_shape import make_shape_model
 from models.envelope_probe import EnvelopeProbe
 from models.factorized_envelope import make_factor_model
 from models.linear_objective import make_linear_model
+from models.rendered_probe import make_rendered_model
 from models.residual_energy import make_energy_model
 from scripts.analyze_envelope_study import KEYS, export_probe, paired_comparison
 
@@ -44,6 +45,7 @@ def test_comparison_weights_recordings_and_requires_pairs():
         "energy-envelope-v1",
         "linear-envelope-v1",
         "shape-envelope-v1",
+        "rendered-envelope-v1",
     ],
 )
 def test_amplitude_probe_export_contract_and_budget(tmp_path, family):
@@ -60,6 +62,9 @@ def test_amplitude_probe_export_contract_and_budget(tmp_path, family):
     if family == "shape-envelope-v1":
         arm = "anchored_band"
         model = make_shape_model(arm).eval()
+    if family == "rendered-envelope-v1":
+        arm = "rendered_balanced"
+        model = make_rendered_model(arm).eval()
     if family != "envelope-probe-v1":
         with torch.no_grad():
             model.energy_head.weight.normal_(std=0.01)

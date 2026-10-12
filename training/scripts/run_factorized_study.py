@@ -176,7 +176,10 @@ def run(
             {
                 "status": "complete",
                 "arms": completed,
-                "scope": "raw amplitude only; no phase/DSP/audio-quality release qualification",
+                "scope": config.get(
+                    "summary_scope",
+                    "raw amplitude only; no phase/DSP/audio-quality release qualification",
+                ),
             },
             root / "summary.json",
         )

@@ -29,4 +29,7 @@ class EnvelopeClips(IdentityClips):
             waves.append(torch.from_numpy(np.pad(wave, (0, SAMPLES - len(wave)))))
         # FFT frontend stays on CPU; MPS FFT is not needed for training.
         batch["pcm"] = torch.stack(waves)
+        batch["identity"] = torch.tensor(
+            [s["row_id"].endswith(":identity") for s in specs], device=device
+        )
         return batch

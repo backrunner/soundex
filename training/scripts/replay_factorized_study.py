@@ -28,6 +28,7 @@ from models.envelope_objective import amplitude_metrics
 from models.envelope_probe import context_features, predict_probe
 from models.factorized_envelope import BURN, make_factor_model
 from models.linear_objective import make_linear_model
+from models.rendered_probe import make_rendered_model
 from models.residual_energy import make_energy_model
 from scripts.analyze_envelope_study import paired_comparison
 from scripts.run_causal_study import prediction
@@ -77,6 +78,8 @@ def run(args):
         factory = make_linear_model
     if config["format"] == "soundex-shape-study-v1":
         factory = make_shape_model
+    if config["format"] == "soundex-rendered-study-v1":
+        factory = make_rendered_model
     if json.loads((root / "summary.json").read_text())["status"] != "complete":
         raise ValueError("finish frozen training before DSP review")
     binary = freeze_binary(
@@ -145,12 +148,15 @@ def run(args):
                 variants = {"p3_original": base, "identity_dsp": batch["x"]}
                 for arm, model in models.items():
                     amplitude = predict_probe(model, batch, context, burn=BURN)
-                    variants[arm + "_p3_phase"] = hybrid_features(
-                        amplitude, phase_features[:, 1], batch["x"]
-                    )
+                    input_phase = config.get("deployment_phase") == "input"
+                    primary = batch["x"][:, 1] if input_phase else phase_features[:, 1]
+                    suffix = "_input_phase" if input_phase else "_p3_phase"
+                    variants[arm + suffix] = hybrid_features(amplitude, primary, batch["x"])
                     if arm == candidate:
-                        variants[candidate + "_input_phase"] = hybrid_features(
-                            amplitude, batch["x"][:, 1], batch["x"]
+                        alternate = phase_features[:, 1] if input_phase else batch["x"][:, 1]
+                        other = "_p3_phase" if input_phase else "_input_phase"
+                        variants[candidate + other] = hybrid_features(
+                            amplitude, alternate, batch["x"]
                         )
                 rate = int(batch["rate"][0, 0])
                 clean, dry = [batch[key][0, region].numpy() for key in ("clean_wave", "dry")]
@@ -285,6 +291,16 @@ def run(args):
                     (candidate + "_p3_phase", "identity_dsp"),
                     (candidate + "_input_phase", candidate + "_p3_phase"),
                 )
+            if config["format"] == "soundex-rendered-study-v1":
+                contrasts = (
+                    *(
+                        (a + "_input_phase", b + "_input_phase")
+                        for a, b in config["experiment"]["contrasts"]
+                    ),
+                    (candidate + "_input_phase", "identity_dsp"),
+                    (candidate + "_input_phase", "p3_original"),
+                    (candidate + "_p3_phase", candidate + "_input_phase"),
+                )
             for treatment, control in contrasts:
                 comparisons[treatment + "_minus_" + control] = paired_comparison(
                     groups[treatment],
@@ -308,7 +324,7 @@ if __name__ == "__main__":
         "--checkpoint-name",
         choices=("best.pth", "latest.pth"),
         default="best.pth",
-        help="latest is for nonzero smoke replay only; never changes selection",
+        help="latest is for nonzero diagnostic replay only; never changes selection",
     )
     parser.add_argument("--study", required=True, type=Path)
     parser.add_argument("--phase-study", required=True, type=Path)

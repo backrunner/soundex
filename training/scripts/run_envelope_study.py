@@ -28,6 +28,11 @@ from scripts.run_causal_study import atomic_save
 from scripts.run_weak_band_study import freeze_binary
 
 
+def score_objective(objective_fn, prediction, target, batch, *, burn):
+    argument = batch if getattr(objective_fn, "uses_batch", False) else batch["rate"]
+    return objective_fn(prediction, target, argument, burn=burn)
+
+
 @torch.no_grad()
 def evaluate(
     model, clips, specs, arm, device, detailed=False, *, objective_fn=envelope_objective, burn=64
@@ -45,7 +50,8 @@ def evaluate(
             else torch.pow(10.0, batch["x"][:, 0] / 20)
         )
         metrics = {
-            k: float(v) for k, v in objective_fn(pred, target, batch["rate"], burn=burn).items()
+            k: float(v)
+            for k, v in score_objective(objective_fn, pred, target, batch, burn=burn).items()
         }
         if detailed:
             metrics.update(
@@ -185,7 +191,7 @@ def run_arm(
         )
         optimizer.zero_grad(set_to_none=True)
         prediction = predict_probe(model, batch, context, burn=burn)
-        loss = training_objective(prediction, target, batch["rate"], burn=burn)["total"]
+        loss = score_objective(training_objective, prediction, target, batch, burn=burn)["total"]
         if not torch.isfinite(loss):
             raise ValueError("nonfinite training objective")
         loss.backward()

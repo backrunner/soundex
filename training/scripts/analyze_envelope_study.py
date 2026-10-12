@@ -26,6 +26,7 @@ from models.conditioned_shape import make_shape_model
 from models.envelope_probe import EnvelopeProbe, StreamingContext
 from models.factorized_envelope import make_factor_model
 from models.linear_objective import make_linear_model
+from models.rendered_probe import make_rendered_model
 from models.residual_energy import make_energy_model
 
 KEYS = (
@@ -72,6 +73,8 @@ def export_probe(checkpoint_path, destination):
         model = make_factor_model(checkpoint["arm"]).eval()
     elif checkpoint["format"] == "energy-envelope-v1":
         model = make_energy_model(checkpoint["arm"]).eval()
+    elif checkpoint["format"] == "rendered-envelope-v1":
+        model = make_rendered_model(checkpoint["arm"]).eval()
     elif checkpoint["format"] == "shape-envelope-v1":
         model = make_shape_model(checkpoint["arm"]).eval()
     elif checkpoint["format"] == "linear-envelope-v1":
@@ -221,13 +224,23 @@ def main(args):
     if summary["status"] != "complete":
         raise ValueError("training must finish before analysis/benchmark")
     config = json.loads((root / "config.json").read_text())
-    linear = config["format"] in ("soundex-linear-study-v1", "soundex-shape-study-v1")
+    linear = config["format"] in (
+        "soundex-linear-study-v1",
+        "soundex-shape-study-v1",
+        "soundex-rendered-study-v1",
+    )
     factored = linear or config["format"] in ("soundex-factor-study-v1", "soundex-energy-study-v1")
     candidate = config.get("benchmark_candidate", "factorized" if factored else "past")
     keys = KEYS + (("band_envelope", "band_shape", "envelope_temporal") if factored else ())
     if linear:
         keys += ("factor_total", "linear_reconstruction", "linear_dynamics")
+    if config["format"] == "soundex-rendered-study-v1":
+        keys += ("raw_total", "rendered_reconstruction", "rendered_waveform", "dsp_preservation")
     report = {"scope": "raw amplitude diagnostic, reused development recordings", "seeds": {}}
+    if config["format"] == "soundex-rendered-study-v1":
+        report["scope"] = (
+            "raw amplitude and rendered proxy diagnostics, reused development recordings"
+        )
     dry = json.loads((root / "compressed-reference.json").read_text())
     for seed in config["seeds"]:
         arms = {}
