@@ -22,6 +22,7 @@ import torch
 
 from evaluation.reporting import bootstrap_mean_ci, sha256_file, write_json_report
 from evaluation.restoration_guards import restoration_guards
+from models.conditioned_shape import make_shape_model
 from models.envelope_probe import EnvelopeProbe, StreamingContext
 from models.factorized_envelope import make_factor_model
 from models.linear_objective import make_linear_model
@@ -71,6 +72,8 @@ def export_probe(checkpoint_path, destination):
         model = make_factor_model(checkpoint["arm"]).eval()
     elif checkpoint["format"] == "energy-envelope-v1":
         model = make_energy_model(checkpoint["arm"]).eval()
+    elif checkpoint["format"] == "shape-envelope-v1":
+        model = make_shape_model(checkpoint["arm"]).eval()
     elif checkpoint["format"] == "linear-envelope-v1":
         model = make_linear_model(checkpoint["arm"]).eval()
     else:
@@ -218,7 +221,7 @@ def main(args):
     if summary["status"] != "complete":
         raise ValueError("training must finish before analysis/benchmark")
     config = json.loads((root / "config.json").read_text())
-    linear = config["format"] == "soundex-linear-study-v1"
+    linear = config["format"] in ("soundex-linear-study-v1", "soundex-shape-study-v1")
     factored = linear or config["format"] in ("soundex-factor-study-v1", "soundex-energy-study-v1")
     candidate = config.get("benchmark_candidate", "factorized" if factored else "past")
     keys = KEYS + (("band_envelope", "band_shape", "envelope_temporal") if factored else ())
@@ -259,9 +262,13 @@ def main(args):
             )
         report["seeds"][str(seed)] = comparisons
         if linear:
-            comparisons["restoration_guards"] = restoration_guards(
-                arms[candidate], arms["energy_control"], dry
-            )
+            for control in config.get("guard_controls", ["energy_control"]):
+                key = (
+                    "restoration_guards"
+                    if control == "energy_control"
+                    else "restoration_guards_vs_" + control
+                )
+                comparisons[key] = restoration_guards(arms[candidate], arms[control], dry)
     write_json_report(report, root / "comparisons.json")
     if args.benchmark:
         # Predeclared seed 1 candidate, no benchmark-driven model selection.

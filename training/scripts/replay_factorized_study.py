@@ -17,11 +17,13 @@ import torch
 
 from data.causal_study import load_sources
 from data.envelope_study import EnvelopeClips
+from data.weak_band_study import identity_specs
 from evaluation.metrics import evaluate_signal_triplet
 from evaluation.reporting import sha256_file, write_json_report
 from evaluation.rust_bridge import read_sxa, write_sxa
 from export_study import make_model
 from models.causal_objective import render
+from models.conditioned_shape import make_shape_model
 from models.envelope_objective import amplitude_metrics
 from models.envelope_probe import context_features, predict_probe
 from models.factorized_envelope import BURN, make_factor_model
@@ -62,6 +64,10 @@ def run(args):
     root = args.study.resolve()
     args.phase_study = args.phase_study.resolve()
     config = json.loads((root / "config.json").read_text())
+    specs = config["validation_specs"]
+    input_groups = ("paired", "identity") if config.get("dsp_identity_controls") else ("paired",)
+    if config.get("dsp_identity_controls"):
+        specs = specs + identity_specs(specs)
     arms = config["arms"]
     candidate = config.get("benchmark_candidate", "factorized")
     factory = (
@@ -69,6 +75,8 @@ def run(args):
     )
     if config["format"] == "soundex-linear-study-v1":
         factory = make_linear_model
+    if config["format"] == "soundex-shape-study-v1":
+        factory = make_shape_model
     if json.loads((root / "summary.json").read_text())["status"] != "complete":
         raise ValueError("finish frozen training before DSP review")
     binary = freeze_binary(
@@ -80,7 +88,7 @@ def run(args):
     for seed in config["seeds"]:
         paths[f"p3-{seed}"] = args.phase_study / f"control-{seed}/best.pth"
         for arm in arms:
-            paths[f"{arm}-{seed}"] = root / f"{arm}-{seed}/best.pth"
+            paths[f"{arm}-{seed}"] = root / f"{arm}-{seed}" / args.checkpoint_name
     registration = {
         "scope": "reused development; offline predicted features through native DSP; not realtime deployment or listening",
         "checkpoints": {k: {"path": str(p), "sha256": sha256_file(p)} for k, p in paths.items()},
@@ -90,13 +98,15 @@ def run(args):
         },
         "binary_sha256": sha256_file(binary),
         "script_sha256": sha256_file(Path(__file__)),
-        "specs": config["validation_specs"],
+        "specs": specs,
+        "input_groups": list(input_groups),
         "burn_hops": BURN,
         "scored_start_sample": (BURN + 9) * 128,
         "scored_end_sample": 32768 - 128,
         "gain": "model",
         "limiter": "smooth-knee",
-        "selection_changed": False,
+        "selection_changed": args.checkpoint_name != "best.pth",
+        "checkpoint_name": args.checkpoint_name,
     }
     registered = root / f"{args.report_prefix}-review-registration.json"
     if registered.exists() and json.loads(registered.read_text()) != registration:
@@ -126,8 +136,8 @@ def run(args):
                     ]
                 )
                 models[arm] = model
-            for index, spec in enumerate(config["validation_specs"]):
-                row = rows[spec["row_id"]]
+            for index, spec in enumerate(specs):
+                row = clips.rows[spec["row_id"]]
                 batch = clips.batch([spec])
                 context = context_features(batch["pcm"], "past")
                 phase_features = prediction(phase_model, "tcn", batch)
@@ -199,6 +209,9 @@ def run(args):
                         {
                             "seed": seed,
                             "variant": name,
+                            "input_group": "identity"
+                            if spec["row_id"].endswith(":identity")
+                            else "paired",
                             "row_id": row["row_id"],
                             "track_id": row["track_id"],
                             "corpus": row["corpus"],
@@ -224,15 +237,19 @@ def run(args):
     )
     for seed in config["seeds"]:
         by_metric_region = {}
-        for metric_region in (
-            "metrics",
-            "fixed_4khz_metrics",
-            "raw_fixed_band_metrics",
-            "output_fixed_band_metrics",
+        for metric_region, input_group in (
+            (region, group)
+            for region in (
+                "metrics",
+                "fixed_4khz_metrics",
+                "raw_fixed_band_metrics",
+                "output_fixed_band_metrics",
+            )
+            for group in input_groups
         ):
             groups = {}
             for record in records:
-                if record["seed"] == seed:
+                if record["seed"] == seed and record["input_group"] == input_group:
                     groups.setdefault(record["variant"], {"rows": []})["rows"].append(
                         {**record, "metrics": record[metric_region]}
                     )
@@ -258,6 +275,16 @@ def run(args):
                     (candidate + "_p3_phase", "identity_dsp"),
                     (candidate + "_input_phase", candidate + "_p3_phase"),
                 )
+            if config["format"] == "soundex-shape-study-v1":
+                contrasts = (
+                    *(
+                        (a + "_p3_phase", b + "_p3_phase")
+                        for a, b in config["experiment"]["contrasts"]
+                    ),
+                    (candidate + "_p3_phase", "p3_original"),
+                    (candidate + "_p3_phase", "identity_dsp"),
+                    (candidate + "_input_phase", candidate + "_p3_phase"),
+                )
             for treatment, control in contrasts:
                 comparisons[treatment + "_minus_" + control] = paired_comparison(
                     groups[treatment],
@@ -266,7 +293,8 @@ def run(args):
                     if metric_region.endswith("band_metrics")
                     else keys,
                 )
-            by_metric_region[metric_region] = comparisons
+            key = metric_region if input_group == "paired" else metric_region + "_identity"
+            by_metric_region[key] = comparisons
         summary[str(seed)] = by_metric_region
     write_json_report(
         {"scope": registration["scope"], "seeds": summary},
@@ -276,8 +304,16 @@ def run(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--checkpoint-name",
+        choices=("best.pth", "latest.pth"),
+        default="best.pth",
+        help="latest is for nonzero smoke replay only; never changes selection",
+    )
     parser.add_argument("--study", required=True, type=Path)
     parser.add_argument("--phase-study", required=True, type=Path)
     parser.add_argument("--replay-binary", required=True, type=Path)
-    parser.add_argument("--report-prefix", choices=("dsp", "dsp-aligned"), default="dsp")
+    parser.add_argument(
+        "--report-prefix", choices=("dsp", "dsp-aligned", "dsp-latest"), default="dsp"
+    )
     run(parser.parse_args())

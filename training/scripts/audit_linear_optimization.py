@@ -19,6 +19,7 @@ from data.envelope_study import EnvelopeClips
 from data.weak_band_study import identity_specs
 from evaluation.reporting import sha256_file, write_json_report
 from models.conditioned_energy import make_conditioned_model
+from models.conditioned_shape import make_shape_model
 from models.envelope_objective import BANDS
 from models.envelope_probe import context_features, predict_probe
 from models.factorized_envelope import BURN
@@ -93,11 +94,14 @@ def measure(model, pair):
 
 def initial_model(seed, device, coordinate="full_spectrum"):
     torch.manual_seed(seed)
-    model = (
-        make_conditioned_model()
-        if coordinate == "input_relative"
-        else make_linear_model("linear_reconstruction")
-    )
+    if coordinate in ("band_relative", "anchored_band"):
+        model = make_shape_model(
+            "band_conditioned" if coordinate == "band_relative" else "anchored_band"
+        )
+    elif coordinate == "input_relative":
+        model = make_conditioned_model()
+    else:
+        model = make_linear_model("linear_reconstruction")
     return model.to(device)
 
 
@@ -275,7 +279,9 @@ if __name__ == "__main__":
     parser.add_argument("--study", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
-        "--coordinate", choices=("full_spectrum", "input_relative"), default="full_spectrum"
+        "--coordinate",
+        choices=("full_spectrum", "input_relative", "band_relative", "anchored_band"),
+        default="full_spectrum",
     )
     parser.add_argument("--rates", type=float, nargs="+", default=[1e-4, 1e-5, 1e-6])
     parser.add_argument("--steps", type=int, default=128)

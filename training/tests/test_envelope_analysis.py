@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 import torch
 
+from models.conditioned_shape import make_shape_model
 from models.envelope_probe import EnvelopeProbe
 from models.factorized_envelope import make_factor_model
 from models.linear_objective import make_linear_model
@@ -37,7 +38,13 @@ def test_comparison_weights_recordings_and_requires_pairs():
 
 @pytest.mark.parametrize(
     "family",
-    ["envelope-probe-v1", "factor-envelope-v1", "energy-envelope-v1", "linear-envelope-v1"],
+    [
+        "envelope-probe-v1",
+        "factor-envelope-v1",
+        "energy-envelope-v1",
+        "linear-envelope-v1",
+        "shape-envelope-v1",
+    ],
 )
 def test_amplitude_probe_export_contract_and_budget(tmp_path, family):
     model = (
@@ -50,6 +57,9 @@ def test_amplitude_probe_export_contract_and_budget(tmp_path, family):
     if family == "linear-envelope-v1":
         arm = "linear_reconstruction"
         model = make_linear_model(arm).eval()
+    if family == "shape-envelope-v1":
+        arm = "anchored_band"
+        model = make_shape_model(arm).eval()
     if family != "envelope-probe-v1":
         with torch.no_grad():
             model.energy_head.weight.normal_(std=0.01)
