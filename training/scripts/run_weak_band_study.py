@@ -62,11 +62,15 @@ def freeze_binary(source, destination, expected):
     return destination
 
 
-def common_validation(model, kind, clips, specs, device, *, train_specs=()):
-    paired = validation(model, kind, clips, specs, device, objective_fn=objective)
-    identity = validation(model, kind, clips, identity_specs(specs), device, objective_fn=objective)
+def common_validation(
+    model, kind, clips, specs, device, *, train_specs=(), objective_fn=objective, version=VERSION
+):
+    paired = validation(model, kind, clips, specs, device, objective_fn=objective_fn)
+    identity = validation(
+        model, kind, clips, identity_specs(specs), device, objective_fn=objective_fn
+    )
     train = (
-        validation(model, kind, clips, train_specs, device, objective_fn=objective)
+        validation(model, kind, clips, train_specs, device, objective_fn=objective_fn)
         if train_specs
         else None
     )
@@ -76,7 +80,7 @@ def common_validation(model, kind, clips, specs, device, *, train_specs=()):
         "score": 0.875 * paired["score"] + 0.125 * identity["score"],
         "paired": paired,
         "identity": identity,
-        "selection_objective": VERSION,
+        "selection_objective": version,
     }
 
 

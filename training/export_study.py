@@ -40,6 +40,9 @@ def export_study(checkpoint_path, output_path):
     if state["config"]["objective_version"] not in {
         "causal-reconstruction-v1",
         "causal-weak-band-v1",
+        "causal-balanced-band-v1:smooth_control",
+        "causal-balanced-band-v1:reference_peak",
+        "causal-balanced-band-v1:balanced",
     }:
         raise ValueError("unknown objective")
     if state["kind"] != "legacy":

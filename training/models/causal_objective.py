@@ -114,9 +114,11 @@ def energy_error(predicted, target, mask):
     return (10 * (powers[0].log10() - powers[1].log10()).abs() * (mask.sum(-1) > 0)).mean()
 
 
-def objective(predicted, batch):
+def objective(predicted, batch, *, limiter_mode="legacy", reference_peak=False):
     x, y, mask = batch["x"], batch["y"], batch["mask"]
-    output, prelimit = render(predicted, x, mask, batch["active"], batch["gate"], batch["dry"])
+    output, prelimit = render(
+        predicted, x, mask, batch["active"], batch["gate"], batch["dry"], limiter_mode=limiter_mode
+    )
     target_wave = batch["clean_wave"]
     dry_wave = batch["dry"]
     spectra = []
@@ -150,8 +152,9 @@ def objective(predicted, batch):
         .detach()
     )
     terms["output_waveform"] = ((waves[0] - waves[1]).abs().mean(-1) / scale).mean()
+    allowed_peak = waves[1].abs().clamp_min(0.855).detach() if reference_peak else 0.855
     terms["prelimit_excess"] = (
-        (prelimit[:, (BURN + 1) * 128 :].abs() - 0.855).clamp_min(0).square().mean(-1)
+        (prelimit[:, (BURN + 1) * 128 :].abs() - allowed_peak).clamp_min(0).square().mean(-1)
         / (waves[1].square().mean(-1) + 1e-4).detach()
     ).mean()
     multi = {

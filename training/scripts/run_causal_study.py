@@ -93,7 +93,7 @@ def validation(model, kind, clips, specs, device, objective_fn=objective):
     return {"score": score, "corpora": groups, "rows": rows}
 
 
-def actual_score(model_path, clips, specs, binary, *, sample_count=SAMPLES):
+def actual_score(model_path, clips, specs, binary, *, sample_count=SAMPLES, limiter_mode="legacy"):
     evaluator = RustStreamEvaluator(binary)
     metrics = []
     for spec in specs:
@@ -111,7 +111,12 @@ def actual_score(model_path, clips, specs, binary, *, sample_count=SAMPLES):
             waves.append(np.pad(wave, (0, count - len(wave))))
         clean, degraded = waves
         result = evaluator.process(
-            model_path, degraded, rate, mode="offline", high_band_gain="model"
+            model_path,
+            degraded,
+            rate,
+            mode="offline",
+            high_band_gain="model",
+            limiter_mode=limiter_mode,
         )
         full = evaluate_signal_triplet(
             clean,
@@ -134,6 +139,7 @@ def actual_score(model_path, clips, specs, binary, *, sample_count=SAMPLES):
         metrics.append(_metric_row(row, full))
     return {
         "model_sha256": sha256_file(model_path),
+        "limiter_mode": limiter_mode,
         "independent_test": False,
         "listening_performed": False,
         "rows": metrics,
@@ -268,7 +274,13 @@ def run_arm(
     best_path = root / "best.pth"
     # Export and actual CPU Rust scoring are required even after a resumed final update.
     export_study(best_path, root / "best.onnx")
-    actual = actual_score(root / "best.onnx", clips, val_specs, config["stream_binary"])
+    actual = actual_score(
+        root / "best.onnx",
+        clips,
+        val_specs,
+        config["stream_binary"],
+        limiter_mode=config.get("evaluation_limiter_mode", "legacy"),
+    )
     write_json_report(actual, root / "rust-validation.json")
     state = torch.load(best_path, map_location="cpu", weights_only=True)
     receipt = {

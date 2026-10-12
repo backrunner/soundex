@@ -70,7 +70,11 @@ def test_resume_matches_uninterrupted_updates(tmp_path, monkeypatch):
         Path(path).write_bytes(b"fixture")
 
     monkeypatch.setattr(runner, "export_study", export)
-    monkeypatch.setattr(runner, "actual_score", lambda *_: {"diagnostic_mock": True})
+    monkeypatch.setattr(
+        runner,
+        "actual_score",
+        lambda *_, limiter_mode="legacy": {"diagnostic_mock": True, "limiter_mode": limiter_mode},
+    )
     config = {
         "steps": 4,
         "batch_size": 1,
