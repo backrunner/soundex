@@ -52,6 +52,9 @@ but every selected checkpoint is step zero: neither objective beats the initial 
 The [optimization audit](docs/linear-optimization-audit.md) isolates first-step energy overshoot
 and tests input-relative updates without changing loss or model capacity. These are diagnostics;
 no new weights are promoted.
+The [P9 shape-coordinate study](docs/shape-coordinate-study.md) separates band-relative shape
+updates from exact identity initialization, with matched training and clean-identity native DSP
+controls. Restoration quality remains experimental.
 The [baseline audit](docs/baseline-generalization-20261012.md) identifies gain-policy tradeoffs
 and limiter distortion even with an identity model; baseline overfitting is not established.
 
