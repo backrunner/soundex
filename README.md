@@ -42,10 +42,11 @@ The [P6 band-envelope/shape study](docs/factorized-envelope-study-20261012.md) c
 matched fresh runs and native DSP comparisons. Separating energy and shape reduces some
 raw spectral errors but sacrifices energy recovery, without a consistent final-output win.
 The 3.13 MiB probe meets the diagnostic compute budget; default weights remain unchanged.
-The [P7 energy-coordinate experiment](docs/energy-coordinate-study-20261012.md) tests whether
-additive band-energy prediction can improve recovery of nearly empty bands at matched capacity
-and training budget. Its synthetic optimization probe supports testing this hypothesis;
-real-music and deployment gains remain unproven.
+The [P7 energy-coordinate experiment](docs/energy-coordinate-study-20261012.md) completed four
+matched runs and 890 native DSP replays. Additive energy prediction improves average energy
+recovery but regresses spectral and transient errors; no candidate is promoted.
+The [objective audit](docs/energy-objective-audit.md) locates the main regression in excess
+energy on naturally weak bands and documents loss-ranking and aggregate-score tradeoffs.
 The [baseline audit](docs/baseline-generalization-20261012.md) identifies gain-policy tradeoffs
 and limiter distortion even with an identity model; baseline overfitting is not established.
 
