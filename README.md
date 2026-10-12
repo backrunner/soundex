@@ -59,7 +59,9 @@ still cause identity damage. The [P10 rendered-output study](docs/rendered-resto
 now supervises DSP synthesis directly and balances identity preservation. Its
 pilot and six 2048-step runs reduce damage but select step zero in every arm.
 The completed diagnosis separates a generalization gap from preservation pressure;
-no candidate has demonstrated a balanced restoration win.
+no candidate has demonstrated a balanced restoration win. The
+[P11 fixed-set fitting diagnostic](docs/fixed-fit-diagnostic.md) separates direct
+amplitude/complex fitting from the shared network before further architecture changes.
 The [baseline audit](docs/baseline-generalization-20261012.md) identifies gain-policy tradeoffs
 and limiter distortion even with an identity model; baseline overfitting is not established.
 
