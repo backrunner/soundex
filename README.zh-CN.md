@@ -27,6 +27,10 @@ DSP、ONNX 推理和实时流适配，同时提供文件处理 CLI 和 PyTorch �
 降低 DSP 失真并消除实时端重复压缩，默认配置保持不变。
 [P4 受控续训](docs/balanced-restoration-study-20261012.md)六组已完成：双向能量监督增加恢复能量，
 但谱形、瞬态与低频保真退步，没有候选晋级。
+[P9 谱形坐标对照](docs/shape-coordinate-study.md)六组及 2,136 次真实 DSP 回放已完成，
+原始幅度 loss 的小幅改善仍伴随恒等损伤。[P10 成品监督](docs/rendered-restoration-study.md)
+已将 DSP 合成输出纳入训练，并平衡恒等保真；128 步短训减少了损伤，但综合分数尚未
+超过初始值，继续通过有预算上限的双种子对照验证。
 [基线复核](docs/baseline-generalization-20261012.md)确认了增益策略的取舍
 及恒等 DSP 路径的限幅失真，目前不足以把旧基线的问题直接归因为过拟合。
 

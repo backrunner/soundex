@@ -54,7 +54,11 @@ and tests input-relative updates without changing loss or model capacity. These 
 no new weights are promoted.
 The [P9 shape-coordinate study](docs/shape-coordinate-study.md) separates band-relative shape
 updates from exact identity initialization, with matched training and clean-identity native DSP
-controls. Restoration quality remains experimental.
+controls. All six runs and 2,136 native replays are complete; small raw-loss gains
+still cause identity damage. The [P10 rendered-output study](docs/rendered-restoration-study.md)
+now supervises DSP synthesis directly and balances identity preservation. Its
+128-step pilot reduces damage but does not beat the initial common score; a bounded
+two-seed follow-up tests whether the small restoration gain can persist.
 The [baseline audit](docs/baseline-generalization-20261012.md) identifies gain-policy tradeoffs
 and limiter distortion even with an identity model; baseline overfitting is not established.
 
