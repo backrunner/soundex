@@ -12,6 +12,7 @@ import fcntl
 import json
 import math
 import time
+from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -28,7 +29,9 @@ from scripts.run_weak_band_study import freeze_binary
 
 
 @torch.no_grad()
-def evaluate(model, clips, specs, arm, device, detailed=False):
+def evaluate(
+    model, clips, specs, arm, device, detailed=False, *, objective_fn=envelope_objective, burn=64
+):
     if model is not None:
         model.eval()
     records = []
@@ -37,13 +40,17 @@ def evaluate(model, clips, specs, arm, device, detailed=False):
         context = context_features(batch["pcm"], arm).to(device)
         target = torch.pow(10.0, batch["y"][:, 0] / 20)
         pred = (
-            predict_probe(model, batch, context)
+            predict_probe(model, batch, context, burn=burn)
             if model is not None
             else torch.pow(10.0, batch["x"][:, 0] / 20)
         )
-        metrics = {k: float(v) for k, v in envelope_objective(pred, target, batch["rate"]).items()}
+        metrics = {
+            k: float(v) for k, v in objective_fn(pred, target, batch["rate"], burn=burn).items()
+        }
         if detailed:
-            metrics.update(amplitude_metrics(pred.cpu(), target.cpu(), batch["rate"].cpu()))
+            metrics.update(
+                amplitude_metrics(pred.cpu(), target.cpu(), batch["rate"].cpu(), burn=burn)
+            )
         row = clips.rows[spec["row_id"]]
         meta = row.get("source_metadata", {})
         records.append(
@@ -74,9 +81,9 @@ def evaluate(model, clips, specs, arm, device, detailed=False):
     return {"score": weighted, "corpus": by_corpus, "rows": records}
 
 
-def validate(model, clips, specs, arm, device):
-    paired = evaluate(model, clips, specs, arm, device)
-    identity = evaluate(model, clips, identity_specs(specs), arm, device)
+def validate(model, clips, specs, arm, device, **kwargs):
+    paired = evaluate(model, clips, specs, arm, device, **kwargs)
+    identity = evaluate(model, clips, identity_specs(specs), arm, device, **kwargs)
     return {
         "score": 0.875 * paired["score"] + 0.125 * identity["score"],
         "paired": paired,
@@ -84,20 +91,47 @@ def validate(model, clips, specs, arm, device):
     }
 
 
-def run_arm(config, seed, arm, draws, clips, root):
+def run_arm(
+    config,
+    seed,
+    arm,
+    draws,
+    clips,
+    root,
+    *,
+    model_factory=EnvelopeProbe,
+    training_objective=envelope_objective,
+    selection_objective=envelope_objective,
+    context_arm=None,
+    burn=64,
+    include_initial=False,
+):
     directory = root / f"{arm}-{seed}"
     directory.mkdir(exist_ok=True)
     signature = digest({"config": config, "seed": seed, "arm": arm, "draws": draws})
     complete = directory / "complete.json"
     if complete.exists():
         receipt = json.loads(complete.read_text())
-        if receipt["signature"] != signature or receipt["checkpoint_sha256"] != sha256_file(
-            directory / "best.pth"
+        if (
+            receipt["signature"] != signature
+            or receipt["checkpoint_sha256"] != sha256_file(directory / "best.pth")
+            or receipt["evaluation_sha256"] != sha256_file(directory / "evaluation.json")
         ):
             raise ValueError("completed arm changed")
         return receipt
     torch.manual_seed(seed)
-    model = EnvelopeProbe().to(config["device"])
+    model = model_factory().to(config["device"])
+    context_arm = context_arm or arm
+    scorer = partial(evaluate, objective_fn=selection_objective, burn=burn)
+    validator = partial(
+        validate,
+        clips=clips,
+        specs=config["validation_specs"],
+        arm=context_arm,
+        device=config["device"],
+        objective_fn=selection_objective,
+        burn=burn,
+    )
     optimizer = torch.optim.AdamW(model.parameters(), lr=config["learning_rate"], weight_decay=1e-4)
     start, best = 0, float("inf")
     latest = directory / "latest.pth"
@@ -113,21 +147,45 @@ def run_arm(config, seed, arm, draws, clips, root):
         start, best = checkpoint["step"], checkpoint["best_score"]
     initial = directory / "initial.json"
     if not initial.exists():
-        write_json_report(
-            validate(model, clips, config["validation_specs"], arm, config["device"]), initial
-        )
+        write_json_report(validator(model), initial)
+
+    def save_state(step, result, improved):
+        checkpoint = {
+            "format": config.get("checkpoint_format", "envelope-probe-v1"),
+            "signature": signature,
+            "step": step,
+            "arm": arm,
+            "seed": seed,
+            "model": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+            "best_score": best,
+            "validation": result,
+            "config": config,
+            "rng": torch.get_rng_state(),
+            "mps_rng": torch.mps.get_rng_state() if config["device"] == "mps" else None,
+        }
+        # Publish best before latest so an interrupted improved checkpoint cannot
+        # leave a latest checkpoint that refers to a missing best artifact.
+        if improved:
+            atomic_save(checkpoint, directory / "best.pth")
+        atomic_save(checkpoint, latest)
+
+    if include_initial and not latest.exists():
+        result = json.loads(initial.read_text())
+        best = result["score"]
+        save_state(0, result, True)
     began = time.monotonic()
     for step in range(start + 1, config["steps"] + 1):
         model.train()
         batch = clips.batch(draws[(step - 1) * 4 : step * 4], config["device"])
-        context = context_features(batch["pcm"], arm).to(config["device"])
+        context = context_features(batch["pcm"], context_arm).to(config["device"])
         target = torch.pow(10.0, batch["y"][:, 0] / 20)
         optimizer.param_groups[0]["lr"] = config["learning_rate"] * (
             0.1 + 0.9 * 0.5 * (1 + math.cos(math.pi * (step - 1) / config["steps"]))
         )
         optimizer.zero_grad(set_to_none=True)
-        prediction = predict_probe(model, batch, context)
-        loss = envelope_objective(prediction, target, batch["rate"])["total"]
+        prediction = predict_probe(model, batch, context, burn=burn)
+        loss = training_objective(prediction, target, batch["rate"], burn=burn)["total"]
         if not torch.isfinite(loss):
             raise ValueError("nonfinite training objective")
         loss.backward()
@@ -145,28 +203,14 @@ def run_arm(config, seed, arm, draws, clips, root):
             write_json_report(progress, root / "progress.json")
             print(json.dumps(progress), flush=True)
         if step % config["validation_interval"] == 0 or step == config["steps"]:
-            result = validate(model, clips, config["validation_specs"], arm, config["device"])
+            result = validator(model)
             improved = result["score"] < best
             best = min(best, result["score"])
-            checkpoint = {
-                "format": "envelope-probe-v1",
-                "signature": signature,
-                "step": step,
-                "arm": arm,
-                "seed": seed,
-                "model": model.state_dict(),
-                "optimizer": optimizer.state_dict(),
-                "best_score": best,
-                "validation": result,
-                "config": config,
-                "rng": torch.get_rng_state(),
-                "mps_rng": torch.mps.get_rng_state() if config["device"] == "mps" else None,
-            }
-            atomic_save(checkpoint, latest)
-            if improved:
-                atomic_save(checkpoint, directory / "best.pth")
+            save_state(step, result, improved)
             write_json_report(result, directory / f"validation-{step}.json")
     checkpoint = torch.load(directory / "best.pth", map_location="cpu", weights_only=False)
+    if checkpoint["signature"] != signature:
+        raise ValueError("best checkpoint changed")
     model.load_state_dict(checkpoint["model"])
     reports = {}
     for name, specs in (
@@ -174,10 +218,10 @@ def run_arm(config, seed, arm, draws, clips, root):
         ("identity", identity_specs(config["validation_specs"])),
         ("train_probe", config["training_probe_specs"]),
     ):
-        reports[name] = evaluate(model, clips, specs, arm, config["device"], detailed=True)
-    if arm == "past":
+        reports[name] = scorer(model, clips, specs, context_arm, config["device"], detailed=True)
+    if arm in config.get("history_ablation_arms", ["past"]):
         for alternative in ("short", "tiled"):
-            reports["ablation_" + alternative] = evaluate(
+            reports["ablation_" + alternative] = scorer(
                 model,
                 clips,
                 config["validation_specs"],

@@ -84,7 +84,7 @@ class EnvelopeProbe(nn.Module):
     def initial_state(self, batch, *, device=None):
         return torch.zeros(batch, self.state_size, device=device)
 
-    def forward(self, magnitude, context, condition, state):
+    def encode(self, magnitude, context, condition, state):
         # condition = [sample_rate / 48000, cutoff / Nyquist, active].
         scale = magnitude.square().mean(-1, keepdim=True).clamp_min(1e-20).sqrt()
         inputs = torch.cat(
@@ -105,8 +105,12 @@ class EnvelopeProbe(nn.Module):
             )
             states.append(updated.reshape(-1, count))
             offset += count
-        delta = 2 * torch.tanh(self.decoder(torch.cat((encoded, temporal), dim=-1)))
-        return (magnitude + scale * delta).abs(), torch.cat(states, dim=1)
+        return torch.cat((encoded, temporal), dim=-1), scale, torch.cat(states, dim=1)
+
+    def forward(self, magnitude, context, condition, state):
+        latent, scale, next_state = self.encode(magnitude, context, condition, state)
+        delta = 2 * torch.tanh(self.decoder(latent))
+        return (magnitude + scale * delta).abs(), next_state
 
 
 def probe_inputs(batch, context):

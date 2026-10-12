@@ -21,6 +21,7 @@ import torch
 
 from evaluation.reporting import bootstrap_mean_ci, sha256_file, write_json_report
 from models.envelope_probe import EnvelopeProbe, StreamingContext
+from models.factorized_envelope import make_factor_model
 
 KEYS = (
     "total",
@@ -33,7 +34,7 @@ KEYS = (
 )
 
 
-def paired_comparison(candidate, control):
+def paired_comparison(candidate, control, keys=KEYS):
     baseline = {r["row_id"]: r for r in control["rows"]}
     if set(baseline) != {r["row_id"] for r in candidate["rows"]}:
         raise ValueError("unpaired evaluation")
@@ -41,7 +42,7 @@ def paired_comparison(candidate, control):
     for corpus in ("music_library", "speech_library"):
         selected = [r for r in candidate["rows"] if r["corpus"] == corpus]
         result = {}
-        for key in KEYS:
+        for key in keys:
             groups = {}
             for row in selected:
                 groups.setdefault(row["track_id"], []).append(
@@ -60,9 +61,12 @@ def paired_comparison(candidate, control):
 
 def export_probe(checkpoint_path, destination):
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-    if checkpoint["format"] != "envelope-probe-v1":
+    if checkpoint["format"] == "envelope-probe-v1":
+        model = EnvelopeProbe().eval()
+    elif checkpoint["format"] == "factor-envelope-v1":
+        model = make_factor_model(checkpoint["arm"]).eval()
+    else:
         raise ValueError("not an amplitude probe")
-    model = EnvelopeProbe().eval()
     model.load_state_dict(checkpoint["model"])
     generator = torch.Generator().manual_seed(20261012)
     inputs = (
@@ -87,7 +91,7 @@ def export_probe(checkpoint_path, destination):
     onnx.helper.set_model_props(
         artifact,
         {
-            "soundex.experimental_contract": "envelope-probe-v1",
+            "soundex.experimental_contract": checkpoint["format"],
             "soundex.production_compatible": "false",
             "checkpoint_sha256": sha256_file(checkpoint_path),
         },
@@ -206,6 +210,9 @@ def main(args):
     if summary["status"] != "complete":
         raise ValueError("training must finish before analysis/benchmark")
     config = json.loads((root / "config.json").read_text())
+    factored = config["format"] == "soundex-factor-study-v1"
+    candidate = "factorized" if factored else "past"
+    keys = KEYS + (("band_envelope", "band_shape", "envelope_temporal") if factored else ())
     report = {"scope": "raw amplitude diagnostic, reused development recordings", "seeds": {}}
     dry = json.loads((root / "compressed-reference.json").read_text())
     for seed in config["seeds"]:
@@ -217,21 +224,29 @@ def main(args):
                 raise ValueError("evaluation receipt changed")
             arms[arm] = json.loads((directory / "evaluation.json").read_text())
         comparisons = {}
-        for control in ("short", "tiled"):
+        contrasts = (
+            (("direct_factored_loss", "direct_legacy"), ("factorized", "direct_factored_loss"))
+            if factored
+            else (("past", "short"), ("past", "tiled"))
+        )
+        for treatment, control in contrasts:
             for split in ("validation", "identity", "train_probe"):
-                comparisons[f"past_minus_{control}_{split}"] = paired_comparison(
-                    arms["past"][split], arms[control][split]
+                comparisons[f"{treatment}_minus_{control}_{split}"] = paired_comparison(
+                    arms[treatment][split], arms[control][split], keys=keys
                 )
-            comparisons[f"ablated_{control}_minus_past"] = paired_comparison(
-                arms["past"]["ablation_" + control], arms["past"]["validation"]
+        for control in ("short", "tiled"):
+            comparisons[f"ablated_{control}_minus_{candidate}"] = paired_comparison(
+                arms[candidate]["ablation_" + control], arms[candidate]["validation"], keys=keys
             )
         for arm in config["arms"]:
-            comparisons[arm + "_minus_compressed"] = paired_comparison(arms[arm]["validation"], dry)
+            comparisons[arm + "_minus_compressed"] = paired_comparison(
+                arms[arm]["validation"], dry, keys=keys
+            )
         report["seeds"][str(seed)] = comparisons
     write_json_report(report, root / "comparisons.json")
     if args.benchmark:
-        # Predeclared seed 1 past, no benchmark-driven model selection.
-        directory = root / f"past-{config['seeds'][0]}"
+        # Predeclared seed 1 candidate, no benchmark-driven model selection.
+        directory = root / f"{candidate}-{config['seeds'][0]}"
         session, exported = export_probe(directory / "best.pth", directory / "diagnostic.onnx")
         write_json_report(
             {"export": exported, "benchmark": benchmark(session, "past", args.seconds)},
