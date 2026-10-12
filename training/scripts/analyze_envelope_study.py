@@ -182,6 +182,7 @@ def benchmark(session, arm, seconds):
                     "measured_hops": len(durations),
                     "wall_seconds": elapsed,
                     "busy_loop_cpu_seconds": cpu,
+                    "estimated_one_core_cpu_percent_at_audio_rate": cpu / (hop * 128 / rate) * 100,
                     "feature_p99_ms": float(np.percentile(features, 99)),
                     "inference_p99_ms": float(np.percentile(inference, 99)),
                     "combined_p99_ms": float(np.percentile(durations, 99)),
