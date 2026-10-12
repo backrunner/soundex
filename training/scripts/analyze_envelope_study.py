@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import resource
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -252,6 +253,16 @@ def main(args):
             {"export": exported, "benchmark": benchmark(session, "past", args.seconds)},
             root / "diagnostic-cost.json",
         )
+        memory = subprocess.check_output(
+            [
+                sys.executable,
+                str(Path(__file__).with_name("measure_probe_memory.py")),
+                "--model",
+                str(directory / "diagnostic.onnx"),
+            ],
+            text=True,
+        )
+        write_json_report(json.loads(memory), root / "diagnostic-memory.json")
 
 
 if __name__ == "__main__":

@@ -24,6 +24,7 @@ from export_study import make_model
 from models.causal_objective import render
 from models.envelope_probe import context_features, predict_probe
 from models.factorized_envelope import ARMS, BURN, make_factor_model
+from scripts.analyze_envelope_study import paired_comparison
 from scripts.run_causal_study import prediction
 from scripts.run_weak_band_study import freeze_binary
 
@@ -75,7 +76,9 @@ def run(args):
     rows, hashes = load_sources([Path(p) for p in config["manifests"]])
     if hashes != config["manifests"]:
         raise ValueError("manifests changed")
-    clips = EnvelopeClips(rows, root / "binaries/soundex-gain-data", root / "cache")
+    clips = EnvelopeClips(
+        rows, root / "binaries/soundex-gain-data", config.get("cache_path", root / "cache")
+    )
     records = []
     region = slice((BURN + 9) * 128, 32768 - 128)
     with torch.no_grad(), tempfile.TemporaryDirectory(prefix="soundex-p6-replay-") as tmp:
@@ -175,6 +178,38 @@ def run(args):
                 if index % 16 == 0:
                     print(json.dumps({"seed": seed, "clips": index + 1}), flush=True)
         write_json_report({"registration": registration, "rows": records}, root / "dsp-review.json")
+    summary = {}
+    keys = (
+        "enhanced_high_spectral_convergence",
+        "enhanced_high_flux_error",
+        "enhanced_high_band_energy_error_db",
+        "delta_si_sdr_db",
+    )
+    for seed in config["seeds"]:
+        by_metric_region = {}
+        for metric_region in ("metrics", "fixed_4khz_metrics"):
+            groups = {}
+            for record in records:
+                if record["seed"] == seed:
+                    groups.setdefault(record["variant"], {"rows": []})["rows"].append(
+                        {**record, "metrics": record[metric_region]}
+                    )
+            comparisons = {}
+            for treatment, control in (
+                ("direct_factored_loss_p3_phase", "direct_legacy_p3_phase"),
+                ("factorized_p3_phase", "direct_factored_loss_p3_phase"),
+                ("factorized_p3_phase", "p3_original"),
+                ("factorized_p3_phase", "identity_dsp"),
+                ("factorized_input_phase", "factorized_p3_phase"),
+            ):
+                comparisons[treatment + "_minus_" + control] = paired_comparison(
+                    groups[treatment], groups[control], keys=keys
+                )
+            by_metric_region[metric_region] = comparisons
+        summary[str(seed)] = by_metric_region
+    write_json_report(
+        {"scope": registration["scope"], "seeds": summary}, root / "dsp-comparisons.json"
+    )
 
 
 if __name__ == "__main__":

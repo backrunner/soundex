@@ -1,4 +1,7 @@
 import json
+import subprocess
+import sys
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -55,3 +58,16 @@ def test_amplitude_probe_export_contract_and_budget(tmp_path, family):
     out = session.run(None, data)
     assert np.isfinite(out[0]).all() and np.max(out[0]) < 1e-9
     assert session.get_modelmeta().custom_metadata_map["soundex.production_compatible"] == "false"
+    memory = json.loads(
+        subprocess.check_output(
+            [
+                sys.executable,
+                str(Path(__file__).resolve().parents[1] / "scripts/measure_probe_memory.py"),
+                "--model",
+                str(tmp_path / "probe.onnx"),
+            ],
+            text=True,
+        )
+    )
+    assert memory["onnx_sha256"] == result["onnx_sha256"]
+    assert memory["after_inference_peak_mib"] >= memory["baseline_import_peak_mib"]
