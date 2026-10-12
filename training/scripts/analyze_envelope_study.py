@@ -21,8 +21,10 @@ import onnxruntime as ort
 import torch
 
 from evaluation.reporting import bootstrap_mean_ci, sha256_file, write_json_report
+from evaluation.restoration_guards import restoration_guards
 from models.envelope_probe import EnvelopeProbe, StreamingContext
 from models.factorized_envelope import make_factor_model
+from models.linear_objective import make_linear_model
 from models.residual_energy import make_energy_model
 
 KEYS = (
@@ -69,6 +71,8 @@ def export_probe(checkpoint_path, destination):
         model = make_factor_model(checkpoint["arm"]).eval()
     elif checkpoint["format"] == "energy-envelope-v1":
         model = make_energy_model(checkpoint["arm"]).eval()
+    elif checkpoint["format"] == "linear-envelope-v1":
+        model = make_linear_model(checkpoint["arm"]).eval()
     else:
         raise ValueError("not an amplitude probe")
     model.load_state_dict(checkpoint["model"])
@@ -214,9 +218,12 @@ def main(args):
     if summary["status"] != "complete":
         raise ValueError("training must finish before analysis/benchmark")
     config = json.loads((root / "config.json").read_text())
-    factored = config["format"] in ("soundex-factor-study-v1", "soundex-energy-study-v1")
+    linear = config["format"] == "soundex-linear-study-v1"
+    factored = linear or config["format"] in ("soundex-factor-study-v1", "soundex-energy-study-v1")
     candidate = config.get("benchmark_candidate", "factorized" if factored else "past")
     keys = KEYS + (("band_envelope", "band_shape", "envelope_temporal") if factored else ())
+    if linear:
+        keys += ("factor_total", "linear_reconstruction", "linear_dynamics")
     report = {"scope": "raw amplitude diagnostic, reused development recordings", "seeds": {}}
     dry = json.loads((root / "compressed-reference.json").read_text())
     for seed in config["seeds"]:
@@ -224,7 +231,10 @@ def main(args):
         for arm in config["arms"]:
             directory = root / f"{arm}-{seed}"
             receipt = json.loads((directory / "complete.json").read_text())
-            if sha256_file(directory / "evaluation.json") != receipt["evaluation_sha256"]:
+            if (
+                sha256_file(directory / "evaluation.json") != receipt["evaluation_sha256"]
+                or sha256_file(directory / "best.pth") != receipt["checkpoint_sha256"]
+            ):
                 raise ValueError("evaluation receipt changed")
             arms[arm] = json.loads((directory / "evaluation.json").read_text())
         comparisons = {}
@@ -248,6 +258,10 @@ def main(args):
                 arms[arm]["validation"], dry, keys=keys
             )
         report["seeds"][str(seed)] = comparisons
+        if linear:
+            comparisons["restoration_guards"] = restoration_guards(
+                arms[candidate], arms["energy_control"], dry
+            )
     write_json_report(report, root / "comparisons.json")
     if args.benchmark:
         # Predeclared seed 1 candidate, no benchmark-driven model selection.

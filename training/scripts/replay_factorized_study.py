@@ -25,6 +25,7 @@ from models.causal_objective import render
 from models.envelope_objective import amplitude_metrics
 from models.envelope_probe import context_features, predict_probe
 from models.factorized_envelope import BURN, make_factor_model
+from models.linear_objective import make_linear_model
 from models.residual_energy import make_energy_model
 from scripts.analyze_envelope_study import paired_comparison
 from scripts.run_causal_study import prediction
@@ -66,6 +67,8 @@ def run(args):
     factory = (
         make_energy_model if config["format"] == "soundex-energy-study-v1" else make_factor_model
     )
+    if config["format"] == "soundex-linear-study-v1":
+        factory = make_linear_model
     if json.loads((root / "summary.json").read_text())["status"] != "complete":
         raise ValueError("finish frozen training before DSP review")
     binary = freeze_binary(
@@ -244,6 +247,13 @@ def run(args):
             if config["format"] == "soundex-energy-study-v1":
                 contrasts = (
                     (candidate + "_p3_phase", "factorized_p3_phase"),
+                    (candidate + "_p3_phase", "p3_original"),
+                    (candidate + "_p3_phase", "identity_dsp"),
+                    (candidate + "_input_phase", candidate + "_p3_phase"),
+                )
+            if config["format"] == "soundex-linear-study-v1":
+                contrasts = (
+                    (candidate + "_p3_phase", "energy_control_p3_phase"),
                     (candidate + "_p3_phase", "p3_original"),
                     (candidate + "_p3_phase", "identity_dsp"),
                     (candidate + "_input_phase", candidate + "_p3_phase"),

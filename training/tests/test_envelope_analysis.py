@@ -9,6 +9,7 @@ import torch
 
 from models.envelope_probe import EnvelopeProbe
 from models.factorized_envelope import make_factor_model
+from models.linear_objective import make_linear_model
 from models.residual_energy import make_energy_model
 from scripts.analyze_envelope_study import KEYS, export_probe, paired_comparison
 
@@ -35,7 +36,8 @@ def test_comparison_weights_recordings_and_requires_pairs():
 
 
 @pytest.mark.parametrize(
-    "family", ["envelope-probe-v1", "factor-envelope-v1", "energy-envelope-v1"]
+    "family",
+    ["envelope-probe-v1", "factor-envelope-v1", "energy-envelope-v1", "linear-envelope-v1"],
 )
 def test_amplitude_probe_export_contract_and_budget(tmp_path, family):
     model = (
@@ -45,6 +47,9 @@ def test_amplitude_probe_export_contract_and_budget(tmp_path, family):
     if family == "energy-envelope-v1":
         arm = "rms_residual"
         model = make_energy_model(arm).eval()
+    if family == "linear-envelope-v1":
+        arm = "linear_reconstruction"
+        model = make_linear_model(arm).eval()
     if family != "envelope-probe-v1":
         with torch.no_grad():
             model.energy_head.weight.normal_(std=0.01)

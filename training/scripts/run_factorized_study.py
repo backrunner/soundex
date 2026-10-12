@@ -36,6 +36,9 @@ def run(
     schedule_offset=40000,
     candidate="factorized",
     experiment=None,
+    training_objectives=None,
+    selection_objective=factor_objective,
+    objective_metadata=None,
 ):
     torch.set_num_threads(1)
     torch.set_num_interop_threads(1)
@@ -120,6 +123,8 @@ def run(
             config["experiment"] = experiment
             config["schedule_offset"] = schedule_offset
             config["benchmark_candidate"] = candidate
+        if objective_metadata is not None:
+            config.update(objective_metadata)
         config_path = root / "config.json"
         if config_path.exists() and json.loads(config_path.read_text()) != config:
             raise ValueError("registered study changed")
@@ -135,7 +140,7 @@ def run(
                     "past",
                     args.device,
                     detailed=True,
-                    objective_fn=factor_objective,
+                    objective_fn=selection_objective,
                     burn=BURN,
                 ),
                 root / "compressed-reference.json",
@@ -158,10 +163,10 @@ def run(
                         clips,
                         root,
                         model_factory=partial(model_factory, arm),
-                        training_objective=envelope_objective
-                        if arm == "direct_legacy"
-                        else factor_objective,
-                        selection_objective=factor_objective,
+                        training_objective=training_objectives[arm]
+                        if training_objectives is not None
+                        else (envelope_objective if arm == "direct_legacy" else factor_objective),
+                        selection_objective=selection_objective,
                         context_arm="past",
                         burn=BURN,
                         include_initial=True,
