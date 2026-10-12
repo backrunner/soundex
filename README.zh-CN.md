@@ -25,8 +25,8 @@ DSP、ONNX 推理和实时流适配，同时提供文件处理 CLI 和 PyTorch �
 [P3 受控续训](docs/weak-band-study-20261012.md)六组已完成，过量能量约束和恒等控制
 减少了额外生成，但高频恢复仍有取舍。[可选平滑限幅](docs/limiter-study-20261012.md)
 降低 DSP 失真并消除实时端重复压缩，默认配置保持不变。
-[P4 受控续训](docs/balanced-restoration-study-20261012.md)进一步对齐新 DSP，比较参考峰值放行
-与双向高频能量监督。
+[P4 受控续训](docs/balanced-restoration-study-20261012.md)六组已完成：双向能量监督增加恢复能量，
+但谱形、瞬态与低频保真退步，没有候选晋级。
 [基线复核](docs/baseline-generalization-20261012.md)确认了增益策略的取舍
 及恒等 DSP 路径的限幅失真，目前不足以把旧基线的问题直接归因为过拟合。
 
