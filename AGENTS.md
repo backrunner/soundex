@@ -1,6 +1,6 @@
 # SoundEx 工程约定
 
-@~/.codex/RTK.md
+Use `rtk` or `rtk proxy` for shell commands. Local usage guide: `~/.codex/RTK.md`.
 
 ## 项目目标
 
