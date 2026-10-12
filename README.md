@@ -34,6 +34,10 @@ recompressing worker output in the callback; the default remains unchanged.
 The [P4 matched continuation](docs/balanced-restoration-study-20261012.md) completed six runs against
 the smooth DSP. Bidirectional energy supervision improves energy recovery but regresses
 other fidelity measures; no candidate is promoted.
+The [P5 amplitude representation study](docs/envelope-study-20261012.md) completed six
+fresh short/tiled/past-context runs. Past-only features improve one transient measure
+but do not establish a consistent amplitude-quality win. Band-envelope/shape diagnostics
+guide the next structural experiment; the 3.10 MiB amplitude probe is not a deployable audio model.
 The [baseline audit](docs/baseline-generalization-20261012.md) identifies gain-policy tradeoffs
 and limiter distortion even with an identity model; baseline overfitting is not established.
 
