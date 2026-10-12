@@ -102,6 +102,7 @@ pub(super) struct BenchmarkReport {
     pub(super) generated_unix_seconds: u64,
     pub(super) diagnostic: bool,
     pub(super) high_band_gain: String,
+    pub(super) limiter_mode: String,
     pub(super) artifact: ArtifactEvidence,
     pub(super) protocol: FrameProtocol,
     pub(super) hardware: HardwareEvidence,

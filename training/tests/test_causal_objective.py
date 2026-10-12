@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -59,8 +60,9 @@ def make_batch(audio, rate, root):
     }
 
 
+@pytest.mark.parametrize("limiter_mode", ["legacy", "smooth-knee"])
 @pytest.mark.parametrize("rate", [44100, 48000])
-def test_renderer_matches_rust_gate_limiter_and_silence(tmp_path, rate):
+def test_renderer_matches_rust_gate_limiter_and_silence(tmp_path, rate, limiter_mode):
     torch.set_num_threads(1)
     n = np.arange(256 * 128)
     audio = (1.15 * np.sin(n * 2 * np.pi * 1700 / rate)).astype(np.float32)
@@ -82,10 +84,17 @@ def test_renderer_matches_rust_gate_limiter_and_silence(tmp_path, rate):
         ],
         check=True,
         capture_output=True,
+        env={**os.environ, "SOUNDEX_EVAL_LIMITER_MODE": limiter_mode},
     )
     actual, _ = read_sxa(tmp_path / "output.sxa")
     expected, _ = render(
-        predicted, batch["x"], batch["mask"], batch["active"], batch["gate"], batch["dry"]
+        predicted,
+        batch["x"],
+        batch["mask"],
+        batch["active"],
+        batch["gate"],
+        batch["dry"],
+        limiter_mode=limiter_mode,
     )
     # Float32 analyzer/window differences can rotate almost-zero observed bins.
     # This adversarial pure-tone test then gives them nonzero generated energy.
@@ -122,3 +131,17 @@ def test_objective_identity_and_silence_have_finite_backward(tmp_path):
         assert all(bool(torch.isfinite(v)) for v in values.values())
         assert bool(torch.isfinite(prediction.grad).all())
         assert float(values["output_waveform"].detach()) < 1e-4
+
+
+def test_smooth_limiter_gradient_and_invalid_mode():
+    from models.causal_objective import limit
+
+    wave = torch.tensor(
+        [-1.1, -0.9, -0.855, 0.0, 0.855, 0.9, 1.1], dtype=torch.float64, requires_grad=True
+    )
+    assert torch.autograd.gradcheck(lambda x: limit(x, "smooth-knee"), (wave,))
+    limit(wave, "smooth-knee").sum().backward()
+    assert torch.isfinite(wave.grad).all()
+    torch.testing.assert_close(wave.grad[[2, 3, 4]], torch.ones(3, dtype=torch.float64))
+    with pytest.raises(ValueError):
+        limit(wave, "typo")

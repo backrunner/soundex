@@ -88,6 +88,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "report_type": "soundex-paced-realtime-diagnostic",
                 "diagnostic": true,
                 "enhancement_mode": enhancement_mode.as_str(),
+                "limiter_mode": env::var("SOUNDEX_LIMITER_MODE").unwrap_or_else(|_| "legacy".into()),
                 "model_loaded": enhancement_mode != EnhancementMode::Spectral,
                 "model_path": model,
                 "model_sha256": hash,
@@ -129,6 +130,10 @@ fn measure(
         .sample_rate(sample_rate)
         .channels(channels);
     config.enhancement_mode = enhancement_mode;
+    config.limiter_mode = env::var("SOUNDEX_LIMITER_MODE")
+        .unwrap_or_else(|_| "legacy".into())
+        .parse()
+        .map_err(|error: &str| error.to_string())?;
     config.high_band_gain = env::var("SOUNDEX_HIGH_BAND_GAIN")
         .unwrap_or_else(|_| "match-edge".into())
         .parse()

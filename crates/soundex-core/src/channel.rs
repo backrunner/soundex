@@ -64,7 +64,7 @@ impl ChannelProcessor {
                     SpectralFrame::zeros(bins),
                 )
             }),
-            limiter: Limiter::new(config.limiter_ceiling, 10.0),
+            limiter: Limiter::with_mode(config.limiter_ceiling, 10.0, config.limiter_mode),
             input: StreamBuffer::with_latency_padding(config.fft_size, config.hop_size),
             original: SpectralFrame::zeros(bins),
             history,

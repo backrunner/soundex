@@ -63,6 +63,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         .unwrap_or_else(|_| "neural".into())
         .parse()
         .map_err(|error: &str| error.to_string())?;
+    config.limiter_mode = std::env::var("SOUNDEX_EVAL_LIMITER_MODE")
+        .unwrap_or_else(|_| "legacy".into())
+        .parse()
+        .map_err(|error: &str| error.to_string())?;
     config.high_band_gain = std::env::var("SOUNDEX_EVAL_HIGH_BAND_GAIN")
         .unwrap_or_else(|_| "match-edge".into())
         .parse()
@@ -75,6 +79,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         .parse()
         .map_err(|error: &str| error.to_string())?;
     let phase_policy = config.phase_policy.as_str();
+    let limiter_mode = config.limiter_mode.as_str();
     let enhancement_mode = config.enhancement_mode.as_str();
     let high_band_gain = config.high_band_gain.as_str();
     let analysis = analyze_buffer(&config, &audio.samples)?;
@@ -156,6 +161,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         clipped_samples,
     );
     let mut report: serde_json::Value = serde_json::from_str(&report)?;
+    report["limiter_mode"] = serde_json::json!(limiter_mode);
     report["phase_policy"] = serde_json::json!(phase_policy);
     report["gain_calibration_coefficients"] = serde_json::json!(gain_calibration);
     fs::write(report_path, serde_json::to_vec_pretty(&report)?)?;

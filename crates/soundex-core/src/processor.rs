@@ -193,7 +193,7 @@ impl SoundExProcessor {
         let hop_samples = hop_size * channel_count;
         let frequency_bins = config.fft_size / 2 + 1;
         let gate = GateMixer::new(config.hop_size.min(128), latency);
-        let dry_limiter = Limiter::new(config.limiter_ceiling, 10.0);
+        let dry_limiter = Limiter::with_mode(config.limiter_ceiling, 10.0, config.limiter_mode);
         Ok(Self {
             config,
             engine,

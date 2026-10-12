@@ -116,7 +116,11 @@ impl RealtimeProcessor {
             config.realtime_warmup,
         )?;
         Ok(Self {
-            state: AudioState::new(config.channels as usize, config.limiter_ceiling),
+            state: AudioState::new(
+                config.channels as usize,
+                config.limiter_ceiling,
+                config.limiter_mode,
+            ),
             queues,
             control,
             worker: Some(worker),

@@ -14,6 +14,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut config = SoundExConfig::with_model(&args[1])
         .sample_rate(input.sample_rate)
         .channels(input.channels);
+    config.limiter_mode = std::env::var("SOUNDEX_EVAL_LIMITER_MODE")
+        .unwrap_or_else(|_| "legacy".into())
+        .parse()
+        .map_err(|error: &str| error.to_string())?;
     config.high_band_gain = HighBandGain::Model;
     let samples = replay_predictions(config, &input.samples, &features)?;
     audio_io::write_audio(

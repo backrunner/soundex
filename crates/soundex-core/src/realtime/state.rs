@@ -21,7 +21,7 @@ pub(super) struct AudioState {
 }
 
 impl AudioState {
-    pub fn new(channels: usize, ceiling: f32) -> Self {
+    pub fn new(channels: usize, ceiling: f32, mode: crate::LimiterMode) -> Self {
         Self {
             channels,
             stats: RealtimeStats::default(),
@@ -34,7 +34,7 @@ impl AudioState {
             last_input: [0.0; 2],
             healthy_hops: 0,
             consecutive_misses: 0,
-            mixer: SafetyMixer::new(ceiling),
+            mixer: SafetyMixer::new(ceiling, mode),
         }
     }
 

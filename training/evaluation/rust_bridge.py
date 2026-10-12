@@ -63,6 +63,7 @@ class RustStreamEvaluator:
         enhancement_mode: str = "neural",
         high_band_gain: str = "match-edge",
         phase_policy: str = "model",
+        limiter_mode: str = "legacy",
         gain_calibration: str | Path | None = None,
     ) -> RustEvaluationOutput:
         """Run one offline or chunked evaluation and return aligned audio/report."""
@@ -71,6 +72,8 @@ class RustStreamEvaluator:
             raise ValueError("enhancement_mode must be neural, spectral or hybrid")
         if high_band_gain not in {"match-edge", "model"}:
             raise ValueError("high_band_gain must be match-edge or model")
+        if limiter_mode not in {"legacy", "smooth-knee"}:
+            raise ValueError("limiter_mode must be legacy or smooth-knee")
         if phase_policy not in {"model", "observed", "surviving-power"}:
             raise ValueError("phase_policy must be model, observed or surviving-power")
         with tempfile.TemporaryDirectory(prefix="soundex-eval-") as directory:
@@ -102,6 +105,7 @@ class RustStreamEvaluator:
                     "SOUNDEX_EVAL_ENHANCEMENT_MODE": enhancement_mode,
                     "SOUNDEX_EVAL_HIGH_BAND_GAIN": high_band_gain,
                     "SOUNDEX_EVAL_PHASE_POLICY": phase_policy,
+                    "SOUNDEX_EVAL_LIMITER_MODE": limiter_mode,
                 }
             )
             environment.pop("SOUNDEX_EVAL_GAIN_CALIBRATION", None)
@@ -132,6 +136,8 @@ class RustStreamEvaluator:
             raise RuntimeError("Rust stream report enhancement mode mismatch")
         if report.get("high_band_gain", "match-edge") != high_band_gain:
             raise RuntimeError("Rust stream report high-band gain mismatch")
+        if report.get("limiter_mode", "legacy") != limiter_mode:
+            raise RuntimeError("Rust stream limiter mode mismatch")
         if report.get("phase_policy") != phase_policy:
             raise RuntimeError("Rust stream report phase policy mismatch")
         if not bool(report.get("processor", {}).get("output_finite", False)):

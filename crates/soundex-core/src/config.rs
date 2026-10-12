@@ -1,5 +1,6 @@
 //! Configuration for the SoundEx processor.
 
+pub use soundex_dsp::limiter::LimiterMode;
 use std::path::PathBuf;
 
 /// High-frequency candidate source. Every mode retains the common detection,
@@ -140,6 +141,9 @@ pub struct SoundExConfig {
     /// Limiter ceiling amplitude (default: 0.95).
     pub limiter_ceiling: f32,
 
+    /// Experimental smooth knee; default preserves historical output.
+    pub limiter_mode: LimiterMode,
+
     /// ONNX Runtime intra-op worker threads (default: 1).
     pub ort_intra_threads: usize,
 
@@ -174,6 +178,7 @@ impl Default for SoundExConfig {
             min_bandwidth_ratio: 0.85,
             crossover_width_hz: 1000.0,
             limiter_ceiling: 0.95,
+            limiter_mode: LimiterMode::Legacy,
             ort_intra_threads: 1,
             ort_inter_threads: 1,
             ort_parallel_execution: false,

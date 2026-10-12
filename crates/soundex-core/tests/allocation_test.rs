@@ -187,3 +187,30 @@ fn phase_policies_allocate_nothing_in_active_worker_hops() {
         assert_eq!(allocations, 0, "{policy:?}");
     }
 }
+
+#[test]
+fn smooth_protection_allocates_nothing_in_worker_or_callback() {
+    let mut config = SoundExConfig::with_model(model_path("low-latency-identity.onnx")).channels(2);
+    config.limiter_mode = soundex_core::LimiterMode::SmoothKnee;
+    let mut worker = SoundExProcessor::new(config.clone()).unwrap();
+    let mut realtime = RealtimeProcessor::new(config).unwrap();
+    let mut input = [0.93; 256];
+    input[1] = -1.2;
+    let mut output = [0.0; 256];
+    for _ in 0..72 {
+        worker.process_frame(&input, &mut output).unwrap();
+    }
+    let (result, allocations) = count_allocations(|| worker.process_frame(&input, &mut output));
+    result.unwrap();
+    assert_eq!(allocations, 0);
+    let (result, allocations) = count_allocations(|| {
+        for _ in 0..1000 {
+            realtime.process(&input, &mut output)?;
+        }
+        Ok::<_, soundex_core::SoundExError>(())
+    });
+    result.unwrap();
+    assert_eq!(allocations, 0);
+    assert!(output.iter().all(|s| s.is_finite() && s.abs() <= 0.95));
+    realtime.shutdown();
+}

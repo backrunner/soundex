@@ -43,7 +43,12 @@ def overlap_add(features):
     return torch.where(weights > 1e-12, wave / weights.clamp_min(1e-12), 0.0)
 
 
-def limit(wave):
+def limit(wave, mode="legacy"):
+    if mode == "smooth-knee":
+        shaped = 0.95 * (0.9 + 0.1 * torch.tanh((wave.abs() / 0.95 - 0.9) * 10))
+        return torch.where(wave.abs() <= 0.855, wave, wave.sign() * shaped.clamp(max=0.95))
+    if mode != "legacy":
+        raise ValueError("unknown limiter mode")
     knee, width = 0.855, 0.095
     compressed = knee + width * (1 - torch.exp(-(wave.abs() - knee).clamp_min(0) / (width * 10)))
     return torch.where(wave.abs() <= knee, wave, wave.sign() * compressed.clamp(0, 0.95))
@@ -83,12 +88,14 @@ def gate_envelope(active: torch.Tensor) -> torch.Tensor:
     return torch.tensor(result, dtype=torch.float32, device=active.device)
 
 
-def render(predicted, degraded, mask, active, gate, dry):
+def render(predicted, degraded, mask, active, gate, dry, *, limiter_mode="legacy"):
     effective = mask * active[:, None, :, None]
     blended = blend_deployment_features(degraded, predicted, effective)
     length = predicted.shape[2] * 128
     prelimit = overlap_add(blended)[:, :length]
-    return (limit(dry) * (1 - gate) + limit(prelimit) * gate).clamp(-0.95, 0.95), prelimit
+    return (limit(dry, limiter_mode) * (1 - gate) + limit(prelimit, limiter_mode) * gate).clamp(
+        -0.95, 0.95
+    ), prelimit
 
 
 def relative(delta, reference, weight):

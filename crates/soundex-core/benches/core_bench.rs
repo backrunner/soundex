@@ -89,6 +89,7 @@ fn run() -> Result<bool, Box<dyn Error>> {
         report_type: "soundex-performance",
         generated_unix_seconds: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
         diagnostic,
+        limiter_mode: env::var("SOUNDEX_LIMITER_MODE").unwrap_or_else(|_| "legacy".into()),
         high_band_gain: env::var("SOUNDEX_HIGH_BAND_GAIN").unwrap_or_else(|_| "match-edge".into()),
         artifact,
         protocol: FrameProtocol {
@@ -135,6 +136,10 @@ fn run_case(
         .ort_threads(1, 1)
         .ort_parallel_execution(false);
     config.min_bandwidth_ratio = 1.0;
+    config.limiter_mode = env::var("SOUNDEX_LIMITER_MODE")
+        .unwrap_or_else(|_| "legacy".into())
+        .parse()
+        .map_err(|error: &str| error.to_string())?;
     config.high_band_gain = env::var("SOUNDEX_HIGH_BAND_GAIN")
         .unwrap_or_else(|_| "match-edge".into())
         .parse()
