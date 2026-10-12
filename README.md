@@ -57,8 +57,9 @@ updates from exact identity initialization, with matched training and clean-iden
 controls. All six runs and 2,136 native replays are complete; small raw-loss gains
 still cause identity damage. The [P10 rendered-output study](docs/rendered-restoration-study.md)
 now supervises DSP synthesis directly and balances identity preservation. Its
-128-step pilot reduces damage but does not beat the initial common score; a bounded
-two-seed follow-up tests whether the small restoration gain can persist.
+pilot and six 2048-step runs reduce damage but select step zero in every arm.
+The completed diagnosis separates a generalization gap from preservation pressure;
+no candidate has demonstrated a balanced restoration win.
 The [baseline audit](docs/baseline-generalization-20261012.md) identifies gain-policy tradeoffs
 and limiter distortion even with an identity model; baseline overfitting is not established.
 
