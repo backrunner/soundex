@@ -104,13 +104,14 @@ def run(args):
             "independent_test": False,
             "test_scored": False,
             "deployable_audio_model": False,
+            "cache_path": str((args.cache or root / "cache").resolve()),
         }
         config_path = root / "config.json"
         if config_path.exists() and json.loads(config_path.read_text()) != config:
             raise ValueError("registered study changed")
         write_json_report(config, config_path)
         write_json_report(hashes, root / "source-files.json")
-        clips = EnvelopeClips(rows, detector, root / "cache")
+        clips = EnvelopeClips(rows, detector, args.cache or root / "cache")
         if not (root / "compressed-reference.json").exists():
             write_json_report(
                 evaluate(
@@ -168,6 +169,7 @@ if __name__ == "__main__":
         "--parent", required=True, type=Path, help="P5 config supplying audited splits"
     )
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--cache", type=Path, help="optional shared audited input-feature cache")
     parser.add_argument("--steps", type=int, default=2048)
     parser.add_argument("--validation-interval", type=int, default=512)
     parser.add_argument("--seeds", nargs="+", type=int, default=[20261012, 20261013])

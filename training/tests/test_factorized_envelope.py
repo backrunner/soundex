@@ -134,3 +134,57 @@ def test_factorized_parameter_gradients_finite_for_zero_and_weak_input():
         loss = factor_objective(out, target, torch.tensor([[44100.0], [48000.0]]))["total"]
         loss.backward()
         assert all(p.grad is None or torch.isfinite(p.grad).all() for p in model.parameters())
+
+
+@pytest.mark.parametrize("input_floor", [0.0, 1e-10])
+def test_fully_missing_band_can_learn_both_energy_and_shape(input_floor):
+    torch.manual_seed(13)
+    model = make_factor_model("factorized", width=16)
+    magnitude = torch.full((1, 84, 129), 0.1)
+    magnitude[:, :, 86:] = input_floor
+    context = torch.zeros(1, 84, 1538)
+    condition = torch.tensor([[[1.0, 0.5, 1.0]]]).expand(1, 84, 3)
+    target = magnitude.clone()
+    target[:, :, 86:] = torch.linspace(0.001, 0.02, 43)
+    output, _ = model(magnitude, context, condition, model.initial_state(1))
+    loss = factor_objective(output, target, torch.tensor([[48000.0]]))["total"]
+    loss.backward()
+    assert model.energy_head.bias.grad[-1] < -1e-6
+    # With almost zero predicted energy, a uniform shape is below every target
+    # bin and L1 cannot distinguish a redistribution at fixed RMS. Once energy
+    # has increased, the shape head must be able to learn a nonuniform spectrum.
+    model.zero_grad(set_to_none=True)
+    with torch.no_grad():
+        model.energy_head.bias[-1] = 3.6
+    output, _ = model(magnitude, context, condition, model.initial_state(1))
+    loss = factor_objective(output, target, torch.tensor([[48000.0]]))["total"]
+    loss.backward()
+    assert model.decoder[-1].bias.grad[86:].abs().max() > 1e-5
+    assert torch.isfinite(model.decoder[-1].bias.grad).all()
+
+
+def test_completely_missing_nonuniform_band_is_learnable():
+    torch.set_num_threads(1)
+    torch.manual_seed(13)
+    model = make_factor_model("factorized", width=16)
+    magnitude = torch.full((1, 84, 129), 0.1)
+    magnitude[:, :, 86:] = 0
+    context = torch.zeros(1, 84, 1538)
+    condition = torch.tensor([[[1.0, 0.5, 1.0]]]).expand(1, 84, 3)
+    target = magnitude.clone()
+    target[:, :, 86:] = torch.linspace(0.001, 0.02, 43)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+    initial = None
+    for step in range(121):
+        output, _ = model(magnitude, context, condition, model.initial_state(1))
+        loss = factor_objective(output, target, torch.tensor([[48000.0]]))["total"]
+        if step == 0:
+            initial = float(loss.detach())
+        if step == 120:
+            break
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 5, error_if_nonfinite=True)
+        optimizer.step()
+    assert float(loss.detach()) < initial * 0.2
+    assert output[:, -1, 86:].square().mean().sqrt() > 0.001

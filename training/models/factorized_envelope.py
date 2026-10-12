@@ -28,7 +28,7 @@ class FactorizedEnvelope(EnvelopeProbe):
         latent, scale, next_state = self.encode(magnitude, context, condition, state)
         delta = 2 * torch.tanh(self.decoder(latent))
         # Positive seed also permits generation when an entire band is exactly 0.
-        seed = ((magnitude + scale * delta).square() + (scale * 1e-8).square()).sqrt()
+        seed = ((magnitude + scale * (delta + 1e-8)).square() + (scale * 1e-8).square()).sqrt()
         energy_delta = 4 * self.energy_head(latent)
         frequency = self.bin_index[None, None, :] * condition[:, :1, :1] * (48000 / 256)
         prediction = torch.zeros_like(magnitude)
@@ -42,7 +42,9 @@ class FactorizedEnvelope(EnvelopeProbe):
                 ((seed.square() * mask).sum(-1, keepdim=True) / count).clamp_min(1e-36).sqrt()
             )
             log_ratio = (input_rms / scale).log() + energy_delta[..., index : index + 1]
-            energy = scale * log_ratio.clamp(-18, 2).exp()
+            # The lower bound must be below log(1e-8), our input seed floor,
+            # otherwise completely missing bands start with a dead energy head.
+            energy = scale * log_ratio.clamp(-30, 2).exp()
             prediction = prediction + mask * seed / seed_rms * energy
         return prediction, next_state
 
