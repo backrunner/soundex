@@ -9,6 +9,7 @@ import torch
 
 from models.envelope_probe import EnvelopeProbe
 from models.factorized_envelope import make_factor_model
+from models.residual_energy import make_energy_model
 from scripts.analyze_envelope_study import KEYS, export_probe, paired_comparison
 
 
@@ -33,17 +34,23 @@ def test_comparison_weights_recordings_and_requires_pairs():
         paired_comparison({"rows": rows}, {"rows": zero[:-1]})
 
 
-@pytest.mark.parametrize("family", ["envelope-probe-v1", "factor-envelope-v1"])
+@pytest.mark.parametrize(
+    "family", ["envelope-probe-v1", "factor-envelope-v1", "energy-envelope-v1"]
+)
 def test_amplitude_probe_export_contract_and_budget(tmp_path, family):
     model = (
         EnvelopeProbe() if family == "envelope-probe-v1" else make_factor_model("factorized")
     ).eval()
-    if family == "factor-envelope-v1":
+    arm = "factorized"
+    if family == "energy-envelope-v1":
+        arm = "rms_residual"
+        model = make_energy_model(arm).eval()
+    if family != "envelope-probe-v1":
         with torch.no_grad():
             model.energy_head.weight.normal_(std=0.01)
             model.decoder[-1].weight.normal_(std=0.01)
     checkpoint = tmp_path / "probe.pth"
-    torch.save({"format": family, "arm": "factorized", "model": model.state_dict()}, checkpoint)
+    torch.save({"format": family, "arm": arm, "model": model.state_dict()}, checkpoint)
     session, result = export_probe(checkpoint, tmp_path / "probe.onnx")
     assert result["parameters"] < 2_000_000
     assert result["bytes"] < 8 * 1024 * 1024

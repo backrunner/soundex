@@ -23,6 +23,7 @@ import torch
 from evaluation.reporting import bootstrap_mean_ci, sha256_file, write_json_report
 from models.envelope_probe import EnvelopeProbe, StreamingContext
 from models.factorized_envelope import make_factor_model
+from models.residual_energy import make_energy_model
 
 KEYS = (
     "total",
@@ -66,6 +67,8 @@ def export_probe(checkpoint_path, destination):
         model = EnvelopeProbe().eval()
     elif checkpoint["format"] == "factor-envelope-v1":
         model = make_factor_model(checkpoint["arm"]).eval()
+    elif checkpoint["format"] == "energy-envelope-v1":
+        model = make_energy_model(checkpoint["arm"]).eval()
     else:
         raise ValueError("not an amplitude probe")
     model.load_state_dict(checkpoint["model"])
@@ -211,8 +214,8 @@ def main(args):
     if summary["status"] != "complete":
         raise ValueError("training must finish before analysis/benchmark")
     config = json.loads((root / "config.json").read_text())
-    factored = config["format"] == "soundex-factor-study-v1"
-    candidate = "factorized" if factored else "past"
+    factored = config["format"] in ("soundex-factor-study-v1", "soundex-energy-study-v1")
+    candidate = config.get("benchmark_candidate", "factorized" if factored else "past")
     keys = KEYS + (("band_envelope", "band_shape", "envelope_temporal") if factored else ())
     report = {"scope": "raw amplitude diagnostic, reused development recordings", "seeds": {}}
     dry = json.loads((root / "compressed-reference.json").read_text())
@@ -230,6 +233,7 @@ def main(args):
             if factored
             else (("past", "short"), ("past", "tiled"))
         )
+        contrasts = config.get("experiment", {}).get("contrasts", contrasts)
         for treatment, control in contrasts:
             for split in ("validation", "identity", "train_probe"):
                 comparisons[f"{treatment}_minus_{control}_{split}"] = paired_comparison(

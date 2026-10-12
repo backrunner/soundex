@@ -24,6 +24,11 @@ class FactorizedEnvelope(EnvelopeProbe):
         nn.init.zeros_(self.energy_head.bias)
         self.register_buffer("bin_index", torch.arange(129, dtype=torch.float32))
 
+    def band_energy(self, input_rms, scale, delta):
+        log_ratio = (input_rms / scale).log() + delta
+        # Lower than log(1e-8), so a completely missing band is not clamped.
+        return scale * log_ratio.clamp(-30, 2).exp()
+
     def forward(self, magnitude, context, condition, state):
         latent, scale, next_state = self.encode(magnitude, context, condition, state)
         delta = 2 * torch.tanh(self.decoder(latent))
@@ -41,10 +46,7 @@ class FactorizedEnvelope(EnvelopeProbe):
             seed_rms = (
                 ((seed.square() * mask).sum(-1, keepdim=True) / count).clamp_min(1e-36).sqrt()
             )
-            log_ratio = (input_rms / scale).log() + energy_delta[..., index : index + 1]
-            # The lower bound must be below log(1e-8), our input seed floor,
-            # otherwise completely missing bands start with a dead energy head.
-            energy = scale * log_ratio.clamp(-30, 2).exp()
+            energy = self.band_energy(input_rms, scale, energy_delta[..., index : index + 1])
             prediction = prediction + mask * seed / seed_rms * energy
         return prediction, next_state
 

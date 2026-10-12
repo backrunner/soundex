@@ -24,7 +24,8 @@ from export_study import make_model
 from models.causal_objective import render
 from models.envelope_objective import amplitude_metrics
 from models.envelope_probe import context_features, predict_probe
-from models.factorized_envelope import ARMS, BURN, make_factor_model
+from models.factorized_envelope import BURN, make_factor_model
+from models.residual_energy import make_energy_model
 from scripts.analyze_envelope_study import paired_comparison
 from scripts.run_causal_study import prediction
 from scripts.run_weak_band_study import freeze_binary
@@ -60,6 +61,11 @@ def run(args):
     root = args.study.resolve()
     args.phase_study = args.phase_study.resolve()
     config = json.loads((root / "config.json").read_text())
+    arms = config["arms"]
+    candidate = config.get("benchmark_candidate", "factorized")
+    factory = (
+        make_energy_model if config["format"] == "soundex-energy-study-v1" else make_factor_model
+    )
     if json.loads((root / "summary.json").read_text())["status"] != "complete":
         raise ValueError("finish frozen training before DSP review")
     binary = freeze_binary(
@@ -70,7 +76,7 @@ def run(args):
     paths = {}
     for seed in config["seeds"]:
         paths[f"p3-{seed}"] = args.phase_study / f"control-{seed}/best.pth"
-        for arm in ARMS:
+        for arm in arms:
             paths[f"{arm}-{seed}"] = root / f"{arm}-{seed}/best.pth"
     registration = {
         "scope": "reused development; offline predicted features through native DSP; not realtime deployment or listening",
@@ -109,8 +115,8 @@ def run(args):
                 torch.load(paths[f"p3-{seed}"], map_location="cpu", weights_only=False)["model"]
             )
             models = {}
-            for arm in ARMS:
-                model = make_factor_model(arm).eval()
+            for arm in arms:
+                model = factory(arm).eval()
                 model.load_state_dict(
                     torch.load(paths[f"{arm}-{seed}"], map_location="cpu", weights_only=False)[
                         "model"
@@ -129,8 +135,8 @@ def run(args):
                     variants[arm + "_p3_phase"] = hybrid_features(
                         amplitude, phase_features[:, 1], batch["x"]
                     )
-                    if arm == "factorized":
-                        variants["factorized_input_phase"] = hybrid_features(
+                    if arm == candidate:
+                        variants[candidate + "_input_phase"] = hybrid_features(
                             amplitude, batch["x"][:, 1], batch["x"]
                         )
                 rate = int(batch["rate"][0, 0])
@@ -228,13 +234,21 @@ def run(args):
                         {**record, "metrics": record[metric_region]}
                     )
             comparisons = {}
-            for treatment, control in (
+            contrasts = (
                 ("direct_factored_loss_p3_phase", "direct_legacy_p3_phase"),
                 ("factorized_p3_phase", "direct_factored_loss_p3_phase"),
                 ("factorized_p3_phase", "p3_original"),
                 ("factorized_p3_phase", "identity_dsp"),
                 ("factorized_input_phase", "factorized_p3_phase"),
-            ):
+            )
+            if config["format"] == "soundex-energy-study-v1":
+                contrasts = (
+                    (candidate + "_p3_phase", "factorized_p3_phase"),
+                    (candidate + "_p3_phase", "p3_original"),
+                    (candidate + "_p3_phase", "identity_dsp"),
+                    (candidate + "_input_phase", candidate + "_p3_phase"),
+                )
+            for treatment, control in contrasts:
                 comparisons[treatment + "_minus_" + control] = paired_comparison(
                     groups[treatment],
                     groups[control],

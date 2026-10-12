@@ -26,7 +26,17 @@ from scripts.run_envelope_study import evaluate, run_arm
 from scripts.run_weak_band_study import freeze_binary
 
 
-def run(args):
+def run(
+    args,
+    *,
+    arms=ARMS,
+    model_factory=make_factor_model,
+    study_format="soundex-factor-study-v1",
+    checkpoint_format="factor-envelope-v1",
+    schedule_offset=40000,
+    candidate="factorized",
+    experiment=None,
+):
     torch.set_num_threads(1)
     torch.set_num_interop_threads(1)
     root = args.output.resolve()
@@ -62,15 +72,15 @@ def run(args):
 
             specs, train_specs = subset(specs), subset(train_specs)
         config = {
-            "format": "soundex-factor-study-v1",
-            "checkpoint_format": "factor-envelope-v1",
+            "format": study_format,
+            "checkpoint_format": checkpoint_format,
             "steps": args.steps,
             "batch_size": 4,
             "learning_rate": 1e-4,
             "validation_interval": args.validation_interval,
             "seeds": args.seeds,
-            "arms": list(ARMS),
-            "history_ablation_arms": ["factorized"],
+            "arms": list(arms),
+            "history_ablation_arms": [candidate],
             "context": "past",
             "burn_hops": BURN,
             "context_stride": 4,
@@ -78,7 +88,7 @@ def run(args):
             "initial_checkpoint_eligible": True,
             "training_objectives": {
                 arm: "amplitude-log1p-v1" if arm == "direct_legacy" else "band-envelope-shape-v1"
-                for arm in ARMS
+                for arm in arms
             },
             "weights": {
                 "band_envelope": 1.0,
@@ -106,6 +116,10 @@ def run(args):
             "deployable_audio_model": False,
             "cache_path": str((args.cache or root / "cache").resolve()),
         }
+        if experiment is not None:
+            config["experiment"] = experiment
+            config["schedule_offset"] = schedule_offset
+            config["benchmark_candidate"] = candidate
         config_path = root / "config.json"
         if config_path.exists() and json.loads(config_path.read_text()) != config:
             raise ValueError("registered study changed")
@@ -128,13 +142,13 @@ def run(args):
             )
         completed = []
         for seed in args.seeds:
-            schedule, sampling = make_schedule(rows, seed + 40000, args.steps * 4)
+            schedule, sampling = make_schedule(rows, seed + schedule_offset, args.steps * 4)
             draws = add_identity_controls(schedule, 4)
             write_json_report(
                 {"draws": draws, "sampling_before_identity": sampling, "sha256": digest(draws)},
                 root / f"draws-{seed}.json",
             )
-            for arm in ARMS:
+            for arm in arms:
                 completed.append(
                     run_arm(
                         config,
@@ -143,7 +157,7 @@ def run(args):
                         draws,
                         clips,
                         root,
-                        model_factory=partial(make_factor_model, arm),
+                        model_factory=partial(model_factory, arm),
                         training_objective=envelope_objective
                         if arm == "direct_legacy"
                         else factor_objective,
