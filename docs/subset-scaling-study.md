@@ -104,5 +104,79 @@ listening quality. No runtime changes or new streaming delay are introduced.
 The two-update integration check completed all three evaluation regions and 60
 native replays (30 baseline, 30 checkpoint), maximum sample error 2.981e-7.
 All 424 local Python tests passed, as did Ruff lint/format checks. The formal
-six-run queue is launched with frozen source; `pipeline.json`, `pipeline.log` and
-`study/progress.json` report its actual state. No formal outcome is claimed yet.
+six-run queue completed with frozen source `ce6fd15`; `pipeline.json` and
+`study/summary.json` both report completion. All milestone/checkpoint/evaluation
+receipts and exact per-anchor exposure counts were verified during analysis.
+
+
+## Completed results
+
+All six runs and 330 native replays completed. The maximum native/proxy sample
+error is 1.885e-6. Every anchor receives exactly 256 paired exposures and 256
+identity exposures at its equal-exposure endpoint. Both code CI runs passed;
+this is software correctness, not restoration qualification.
+
+The following three scores use **identical evaluation cases across all sizes**:
+the common five P11 anchors, their shifted scoring regions, and all 89 development
+clips. This avoids confusing changes in the fitted set's difficulty with learning
+progress. Lower is better; no development checkpoint was selected.
+
+| Size | Seed | Updates | Common anchors | Common shifted regions | Development |
+|---|---:|---:|---:|---:|---:|
+| Input/DSP | — | 0 | 0.306496 | 0.313313 | 0.271475 |
+| 5 | 20261012 | 256 | 0.245245 | 0.714323 | 2.523811 |
+| 10 | 20261012 | 256 | 0.294612 | 0.360389 | 0.816346 |
+| 10 | 20261012 | 512 | 0.273871 | 0.322062 | 2.016946 |
+| 40 | 20261012 | 256 | 0.306103 | 0.316296 | 0.338419 |
+| 40 | 20261012 | 2048 | 0.296676 | 0.424947 | 0.511675 |
+| 5 | 20261013 | 256 | 0.232373 | 0.728909 | 2.879109 |
+| 10 | 20261013 | 256 | 0.297357 | 0.334839 | 0.660467 |
+| 10 | 20261013 | 512 | 0.267971 | 0.365623 | 2.032494 |
+| 40 | 20261013 | 256 | 0.306262 | 0.319017 | 0.341236 |
+| 40 | 20261013 | 2048 | 0.296164 | 0.403989 | 0.446079 |
+
+At the same 256 updates, increasing the training pool reduces the severe
+small-set development regression. It does not produce a development win over
+input/DSP. With 40 anchors, development is still worse by 24.66% / 25.70% at 256
+updates. Extending to 2048 updates worsens that to 88.48% / 64.32%, while the full
+fitted-anchor score improves by 6.45% / 6.72% from its own input/DSP baseline.
+The ten-anchor runs show the same direction: more exposures improve fitting but
+worsen development. Thus insufficient per-anchor exposure does not explain the
+missing generalization under this fixed-crop protocol.
+
+These percentages describe this normalized composite score, not perceived quality
+or a percentage of recovered information. The protocol uses fixed crops, no gain
+augmentation, an 80/20 diagnostic corpus mix and learning rate 1e-3. It cannot
+establish that every previous full-library failure has the same cause; P10 had
+other training settings, including crop/gain sampling. Both seeds support
+fragment-specific fitting and a broader generalization gap in **this** protocol.
+
+Native evidence on the fixed five development pairs independently exposes the
+tradeoff. At 40 anchors / 256 updates, mean high-band SC changes by
+-0.004019 / -0.009561, but identity SC worsens by +0.033996 / +0.031766. At the
+2048-update endpoints, paired SC changes by +0.012544 / -0.002230 and identity SC
+by +0.098312 / +0.025745. High-band energy error can improve despite those fidelity
+failures; it must not be used as a standalone success measure. These are five-case
+native diagnostics, not whole-library native validation or statistical evidence
+of listening quality. No candidate is promoted.
+
+The next isolated intervention is fixed versus resampled positions **within the
+same selected recordings**, with model, objective, gain policy, corpus ratio and
+update budget fixed. First test whether same-recording new regions improve, then
+check cross-recording development. Do not simultaneously increase capacity,
+change phase or relax identity guards. A later separate head-coordinate study
+can investigate remaining generation/optimization limits. Simply extending this
+fixed-crop run is not supported by the results.
+
+Reproduce the comparison report after training:
+
+```sh
+PYTHONPATH=training training/.venv/bin/python training/scripts/analyze_subset_study.py \
+  --study data/runs/subset-p12-20261013/study
+```
+
+`scaling-comparisons.json` verifies all registered checkpoint/evaluation receipts,
+compares matching cases, records per-corpus restoration/preservation deltas and
+per-clip native deltas, and retains the analysis-script hash. The analysis also
+passed a real artifact smoke check. Published weights, model architecture, DSP
+and realtime behavior remain unchanged.
