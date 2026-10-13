@@ -11,8 +11,8 @@ DSP、ONNX 推理和实时流适配，同时提供文件处理 CLI 和 PyTorch �
 详细进展见[模型说明](models/README.md)。
 
 当前 [P19 音乐覆盖实验](docs/music-coverage-study.md)比较 32 与 253 首训练音乐，
-保持模型、loss 和语音子集一致；训练正在运行，固定检查点之后执行真实 Rust DSP 复核。
-上一轮 [P18](docs/consistency-followup-study.md)的训练 loss 下降，但开发集音乐保真退步，
+保持模型、loss 和语音子集一致；四条训练轨迹和 1,246 次真实 Rust DSP 回放已完成。
+扩大覆盖减轻部分开发集退化，但长训练后的音乐谱形与瞬态仍差于初始控制，
 因此没有晋级新权重。
 
 经核查的曲库共 300 首原生无损音乐，另有 VCTK 语音。原始音频、配对数据和实验检查点

@@ -1,7 +1,8 @@
 # Research status and experiment history
 
-Current experiment: [P19 music coverage](music-coverage-study.md). Training is
-running; frozen native development review is queued. Previous studies below are
+Latest completed experiment: [P19 music coverage](music-coverage-study.md).
+All four runs and 1,246 native replays completed; broader coverage reduces some
+regression, but final music fidelity still trails initialization. Previous studies below are
 completed diagnostics, not recommended production models. Their code remains
 where it supplies shared model/loss/evaluation functionality or reproducible
 controls. None has qualified new release weights.
@@ -94,7 +95,8 @@ including the genre of the largest recurring failure. Further identical
 continuation is not justified. The [P19 coverage study](music-coverage-study.md)
 now compares 32 versus 253 training music recordings with fixed speech, model and
 loss, reporting matched updates and matched music exposure separately. Training
-is running, with native review queued; no coverage benefit is claimed yet.
+and 1,246 native replays completed. Broader coverage reduces some regression,
+but neither budget passes the registered restoration screen across both seeds.
 Default weights remain unchanged.
 The [baseline audit](baseline-generalization-20261012.md) identifies gain-policy tradeoffs
 and limiter distortion even with an identity model; baseline overfitting is not established.

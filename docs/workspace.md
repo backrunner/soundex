@@ -32,7 +32,7 @@ data/                      Local artifacts, all ignored
 references in historical immutable manifests. New runs should use `data/` paths.
 Retained survey receipts are historical evidence, not an approved source catalog.
 Only the current audited catalog selects training inputs.
-The active [P19 coverage study](music-coverage-study.md) lives under
+The completed [P19 coverage study](music-coverage-study.md) lives under
 `data/runs/music-coverage-p19-20261014/`; `pipeline.json` records the pipeline stage
 and `study/progress.json` the latest training update. Earlier runs are indexed in
 [research history](research.md) and [native-lossless training](native-training-20261009.md). Retired Slakh audio/pairs

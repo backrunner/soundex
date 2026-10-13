@@ -14,9 +14,9 @@ exercise inference but do not improve audio quality. See [model status](models/R
 
 The current [P19 study](docs/music-coverage-study.md) compares 32 versus 253
 training music recordings, keeping the model, loss and speech subset fixed.
-Training is running; actual Rust DSP review follows frozen checkpoints. The
-[P18 follow-up](docs/consistency-followup-study.md) reduced training loss but
-worsened development music fidelity, so no new weights were promoted.
+All four runs and 1,246 Rust DSP replays are complete. Broader coverage reduces
+some development regression, but longer training still worsens music spectral
+shape and transients versus initialization. No new weights were promoted.
 
 The reviewed library contains 300 native-lossless music works plus VCTK speech;
 raw audio, prepared pairs and experimental checkpoints stay local. See the

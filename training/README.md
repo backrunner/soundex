@@ -7,7 +7,9 @@ for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
 The current experiment is [P19 music coverage](../docs/music-coverage-study.md):
 32 versus all 253 training music recordings, with a fixed speech subset and two
-seeds. Training is running; frozen Rust review follows. The source library has
+seeds. All runs and native reviews completed without qualifying new weights;
+see the study report for the coverage benefit and remaining music regression.
+The source library has
 300 reviewed native-lossless music works split into 253 train / 26 validation /
 21 test. [The original training run](../docs/native-training-20261009.md) documents
 acquisition, recipe and earlier checkpoints. MUSDB and Slakh are not used.
