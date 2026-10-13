@@ -1,5 +1,7 @@
 """P11 fixed-example fitting diagnostic, never a deployable model or quality gate."""
 
+import copy
+
 import torch
 from torch import nn
 
@@ -72,6 +74,14 @@ class FixedFitObjective:
             self.baseline = self.render(amplitude_features(mag, batch["x"]))
             self.baseline_amplitude = reanalyze(self.baseline)
         self.region = slice((BURN + 9) * 128, self.baseline.shape[-1] - 128)
+
+    def select(self, indices):
+        """Slice immutable reference caches for a paired/identity mini-batch."""
+        selected = copy.copy(self)
+        selected.batch = {key: value[indices] for key, value in self.batch.items()}
+        for key in ("target", "baseline", "baseline_amplitude"):
+            setattr(selected, key, getattr(self, key)[indices])
+        return selected
 
     def render(self, features):
         b = self.batch
