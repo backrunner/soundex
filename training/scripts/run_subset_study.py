@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""P12 matched-update and matched-exposure subset scaling, without dev selection."""
+"""P12 subset scaling / P13 crop coverage at fixed milestones, without dev selection."""
 
 import argparse
 import fcntl
@@ -10,6 +10,7 @@ import numpy as np
 import torch
 
 from data.causal_study import digest, load_sources
+from data.crop_study import crop_bank, crop_draws, protected_probes
 from data.envelope_study import EnvelopeClips
 from data.subset_study import make_draws, native_development_specs, nested_specs, shifted_specs
 from data.weak_band_study import audit_groups, identity_specs
@@ -99,7 +100,14 @@ def run(args):
         if manifests != parent["manifests"]:
             raise ValueError("manifest drift")
         pools = nested_specs(parent["training_probe_specs"], rows)
-        shifted = shifted_specs(pools[40], rows)
+        shifted = (
+            protected_probes(pools[40], rows) if args.crop_study else shifted_specs(pools[40], rows)
+        )
+        bank, crop_audit = (
+            crop_bank(pools[40], shifted, rows, args.crop_positions)
+            if args.crop_study
+            else (pools[40], [])
+        )
         development = parent["validation_specs"]
         development_native = native_development_specs(development, rows)
         source = Path(__file__).resolve().parents[1]
@@ -112,7 +120,13 @@ def run(args):
             )
         }
         config = {
-            "format": "soundex-subset-study-v1",
+            "format": "soundex-subset-study-v2",
+            "crop_sampling": {
+                "positions_per_recording": args.crop_positions,
+                "bank": bank,
+                "audit": crop_audit,
+                "policy": "fixed anchor or balanced cycling of a finite protected crop bank; gain unchanged",
+            },
             "sizes": args.sizes,
             "seeds": args.seeds,
             "common_steps": args.common_steps,
@@ -161,6 +175,7 @@ def run(args):
             "shifted": Pool(shifted, clips),
             "development": Pool(development, clips),
         }
+        training_pool = prepared["anchor"] if args.crop_positions == 1 else Pool(bank, clips)
         common_indices = [pools[40].index(s) for s in pools[5]]
         native_indices = {
             "anchor": common_indices,
@@ -187,10 +202,23 @@ def run(args):
                 directory.mkdir(exist_ok=True)
                 steps = args.common_steps * size // 5
                 draws = make_draws(size, steps, seed)
-                signature = digest({"config": config, "seed": seed, "size": size, "draws": draws})
+                sampled = crop_draws(draws, args.crop_positions, seed, size)
+                signature = digest(
+                    {
+                        "config": config,
+                        "seed": seed,
+                        "size": size,
+                        "draws": draws,
+                        "crop_draws": sampled,
+                    }
+                )
                 write_json_report(
                     {
                         "draws": draws,
+                        "crop_draws": sampled,
+                        "crop_exposures_final": np.bincount(
+                            np.array(sampled).reshape(-1), minlength=size * args.crop_positions
+                        ).tolist(),
                         "sha256": digest(draws),
                         "exposures_final": np.bincount(
                             np.array(draws).reshape(-1), minlength=size
@@ -248,8 +276,12 @@ def run(args):
                     atomic_save(value, directory / "latest.pth")
 
                 for step in range(start + 1, steps + 1):
-                    chosen = [anchor_indices[i] for i in draws[step - 1]]
-                    objective, context = prepared["anchor"].select(chosen)
+                    chosen = [
+                        anchor_indices[i // args.crop_positions] * args.crop_positions
+                        + i % args.crop_positions
+                        for i in sampled[step - 1]
+                    ]
+                    objective, context = training_pool.select(chosen)
                     optimizer.zero_grad(set_to_none=True)
                     loss = objective(features(model, objective, context))["total"]
                     if not torch.isfinite(loss):
@@ -285,6 +317,7 @@ def run(args):
                         "step": step,
                         "checkpoint_sha256": registration[f"step-{step}.pth"],
                         "groups": {},
+                        "training_bank_proxy": evaluate(model, training_pool),
                     }
                     for group, pool in prepared.items():
                         result = evaluate(model, pool)
@@ -334,12 +367,16 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--replay-binary", type=Path, required=True)
     parser.add_argument("--onnx", type=Path, required=True)
+    parser.add_argument("--crop-study", action="store_true")
+    parser.add_argument("--crop-positions", type=int, choices=(1, 8), default=1)
     parser.add_argument("--common-steps", type=int, default=256)
     parser.add_argument("--sizes", type=int, nargs="+", default=[5, 10, 40])
     parser.add_argument("--seeds", type=int, nargs="+", default=[20261012, 20261013])
     args = parser.parse_args()
     if (
-        args.common_steps < 1
+        (args.crop_study and args.sizes != [40])
+        or (args.crop_positions > 1 and not args.crop_study)
+        or args.common_steps < 1
         or any(n not in (5, 10, 40) for n in args.sizes)
         or len(set(args.sizes)) != len(args.sizes)
     ):
