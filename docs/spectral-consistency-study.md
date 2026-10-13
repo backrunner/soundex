@@ -45,7 +45,10 @@ identity 使用真实输入幅度与输入相位。预热部分保持输入值�
 辅助项已检查：参考正确时的零误差/零梯度、静音及弱能量有限梯度、有限差分、
 参考瞬态不受平滑惩罚；复数合成算子与原有 OLA/再分析数值对应。
 
-正式训练结果尚未完成。实验根目录：`data/runs/consistency-p16-20261013/`。
+训练侧校准已完成：主项初始参数梯度 RMS 为 1.349659，辅助项为 0.988589，
+冻结系数 `lambda = 0.1365237430457469`。未使用开发样本确定系数。
+正式训练队列已启动，结果尚未完成。源码快照为
+`000c450041e29b6fa44be4168e0b9b6f717186de`。实验根目录：`data/runs/consistency-p16-20261013/`。
 队列依次执行训练侧校准、两组双种子训练、固定 checkpoint 评分与原生回放、
 共同指标对照汇总。计划共 300 次正式原生回放。
 
@@ -59,3 +62,7 @@ identity 使用真实输入幅度与输入相位。预热部分保持输入值�
 - `training/scripts/run_subset_study.py --sizes 40 --crop-study --crop-positions 8`：共同训练过程。
   实验组额外传入 `--consistency-calibration <calibration.json>`。
 - `training/scripts/analyze_consistency_study.py`：校验两组采样与产物哈希，只对比原有指标。
+
+当前验证：451 项本地 Python 测试、Ruff lint/format 通过。P15 代码 CI 已通过；
+P16 的远程 CI 以仓库实际状态为准。状态见实验根目录的 `pipeline.json`，
+日志见 `pipeline.log`；队列会自动完成训练、原生回放和对照汇总。

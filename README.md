@@ -74,8 +74,12 @@ versus fixed crops, but still trails initialization; cross-recording music fidel
 and identity damage remain unresolved.
 The [P14 loss and synthesis audit](docs/loss-scale-audit.md) covers every P13 training
 position and development clip. Weak-band errors persist in native DSP, with severe
-cases amplified during overlap-add synthesis; synthesis consistency is the next
-diagnostic target. No training objective or default weights changed.
+cases amplified during overlap-add synthesis. The completed
+[P15 frequency interventions](docs/band-transfer-study.md) locate cross-band spill
+and show why simply disabling a band loses restoration gains.
+[P16](docs/spectral-consistency-study.md) now tests a reference-aware consistency
+auxiliary with training-only coefficient calibration and unchanged evaluation.
+Default weights remain unchanged.
 The [baseline audit](docs/baseline-generalization-20261012.md) identifies gain-policy tradeoffs
 and limiter distortion even with an identity model; baseline overfitting is not established.
 
