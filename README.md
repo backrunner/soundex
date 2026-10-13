@@ -85,9 +85,12 @@ completed four short runs and 60 native replays: a smaller learning rate improve
 the training objective in both seeds, mainly by reducing identity damage. Native
 paired high-frequency detail does not improve consistently; cross-recording
 fidelity remains unresolved.
-The [P18 follow-up](docs/consistency-followup-study.md) is now running two fixed
-low-rate continuations to step 2,048, followed by all-development native review
-against frozen starts, high-rate endpoints and initial DSP controls.
+The [P18 follow-up](docs/consistency-followup-study.md) completed both continuations
+to step 2,048 and 1,246 native replays. Training loss improves, but development
+music fidelity regresses in both seeds; lower energy error does not bring better
+spectral shape or transients. The 32-recording music subset also omits blues,
+including the genre of the largest recurring failure. Broader training coverage
+needs a controlled test; further identical continuation is not justified.
 Default weights remain unchanged.
 The [baseline audit](docs/baseline-generalization-20261012.md) identifies gain-policy tradeoffs
 and limiter distortion even with an identity model; baseline overfitting is not established.
