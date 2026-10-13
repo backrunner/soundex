@@ -85,6 +85,9 @@ completed four short runs and 60 native replays: a smaller learning rate improve
 the training objective in both seeds, mainly by reducing identity damage. Native
 paired high-frequency detail does not improve consistently; cross-recording
 fidelity remains unresolved.
+The [P18 follow-up](docs/consistency-followup-study.md) is now running two fixed
+low-rate continuations to step 2,048, followed by all-development native review
+against frozen starts, high-rate endpoints and initial DSP controls.
 Default weights remain unchanged.
 The [baseline audit](docs/baseline-generalization-20261012.md) identifies gain-policy tradeoffs
 and limiter distortion even with an identity model; baseline overfitting is not established.
