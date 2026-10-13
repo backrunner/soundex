@@ -72,6 +72,10 @@ The [P13 crop-coverage study](docs/crop-coverage-study.md) completed four runs a
 300 native replays. Eight-position sampling reduces final development regression
 versus fixed crops, but still trails initialization; cross-recording music fidelity
 and identity damage remain unresolved.
+The [P14 loss and synthesis audit](docs/loss-scale-audit.md) covers every P13 training
+position and development clip. Weak-band errors persist in native DSP, with severe
+cases amplified during overlap-add synthesis; synthesis consistency is the next
+diagnostic target. No training objective or default weights changed.
 The [baseline audit](docs/baseline-generalization-20261012.md) identifies gain-policy tradeoffs
 and limiter distortion even with an identity model; baseline overfitting is not established.
 
