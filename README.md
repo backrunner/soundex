@@ -12,123 +12,16 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-The [current native-lossless run](docs/native-training-20261009.md) uses 300
-reviewed music works plus VCTK speech, from fresh initialization with MUSDB and
-Slakh disabled. Raw audio, prepared pairs and training checkpoints stay local;
-the repository publishes their source documentation and reproducible workflow.
-The original 200 epochs are complete; [loss auditing and controlled continuation](docs/loss-audit-20261010.md)
-address the remaining fidelity issues. Deployment validation still determines release qualification.
-The [inpainting objective and neural/DSP paths](docs/inpainting-objective.md) make
-high-band reconstruction the main training target; DSP-only and hybrid paths remain experimental.
-The [P2 matched training study](docs/causal-training-20261012.md) has completed all six local runs:
-fresh legacy, GRU and TCN backbones, 4096 updates each across two seeds, with a
-shared reconstruction objective and production DSP validation.
-Experimental weights have not replaced the default model. The
-[first-seed review](docs/causal-p2-review-20261012.md) finds gains over the matched
-fresh control, but no overall win over the previous checkpoint and excess
-generation on naturally weak high bands. The [P3 controlled continuation](docs/weak-band-study-20261012.md)
-has completed both seeds with excess-energy supervision and identity/generalization controls.
-It reduces excess generation but retains restoration tradeoffs. The optional
-[smooth limiter](docs/limiter-study-20261012.md) reduces DSP distortion and avoids
-recompressing worker output in the callback; the default remains unchanged.
-The [P4 matched continuation](docs/balanced-restoration-study-20261012.md) completed six runs against
-the smooth DSP. Bidirectional energy supervision improves energy recovery but regresses
-other fidelity measures; no candidate is promoted.
-The [P5 amplitude representation study](docs/envelope-study-20261012.md) completed six
-fresh short/tiled/past-context runs. Past-only features improve one transient measure
-but do not establish a consistent amplitude-quality win. Band-envelope/shape diagnostics
-guide the next structural experiment; the 3.10 MiB amplitude probe is not a deployable audio model.
-The [P6 band-envelope/shape study](docs/factorized-envelope-study-20261012.md) completed six
-matched fresh runs and native DSP comparisons. Separating energy and shape reduces some
-raw spectral errors but sacrifices energy recovery, without a consistent final-output win.
-The 3.13 MiB probe meets the diagnostic compute budget; default weights remain unchanged.
-The [P7 energy-coordinate experiment](docs/energy-coordinate-study-20261012.md) completed four
-matched runs and 890 native DSP replays. Additive energy prediction improves average energy
-recovery but regresses spectral and transient errors; no candidate is promoted.
-The [objective audit](docs/energy-objective-audit.md) locates the main regression in excess
-energy on naturally weak bands and documents loss-ranking and aggregate-score tradeoffs.
-The [P8 reconstruction-objective study](docs/linear-reconstruction-study.md) completed four runs,
-but every selected checkpoint is step zero: neither objective beats the initial common score.
-The [optimization audit](docs/linear-optimization-audit.md) isolates first-step energy overshoot
-and tests input-relative updates without changing loss or model capacity. These are diagnostics;
-no new weights are promoted.
-The [P9 shape-coordinate study](docs/shape-coordinate-study.md) separates band-relative shape
-updates from exact identity initialization, with matched training and clean-identity native DSP
-controls. All six runs and 2,136 native replays are complete; small raw-loss gains
-still cause identity damage. The [P10 rendered-output study](docs/rendered-restoration-study.md)
-now supervises DSP synthesis directly and balances identity preservation. Its
-pilot and six 2048-step runs reduce damage but select step zero in every arm.
-The completed diagnosis separates a generalization gap from preservation pressure;
-no candidate has demonstrated a balanced restoration win. The
-[P11 fixed-set fitting diagnostic](docs/fixed-fit-diagnostic.md) separates direct
-amplitude/complex fitting from the shared network. All eight runs and 90 native
-replays completed: direct fitting has substantial headroom and the existing network
-can fit the small set, but identity damage and generalization remain unresolved.
-The [P12 subset-scaling study](docs/subset-scaling-study.md) now compares 5/10/40
-recordings at equal update and equal per-recording exposure budgets. All six runs
-and 330 native replays completed: broader data reduces regression, but longer
-fixed-crop fitting worsens development fidelity. No candidate is promoted.
-The [P13 crop-coverage study](docs/crop-coverage-study.md) completed four runs and
-300 native replays. Eight-position sampling reduces final development regression
-versus fixed crops, but still trails initialization; cross-recording music fidelity
-and identity damage remain unresolved.
-The [P14 loss and synthesis audit](docs/loss-scale-audit.md) covers every P13 training
-position and development clip. Weak-band errors persist in native DSP, with severe
-cases amplified during overlap-add synthesis. The completed
-[P15 frequency interventions](docs/band-transfer-study.md) locate cross-band spill
-and show why simply disabling a band loses restoration gains.
-[P16](docs/spectral-consistency-study.md) completed four runs and 300 native replays
-with a reference-aware consistency auxiliary and unchanged evaluation. Final
-development changes disagree across seeds; one seed also regresses on the full
-training bank in both objective terms. The [P17 matched continuation](docs/consistency-learning-rate-study.md)
-completed four short runs and 60 native replays: a smaller learning rate improves
-the training objective in both seeds, mainly by reducing identity damage. Native
-paired high-frequency detail does not improve consistently; cross-recording
-fidelity remains unresolved.
-The [P18 follow-up](docs/consistency-followup-study.md) completed both continuations
-to step 2,048 and 1,246 native replays. Training loss improves, but development
-music fidelity regresses in both seeds; lower energy error does not bring better
-spectral shape or transients. The 32-recording music subset also omits blues,
-including the genre of the largest recurring failure. Further identical
-continuation is not justified. The [P19 coverage study](docs/music-coverage-study.md)
-now compares 32 versus 253 training music recordings with fixed speech, model and
-loss, reporting matched updates and matched music exposure separately. Training
-is running, with native review queued; no coverage benefit is claimed yet.
-Default weights remain unchanged.
-The [baseline audit](docs/baseline-generalization-20261012.md) identifies gain-policy tradeoffs
-and limiter distortion even with an identity model; baseline overfitting is not established.
+The current [P19 study](docs/music-coverage-study.md) compares 32 versus 253
+training music recordings, keeping the model, loss and speech subset fixed.
+Training is running; actual Rust DSP review follows frozen checkpoints. The
+[P18 follow-up](docs/consistency-followup-study.md) reduced training loss but
+worsened development music fidelity, so no new weights were promoted.
 
-The [V4/architecture comparison](docs/optimization-20261011.md) evaluates complex
-reconstruction, amplitude/phase interactions and prepared real-time startup.
-The [V5 goal review](docs/goal-refinement-20261011.md) tests reconstructed energy
-calibration and circular phase features, with recording-held-out rechecks and
-explicit data-coverage limits. Experimental weights remain local.
-The [V6 deployment-aware continuation](docs/deployment-refinement-20261011.md)
-adds edge-gain matching and reconstructed transient supervision to the training proxy.
-The [architecture research and capacity study](docs/architecture-research-20261011.md)
-reviews recent restoration methods against the streaming budget and tests bounded
-global spectral refinement with matched representation and capacity comparisons.
-All three new arms completed eight epochs; the [measured results](docs/architecture-study-20261011.md)
-show a lower validation loss, but no balanced quality win that warrants promotion.
-The [causal follow-up](docs/causal-context-20261011.md) implements eight past frames
-with unchanged output delay and two matched eight-epoch runs; it remains experimental.
-The [V7 reconstruction study](docs/multires-reconstruction-20261011.md) adds real DSP
-warmup and multiresolution waveform supervision. Two four-epoch runs are complete;
-measured improvements remain mixed, so neither candidate replaces the baseline.
-A [bounded DSP gain calibration study](docs/gain-calibration-20261011.md) fits ten
-coefficients from production analyzer observations. Its regression improves but
-actual high-band recovery regresses, so the default gain policy remains unchanged.
-The [phase reconstruction study](docs/phase-reconstruction-20261011.md) retains
-model magnitudes while anchoring phase to surviving input power. Waveform fidelity
-and some high-band metrics improve, but music remains short of balanced restoration;
-the new DSP policy is opt-in and no weights are promoted.
-The [architecture reset review](docs/architecture-reset-20261011.md) broadens the
-research to complex spectral generation, causal temporal models, differentiable
-DSP and generative training. It proposes fresh backbone experiments with explicit
-quality and streaming gates. The [first implementation stage](docs/causal-prototypes-20261011.md)
-now includes original GRU/TCN prototypes, an explicit-state Rust/ONNX contract,
-production-DSP oracle diagnostics and six completed tiny-set learning probes.
-Full-library matched training and qualification remain pending.
+The reviewed library contains 300 native-lossless music works plus VCTK speech;
+raw audio, prepared pairs and experimental checkpoints stay local. See the
+[training guide](training/README.md), [source documentation](docs/datasets.md)
+and [research history](docs/research.md) for protocols, evidence and limitations.
 
 ## Quick start
 

@@ -4,14 +4,8 @@
 #   # Build
 #   docker compose build
 #
-#   # Download Slakh (mix-only) + preprocess + train
-#   DATA_HOST=/path/on/host DOWNLOAD_DATASETS=slakh2100 docker compose run --rm train
-#
-#   # Full auto (huge): Slakh mix-only
-#   DATA_HOST=/path/on/host DOWNLOAD_DATASETS=slakh2100 docker compose run --rm train
-#
-#   # Data prep only (no train)
-#   DATA_HOST=/path/on/host DOWNLOAD_DATASETS=slakh2100 RUN_TRAIN=0 docker compose run --rm train
+#   # Train with already prepared pairs matching the selected config
+#   DATA_HOST=/path/on/host MUSIC_LIBRARY_PATH=/data/music-library docker compose run --rm train
 #
 #   # Env check only
 #   docker compose run --rm train-check
@@ -30,19 +24,14 @@ services:
       - ${DATA_HOST:-./data_host}:/data
     environment:
       DATA_ROOT: ${DATA_ROOT:-/data}
-      CACHE_DIR: ${CACHE_DIR:-}
-      DOWNLOAD_CACHE_DIR: ${DOWNLOAD_CACHE_DIR:-}
       MUSIC_LIBRARY_PATH: ${MUSIC_LIBRARY_PATH:-}
-      SLAKH2100_PATH: ${SLAKH2100_PATH:-}
-      BABYSLAKH_PATH: ${BABYSLAKH_PATH:-}
+      SPEECH_LIBRARY_PATH: ${SPEECH_LIBRARY_PATH:-}
       PATHS_MANIFEST: ${PATHS_MANIFEST:-}
-      DOWNLOAD_DATASETS: ${DOWNLOAD_DATASETS:-}
-      SKIP_EXISTING: ${SKIP_EXISTING:-1}
-      PREPROCESS: ${PREPROCESS:-}
-      KEEP_ARCHIVE: ${KEEP_ARCHIVE:-0}
       RUN_TRAIN: ${RUN_TRAIN:-1}
       CONFIG: ${CONFIG:-configs/default.yaml}
-      MEDLEYDB_URL: ${MEDLEYDB_URL:-}
+      # Forward retired options only so old automation fails with migration guidance.
+      DOWNLOAD_DATASETS: ${DOWNLOAD_DATASETS:-}
+      PREPROCESS: ${PREPROCESS:-0}
       EXTRA_TRAIN_ARGS: ${EXTRA_TRAIN_ARGS:-}
     # shm for DataLoader workers
     shm_size: "8gb"

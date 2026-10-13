@@ -26,9 +26,6 @@ from data.dataset import (
     create_balanced_dataloaders,
     set_dataset_epoch,
 )
-from data.preprocess_medleydb import find_mix_files
-from data.preprocess_medleydb import iter_tracks as iter_medley_tracks
-from data.preprocess_slakh import iter_tracks as iter_slakh_tracks
 from data.protocol import (
     DATA_SCHEMA_VERSION,
     DataProtocolError,
@@ -501,25 +498,3 @@ def test_validation_source_quota_is_exact_and_fails_closed(
             num_workers=0,
             sampling_config=sampling,
         )
-
-
-def test_mix_discovery_preserves_upstream_roles_and_excludes_stems(
-    tmp_path: Path, recipe: DataRecipe
-) -> None:
-    for split in ("train", "validation", "test", "omitted"):
-        track = tmp_path / "slakh" / split / f"Track-{split}"
-        track.mkdir(parents=True)
-        (track / "mix.flac").touch()
-    slakh = iter_slakh_tracks(tmp_path / "slakh", recipe)
-    assert {split for split, _track, _path in slakh} == {"train", "validation", "test"}
-    assert all("omitted" not in track for _split, track, _path in slakh)
-
-    mix_a = tmp_path / "medley" / "V1" / "Artist_Song_MIX.wav"
-    mix_b = tmp_path / "medley" / "V2" / "Artist_Song_MIX.wav"
-    stem = tmp_path / "medley" / "Artist_Song_STEMS" / "Fake_MIX.wav"
-    for path in (mix_a, mix_b, stem):
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.touch()
-    assert set(find_mix_files(tmp_path / "medley")) == {mix_a.resolve(), mix_b.resolve()}
-    medley = iter_medley_tracks(tmp_path / "medley", recipe)
-    assert len(medley) == 1

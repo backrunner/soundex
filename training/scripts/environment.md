@@ -122,28 +122,20 @@ docker run --gpus all -v /data:/data \
   -e PATHS_MANIFEST=/data/native-only-paths.yaml \
   soundex-train
 
-# Explicit legacy data inspection only; not the upcoming regional run
-docker run --gpus all -v /data:/data \
-  -e DOWNLOAD_DATASETS=slakh2100 -e RUN_TRAIN=0 \
-  soundex-train
 ```
 
 ### Path controls
 
-| Variable / flag | Meaning |
-|-----------------|--------|
-| `DATA_ROOT` / `--data-root` | Default parent for dataset folders |
-| `CACHE_DIR` / `--cache-dir` | Where zip/tar archives are downloaded |
-| `SLAKH2100_PATH` / `--slakh2100-path` | Slakh extract + `processed/` root |
-| `MUSIC_LIBRARY_PATH` | Generic audio-library processed-data root |
-| `--path NAME=DIR` | Same as per-dataset path (repeatable) |
-| `PATHS_MANIFEST` | YAML written by downloader; read by `train.py` |
+Mount already prepared pairs whose recipe matches the selected config. Set
+`MUSIC_LIBRARY_PATH` and, when enabled, `SPEECH_LIBRARY_PATH` to those roots.
+`PATHS_MANIFEST` is optional explicit YAML with a `training_data` mapping of
+`music_library_path` / `speech_library_path`; no manifest is loaded implicitly.
+`train.py` priority is environment overrides, then explicit manifest, then config.
 
-Priority for dataset storage: **CLI `--path` / dedicated flags → env `*_PATH` → `$DATA_ROOT/<name>`**.  
-`train.py` priority: **env `*_PATH` → paths manifest → config YAML**.
-
-Entrypoint: `scripts/entrypoint.sh`  
-Downloader: `scripts/download_datasets.py` (explicit legacy dataset selection; MUSDB removed)
+Preprocess reviewed originals with `data/preprocess_library.py`; retired corpus
+downloaders and automatic container acquisition have been removed. The entrypoint
+rejects old `DOWNLOAD_DATASETS` / `PREPROCESS=1` requests with migration guidance.
+Entrypoint: `scripts/entrypoint.sh`.
 Host needs a compatible NVIDIA driver + `nvidia-container-toolkit`.
 
 The default recipe requires FFmpeg encoders `libmp3lame`, `aac` and `libvorbis`.

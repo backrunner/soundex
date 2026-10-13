@@ -6,20 +6,10 @@
 #   docker build -t soundex-train .
 #   docker build --build-arg BASE_IMAGE=pytorch/pytorch:2.12.1-cuda13.0-cudnn9-runtime -t soundex-train:cu130 .
 #
-# Run (download MUSDB mix-only + preprocess + train):
+# Run with prepared pairs matching the selected profile:
 #   docker run --gpus all -v /data:/data \
-#     -e DOWNLOAD_DATASETS=musdb18-hq \
-#     soundex-train
-#
-# Run (MUSDB + Slakh mix-only extract — needs large free disk at peak):
-#   docker run --gpus all -v /data:/data \
-#     -e DOWNLOAD_DATASETS=musdb18-hq,slakh2100 \
-#     soundex-train
-#
-# Data prep only:
-#   docker run --gpus all -v /data:/data \
-#     -e DOWNLOAD_DATASETS=musdb18-hq -e RUN_TRAIN=0 \
-#     soundex-train
+#     -e MUSIC_LIBRARY_PATH=/data/music-library soundex-train
+# Prepare reviewed originals explicitly with data/preprocess_library.py first.
 #
 # Env check:
 #   docker run --rm --gpus all -e CHECK_ENV_ONLY=1 soundex-train
@@ -37,10 +27,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     DATA_ROOT=/data \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# curl: large Zenodo resumes; ffmpeg/libsndfile: preprocess + soundfile
+# ffmpeg/libsndfile: codec synthesis and soundfile I/O
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
-    curl \
     ffmpeg \
     libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
@@ -52,20 +41,19 @@ COPY configs/ ./configs/
 COPY data/ ./data/
 COPY models/ ./models/
 COPY scripts/ ./scripts/
-COPY artifact_contract.py checkpoint.py checkpoint_state.py export_validation.py ./
-COPY train.py export_onnx.py evaluate.py ./
+COPY evaluation/ ./evaluation/
+COPY *.py ./
+COPY parity_policy.json ./
 
-# Ensure entrypoint is executable even on volume-unfriendly FS
-RUN chmod +x /workspace/scripts/entrypoint.sh /workspace/scripts/check_env.py \
-    /workspace/scripts/download_datasets.py /workspace/scripts/filter_mix_only.py
+RUN chmod +x /workspace/scripts/entrypoint.sh /workspace/scripts/check_env.py
 
 VOLUME ["/data"]
 
-# Default: train with config; set DOWNLOAD_DATASETS to auto-fetch first
+# Default: train on prepared audio-library pairs
 ENTRYPOINT ["/workspace/scripts/entrypoint.sh"]
 CMD []
 
 # Metadata
 LABEL org.opencontainers.image.title="soundex-train" \
-      org.opencontainers.image.description="SoundEx BWE training (PyTorch 2.12 + mix-only dataset download)" \
-      org.opencontainers.image.source="https://github.com/soundex"
+      org.opencontainers.image.description="SoundEx audio restoration training with reviewed lossless libraries" \
+      org.opencontainers.image.source="https://github.com/backrunner/soundex"

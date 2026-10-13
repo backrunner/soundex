@@ -794,7 +794,7 @@ def main() -> None:
         type=Path,
         default=None,
         help=(
-            "Optional YAML from download_datasets.py (soundex_data_paths.yaml). "
+            "Optional YAML with training_data or datasets path mappings. "
             "Also read from PATHS_MANIFEST env if unset."
         ),
     )

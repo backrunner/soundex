@@ -9,5 +9,8 @@ checkpoints
 data_host
 **/.DS_Store
 **/*.md
-!scripts/download_mix_only.md
 !scripts/environment.md
+
+.venv
+.tools
+outputs

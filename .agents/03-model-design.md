@@ -238,7 +238,7 @@ audio:
 
 data:
   music_library_path: /data/music-library
-  slakh2100_path: /data/slakh2100
+  speech_library_path: /data/speech-library
   recipe:
     schema_version: 1
     sample_rates: [44100, 48000]

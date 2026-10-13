@@ -32,8 +32,10 @@ data/                      Local artifacts, all ignored
 references in historical immutable manifests. New runs should use `data/` paths.
 Retained survey receipts are historical evidence, not an approved source catalog.
 Only the current audited catalog selects training inputs.
-The current run and artifact locations are documented in
-[native-lossless training](native-training-20261009.md). Retired Slakh audio/pairs
+The active [P19 coverage study](music-coverage-study.md) lives under
+`data/runs/music-coverage-p19-20261014/`; `pipeline.json` records the pipeline stage
+and `study/progress.json` the latest training update. Earlier runs are indexed in
+[research history](research.md) and [native-lossless training](native-training-20261009.md). Retired Slakh audio/pairs
 have been removed; their historical manifest and recipe receipts remain under
 `data/evidence/retired-corpora/`. Historical generated audio, duplicate periodic
 checkpoints and unused tool/cache copies are removed with deletion receipts.
@@ -117,3 +119,32 @@ fine-grained genre and regional-vocal gaps remain advisory. Source review and
 quality selection are required before starting. The count-only queue
 has been superseded. The selected catalog now meets its 300-work target and
 required checks; fine-grained coverage gaps remain acquisition work.
+
+## Source cleanup (2026-10-14)
+
+Removed the retired Slakh/MedleyDB importers, legacy dataset downloader, mix-only
+pruner, their obsolete storage guide and importer-only tests. Git history at
+`723c028` retains the old files. Current folder/catalog ingestion, mono/stereo
+handling, recipe compatibility, licensing records and all runtime models remain.
+Docker now accepts prepared libraries, copies the current training dependencies,
+and rejects removed acquisition options explicitly.
+
+The root READMEs show current status and usage. Earlier results are indexed in
+`docs/research.md`; continuation instructions live in `training/EXPERIMENTS.md`.
+Historical model/loss and study modules remain because they are shared by current
+experiments or supply reproducible controls. Acquisition queue helpers also still
+serve source auditing and retries. Historical dataset identifiers in checkpoint
+and recipe readers remain for compatibility; they do not acquire old corpora.
+
+Local deletion receipts are under `data/reports/workspace-cleanup-20261014/`.
+P19 uses its frozen source from `b2b8a2d`, its existing Python environment and
+registered parent inputs. Resume it using that pipeline/source, not edited main.
+Audio, source-rights evidence, frozen runs/checkpoints and mixed Rust build trees
+were preserved. Only regenerable caches outside frozen runs are eligible here.
+
+Cleanup validation: 468 local Python tests passed (including six container shell
+cases), Ruff lint/format, shell syntax and changed-document links passed. A staged
+copy matching Docker's COPY instructions imported train/export/evaluation modules
+successfully; a full CUDA container build/run was not performed. Removed nine
+regenerable cache directories (2,865,011 bytes); active pipeline and child PIDs
+remained 5235 / 5994, and the wide training arm started after cleanup.
