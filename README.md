@@ -89,8 +89,11 @@ The [P18 follow-up](docs/consistency-followup-study.md) completed both continuat
 to step 2,048 and 1,246 native replays. Training loss improves, but development
 music fidelity regresses in both seeds; lower energy error does not bring better
 spectral shape or transients. The 32-recording music subset also omits blues,
-including the genre of the largest recurring failure. Broader training coverage
-needs a controlled test; further identical continuation is not justified.
+including the genre of the largest recurring failure. Further identical
+continuation is not justified. The [P19 coverage study](docs/music-coverage-study.md)
+now compares 32 versus 253 training music recordings with fixed speech, model and
+loss, reporting matched updates and matched music exposure separately. Training
+is running, with native review queued; no coverage benefit is claimed yet.
 Default weights remain unchanged.
 The [baseline audit](docs/baseline-generalization-20261012.md) identifies gain-policy tradeoffs
 and limiter distortion even with an identity model; baseline overfitting is not established.
