@@ -79,3 +79,26 @@ def test_full_dsp_audit_is_read_only_and_separates_two_risks():
     for key, tensor in model.state_dict().items():
         torch.testing.assert_close(tensor, before[key], atol=0, rtol=0)
     assert all(p.grad is None for p in model.parameters())
+
+
+def test_stage_audit_uses_common_frame_support_and_matches_render():
+    from models.causal_objective import render
+    from models.rendered_objective import amplitude_features, reanalyze
+    from scripts.audit_render_stages import stages
+    from tests.test_fit_diagnostic import paired_batch
+
+    amplitude, batch = paired_batch()
+    features = amplitude_features(amplitude + 0.002, batch["x"])
+    result, prelimit = stages(features, batch)
+    expected, expected_prelimit = render(
+        features,
+        batch["x"],
+        batch["mask"],
+        batch["active"],
+        batch["gate"],
+        batch["dry"],
+        limiter_mode="smooth-knee",
+    )
+    assert len({v.shape for v in result.values()}) == 1
+    torch.testing.assert_close(result["limited"], reanalyze(expected), atol=0, rtol=0)
+    torch.testing.assert_close(prelimit, expected_prelimit, atol=0, rtol=0)
