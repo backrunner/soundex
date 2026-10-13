@@ -68,6 +68,9 @@ The [P12 subset-scaling study](docs/subset-scaling-study.md) now compares 5/10/4
 recordings at equal update and equal per-recording exposure budgets. All six runs
 and 330 native replays completed: broader data reduces regression, but longer
 fixed-crop fitting worsens development fidelity. No candidate is promoted.
+The [P13 crop-coverage study](docs/crop-coverage-study.md) is running a matched
+fixed-position versus eight-position comparison on the same 40 recordings, with
+protected scoring windows and two seeds.
 The [baseline audit](docs/baseline-generalization-20261012.md) identifies gain-policy tradeoffs
 and limiter distortion even with an identity model; baseline overfitting is not established.
 

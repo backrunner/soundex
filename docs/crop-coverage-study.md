@@ -38,7 +38,8 @@ P12 的 shifted 总分拿来和 P13 对比；P13 两组使用相同的保留端�
 
 ## 状态与复现
 
-正式结果尚未完成；不替换默认权重。运行根目录：
+正式训练已启动，结果尚未完成；不替换默认权重。源码快照为
+`279d7548222f75b7b3b4281116ad34c789650d70`。运行根目录：
 `data/runs/crop-p13-20261013/`，原音频、缓存、检查点和报告全部忽略、不提交。
 
 两组均调用 `training/scripts/run_subset_study.py --sizes 40 --crop-study`，
@@ -53,3 +54,10 @@ PYTHONPATH=training training/.venv/bin/python training/scripts/analyze_crop_stud
 checkpoint 固定前禁止用开发集更改本轮配置。判断时同时观察成对恢复、
 identity 损伤、真实 DSP 高频谱收敛/瞬态/能量/低频，以及两种子的方向一致性。
 模型结构及实时执行路径没有改变；本轮不产生新的实时合格或盲听通过结论。
+
+验证：两组各 8 步的真实数据冒烟检查已完整跑通训练、Rust 回放及带哈希校验的对照汇总。
+427 项本地 Python 测试、Ruff lint/format 均通过；
+[冻结版本 CI](https://github.com/backrunner/soundex/actions/runs/38375024429)通过。
+固定组种子 20261012 的 step 256 参数与 P12 对应检查点逐项完全一致（最大差 0），
+证明控制训练没有因采样工具扩展而漂移。完整训练结果由后台队列继续生成，
+状态见 `pipeline.json`，日志见 `pipeline.log`。
