@@ -77,8 +77,11 @@ position and development clip. Weak-band errors persist in native DSP, with seve
 cases amplified during overlap-add synthesis. The completed
 [P15 frequency interventions](docs/band-transfer-study.md) locate cross-band spill
 and show why simply disabling a band loses restoration gains.
-[P16](docs/spectral-consistency-study.md) now tests a reference-aware consistency
-auxiliary with training-only coefficient calibration and unchanged evaluation.
+[P16](docs/spectral-consistency-study.md) completed four runs and 300 native replays
+with a reference-aware consistency auxiliary and unchanged evaluation. Final
+development changes disagree across seeds; one seed also regresses on the full
+training bank in both objective terms. Optimization stability needs diagnosis
+before further long training, and cross-recording fidelity remains unresolved.
 Default weights remain unchanged.
 The [baseline audit](docs/baseline-generalization-20261012.md) identifies gain-policy tradeoffs
 and limiter distortion even with an identity model; baseline overfitting is not established.
