@@ -80,8 +80,11 @@ and show why simply disabling a band loses restoration gains.
 [P16](docs/spectral-consistency-study.md) completed four runs and 300 native replays
 with a reference-aware consistency auxiliary and unchanged evaluation. Final
 development changes disagree across seeds; one seed also regresses on the full
-training bank in both objective terms. Optimization stability needs diagnosis
-before further long training, and cross-recording fidelity remains unresolved.
+training bank in both objective terms. The [P17 matched continuation](docs/consistency-learning-rate-study.md)
+completed four short runs and 60 native replays: a smaller learning rate improves
+the training objective in both seeds, mainly by reducing identity damage. Native
+paired high-frequency detail does not improve consistently; cross-recording
+fidelity remains unresolved.
 Default weights remain unchanged.
 The [baseline audit](docs/baseline-generalization-20261012.md) identifies gain-policy tradeoffs
 and limiter distortion even with an identity model; baseline overfitting is not established.
