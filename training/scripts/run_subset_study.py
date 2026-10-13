@@ -4,6 +4,7 @@
 import argparse
 import fcntl
 import json
+import math
 from pathlib import Path
 
 import numpy as np
@@ -19,6 +20,7 @@ from models.envelope_probe import context_features, predict_probe
 from models.fit_diagnostic import BURN, FixedFitObjective
 from models.rendered_objective import amplitude_features
 from models.rendered_probe import make_rendered_model
+from models.spectral_consistency import consistency_loss
 from scripts.run_causal_study import atomic_save
 from scripts.run_fit_diagnostic import metrics, replay
 from scripts.run_weak_band_study import freeze_binary
@@ -119,8 +121,24 @@ def run(args):
                 for x in p.relative_to(source).parts
             )
         }
+        consistency_weight = 0.0
+        calibration_sha256 = None
+        if args.consistency_calibration is not None:
+            calibration = json.loads(args.consistency_calibration.read_text())
+            if (
+                calibration["bank_sha256"] != digest(bank)
+                or calibration["source_sha256"] != digest(hashes)
+                or calibration["seeds"] != args.seeds
+            ):
+                raise ValueError("consistency calibration does not match this training study")
+            consistency_weight = calibration["weight"]
+            if not math.isfinite(consistency_weight) or consistency_weight <= 0:
+                raise ValueError("invalid consistency calibration weight")
+            calibration_sha256 = sha256_file(args.consistency_calibration)
         config = {
-            "format": "soundex-subset-study-v2",
+            "format": "soundex-subset-study-v3",
+            "consistency_weight": consistency_weight,
+            "calibration_sha256": calibration_sha256,
             "crop_sampling": {
                 "positions_per_recording": args.crop_positions,
                 "bank": bank,
@@ -147,7 +165,7 @@ def run(args):
             "detector_sha256": parent["detector_sha256"],
             "replay_sha256": sha256_file(args.replay_binary),
             "onnx_sha256": sha256_file(args.onnx),
-            "scope": "diagnostic subset scaling; same-recording new scoring regions and reused development, not independent test; no promotion",
+            "scope": "diagnostic controlled training; same-recording new scoring regions and reused development, not independent test; no promotion",
         }
         # JSON object keys are strings on reload.
         config = json.loads(json.dumps(config))
@@ -283,7 +301,14 @@ def run(args):
                     ]
                     objective, context = training_pool.select(chosen)
                     optimizer.zero_grad(set_to_none=True)
-                    loss = objective(features(model, objective, context))["total"]
+                    prediction = features(model, objective, context)
+                    main_loss = objective(prediction)["total"]
+                    auxiliary = (
+                        consistency_loss(prediction, objective.batch)
+                        if consistency_weight
+                        else main_loss.new_zeros(())
+                    )
+                    loss = main_loss + consistency_weight * auxiliary
                     if not torch.isfinite(loss):
                         raise ValueError("nonfinite training loss")
                     loss.backward()
@@ -296,6 +321,8 @@ def run(args):
                             "step": step,
                             "steps": steps,
                             "preupdate_batch_loss": float(loss.detach()),
+                            "preupdate_main_loss": float(main_loss.detach()),
+                            "preupdate_consistency_loss": float(auxiliary.detach()),
                         }
                         write_json_report(progress, root / "progress.json")
                         print(json.dumps(progress), flush=True)
@@ -367,6 +394,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--replay-binary", type=Path, required=True)
     parser.add_argument("--onnx", type=Path, required=True)
+    parser.add_argument("--consistency-calibration", type=Path)
     parser.add_argument("--crop-study", action="store_true")
     parser.add_argument("--crop-positions", type=int, choices=(1, 8), default=1)
     parser.add_argument("--common-steps", type=int, default=256)
@@ -374,7 +402,11 @@ if __name__ == "__main__":
     parser.add_argument("--seeds", type=int, nargs="+", default=[20261012, 20261013])
     args = parser.parse_args()
     if (
-        (args.crop_study and args.sizes != [40])
+        (
+            args.consistency_calibration is not None
+            and (not args.crop_study or args.crop_positions != 8)
+        )
+        or (args.crop_study and args.sizes != [40])
         or (args.crop_positions > 1 and not args.crop_study)
         or args.common_steps < 1
         or any(n not in (5, 10, 40) for n in args.sizes)
