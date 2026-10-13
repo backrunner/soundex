@@ -64,6 +64,9 @@ no candidate has demonstrated a balanced restoration win. The
 amplitude/complex fitting from the shared network. All eight runs and 90 native
 replays completed: direct fitting has substantial headroom and the existing network
 can fit the small set, but identity damage and generalization remain unresolved.
+The [P12 subset-scaling study](docs/subset-scaling-study.md) now compares 5/10/40
+recordings at equal update and equal per-recording exposure budgets, with new-region
+and reused-development checks fixed before training.
 The [baseline audit](docs/baseline-generalization-20261012.md) identifies gain-policy tradeoffs
 and limiter distortion even with an identity model; baseline overfitting is not established.
 
