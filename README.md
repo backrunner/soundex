@@ -12,11 +12,11 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-The current [P19 study](docs/music-coverage-study.md) compares 32 versus 253
-training music recordings, keeping the model, loss and speech subset fixed.
-All four runs and 1,246 Rust DSP replays are complete. Broader coverage reduces
-some development regression, but longer training still worsens music spectral
-shape and transients versus initialization. No new weights were promoted.
+The current [P20 head comparison](docs/restoration-head-study.md) tests amplitude
+and complex residual outputs against a freshly trained anchored head, with a
+shared causal backbone, matched data and two seeds. The corrected loss uses a
+clean complex reference. A training-only pilot improves restoration but increases
+clean-input damage; the full frozen comparison is running. No new weights are qualified.
 
 The reviewed library contains 300 native-lossless music works plus VCTK speech;
 raw audio, prepared pairs and experimental checkpoints stay local. See the

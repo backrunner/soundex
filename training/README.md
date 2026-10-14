@@ -5,10 +5,11 @@ Use Python 3.12 and FFmpeg with the encoders required by your recipe. Install
 PyTorch for your hardware first; see [environment setup](scripts/environment.md)
 for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
-The current experiment is [P19 music coverage](../docs/music-coverage-study.md):
-32 versus all 253 training music recordings, with a fixed speech subset and two
-seeds. All runs and native reviews completed without qualifying new weights;
-see the study report for the coverage benefit and remaining music regression.
+The current experiment is [P20 restoration heads](../docs/restoration-head-study.md):
+fresh anchored/amplitude/complex heads with a shared causal backbone, clean-complex
+consistency reference, identical P19 wide sampling and two seeds. The training-only
+pilot passes native/export checks but trades better restoration for greater identity
+damage; the full registered comparison is running. No new weights are qualified.
 The source library has
 300 reviewed native-lossless music works split into 253 train / 26 validation /
 21 test. [The original training run](../docs/native-training-20261009.md) documents
@@ -92,7 +93,7 @@ retained for comparison. See [the loss audit](../docs/loss-audit-20261010.md).
 
 Historical continuation profiles and migration flags are documented in
 [experiment workflows](EXPERIMENTS.md). They are controlled comparisons, not the
-current P19 runner or qualified model recommendations.
+current P20 runner or qualified model recommendations.
 
 `checkpoints/best-validation.pth` is the export candidate;
 `checkpoints/final-resume.pth` is atomically updated every epoch for exact resume.

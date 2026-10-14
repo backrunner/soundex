@@ -1,5 +1,9 @@
 # Research status and experiment history
 
+Current experiment: [P20 restoration heads](restoration-head-study.md), with a common
+clean-complex auxiliary target and matched fresh anchored/amplitude/complex heads.
+The training-only pilot is complete; the full two-seed comparison is running.
+
 Latest completed experiment: [P19 music coverage](music-coverage-study.md).
 All four runs and 1,246 native replays completed; broader coverage reduces some
 regression, but final music fidelity still trails initialization. Previous studies below are
