@@ -5,24 +5,36 @@ import torch
 from models.complex_synthesis import analyze, complex_features, synthesize
 from models.envelope_objective import BANDS
 from models.factorized_envelope import ABSOLUTE_FLOOR, RELATIVE_FLOOR
+from models.fit_diagnostic import BURN
 from models.linear_objective import SMOOTHING
 from models.losses import blend_deployment_features
 from models.rendered_objective import amplitude_features
 
 
-def reference_features(batch):
-    """Reachable target: clean magnitudes and the unchanged input-phase contract.
+def reference_features(batch, *, phase_reference="input"):
+    """Clean target with explicit phase policy; historical default preserves input phase.
 
-    Identity uses the actual input magnitudes. This reference never enters inference.
-    Warmup and blending follow the same path as predictions.
+    P20 uses clean phase so valid phase restoration is not penalized. Identity uses
+    the actual input. This reference never enters inference. Warmup and blending
+    follow the same path as predictions.
     """
+    if phase_reference not in ("input", "clean"):
+        raise ValueError("unknown phase reference")
     amplitude = torch.pow(10.0, batch["y"][:, 0] / 20)
     original = torch.pow(10.0, batch["x"][:, 0] / 20)
     amplitude = torch.where(batch["identity"][:, None, None].bool(), original, amplitude)
-    return amplitude_features(amplitude, batch["x"])
+    reference = amplitude_features(amplitude, batch["x"])
+    if phase_reference == "clean":
+        phase = torch.where(
+            batch["identity"][:, None, None].bool(), batch["x"][:, 1], batch["y"][:, 1]
+        )
+        reference = torch.stack(
+            (reference[:, 0], torch.cat((batch["x"][:, 1, :BURN], phase[:, BURN:]), dim=1)), dim=1
+        )
+    return reference
 
 
-def consistency_loss(predicted, batch, burn=89):
+def consistency_loss(predicted, batch, burn=89, *, phase_reference="input"):
     """Penalize (P-I)(Zpred-Zref), not changes over time or distance to silence.
 
     P is analysis after the existing prelimit OLA. Subtracting the reference
@@ -32,7 +44,9 @@ def consistency_loss(predicted, batch, burn=89):
     effective = batch["mask"] * batch["active"][:, None, :, None]
     blended = blend_deployment_features(batch["x"], predicted, effective)
     with torch.no_grad():
-        target = blend_deployment_features(batch["x"], reference_features(batch), effective)
+        target = blend_deployment_features(
+            batch["x"], reference_features(batch, phase_reference=phase_reference), effective
+        )
         reference = complex_features(target)
     delta = complex_features(blended) - reference
     projected = analyze(synthesize(delta))
