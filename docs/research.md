@@ -12,6 +12,10 @@ continuation commands are in [experiment workflows](../training/EXPERIMENTS.md).
 Resume registered studies from their frozen source and recorded inputs; editing
 main does not change a running experiment's source contract.
 
+P19 [failure analysis](coverage-failure-analysis.md) separates broad small gains from
+severe failures on a few recordings, and confirms cross-band synthesis spill with
+frozen stage analysis and 24 additional native intervention replays.
+
 ## Experiment record
 
 The [original native-lossless run](native-training-20261009.md) uses 300
