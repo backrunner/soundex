@@ -82,6 +82,12 @@ clip 与 recording 等权结果均保留；记录逐片段退化与最坏案例�
 上下文前处理 p99 为 0.1948 / 0.1953 ms，max 为 0.2113 / 0.2175 ms；
 每种子 1,000 个计时 hop 均未超过 48 kHz 的 2.667 ms hop 时长。
 单独 ORT 推理 p99 为 0.1821 / 0.1803 ms，双声道显式状态 72,576 字节。
+另用六个全新 ORT-only 子进程各预热 100 个双声道 hop，比较加载模型前后实际 RSS：
+复数头增量约 20.1–20.2 MiB（总 RSS 约 62 MiB，含 Python/NumPy/ORT）；
+旧头增量约 21.3–21.4 MiB。该快照含 session、allocator 和状态缓冲，不含 PyTorch、
+FFT frontend 或完整 Rust DSP，也不是峰值保证。证据为 pilot 根目录
+`isolated-resources.json` 与 `measure_rss.py`。
+
 这不是固定新增输出延迟或实时稳定性认证，历史上下文不引入前瞻。
 
 正式运行于 2026-10-14 22:08 SGT 启动，冻结训练源码提交 `6002609`，
