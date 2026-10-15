@@ -15,8 +15,9 @@ exercise inference but do not improve audio quality. See [model status](models/R
 The current [P20 head comparison](docs/restoration-head-study.md) tests amplitude
 and complex residual outputs against a freshly trained anchored head, with a
 shared causal backbone, matched data and two seeds. The corrected loss uses a
-clean complex reference. A training-only pilot improves restoration but increases
-clean-input damage; the full frozen comparison is running. No new weights are qualified.
+clean complex reference. All six training runs and 2,314 native replays are complete. The new heads regress
+on full training and development review, with frequent gradient clipping and
+severe weak-band failures. No new weights are qualified.
 
 The reviewed library contains 300 native-lossless music works plus VCTK speech;
 raw audio, prepared pairs and experimental checkpoints stay local. See the

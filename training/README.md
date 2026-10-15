@@ -7,9 +7,9 @@ for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
 The current experiment is [P20 restoration heads](../docs/restoration-head-study.md):
 fresh anchored/amplitude/complex heads with a shared causal backbone, clean-complex
-consistency reference, identical P19 wide sampling and two seeds. The training-only
-pilot passes native/export checks but trades better restoration for greater identity
-damage; the full registered comparison is running. No new weights are qualified.
+consistency reference, identical P19 wide sampling and two seeds. All six runs and 2,314 native replays are complete. The new heads regress on
+full training and development review; scale-sensitive optimization and severe weak-band
+failures remain. No new weights are qualified.
 The source library has
 300 reviewed native-lossless music works split into 253 train / 26 validation /
 21 test. [The original training run](../docs/native-training-20261009.md) documents
