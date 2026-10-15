@@ -10,6 +10,10 @@ DSP、ONNX 推理和实时流适配，同时提供文件处理 CLI 和 PyTorch �
 仓库附带的合成恒等测试模型只用于验证接入，不代表音质提升。
 详细进展见[模型说明](models/README.md)。
 
+[P22 延迟优先扩容](docs/latency-capacity-study.md)已取消实验模型的体积上限：
+459 万和 1,192 万参数通过初步 CPU 成本筛选，安排在 P21 后进行同预算训练。
+目前时延未包含完整 DSP／设备链路，也尚无大模型训练质量结论。
+
 当前 [P21 规模对照](docs/capacity-calibration-study.md)校准残差灵敏度，并比较约
 43 万、82 万、175 万参数的模型。训练集校准正在运行，只有三种规模都通过优化检查，
 才自动进入已登记的长训练对照。[P20](docs/restoration-head-study.md)已完成，

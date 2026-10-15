@@ -1,0 +1,79 @@
+# P22：延迟优先的容量扩展
+
+2026-10-15 用户取消实验模型的体积上限，并确认 **5 ms 指模型 + DSP 计算耗时**，
+不含固定输出缓冲。现有 256 帧缓冲仍为 5.33 / 5.80 ms；模型增大不增加前瞻。
+正式 artifact 的 2M / 8 MiB 契约暂未迁移；本轮使用显式无大小上限的诊断导出，
+保留数值一致性检查，不能直接作为生产模型加载。
+
+## 成本实测
+
+Apple M5 Max，CPU ORT 单线程，双声道，每 hop 128 帧；100 次预热后计时
+10,000 hop，包含 Python 因果 FFT 上下文处理。测量期间 P21 CPU 训练仍在运行。
+全部五种规模通过 320 hop 的 PyTorch/ONNX 连续状态、单/双声道、静音、reset、
+44.1/48 kHz 数值一致性检查。输出头使用固定种子的非零随机权重；不是训练后的音质结果。
+
+| width | 参数 | ONNX | 平均 | p99 | 最大 | ORT RSS 增量 | 初筛 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 224 | 1,748,578 | 6.70 MiB | 0.261 ms | 0.327 ms | 0.654 ms | 28.39 MiB | 通过 |
+| 384 | 4,594,818 | 17.55 MiB | 0.502 ms | 0.576 ms | 0.726 ms | 47.45 MiB | 通过 |
+| 640 | 11,917,698 | 45.47 MiB | 1.075 ms | 1.196 ms | 1.443 ms | 65.30 MiB | 通过 |
+| 896 | 22,648,450 | 86.39 MiB | 2.397 ms | 3.782 ms | 30.650 ms | 114.39 MiB | 暂不进入训练 |
+| 1280 | 45,134,338 | 172.15 MiB | 3.605 ms | 3.979 ms | 5.744 ms | 211.13 MiB | 暂不进入训练 |
+
+RSS 是独立 ORT 进程加载前与 100 hop 预热后的快照差，含 allocator 与缓冲，
+不含 PyTorch、FFT frontend 或完整 Rust，也不是内存峰值。
+当前计时未包含完整 DSP、回调、设备、唤醒与队列等待，不能宣称模型 + DSP 已通过 5 ms 验收。
+计时输入为固定合成信号；真实音乐、静音、瞬态的部署成本仍须在训练后复测。
+
+48 kHz 每 2.667 ms 到达一个新 hop，平均 <5 ms 仍可能持续积压。
+初筛预先要求：双声道平均与 p99 均 <2 ms（给其余 DSP/调度留出约 25% hop），
+观测最大 <5 ms；将实际服务时长按固定 2.667 ms 到达间隔重放时，虚拟超时比例
+<=0.1%，末尾积压为零。该重放只计算容量压力，不是真实设备 deadline 记录。
+
+224/384/640 的虚拟超时均为零；896 超时 5,745/10,000，最大积压 796.86 ms；
+1280 超时 10,000/10,000，结束积压 9.38 秒。896 的波动与并行负载有关，不能据此
+断言其硬件极限；但本次没有足够余量，不因其 p99 <5 ms 就接受。
+
+本地完整报告：`data/reports/latency-capacity-20261015/summary.json`。
+
+## 同预算训练
+
+新实验独立于冻结的 [P21](capacity-calibration-study.md)，不改变 P21 的任何参数或选择规则。
+P22 在 P21 流水线退出后启动，避免同时加载完整训练池与两条长训练相互争抢资源。
+前序失败则停止并报告，不把失败当作训练完成。
+
+- anchored144 控制 + scaled224/384/640，两个种子 `20261012 / 20261013`；
+  每配置每种子 512 步，共 4,096 更新；全部从头初始化。
+- 相同 2,088 裁剪训练池、共同 320 裁剪、P21 校准抽样顺序、主/辅 loss 与权重，
+  每步 4 音乐 + 1 语音，paired/identity 等权。
+- scaled 头继续 `2*tanh(z/64)`，Adam 1e-4、无 weight decay、梯度裁剪 5；
+  先修正已知灵敏度问题，再观察扩容效应。不同宽度不声称共享相同初始化张量。
+- 选择规模只依据训练前 CPU 成本，不读取开发集质量。所有通过成本的规模均纳入，
+  不选择最好种子或事后缩减对照。
+- 共同/完整训练池报告 main、paired、identity 与 combined，分别保留音乐/语音、
+  梯度裁剪比例。各规模训练后重新导出、验证并测量 10,000 hop。
+- 记录各项训练优化检查，不根据一个规模通过就自动启动长训练，不自动发布权重。
+  后续必须冻结候选，再做实际 Rust DSP、复用开发集及新录音泛化、听感、完整链路实时验证。
+
+运行脚本为 `training/scripts/run_latency_capacity_study.py`；源码与输入哈希冻结，支持
+64 步检查点恢复，启动和结束均验证输入。训练目录：
+`data/runs/latency-capacity-p22-20261015/study/`，通过 `progress.json` 区分 queued、
+数据准备、训练及校准完成。排队不代表已经产生大模型权重。
+
+```sh
+PYTHONPATH=training training/.venv/bin/python training/scripts/screen_latency_capacity.py \
+  --output data/reports/latency-capacity-20261015
+PYTHONPATH=training training/.venv/bin/python training/scripts/run_latency_capacity_study.py \
+  --parent data/runs/capacity-p21-20261015/study/calibration \
+  --screen data/reports/latency-capacity-20261015 \
+  --output data/runs/latency-capacity-p22-20261015/study \
+  --wait-for data/runs/capacity-p21-20261015/pipeline.json
+```
+
+正式运行使用该轮冻结源码 `d1697c7`，已于 2026-10-15 15:27 SGT 启动后台队列；
+监督 PID `93749`、子进程 `93751`，当前 `queued` 等待 P21。
+日志 `data/runs/latency-capacity-p22-20261015/pipeline.log`，运行状态以该目录
+`pipeline.json` 和 `study/progress.json` 为准。已登记目录不能随源码修改直接重跑。
+
+本轮全量 Python 测试 496 项通过；之后补充训练汇总的双种子/identity 检查，
+相关 15 项测试通过。Ruff 检查及格式检查通过。未进行新大模型的盲听或设备连续流认证。

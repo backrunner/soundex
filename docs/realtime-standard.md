@@ -28,8 +28,12 @@ adapter delay is 5.333/5.805 ms. A 0.5 ms callback ceiling leaves a software bud
 of 5.833/6.305 ms before external adaptation. The 8 ms target leaves room for
 integration; the 10 ms redline can accommodate one additional 128-frame buffer
 (up to 9.207 ms including the callback allowance at 44.1 kHz), but not two.
-This arithmetic motivates our thresholds; 5 ms is retained only as a historical
-optimization reference and does not decide acceptance.
+The output-delay policy remains separate from computation. On 2026-10-15 the
+user confirmed a <5 ms model-plus-DSP computation budget (excluding fixed
+buffering), with no experiment size cap. That ceiling alone cannot ensure
+continuous processing: sustained work must fit the 2.667/2.902 ms arrival period.
+The [P22 capacity screen](latency-capacity-study.md) reserves additional DSP and
+scheduling headroom, and does not certify the complete integrated worker.
 
 Host buffering is not always selectable at exactly 128 frames. Query supported
 periods and negotiate with the device, then validate the actual arrangement.

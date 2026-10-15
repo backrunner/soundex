@@ -12,6 +12,11 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
+The [P22 latency-first extension](docs/latency-capacity-study.md) removes the
+experimental size cap: 4.59M and 11.92M parameter models passed the initial CPU
+cost screen and are scheduled for matched training after P21. These timings
+exclude the complete DSP/device path; no larger trained quality result exists yet.
+
 The current [P21 capacity study](docs/capacity-calibration-study.md) calibrates
 residual sensitivity and compares 0.43M / 0.82M / 1.75M parameter models.
 Training-only calibration is running; the registered longer comparison starts only

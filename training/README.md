@@ -5,6 +5,12 @@ Use Python 3.12 and FFmpeg with the encoders required by your recipe. Install
 PyTorch for your hardware first; see [environment setup](scripts/environment.md)
 for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
+The [P22 latency-first extension](../docs/latency-capacity-study.md) adds 4.59M and
+11.92M parameter models selected only by CPU cost. The matched 512-step/two-seed
+calibration is scheduled after P21, retaining its residual-slope correction and
+training-only evaluation. Production artifact limits are unchanged; the larger
+experimental graphs require explicit diagnostic size overrides.
+
 The current experiment is [P21 capacity calibration](../docs/capacity-calibration-study.md):
 train-only optimization checks for residual slope/rate controls and 0.43M / 0.82M /
 1.75M parameter variants. The calibration stage is running; the full fresh two-seed

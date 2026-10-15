@@ -1,5 +1,8 @@
 # Research status and experiment history
 
+New extension: [P22 latency-first capacity](latency-capacity-study.md), with
+4.59M / 11.92M parameter CPU-screened candidates and a queued matched calibration.
+
 Current experiment: [P21 capacity calibration](capacity-calibration-study.md), with
 matched residual slope/rate controls and three model widths. Training-only
 calibration gates the registered longer comparison; no weights are qualified.
