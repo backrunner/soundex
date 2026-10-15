@@ -8,10 +8,11 @@ from evaluation.reporting import write_json_report
 from scripts import run_head_study as runner
 
 
-def test_head_study_resumes_exactly_and_rejects_schedule_drift(tmp_path, monkeypatch):
+@pytest.mark.parametrize("configured", (False, True))
+def test_head_study_resumes_exactly_and_rejects_schedule_drift(tmp_path, monkeypatch, configured):
     torch.set_num_threads(1)
 
-    def factory(_):
+    def factory(arm, width=144, residual_slope=1):
         return torch.nn.Sequential(
             torch.nn.Linear(2, 3), torch.nn.Dropout(0.2), torch.nn.Linear(3, 1)
         )
@@ -42,6 +43,11 @@ def test_head_study_resumes_exactly_and_rejects_schedule_drift(tmp_path, monkeyp
         "endpoints": [256],
         "schedule_hashes": {"7": digest(draws)},
     }
+    if configured:
+        config["model_configs"] = {
+            "small": {"arm": "complex", "width": 96, "residual_slope": 1 / 64}
+        }
+        config["rates"] = {"small": 1e-5}
     full, resumed = tmp_path / "full", tmp_path / "resumed"
     for root in (full, resumed):
         root.mkdir()

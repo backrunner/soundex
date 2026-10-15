@@ -1,8 +1,12 @@
 """Diagnostic one-hop ONNX for P20. Context/detector inputs are not a runtime ABI."""
 
+import json
 import platform
 import resource
+import subprocess
+import sys
 import time
+from pathlib import Path
 
 import numpy as np
 import onnx
@@ -12,7 +16,7 @@ import torch
 from artifact_contract import MAX_ARTIFACT_BYTES, MAX_PARAMETERS
 from evaluation.reporting import sha256_file, write_json_report
 from models.envelope_probe import StreamingContext
-from models.restoration_head import RestorationHead
+from models.restoration_head import load_restoration_head
 from scripts.run_consistency_followup import complete, read, verify_receipt
 
 NAMES = ("features", "context", "condition", "state", "output", "next_state")
@@ -95,6 +99,8 @@ def export_graph(model, path):
             "soundex.experimental": "p20-context-head-diagnostic",
             "soundex.deployable": "false",
             "soundex.head": model.arm,
+            "soundex.width": str(model.width),
+            "soundex.residual_slope": str(model.residual_slope),
         },
     )
     onnx.checker.check_model(graph, full_check=True)
@@ -161,8 +167,7 @@ def export_and_measure(checkpoint, directory):
             raise ValueError("export checkpoint drift")
         return
     state = torch.load(checkpoint, map_location="cpu", weights_only=False)
-    model = RestorationHead(state["arm"]).eval()
-    model.load_state_dict(state["model"])
+    model = load_restoration_head(state).eval()
     parameters = sum(p.numel() for p in model.parameters())
     if parameters > MAX_PARAMETERS:
         raise ValueError("parameter budget exceeded")
@@ -172,9 +177,16 @@ def export_and_measure(checkpoint, directory):
         "checkpoint_sha256": checkpoint_hash,
         "onnx_sha256": sha256_file(path),
         "parameters": parameters,
+        "model_config": state.get("model_config", {"arm": state["arm"]}),
         "onnx_bytes": path.stat().st_size,
         "parity": verify(model, session),
         "cost": measure(model, session),
+        "isolated_memory": json.loads(
+            subprocess.check_output(
+                [sys.executable, str(Path(__file__).with_name("onnx_resources.py")), str(path)],
+                text=True,
+            )
+        ),
         "machine": platform.platform(),
         "torch": torch.__version__,
         "onnxruntime": ort.__version__,

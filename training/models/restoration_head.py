@@ -1,6 +1,7 @@
 """P20 causal residual heads with smooth input-only frequency units."""
 
 import copy
+import math
 
 import torch
 from torch import nn
@@ -15,11 +16,17 @@ ARMS = ("anchored", "amplitude", "complex")
 
 
 class RestorationHead(nn.Module):
-    def __init__(self, arm, width=144):
+    def __init__(self, arm, width=144, residual_slope=1.0):
         super().__init__()
         if arm not in ARMS:
             raise ValueError("unknown restoration head")
+        if not math.isfinite(residual_slope) or not 0 < residual_slope <= 1:
+            raise ValueError("residual slope must be finite and in (0, 1]")
+        if arm == "anchored" and residual_slope != 1:
+            raise ValueError("anchored head does not use residual slope")
         self.arm = arm
+        self.width = width
+        self.residual_slope = residual_slope
         self.backbone = make_rendered_model("rendered_balanced", width)
         self.state_size = self.backbone.state_size
         if arm != "anchored":
@@ -41,7 +48,7 @@ class RestorationHead(nn.Module):
             amplitude, state = self.backbone(magnitude, context, condition, state)
             return amplitude_features(amplitude, original, burn=0), state
         latent, scale, state = self.backbone.encode(magnitude, context, condition, state)
-        delta = 2 * torch.tanh(self.backbone.decoder(latent))
+        delta = 2 * torch.tanh(self.residual_slope * self.backbone.decoder(latent))
         # Smooth local units remove independent hard-band normalization. No future frames.
         normalized = magnitude / scale
         power = F.avg_pool1d(F.pad(normalized.square(), (4, 4), mode="replicate"), 9, 1)
@@ -84,3 +91,11 @@ def shared_state(model):
         for k, v in copy.deepcopy(model.state_dict()).items()
         if k.startswith(("backbone.encoder.", "backbone.temporal.", "backbone.decoder.0."))
     }
+
+
+def load_restoration_head(checkpoint):
+    """Explicit P21 configuration; old P20 checkpoints retain their exact defaults."""
+    config = checkpoint.get("model_config", {"arm": checkpoint["arm"]})
+    model = RestorationHead(**config)
+    model.load_state_dict(checkpoint["model"], strict=True)
+    return model

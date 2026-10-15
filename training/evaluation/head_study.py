@@ -4,7 +4,7 @@ import numpy as np
 import torch
 
 from evaluation.reporting import sha256_file, write_json_report
-from models.restoration_head import RestorationHead, predict_head
+from models.restoration_head import load_restoration_head, predict_head
 from models.spectral_consistency import consistency_loss
 from scripts.run_consistency_followup import complete, read, verify_receipt
 from scripts.run_fit_diagnostic import metrics, replay
@@ -56,10 +56,9 @@ def review(label, checkpoint, arm, root, pools, binary, onnx, weight):
         return
     model = None
     if checkpoint:
-        model = RestorationHead(arm).eval()
-        model.load_state_dict(
-            torch.load(checkpoint, map_location="cpu", weights_only=False)["model"]
-        )
+        model = load_restoration_head(
+            torch.load(checkpoint, map_location="cpu", weights_only=False)
+        ).eval()
     checkpoint_hash = sha256_file(checkpoint) if checkpoint else None
     proxy = directory / "proxy.json"
     if not proxy.exists():

@@ -115,20 +115,23 @@ def train(arm, seed, root, config, pool, common):
     if digest(draws) != config["schedule_hashes"][str(seed)]:
         raise ValueError("draw schedule drift")
     torch.manual_seed(seed)
-    model = RestorationHead(arm)
+    model_config = config.get("model_configs", {}).get(arm)
+    model = RestorationHead(**model_config) if model_config else RestorationHead(arm)
+    rate = config.get("rates", {}).get(arm, config["rate"])
     shared = {}
     for name, tensor in shared_state(model).items():
         shared[name] = hashlib.sha256(tensor.numpy().tobytes()).hexdigest()
-    registered(shared, root / f"shared-initialization-{seed}.json")
+    width_key = f"-w{model_config.get('width', 144)}" if model_config else ""
+    registered(shared, root / f"shared-initialization{width_key}-{seed}.json")
     initial = tensor_digest(model)
     signature = digest({"config": config, "arm": arm, "seed": seed})
-    optimizer = torch.optim.Adam(model.parameters(), lr=config["rate"])
+    optimizer = torch.optim.Adam(model.parameters(), lr=rate)
     start, history = 0, []
     if (directory / "latest.pth").exists():
         state = torch.load(directory / "latest.pth", map_location="cpu", weights_only=False)
         if state["signature"] != signature or state["initial_sha256"] != initial:
             raise ValueError("resume registration drift")
-        optimizer = restore(model, state, config["rate"])
+        optimizer = restore(model, state, rate)
         start, history = state["step"], state["history"]
         if (
             len(history) != start
@@ -158,7 +161,7 @@ def train(arm, seed, root, config, pool, common):
                     "preclip_gradient_norm": float(grad),
                 }
             )
-        score_step = step % 2048 == 0 or step in config["endpoints"]
+        score_step = step % config.get("score_interval", 2048) == 0 or step in config["endpoints"]
         if step % 64 == 0 or score_step:
             state = {
                 "step": step,
@@ -170,6 +173,8 @@ def train(arm, seed, root, config, pool, common):
                 "initial_sha256": initial,
                 "history": history,
             }
+            if model_config:
+                state["model_config"] = model_config
             atomic_save(state, directory / "latest.pth")
             if score_step:
                 path = directory / f"step-{step}.pth"

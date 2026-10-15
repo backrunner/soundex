@@ -10,7 +10,13 @@ from scripts.analyze_consistency_followup import METRICS, grouped, support_check
 from scripts.run_consistency_followup import read, verify_receipt
 
 
-def run(root):
+def run(root, *, comparisons=None, source=None):
+    comparisons = comparisons or (
+        ("anchored", "amplitude"),
+        ("anchored", "complex"),
+        ("amplitude", "complex"),
+    )
+    source = source or root.parent / "source/training"
     config, summary = read(root / "registration.json"), read(root / "summary.json")
     if (
         summary["status"] != "complete"
@@ -22,7 +28,7 @@ def run(root):
         if sha256_file(Path(path)) != expected:
             raise ValueError("input drift")
     for name, expected in config["source_hashes"].items():
-        if sha256_file(root.parent / "source/training" / name) != expected:
+        if sha256_file(source / name) != expected:
             raise ValueError("source drift")
     for name, expected in summary["receipt_hashes"].items():
         path = root / name
@@ -94,11 +100,7 @@ def run(root):
     results = []
     for seed in config["seeds"]:
         for step in config["endpoints"]:
-            for base_arm, candidate_arm in (
-                ("anchored", "amplitude"),
-                ("anchored", "complex"),
-                ("amplitude", "complex"),
-            ):
+            for base_arm, candidate_arm in comparisons:
                 base, candidate = f"{base_arm}-{step}-{seed}", f"{candidate_arm}-{step}-{seed}"
                 checks = support_checks(
                     cases[base], cases[candidate], cases["initial"], config["tolerance"]
@@ -154,11 +156,7 @@ def run(root):
                     for r in results
                     if r["comparison"] == comparison and r["step"] == step
                 )
-                for comparison in (
-                    "amplitude_vs_anchored",
-                    "complex_vs_anchored",
-                    "complex_vs_amplitude",
-                )
+                for comparison in (f"{b}_vs_{a}" for a, b in comparisons)
                 for step in config["endpoints"]
             },
             "smoke": config["smoke"],
