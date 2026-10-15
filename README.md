@@ -12,12 +12,11 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-The current [P20 head comparison](docs/restoration-head-study.md) tests amplitude
-and complex residual outputs against a freshly trained anchored head, with a
-shared causal backbone, matched data and two seeds. The corrected loss uses a
-clean complex reference. All six training runs and 2,314 native replays are complete. The new heads regress
-on full training and development review, with frequent gradient clipping and
-severe weak-band failures. No new weights are qualified.
+The current [P21 capacity study](docs/capacity-calibration-study.md) calibrates
+residual sensitivity and compares 0.43M / 0.82M / 1.75M parameter models.
+Training-only calibration is running; the registered longer comparison starts only
+if all three sizes pass its optimization checks. [P20](docs/restoration-head-study.md)
+completed with no qualified weights, exposing optimization-scale and weak-band failures.
 
 The reviewed library contains 300 native-lossless music works plus VCTK speech;
 raw audio, prepared pairs and experimental checkpoints stay local. See the

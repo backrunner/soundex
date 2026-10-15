@@ -1,5 +1,9 @@
 # Research status and experiment history
 
+Current experiment: [P21 capacity calibration](capacity-calibration-study.md), with
+matched residual slope/rate controls and three model widths. Training-only
+calibration gates the registered longer comparison; no weights are qualified.
+
 Latest completed experiment: [P20 restoration heads](restoration-head-study.md), with a common
 clean-complex auxiliary target and matched fresh anchored/amplitude/complex heads.
 All six trajectories and 2,314 native replays completed. New heads regress on full

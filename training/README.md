@@ -5,11 +5,11 @@ Use Python 3.12 and FFmpeg with the encoders required by your recipe. Install
 PyTorch for your hardware first; see [environment setup](scripts/environment.md)
 for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
-The current experiment is [P20 restoration heads](../docs/restoration-head-study.md):
-fresh anchored/amplitude/complex heads with a shared causal backbone, clean-complex
-consistency reference, identical P19 wide sampling and two seeds. All six runs and 2,314 native replays are complete. The new heads regress on
-full training and development review; scale-sensitive optimization and severe weak-band
-failures remain. No new weights are qualified.
+The current experiment is [P21 capacity calibration](../docs/capacity-calibration-study.md):
+train-only optimization checks for residual slope/rate controls and 0.43M / 0.82M /
+1.75M parameter variants. The calibration stage is running; the full fresh two-seed
+comparison is conditional on all three scaled widths passing its registered checks.
+[P20](../docs/restoration-head-study.md) completed without qualified weights.
 The source library has
 300 reviewed native-lossless music works split into 253 train / 26 validation /
 21 test. [The original training run](../docs/native-training-20261009.md) documents
@@ -93,7 +93,7 @@ retained for comparison. See [the loss audit](../docs/loss-audit-20261010.md).
 
 Historical continuation profiles and migration flags are documented in
 [experiment workflows](EXPERIMENTS.md). They are controlled comparisons, not the
-current P20 runner or qualified model recommendations.
+current P21 runner or qualified model recommendations.
 
 `checkpoints/best-validation.pth` is the export candidate;
 `checkpoints/final-resume.pth` is atomically updated every epoch for exact resume.
