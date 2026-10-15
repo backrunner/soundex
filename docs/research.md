@@ -1,13 +1,13 @@
 # Research status and experiment history
 
-New extension: [P22 latency-first capacity](latency-capacity-study.md), with
-4.59M / 11.92M parameter CPU-screened candidates and a queued matched calibration.
+Latest completed calibration: [P22 latency-first capacity](latency-capacity-study.md),
+up to 11.92M parameters, two seeds and 512 updates per arm/seed. CPU cost passed;
+identity damage outweighed small restoration gains. No candidate passed all
+optimization checks. [P21](capacity-calibration-study.md) also ended with its
+calibration rejected, so its longer comparison did not start. No new qualified
+weights or held-out quality results; these short runs do not establish capacity limits.
 
-Current experiment: [P21 capacity calibration](capacity-calibration-study.md), with
-matched residual slope/rate controls and three model widths. Training-only
-calibration gates the registered longer comparison; no weights are qualified.
-
-Latest completed experiment: [P20 restoration heads](restoration-head-study.md), with a common
+Previous full experiment: [P20 restoration heads](restoration-head-study.md), with a common
 clean-complex auxiliary target and matched fresh anchored/amplitude/complex heads.
 All six trajectories and 2,314 native replays completed. New heads regress on full
 training and development review; gradient/weak-band diagnostics point to optimization

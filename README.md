@@ -12,16 +12,12 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-The [P22 latency-first extension](docs/latency-capacity-study.md) removes the
-experimental size cap: 4.59M and 11.92M parameter models passed the initial CPU
-cost screen and are scheduled for matched training after P21. These timings
-exclude the complete DSP/device path; no larger trained quality result exists yet.
-
-The current [P21 capacity study](docs/capacity-calibration-study.md) calibrates
-residual sensitivity and compares 0.43M / 0.82M / 1.75M parameter models.
-Training-only calibration is running; the registered longer comparison starts only
-if all three sizes pass its optimization checks. [P20](docs/restoration-head-study.md)
-completed with no qualified weights, exposing optimization-scale and weak-band failures.
+The [P22 latency-first extension](docs/latency-capacity-study.md) completed matched
+512-step/two-seed calibration up to 11.92M parameters. Larger models fit the initial
+CPU cost screen but increased identity damage enough to outweigh small restoration
+gains. No candidate passed the training optimization checks. [P21](docs/capacity-calibration-study.md)
+also stopped after calibration; its longer comparison did not start. These early
+training results do not establish final capacity limits or held-out audio quality.
 
 The reviewed library contains 300 native-lossless music works plus VCTK speech;
 raw audio, prepared pairs and experimental checkpoints stay local. See the
