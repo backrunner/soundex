@@ -1,5 +1,9 @@
 # Research status and experiment history
 
+Current full training: [P23 capacity comparison](full-capacity-study.md), extending
+all four control/capacity arms to 16,192 steps per seed (two seeds), followed by
+frozen endpoint review. No early train-quality gate; no full-budget results yet.
+
 Latest completed calibration: [P22 latency-first capacity](latency-capacity-study.md),
 up to 11.92M parameters, two seeds and 512 updates per arm/seed. CPU cost passed;
 identity damage outweighed small restoration gains. No candidate passed all
