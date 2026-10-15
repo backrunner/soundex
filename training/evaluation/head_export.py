@@ -75,7 +75,7 @@ def verify(model, session):
     }
 
 
-def export_graph(model, path):
+def export_graph(model, path, *, experimental_unbounded=False):
     args = (
         torch.full((2, 2, 1, 129), -40.0),
         torch.ones(2, 1, 1538),
@@ -105,7 +105,7 @@ def export_graph(model, path):
     )
     onnx.checker.check_model(graph, full_check=True)
     onnx.save(graph, path)
-    if path.stat().st_size >= MAX_ARTIFACT_BYTES:
+    if not experimental_unbounded and path.stat().st_size >= MAX_ARTIFACT_BYTES:
         raise ValueError("ONNX budget exceeded")
     return session_for(path)
 
@@ -118,6 +118,23 @@ def distribution(values):
             (*np.percentile(values, [50, 95, 99]), max(values)),
             strict=True,
         )
+    }
+
+
+def stream_cost(values, period_ms=128 / 48):
+    """Replay measured service times on a fixed arrival clock; not device evidence."""
+    backlog, maximum, misses = 0.0, 0.0, 0
+    for value in values:
+        completion = backlog + value
+        misses += completion > period_ms
+        backlog = max(0.0, completion - period_ms)
+        maximum = max(maximum, backlog)
+    return {
+        "mean_ms": float(np.mean(values)),
+        "virtual_max_backlog_ms": maximum,
+        "virtual_final_backlog_ms": backlog,
+        "virtual_deadline_misses": misses,
+        "period_ms": period_ms,
     }
 
 
@@ -148,7 +165,7 @@ def measure(model, session, iterations=1000):
         results[str(channels)] = {
             "inference": distribution(inference),
             "python_frontend": distribution(context_times),
-            "combined": distribution(combined),
+            "combined": {**distribution(combined), **stream_cost(combined)},
             "measured_hops": iterations,
             "combined_over_48k_hop": sum(v > 128 / 48 for v in combined),
             "cpu_seconds_including_warmup": time.process_time() - cpu_start,
@@ -158,29 +175,39 @@ def measure(model, session, iterations=1000):
     return results
 
 
-def export_and_measure(checkpoint, directory):
+def export_and_measure(checkpoint, directory, *, experimental_unbounded=False, iterations=1000):
     directory.mkdir(parents=True, exist_ok=True)
     checkpoint_hash = sha256_file(checkpoint)
+    policy = {"experimental_unbounded": experimental_unbounded, "iterations": iterations}
     if (directory / "complete.json").exists():
         verify_receipt(directory, "files")
-        if read(directory / "report.json")["checkpoint_sha256"] != checkpoint_hash:
+        previous = read(directory / "report.json")
+        if (
+            previous.get(
+                "measurement_policy", {"experimental_unbounded": False, "iterations": 1000}
+            )
+            != policy
+        ):
+            raise ValueError("export measurement policy drift")
+        if previous["checkpoint_sha256"] != checkpoint_hash:
             raise ValueError("export checkpoint drift")
         return
     state = torch.load(checkpoint, map_location="cpu", weights_only=False)
     model = load_restoration_head(state).eval()
     parameters = sum(p.numel() for p in model.parameters())
-    if parameters > MAX_PARAMETERS:
+    if not experimental_unbounded and parameters > MAX_PARAMETERS:
         raise ValueError("parameter budget exceeded")
     path = directory / "diagnostic.onnx"
-    session = export_graph(model, path)
+    session = export_graph(model, path, experimental_unbounded=experimental_unbounded)
     report = {
         "checkpoint_sha256": checkpoint_hash,
+        "measurement_policy": policy,
         "onnx_sha256": sha256_file(path),
         "parameters": parameters,
         "model_config": state.get("model_config", {"arm": state["arm"]}),
         "onnx_bytes": path.stat().st_size,
         "parity": verify(model, session),
-        "cost": measure(model, session),
+        "cost": measure(model, session, iterations),
         "isolated_memory": json.loads(
             subprocess.check_output(
                 [sys.executable, str(Path(__file__).with_name("onnx_resources.py")), str(path)],
