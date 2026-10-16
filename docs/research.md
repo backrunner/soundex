@@ -1,5 +1,10 @@
 # Research status and experiment history
 
+Latest diagnostic: [P23 absolute-error and stage audit](capacity-outlier-audit.md),
+1,424 measurements plus 128 native candidate/control role replays. The outlier
+combines small absolute HF generation with amplified relative-band scores;
+absolute preservation ranks differ from spectral risk. No threshold or model changes.
+
 Latest completed full run: [P23 capacity comparison](full-capacity-study.md),
 129,536 updates plus 4,450 native role replays. Train loss improved; no comparison passed all quality
 checks, with a weak-high-band outlier dominating aggregate music regressions

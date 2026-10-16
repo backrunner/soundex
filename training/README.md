@@ -10,6 +10,9 @@ Latest completed run: [P23 full-budget capacity comparison](../docs/full-capacit
 capacity comparisons failed full quality checks, with severe weak-band outliers
 dominating aggregate music regressions. No model was promoted; see the full report
 for per-clip improvements, final endpoint costs and remaining validation limits.
+The subsequent [absolute-error audit](../docs/capacity-outlier-audit.md) separates
+small PCM perturbations from inflated weak-band relative scores, without changing
+losses or acceptance thresholds.
 
 The [P22 latency-first extension](../docs/latency-capacity-study.md) completed
 512-step/two-seed calibration up to 11.92M parameters. CPU cost passed, but small

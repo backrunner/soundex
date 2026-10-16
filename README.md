@@ -16,7 +16,9 @@ The [P23 full-budget capacity study](docs/full-capacity-study.md) completed all
 129,536 updates and 4,450 native Rust role replays. Longer training reduced train
 loss, but no capacity passed the full quality checks. Most development music clips
 improved on paired proxy error; a severe weak-high-band failure dominated the
-aggregate regression. No qualified new weights were produced.
+aggregate regression. The [absolute-error audit](docs/capacity-outlier-audit.md)
+found small absolute HF generation with strongly amplified relative scores; this
+has not established audible severity or qualified new weights.
 
 The [P22 latency-first extension](docs/latency-capacity-study.md) completed matched
 512-step/two-seed calibration up to 11.92M parameters. Larger models fit the initial
