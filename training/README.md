@@ -5,6 +5,12 @@ Use Python 3.12 and FFmpeg with the encoders required by your recipe. Install
 PyTorch for your hardware first; see [environment setup](scripts/environment.md)
 for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
+Current experiment: [P24 generation-budget factorial](../docs/generation-budget-study.md),
+four 640-wide configurations, two seeds and 16,192 updates each. Full training
+started on October 16 after train-only preflight. The study separates loss
+normalization from a supervised input-only generation branch and retains common
+relative plus absolute PCM review.
+
 Latest completed run: [P23 full-budget capacity comparison](../docs/full-capacity-study.md),
 129,536 updates and 4,450 native Rust role replays. Training loss improved, but all
 capacity comparisons failed full quality checks, with severe weak-band outliers

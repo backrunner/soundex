@@ -1,5 +1,11 @@
 # Research status and experiment history
 
+Current experiment: [P24 generation-budget factorial](generation-budget-study.md),
+four matched 640-wide configurations, two seeds and full 16,192-step budgets.
+Full training started on October 16 after train-only preflight; no new quality
+conclusion. Common review retains historical relative metrics and adds calibrated
+absolute native PCM measurements.
+
 Latest diagnostic: [P23 absolute-error and stage audit](capacity-outlier-audit.md),
 1,424 measurements plus 128 native candidate/control role replays. The outlier
 combines small absolute HF generation with amplified relative-band scores;

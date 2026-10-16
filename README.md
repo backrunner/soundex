@@ -12,6 +12,12 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
+The [P24 generation-budget study](docs/generation-budget-study.md) adds a matched
+640-wide factorial for reference-power normalization and learned input-only
+generation budgets. It retains relative spectral scores alongside absolute PCM
+errors. Full training started on October 16 after train-only numerical/export
+preflight; no new quality result is available.
+
 The [P23 full-budget capacity study](docs/full-capacity-study.md) completed all
 129,536 updates and 4,450 native Rust role replays. Longer training reduced train
 loss, but no capacity passed the full quality checks. Most development music clips
