@@ -12,10 +12,11 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-The new [P23 full-budget capacity study](docs/full-capacity-study.md) runs the
-control and 1.75M / 4.59M / 11.92M parameter models for 16,192 updates per seed,
-with two seeds and no 512-step quality gate. All endpoints are frozen before
-reused development and native Rust review. No full-budget result is available yet.
+The [P23 full-budget capacity study](docs/full-capacity-study.md) completed all
+129,536 updates and 4,450 native Rust role replays. Longer training reduced train
+loss, but no capacity passed the full quality checks. Most development music clips
+improved on paired proxy error; a severe weak-high-band failure dominated the
+aggregate regression. No qualified new weights were produced.
 
 The [P22 latency-first extension](docs/latency-capacity-study.md) completed matched
 512-step/two-seed calibration up to 11.92M parameters. Larger models fit the initial

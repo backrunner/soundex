@@ -1,8 +1,9 @@
 # Research status and experiment history
 
-Current full training: [P23 capacity comparison](full-capacity-study.md), extending
-all four control/capacity arms to 16,192 steps per seed (two seeds), followed by
-frozen endpoint review. No early train-quality gate; no full-budget results yet.
+Latest completed full run: [P23 capacity comparison](full-capacity-study.md),
+129,536 updates plus 4,450 native role replays. Train loss improved; no comparison passed all quality
+checks, with a weak-high-band outlier dominating aggregate music regressions
+despite paired proxy improvements on most clips. No new qualified weights.
 
 Latest completed calibration: [P22 latency-first capacity](latency-capacity-study.md),
 up to 11.92M parameters, two seeds and 512 updates per arm/seed. CPU cost passed;

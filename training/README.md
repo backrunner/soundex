@@ -5,10 +5,11 @@ Use Python 3.12 and FFmpeg with the encoders required by your recipe. Install
 PyTorch for your hardware first; see [environment setup](scripts/environment.md)
 for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
-Current work: [P23 full-budget capacity comparison](../docs/full-capacity-study.md),
-16,192 steps per arm/seed, two seeds, all four arms. Early calibration scores do
-not stop this run. Final endpoint quality and learning curves are assessed only
-after the complete registered training budget and endpoint freeze.
+Latest completed run: [P23 full-budget capacity comparison](../docs/full-capacity-study.md),
+129,536 updates and 4,450 native Rust role replays. Training loss improved, but all
+capacity comparisons failed full quality checks, with severe weak-band outliers
+dominating aggregate music regressions. No model was promoted; see the full report
+for per-clip improvements, final endpoint costs and remaining validation limits.
 
 The [P22 latency-first extension](../docs/latency-capacity-study.md) completed
 512-step/two-seed calibration up to 11.92M parameters. CPU cost passed, but small
