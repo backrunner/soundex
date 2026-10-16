@@ -50,10 +50,13 @@ def test_shared_backbone_and_real_residual_are_matched():
     )
 
 
-def test_nonzero_complex_head_streaming_future_and_channel_isolation():
-    model = RestorationHead("complex", 8)
+@pytest.mark.parametrize("budget", (False, True))
+def test_nonzero_complex_head_streaming_future_and_channel_isolation(budget):
+    model = RestorationHead("complex", 8, generation_budget=budget)
     with torch.no_grad():
         model.backbone.decoder[-1].weight.normal_(0, 0.01)
+        if budget:
+            model.budget_head.weight.normal_(0, 0.03)
     x, context, condition = inputs()
     whole, end = model(x, context, condition, model.initial_state(2))
     state, parts = model.initial_state(2), []
@@ -113,15 +116,19 @@ def test_clean_complex_reference_is_zero_risk_and_identity_uses_input():
     assert consistency_loss(target, b).item() > 1e-4
 
 
-@pytest.mark.parametrize("arm", ("anchored", "amplitude", "complex"))
-def test_nonzero_head_onnx_streaming_parity(arm, tmp_path):
+@pytest.mark.parametrize(
+    "arm,budget", (("anchored", False), ("amplitude", False), ("complex", False), ("complex", True))
+)
+def test_nonzero_head_onnx_streaming_parity(arm, tmp_path, budget):
     from evaluation.head_export import export_graph, verify
 
     torch.manual_seed(17)
-    model = RestorationHead(arm, width=8).eval()
+    model = RestorationHead(arm, width=8, generation_budget=budget).eval()
     with torch.no_grad():
         model.backbone.decoder[-1].weight.normal_(0, 0.02)
         model.backbone.decoder[-1].bias.normal_(0, 0.02)
+        if budget:
+            model.budget_head.weight.normal_(0, 0.02)
     session = export_graph(model, tmp_path / "head.onnx")
     result = verify(model, session)
     assert result["sequential_hops"] == 320

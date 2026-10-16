@@ -15,7 +15,9 @@ from data.coverage_study import PoolView
 from data.envelope_study import EnvelopeClips
 from evaluation.head_study import auxiliary, evaluate, predict, review
 from evaluation.reporting import sha256_file, write_json_report
-from models.restoration_head import ARMS, RestorationHead, shared_state
+from models.budget_objective import balanced_risk, budget_risk
+from models.restoration_head import ARMS, RestorationHead, predict_budget, shared_state
+from models.spectral_consistency import consistency_loss
 from scripts.run_causal_study import atomic_save
 from scripts.run_consistency_followup import complete, read, registered, verify_receipt
 from scripts.run_consistency_lr_study import restore
@@ -145,9 +147,25 @@ def train(arm, seed, root, config, pool, common):
             model.train()
             objective, context = pool.select(draws[step - 1])
             optimizer.zero_grad(set_to_none=True)
-            prediction = predict(model, objective, context)
-            main, aux = objective(prediction)["total"], auxiliary(prediction, objective.batch)
-            loss = main + config["weight"] * aux
+            balanced = config.get("balanced_arms", [])
+            budget_weight = config.get("budget_weights", {}).get(arm, 0.0)
+            if budget_weight:
+                prediction, budget = predict_budget(model, objective.batch, context)
+                energy = budget_risk(budget, objective.batch)
+            else:
+                prediction = predict(model, objective, context)
+                energy = prediction.new_zeros(())
+            if arm in balanced:
+                main = balanced_risk(objective, prediction)
+                aux = consistency_loss(
+                    prediction,
+                    objective.batch,
+                    phase_reference="clean",
+                    normalization="global_band",
+                )
+            else:
+                main, aux = objective(prediction)["total"], auxiliary(prediction, objective.batch)
+            loss = main + config["weight"] * aux + budget_weight * energy
             if not torch.isfinite(loss):
                 raise ValueError("nonfinite training risk")
             loss.backward()
@@ -161,6 +179,10 @@ def train(arm, seed, root, config, pool, common):
                     "preclip_gradient_norm": float(grad),
                 }
             )
+            if budget_weight or arm in balanced:
+                history[-1].update(
+                    budget=float(energy.detach()), optimized_total=float(loss.detach())
+                )
         score_step = step % config.get("score_interval", 2048) == 0 or step in config["endpoints"]
         if step % 64 == 0 or score_step:
             state = {

@@ -8,11 +8,11 @@ from evaluation.reporting import write_json_report
 from scripts import run_head_study as runner
 
 
-@pytest.mark.parametrize("configured", (False, True))
+@pytest.mark.parametrize("configured", (False, True, "joint"))
 def test_head_study_resumes_exactly_and_rejects_schedule_drift(tmp_path, monkeypatch, configured):
     torch.set_num_threads(1)
 
-    def factory(arm, width=144, residual_slope=1):
+    def factory(arm, width=144, residual_slope=1, generation_budget=False):
         return torch.nn.Sequential(
             torch.nn.Linear(2, 3), torch.nn.Dropout(0.2), torch.nn.Linear(3, 1)
         )
@@ -48,6 +48,14 @@ def test_head_study_resumes_exactly_and_rejects_schedule_drift(tmp_path, monkeyp
             "small": {"arm": "complex", "width": 96, "residual_slope": 1 / 64}
         }
         config["rates"] = {"small": 1e-5}
+    if configured == "joint":
+        config["model_configs"]["small"]["generation_budget"] = True
+        config["balanced_arms"] = ["small"]
+        config["budget_weights"] = {"small": 0.1}
+        monkeypatch.setattr(runner, "predict_budget", lambda m, b, c: (m(c), m(c)))
+        monkeypatch.setattr(runner, "budget_risk", lambda p, b: p.square().mean())
+        monkeypatch.setattr(runner, "balanced_risk", lambda o, p: o(p)["total"])
+        monkeypatch.setattr(runner, "consistency_loss", lambda p, b, **kw: p.square().mean())
     full, resumed = tmp_path / "full", tmp_path / "resumed"
     for root in (full, resumed):
         root.mkdir()

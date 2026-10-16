@@ -16,7 +16,7 @@ ARMS = ("anchored", "amplitude", "complex")
 
 
 class RestorationHead(nn.Module):
-    def __init__(self, arm, width=144, residual_slope=1.0):
+    def __init__(self, arm, width=144, residual_slope=1.0, generation_budget=False):
         super().__init__()
         if arm not in ARMS:
             raise ValueError("unknown restoration head")
@@ -24,9 +24,12 @@ class RestorationHead(nn.Module):
             raise ValueError("residual slope must be finite and in (0, 1]")
         if arm == "anchored" and residual_slope != 1:
             raise ValueError("anchored head does not use residual slope")
+        if generation_budget and arm != "complex":
+            raise ValueError("generation budget requires the complex head")
         self.arm = arm
         self.width = width
         self.residual_slope = residual_slope
+        self.generation_budget = generation_budget
         self.backbone = make_rendered_model("rendered_balanced", width)
         self.state_size = self.backbone.state_size
         if arm != "anchored":
@@ -38,22 +41,52 @@ class RestorationHead(nn.Module):
             nn.init.zeros_(self.backbone.decoder[-1].weight)
             nn.init.zeros_(self.backbone.decoder[-1].bias)
         self.register_buffer("interior", torch.tensor([0.0] + [1.0] * 127 + [0.0]))
+        if generation_budget:
+            # Preserve shared initialization and the original unit scale (=1).
+            with torch.random.fork_rng(devices=[]):
+                self.budget_head = nn.Linear(2 * width, 5)
+            nn.init.zeros_(self.budget_head.weight)
+            nn.init.constant_(self.budget_head.bias, math.log(math.expm1(1.0)))
+
+    def budget_weights(self, condition):
+        # Continuous piecewise-linear interpolation avoids hard band seams.
+        hz = torch.arange(129, device=condition.device, dtype=condition.dtype) * (48000 / 256)
+        hz = condition[..., :1] * hz
+        centers = (2000, 6000, 10000, 14000, 20000)
+        weights = []
+        for i, center in enumerate(centers):
+            left = (hz - centers[i - 1]) / (center - centers[i - 1]) if i else torch.ones_like(hz)
+            right = (
+                (centers[i + 1] - hz) / (centers[i + 1] - center) if i < 4 else torch.ones_like(hz)
+            )
+            weights.append(torch.minimum(left, right).clamp(0, 1))
+        return torch.stack(weights, dim=-1)
 
     def initial_state(self, batch, *, device=None):
         return self.backbone.initial_state(batch, device=device)
 
     def forward(self, original, context, condition, state):
+        output, state, _ = self.forward_details(original, context, condition, state)
+        return output, state
+
+    def forward_details(self, original, context, condition, state):
         magnitude = torch.pow(10.0, original[:, 0] / 20)
         if self.arm == "anchored":
             amplitude, state = self.backbone(magnitude, context, condition, state)
-            return amplitude_features(amplitude, original, burn=0), state
+            return amplitude_features(amplitude, original, burn=0), state, None
         latent, scale, state = self.backbone.encode(magnitude, context, condition, state)
         delta = 2 * torch.tanh(self.residual_slope * self.backbone.decoder(latent))
         # Smooth local units remove independent hard-band normalization. No future frames.
         normalized = magnitude / scale
         power = F.avg_pool1d(F.pad(normalized.square(), (4, 4), mode="replicate"), 9, 1)
         # Global RMS remains available when a whole high band is absent.
-        units = scale * (power + 1.0).sqrt()
+        budget = F.softplus(self.budget_head(latent)) if self.generation_budget else None
+        generation = (
+            (self.budget_weights(condition) * budget[..., None, :]).sum(-1)
+            if budget is not None
+            else torch.ones_like(power)
+        )
+        units = scale * (power + generation.square()).sqrt()
         real = magnitude + units * delta[..., :129]
         imag = (
             units * delta[..., 129:] * self.interior
@@ -72,7 +105,18 @@ class RestorationHead(nn.Module):
             phase = original[:, 1] + torch.atan2(imag, safe_real)
         else:
             phase = original[:, 1]
-        return torch.stack((db, phase), dim=1), state
+        return torch.stack((db, phase), dim=1), state, budget
+
+
+def predict_budget(model, batch, context, burn=BURN):
+    _, _, condition = probe_inputs(batch, context)
+    state = model.initial_state(len(context), device=context.device)
+    with torch.no_grad():
+        _, state = model(batch["x"][:, :, :burn], context[:, :burn], condition[:, :burn], state)
+    tail, _, budget = model.forward_details(
+        batch["x"][:, :, burn:], context[:, burn:], condition[:, burn:], state.detach()
+    )
+    return torch.cat((batch["x"][:, :, :burn], tail), dim=2), budget
 
 
 def predict_head(model, batch, context, burn=BURN):

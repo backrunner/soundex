@@ -34,13 +34,15 @@ def reference_features(batch, *, phase_reference="input"):
     return reference
 
 
-def consistency_loss(predicted, batch, burn=89, *, phase_reference="input"):
+def consistency_loss(predicted, batch, burn=89, *, phase_reference="input", normalization="band"):
     """Penalize (P-I)(Zpred-Zref), not changes over time or distance to silence.
 
     P is analysis after the existing prelimit OLA. Subtracting the reference
     inconsistency avoids treating valid target transients as an error to smooth.
     The original DSP-rendered objective remains the main risk and evaluation score.
     """
+    if normalization not in ("band", "global_band"):
+        raise ValueError("unknown consistency normalization")
     effective = batch["mask"] * batch["active"][:, None, :, None]
     blended = blend_deployment_features(batch["x"], predicted, effective)
     with torch.no_grad():
@@ -59,6 +61,8 @@ def consistency_loss(predicted, batch, burn=89, *, phase_reference="input"):
         mask = ((frequency >= low) & (frequency < high))[:, None, :]
         count = mask.sum((1, 2)).clamp_min(1) * error.shape[1]
         denominator = (magnitude.square() * mask).sum((1, 2)) / count + floor.square()
+        if normalization == "global_band":
+            denominator = denominator + magnitude.square().mean((1, 2))
         power = (error.abs().square() * mask).sum((1, 2)) / count
         weight = (0.25 if low == 0 else 1.0) / 4.25
         per_example = per_example + weight * (
