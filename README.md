@@ -15,8 +15,9 @@ exercise inference but do not improve audio quality. See [model status](models/R
 The [P24 generation-budget study](docs/generation-budget-study.md) adds a matched
 640-wide factorial for reference-power normalization and learned input-only
 generation budgets. It retains relative spectral scores alongside absolute PCM
-errors. Full training started on October 16 after train-only numerical/export
-preflight; no new quality result is available.
+errors. All eight training runs completed on October 17. Native review exposed a
+weak-bin FFT phase discrepancy between the training and Rust frontends; a separate
+review now isolates it without relaxing the original tolerance. No weights are qualified.
 
 The [P23 full-budget capacity study](docs/full-capacity-study.md) completed all
 129,536 updates and 4,450 native Rust role replays. Longer training reduced train

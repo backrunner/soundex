@@ -6,12 +6,12 @@ PyTorch for your hardware first; see [environment setup](scripts/environment.md)
 for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
 Current experiment: [P24 generation-budget factorial](../docs/generation-budget-study.md),
-four 640-wide configurations, two seeds and 16,192 updates each. Full training
-started on October 16 after train-only preflight. The study separates loss
-normalization from a supervised input-only generation branch and retains common
-relative plus absolute PCM review.
+four 640-wide configurations, two seeds and 16,192 updates each. All training
+completed on October 17. A review-only recovery separates a weak-bin FFT phase
+discrepancy from synthesis parity, retaining the original training-proxy failures
+and tolerance. Common relative and absolute PCM review is not yet complete.
 
-Latest completed run: [P23 full-budget capacity comparison](../docs/full-capacity-study.md),
+Latest fully reviewed run: [P23 full-budget capacity comparison](../docs/full-capacity-study.md),
 129,536 updates and 4,450 native Rust role replays. Training loss improved, but all
 capacity comparisons failed full quality checks, with severe weak-band outliers
 dominating aggregate music regressions. No model was promoted; see the full report
