@@ -102,6 +102,7 @@ def export_graph(model, path, *, experimental_unbounded=False):
             "soundex.width": str(model.width),
             "soundex.residual_slope": str(model.residual_slope),
             "soundex.generation_budget": str(model.generation_budget).lower(),
+            "soundex.budget_scope": model.budget_scope,
         },
     )
     onnx.checker.check_model(graph, full_check=True)

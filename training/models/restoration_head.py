@@ -16,7 +16,9 @@ ARMS = ("anchored", "amplitude", "complex")
 
 
 class RestorationHead(nn.Module):
-    def __init__(self, arm, width=144, residual_slope=1.0, generation_budget=False):
+    def __init__(
+        self, arm, width=144, residual_slope=1.0, generation_budget=False, budget_scope="global"
+    ):
         super().__init__()
         if arm not in ARMS:
             raise ValueError("unknown restoration head")
@@ -26,10 +28,15 @@ class RestorationHead(nn.Module):
             raise ValueError("anchored head does not use residual slope")
         if generation_budget and arm != "complex":
             raise ValueError("generation budget requires the complex head")
+        if budget_scope not in {"global", "residual"} or (
+            budget_scope == "residual" and not generation_budget
+        ):
+            raise ValueError("residual budget scope requires a generation budget")
         self.arm = arm
         self.width = width
         self.residual_slope = residual_slope
         self.generation_budget = generation_budget
+        self.budget_scope = budget_scope
         self.backbone = make_rendered_model("rendered_balanced", width)
         self.state_size = self.backbone.state_size
         if arm != "anchored":
@@ -86,7 +93,14 @@ class RestorationHead(nn.Module):
             if budget is not None
             else torch.ones_like(power)
         )
-        units = scale * (power + generation.square()).sqrt()
+        # Experimental residual scope controls BOTH local and missing-band units.
+        # Legacy checkpoints keep the original additive global-only budget.
+        # This is a continuous scale, never a track-specific hard bypass gate.
+        units = (
+            scale * (power + 1).sqrt() * generation
+            if self.budget_scope == "residual"
+            else scale * (power + generation.square()).sqrt()
+        )
         real = magnitude + units * delta[..., :129]
         imag = (
             units * delta[..., 129:] * self.interior
