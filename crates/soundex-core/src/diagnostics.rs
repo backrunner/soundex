@@ -2,6 +2,9 @@
 //! Only the model prediction is replaced; detection, gain, fusion, OLA, gate and
 //! limiting remain the production path. Oracle output is not deployable quality.
 
+#[cfg(feature = "ort-backend")]
+pub mod context_head;
+
 use crate::{
     processor::validate_config,
     stream::{CausalHopIter, StreamBuffer},

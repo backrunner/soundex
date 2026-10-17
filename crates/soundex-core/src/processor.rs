@@ -49,7 +49,7 @@ enum StreamMode {
 }
 
 /// Shared sample-domain wet/dry gate for every channel.
-struct GateMixer {
+pub(crate) struct GateMixer {
     current: f32,
     start: f32,
     target: f32,
@@ -60,7 +60,7 @@ struct GateMixer {
 }
 
 impl GateMixer {
-    fn new(ramp_samples: usize, release_samples: usize) -> Self {
+    pub(crate) fn new(ramp_samples: usize, release_samples: usize) -> Self {
         Self {
             current: 0.0,
             start: 0.0,
@@ -85,7 +85,7 @@ impl GateMixer {
         output
     }
 
-    fn mix_interleaved_into(
+    pub(crate) fn mix_interleaved_into(
         &mut self,
         dry: &[f32],
         wet: &[f32],
@@ -139,7 +139,7 @@ impl GateMixer {
         self.current
     }
 
-    fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.current = 0.0;
         self.start = 0.0;
         self.target = 0.0;
