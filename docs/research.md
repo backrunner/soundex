@@ -1,18 +1,19 @@
 # Research status and experiment history
 
-Current experiment: [P24 generation-budget factorial](generation-budget-study.md),
+Latest completed study: [P24 generation-budget factorial](generation-budget-study.md),
 four matched 640-wide configurations, two seeds and full 16,192-step budgets.
-All eight training trajectories completed on October 17. Native review stopped on
-a weak-bin FFT phase discrepancy between training and Rust observations. A separate
-review-only recovery retains the original failure and tolerance while isolating
-synthesis parity; full relative/absolute output review is still pending.
+All training and review completed on October 17: 9,078 native role replays and 24
+exports. Same-observation synthesis parity passes; one original frontend failure
+is retained. Budget improves the old weak-band relative failure, but music waveform
+error and some identity perturbations increase versus identity DSP. Final timing
+shows deadline misses. No candidate is qualified for release.
 
-Latest diagnostic: [P23 absolute-error and stage audit](capacity-outlier-audit.md),
+Previous diagnostic: [P23 absolute-error and stage audit](capacity-outlier-audit.md),
 1,424 measurements plus 128 native candidate/control role replays. The outlier
 combines small absolute HF generation with amplified relative-band scores;
 absolute preservation ranks differ from spectral risk. No threshold or model changes.
 
-Latest completed full run: [P23 capacity comparison](full-capacity-study.md),
+Previous completed full run: [P23 capacity comparison](full-capacity-study.md),
 129,536 updates plus 4,450 native role replays. Train loss improved; no comparison passed all quality
 checks, with a weak-high-band outlier dominating aggregate music regressions
 despite paired proxy improvements on most clips. No new qualified weights.

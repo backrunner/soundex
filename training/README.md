@@ -5,13 +5,14 @@ Use Python 3.12 and FFmpeg with the encoders required by your recipe. Install
 PyTorch for your hardware first; see [environment setup](scripts/environment.md)
 for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
-Current experiment: [P24 generation-budget factorial](../docs/generation-budget-study.md),
-four 640-wide configurations, two seeds and 16,192 updates each. All training
-completed on October 17. A review-only recovery separates a weak-bin FFT phase
-discrepancy from synthesis parity, retaining the original training-proxy failures
-and tolerance. Common relative and absolute PCM review is not yet complete.
+Latest completed study: [P24 generation-budget factorial](../docs/generation-budget-study.md),
+four 640-wide configurations, two seeds and 16,192 updates each. Training and full
+review completed on October 17: 9,078 native role replays, 24 exports, and 74 verified
+completion receipts. The original frontend discrepancy is retained; same-observation
+synthesis parity passes. Budget improves the old weak-band relative failure but
+does not establish overall music restoration or realtime qualification. No promotion.
 
-Latest fully reviewed run: [P23 full-budget capacity comparison](../docs/full-capacity-study.md),
+Previous fully reviewed run: [P23 full-budget capacity comparison](../docs/full-capacity-study.md),
 129,536 updates and 4,450 native Rust role replays. Training loss improved, but all
 capacity comparisons failed full quality checks, with severe weak-band outliers
 dominating aggregate music regressions. No model was promoted; see the full report
