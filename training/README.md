@@ -5,7 +5,14 @@ Use Python 3.12 and FFmpeg with the encoders required by your recipe. Install
 PyTorch for your hardware first; see [environment setup](scripts/environment.md)
 for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
-Latest completed study: [P24 generation-budget factorial](../docs/generation-budget-study.md),
+Current diagnosis: [P25 native inference and actual crop coverage](../docs/context-deployment-audit.md).
+The finite P24 bank is not full-library training: 482 seconds of unique music
+supervision and 16 seconds of speech. The experimental `budget_scope="residual"`
+controls the entire residual, while old checkpoints retain `"global"`. This new
+option has structural/export tests but no trained quality result. Broader paired
+row sampling and matched complete budgets are required before its quality review.
+
+Latest completed training study: [P24 generation-budget factorial](../docs/generation-budget-study.md),
 four 640-wide configurations, two seeds and 16,192 updates each. Training and full
 review completed on October 17: 9,078 native role replays, 24 exports, and 74 verified
 completion receipts. The original frontend discrepancy is retained; same-observation

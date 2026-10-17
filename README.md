@@ -12,6 +12,12 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
+The [P25 deployment and coverage audit](docs/context-deployment-audit.md) connects
+experimental heads to a Rust frontend, ORT and production DSP. P24 used only about
+eight minutes of unique supervised music regions, and its budget left a local
+residual path uncontrolled. A full-residual budget candidate passes structural
+checks; it has not been trained or promoted.
+
 The [P24 generation-budget study](docs/generation-budget-study.md) adds a matched
 640-wide factorial for reference-power normalization and learned input-only
 generation budgets. It retains relative spectral scores alongside absolute PCM
