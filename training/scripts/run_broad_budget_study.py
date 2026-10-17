@@ -84,6 +84,12 @@ def register(parent_path, root, native_binary):
         "steps": STEPS,
         "endpoints": ENDPOINTS,
         "primary_endpoint": STEPS,
+        "native_count": (1 + len(ARMS) * len(parent["seeds"]) * len(ENDPOINTS))
+        * len(parent["development"])
+        * 2,
+        "joint_native_count": (2 + len(ARMS) * len(parent["seeds"]) * len(ENDPOINTS))
+        * len(parent["development"])
+        * 2,
         "score_interval": 2048,
         "score_entire_bank": False,
         "smoke": False,
