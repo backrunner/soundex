@@ -8,7 +8,7 @@ from evaluation.reporting import write_json_report
 from scripts import run_head_study as runner
 
 
-@pytest.mark.parametrize("configured", (False, True, "joint"))
+@pytest.mark.parametrize("configured", (False, True, "joint", "broad"))
 def test_head_study_resumes_exactly_and_rejects_schedule_drift(tmp_path, monkeypatch, configured):
     torch.set_num_threads(1)
 
@@ -56,10 +56,16 @@ def test_head_study_resumes_exactly_and_rejects_schedule_drift(tmp_path, monkeyp
         monkeypatch.setattr(runner, "budget_risk", lambda p, b: p.square().mean())
         monkeypatch.setattr(runner, "balanced_risk", lambda o, p: o(p)["total"])
         monkeypatch.setattr(runner, "consistency_loss", lambda p, b, **kw: p.square().mean())
+    suffix = "7"
+    if configured == "broad":
+        config["schedule_groups"] = {"small": "broad"}
+        config["schedule_hashes"] = {"broad-7": digest(draws)}
+        config["score_entire_bank"] = False
+        suffix = "broad-7"
     full, resumed = tmp_path / "full", tmp_path / "resumed"
     for root in (full, resumed):
         root.mkdir()
-        write_json_report({"draws": draws}, root / "draws-7.json")
+        write_json_report({"draws": draws}, root / f"draws-{suffix}.json")
     runner.train("small", 7, full, config, Pool(), None)
     save = runner.atomic_save
 
@@ -72,10 +78,10 @@ def test_head_study_resumes_exactly_and_rejects_schedule_drift(tmp_path, monkeyp
     with pytest.raises(RuntimeError, match="simulated interruption"):
         runner.train("small", 7, resumed, config, Pool(), None)
     monkeypatch.setattr(runner, "atomic_save", save)
-    write_json_report({"draws": [[0, 1, 2, 3, 5]] * 256}, resumed / "draws-7.json")
+    write_json_report({"draws": [[0, 1, 2, 3, 5]] * 256}, resumed / f"draws-{suffix}.json")
     with pytest.raises(ValueError, match="draw schedule drift"):
         runner.train("small", 7, resumed, config, Pool(), None)
-    write_json_report({"draws": draws}, resumed / "draws-7.json")
+    write_json_report({"draws": draws}, resumed / f"draws-{suffix}.json")
     runner.train("small", 7, resumed, config, Pool(), None)
     a, b = [
         torch.load(root / "small-7/step-256.pth", weights_only=False) for root in (full, resumed)

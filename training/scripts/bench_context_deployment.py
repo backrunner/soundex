@@ -49,7 +49,8 @@ def run(args):
     root.mkdir(parents=True, exist_ok=True)
     labels = sorted(k for k in read(study / "review-registration.json") if "-16192-" in k)
     if len(labels) != 8:
-        raise ValueError("expected all eight fixed P24 final endpoints")
+        raise ValueError("expected all eight fixed final endpoints")
+    paced_arms = read(study / "registration.json").get("paced_arms", ["control", "budget"])
     schedule = []
     for rate in (44100, 48000):
         for channels in (1, 2):
@@ -61,7 +62,7 @@ def run(args):
         for label in labels[repeat:] + labels[:repeat]:
             schedule.append(dict(label=label, rate=48000, channels=2, paced=False, round=repeat))
     for label in labels:
-        if label.startswith(("control-", "budget-")):
+        if any(label.startswith(arm + "-") for arm in paced_arms):
             schedule.append(dict(label=label, rate=48000, channels=2, paced=True, round=0))
     models = {label: study / "exports" / label / "diagnostic.onnx" for label in labels}
     hashes = {str(p): sha256_file(p) for p in [binary, Path(__file__), *models.values()]}

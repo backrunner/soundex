@@ -3,9 +3,10 @@
 
 import argparse
 from collections import Counter, defaultdict
+from fractions import Fraction
 from pathlib import Path
 
-from data.causal_study import load_sources
+from data.causal_study import load_sources, source_origin
 from evaluation.reporting import sha256_file, write_json_report
 from scripts.run_consistency_followup import read
 
@@ -25,11 +26,18 @@ def coverage(specs, rows):
     if any(r["split"] != "train" or r["held_out"] for r in chosen.values()):
         raise ValueError("training bank includes held-out audio")
     intervals = defaultdict(list)
+    source_intervals = defaultdict(list)
     for s in specs:
         row = rows[s["row_id"]]
-        origin = row["start_sample"] + s["start"]
+        origin = source_origin(row) + s["start"]
         key = (row["source_checksum"], row["channel_role"], row["sample_rate"])
         intervals[key].append((origin + 89 * 128, origin + 32768 - 128))
+        source_intervals[row["source_checksum"]].append(
+            (
+                Fraction(origin + 89 * 128, row["sample_rate"]),
+                Fraction(origin + 32768 - 128, row["sample_rate"]),
+            )
+        )
     return {
         "crops": len(specs),
         "paired_rows": len(chosen),
@@ -38,6 +46,9 @@ def coverage(specs, rows):
         "channel_views": dict(Counter(r["channel_role"] for r in chosen.values())),
         "unique_supervised_channel_seconds": sum(
             union_length(v) / k[2] for k, v in intervals.items()
+        ),
+        "unique_supervised_source_seconds": float(
+            sum(union_length(v) for v in source_intervals.values())
         ),
         "selected_row_seconds": sum(
             r["length_samples"] / r["sample_rate"] for r in chosen.values()

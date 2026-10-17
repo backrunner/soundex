@@ -113,8 +113,10 @@ def train(arm, seed, root, config, pool, common):
     if (directory / "complete.json").exists():
         verify_receipt(directory, "files")
         return
-    draws = read(root / f"draws-{seed}.json")["draws"]
-    if digest(draws) != config["schedule_hashes"][str(seed)]:
+    schedule_key = config.get("schedule_groups", {}).get(arm)
+    suffix = f"{schedule_key}-{seed}" if schedule_key else str(seed)
+    draws = read(root / f"draws-{suffix}.json")["draws"]
+    if digest(draws) != config["schedule_hashes"][suffix]:
         raise ValueError("draw schedule drift")
     torch.manual_seed(seed)
     model_config = config.get("model_configs", {}).get(arm)
@@ -212,7 +214,7 @@ def train(arm, seed, root, config, pool, common):
                         "checkpoint_sha256": sha256_file(path),
                         "common": evaluate(model, common, config["weight"]),
                     }
-                    if step in config["endpoints"]:
+                    if step in config["endpoints"] and config.get("score_entire_bank", True):
                         measured["arm_bank"] = evaluate(model, pool, config["weight"])
                     write_json_report(measured, report)
                 measured = read(report)

@@ -119,8 +119,8 @@ def run(args):
             if model.generation_budget:
                 _, budget = predict_budget(model, b, context)
                 target = budget_target(b)
-                # Diagnostic only: softplus(-inf)=0 removes global generation
-                # units, retaining the local-power pathway and every decoder weight.
+                # Diagnostic only: zero the declared budget pathway, leaving weights intact.
+                # Global scope retains local-power units; residual scope removes all units.
                 hook = model.budget_head.register_forward_hook(
                     lambda _m, _a, out: torch.full_like(out, -torch.inf)
                 )
@@ -204,6 +204,7 @@ def run(args):
                 }
                 if budget_info:
                     record["budget"] = {
+                        "scope": model.budget_scope,
                         "predicted_band_mean": budget_info[0][role],
                         "teacher_band_mean": budget_info[1][role],
                         "zero_global_budget_vs_identity_dsp": compare_pcm(

@@ -25,6 +25,11 @@ FRAMES = 256
 SAMPLES = FRAMES * 128
 
 
+def source_origin(row):
+    """Source coordinates after alignment may trim the clean file's leading samples."""
+    return row["start_sample"] + max(0, -int(row.get("alignment_offset_samples", 0)))
+
+
 def digest(value):
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
@@ -100,6 +105,7 @@ class PreparedClips:
         self.cache.mkdir(parents=True, exist_ok=True)
         self.detector_sha = sha256_file(self.detector)
         self.audited = set()
+        self.write_cache = True
 
     def get(self, spec):
         row = self.rows[spec["row_id"]]
@@ -182,9 +188,10 @@ class PreparedClips:
             "dry": F.pad(torch.from_numpy(waves[0]), (128, 0))[:SAMPLES],
             "clean_wave": F.pad(torch.from_numpy(waves[1]), (128, 0))[:SAMPLES],
         }
-        staged = path.with_suffix(".partial.npz")
-        np.savez(staged, **{k: v.numpy() for k, v in result.items()})
-        staged.replace(path)
+        if self.write_cache:
+            staged = path.with_suffix(".partial.npz")
+            np.savez(staged, **{k: v.numpy() for k, v in result.items()})
+            staged.replace(path)
         return result
 
     def batch(self, specs, device="cpu"):
