@@ -1,6 +1,10 @@
 # Research status and experiment history
 
-Current diagnostic: [P25 native inference and coverage audit](context-deployment-audit.md).
+Current training: [P26 broad coverage × residual budget](broad-budget-study.md),
+four configurations × two seeds × 16,192 updates. Frozen schedules expand actual
+source-time coverage; no quality conclusion before all endpoints complete.
+
+Previous diagnostic: [P25 native inference and coverage audit](context-deployment-audit.md).
 All fixed final P24 endpoints undergo native frontend → ORT → DSP review. The
 finite bank provides only 482 seconds of unique music supervision, and zeroing
 the old budget leaves a local residual. A continuous full-residual budget is
