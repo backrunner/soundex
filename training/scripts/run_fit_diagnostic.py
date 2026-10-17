@@ -9,12 +9,12 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-import numpy as np
 import torch
 
 from data.causal_study import digest, load_sources
 from data.envelope_study import EnvelopeClips
 from data.weak_band_study import identity_specs
+from evaluation.replay_parity import parity_report
 from evaluation.reporting import sha256_file, write_json_report
 from evaluation.rust_bridge import read_sxa, write_sxa
 from models.envelope_probe import context_features, predict_probe
@@ -61,7 +61,7 @@ def metrics(result, batch):
     }
 
 
-def replay(features, batch, objective, binary, onnx):
+def replay(features, batch, objective, binary, onnx, *, observed_binary=None):
     records = []
     with torch.no_grad(), tempfile.TemporaryDirectory(prefix="soundex-p11-") as tmp:
         work = Path(tmp)
@@ -89,20 +89,23 @@ def replay(features, batch, objective, binary, onnx):
             audio, actual_rate = read_sxa(work / "output.sxa")
             if audio.shape != (batch["pcm"].shape[-1], 1) or actual_rate != rate:
                 raise ValueError("native output shape/rate mismatch")
-            error = float(
-                np.max(np.abs(audio[objective.region, 0] - proxy[i, objective.region].numpy()))
+            parity = parity_report(
+                audio[:, 0],
+                proxy[i].numpy(),
+                objective.region,
+                observed_binary=observed_binary,
+                input_path=work / "input.sxa",
+                trace_path=work / "observed.json",
+                prediction=features[i : i + 1],
+                batch={k: v[i : i + 1] for k, v in batch.items()},
             )
-            if not np.isfinite(error) or error > 2e-5:
-                raise ValueError(f"native parity failure: {error}")
             raw, rendered = aligned_band_metrics(
                 features[i : i + 1],
                 batch["y"][i : i + 1],
                 torch.from_numpy(audio[:, 0])[None],
                 batch["rate"][i : i + 1],
             )
-            records.append(
-                {"proxy_max_error": error, "raw_band_metrics": raw, "output_band_metrics": rendered}
-            )
+            records.append({**parity, "raw_band_metrics": raw, "output_band_metrics": rendered})
     return records
 
 

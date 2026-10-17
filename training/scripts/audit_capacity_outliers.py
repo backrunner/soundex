@@ -17,6 +17,7 @@ from data.envelope_study import EnvelopeClips
 from evaluation.absolute_audio import BANDS, compare_pcm
 from evaluation.head_study import predict
 from evaluation.loss_scale import spectral_parts, summarize_parts
+from evaluation.replay_parity import parity_report
 from evaluation.reporting import sha256_file, write_json_report
 from evaluation.rust_bridge import read_sxa, write_sxa
 from models.restoration_head import load_restoration_head
@@ -50,7 +51,7 @@ def reference_rows(batch, specs, rows):
     return records
 
 
-def native_audio(features, batch, objective, binary, onnx):
+def native_audio(features, batch, objective, binary, onnx, *, observed_binary=None):
     waves, errors = [], []
     expected = objective.render(features).numpy()
     with tempfile.TemporaryDirectory(prefix="soundex-p23-audit-") as tmp:
@@ -83,13 +84,18 @@ def native_audio(features, batch, objective, binary, onnx):
                 or not np.isfinite(wave).all()
             ):
                 raise ValueError("native shape/rate/finite failure")
-            error = float(
-                np.max(np.abs(wave[objective.region, 0] - expected[role, objective.region]))
+            parity = parity_report(
+                wave[:, 0],
+                expected[role],
+                objective.region,
+                observed_binary=observed_binary,
+                input_path=work / "input.sxa",
+                trace_path=work / "observed.json",
+                prediction=features[role : role + 1],
+                batch={k: v[role : role + 1] for k, v in batch.items()},
             )
-            if error > 2e-5:
-                raise ValueError("native parity failure")
             waves.append(wave[:, 0])
-            errors.append(error)
+            errors.append(parity if observed_binary else parity["proxy_max_error"])
     return np.stack(waves), errors
 
 

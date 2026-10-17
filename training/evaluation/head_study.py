@@ -48,7 +48,7 @@ def evaluate(model, pool, weight):
     }
 
 
-def review(label, checkpoint, arm, root, pools, binary, onnx, weight):
+def review(label, checkpoint, arm, root, pools, binary, onnx, weight, *, observed_binary=None):
     directory = root / "review" / label
     directory.mkdir(parents=True, exist_ok=True)
     if (directory / "complete.json").exists():
@@ -83,7 +83,12 @@ def review(label, checkpoint, arm, root, pools, binary, onnx, weight):
             continue
         objective, context = pool.select([i])
         paired, identity = replay(
-            predict(model, objective, context), objective.batch, objective, binary, onnx
+            predict(model, objective, context),
+            objective.batch,
+            objective,
+            binary,
+            onnx,
+            observed_binary=observed_binary,
         )
         row = pool.rows[i]
         write_json_report(

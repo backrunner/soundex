@@ -45,7 +45,7 @@ def summarize(rows):
 
 
 @torch.no_grad()
-def joint_review(label, checkpoint, root, pools, binary, onnx):
+def joint_review(label, checkpoint, root, pools, binary, onnx, *, observed_binary=None):
     directory = root / "joint-review" / label
     directory.mkdir(parents=True, exist_ok=True)
     if (directory / "complete.json").exists():
@@ -71,12 +71,16 @@ def joint_review(label, checkpoint, root, pools, binary, onnx):
             output = objective.render(prediction).numpy()
             parity = None
             if group == "development":
-                output, parity = native_audio(prediction, b, objective, binary, onnx)
+                output, parity = native_audio(
+                    prediction, b, objective, binary, onnx, observed_binary=observed_binary
+                )
                 # Validate the shared identity DSP control once, then reuse it.
                 cache = root / "joint-baseline" / f"{i:03d}.npy"
                 cache.parent.mkdir(exist_ok=True)
                 if not cache.exists():
-                    baseline, _ = native_audio(b["x"], b, objective, binary, onnx)
+                    baseline, _ = native_audio(
+                        b["x"], b, objective, binary, onnx, observed_binary=observed_binary
+                    )
                     np.save(cache, baseline, allow_pickle=False)
                 else:
                     baseline = np.load(cache, allow_pickle=False)
