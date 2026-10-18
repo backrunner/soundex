@@ -84,7 +84,7 @@ class EnvelopeProbe(nn.Module):
     def initial_state(self, batch, *, device=None):
         return torch.zeros(batch, self.state_size, device=device)
 
-    def encode(self, magnitude, context, condition, state):
+    def encode(self, magnitude, context, condition, state, encoder_residual=None):
         # condition = [sample_rate / 48000, cutoff / Nyquist, active].
         scale = magnitude.square().mean(-1, keepdim=True).clamp_min(1e-20).sqrt()
         inputs = torch.cat(
@@ -96,7 +96,10 @@ class EnvelopeProbe(nn.Module):
             ),
             dim=-1,
         )
-        encoded = self.encoder(inputs)
+        if encoder_residual is None:
+            encoded = self.encoder(inputs)
+        else:
+            encoded = self.encoder[2](self.encoder[1](self.encoder[0](inputs) + encoder_residual))
         temporal, states, offset = encoded, [], 0
         for block, dilation in zip(self.temporal, self.dilations, strict=True):
             count = dilation * self.width

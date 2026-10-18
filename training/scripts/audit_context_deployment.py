@@ -91,7 +91,7 @@ def run(args):
         "source_hashes": hashes,
         "cases": paths,
         "specs": config["development"],
-        "policy": "all 89 pairs and both roles; same warmup/crop; no threshold exclusions; zero budget is an oracle ablation not a proposed runtime gate",
+        "policy": f"all {len(config['development'])} registered pairs and both roles; same warmup/crop; no threshold exclusions; zero budget is an oracle ablation not a proposed runtime gate",
     }
     verify_inputs(registration)
     registered(registration, output / "registration.json")
@@ -99,7 +99,9 @@ def run(args):
     rows, _ = load_sources([p for p in old_inputs if p.name == "manifest.jsonl"])
     detector = next(p for p in old_inputs if p.name == "soundex-gain-data")
     parent = next(p for p in old_inputs if "rendered-p10" in str(p) and p.name == "config.json")
-    clips = EnvelopeClips(rows, detector, Path(read(parent)["cache_path"]))
+    clips = EnvelopeClips(
+        rows, detector, Path(config.get("cache_path", read(parent)["cache_path"]))
+    )
     pool = Pool(config["development"], clips)
     for label, value in sorted(paths.items()):
         records = []
@@ -227,7 +229,7 @@ def run(args):
             "status": "complete",
             "roles": len(paths) * len(pool.rows) * 2,
             "registration_sha256": sha256_file(output / "registration.json"),
-            "reports": {p.name: sha256_file(p) for p in output.glob("*-16192-*.json")},
+            "reports": {f"{label}.json": sha256_file(output / f"{label}.json") for label in paths},
         },
         output / "summary.json",
     )

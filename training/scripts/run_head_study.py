@@ -152,7 +152,12 @@ def train(arm, seed, root, config, pool, common):
             balanced = config.get("balanced_arms", [])
             budget_weight = config.get("budget_weights", {}).get(arm, 0.0)
             if budget_weight:
-                prediction, budget = predict_budget(model, objective.batch, context)
+                prediction, budget = predict_budget(
+                    model,
+                    objective.batch,
+                    context,
+                    detach_auxiliary=arm in config.get("detached_budget_arms", []),
+                )
                 energy = budget_risk(budget, objective.batch)
             else:
                 prediction = predict(model, objective, context)

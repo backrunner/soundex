@@ -17,7 +17,14 @@ ARMS = ("anchored", "amplitude", "complex")
 
 class RestorationHead(nn.Module):
     def __init__(
-        self, arm, width=144, residual_slope=1.0, generation_budget=False, budget_scope="global"
+        self,
+        arm,
+        width=144,
+        residual_slope=1.0,
+        generation_budget=False,
+        budget_scope="global",
+        decoder_normalization=False,
+        phase_input=False,
     ):
         super().__init__()
         if arm not in ARMS:
@@ -28,6 +35,8 @@ class RestorationHead(nn.Module):
             raise ValueError("anchored head does not use residual slope")
         if generation_budget and arm != "complex":
             raise ValueError("generation budget requires the complex head")
+        if (decoder_normalization or phase_input) and arm != "complex":
+            raise ValueError("mechanism interventions require the complex head")
         if budget_scope not in {"global", "residual"} or (
             budget_scope == "residual" and not generation_budget
         ):
@@ -37,6 +46,8 @@ class RestorationHead(nn.Module):
         self.residual_slope = residual_slope
         self.generation_budget = generation_budget
         self.budget_scope = budget_scope
+        self.decoder_normalization = decoder_normalization
+        self.phase_input = phase_input
         self.backbone = make_rendered_model("rendered_balanced", width)
         self.state_size = self.backbone.state_size
         if arm != "anchored":
@@ -54,6 +65,14 @@ class RestorationHead(nn.Module):
                 self.budget_head = nn.Linear(2 * width, 5)
             nn.init.zeros_(self.budget_head.weight)
             nn.init.constant_(self.budget_head.bias, math.log(math.expm1(1.0)))
+        if decoder_normalization:
+            self.decoder_norm = nn.LayerNorm(width)
+        if phase_input:
+            # Additive zero initialization preserves the common magnitude-only function
+            # and RNG stream. Only observed current-frame phase enters this branch.
+            with torch.random.fork_rng(devices=[]):
+                self.phase_projection = nn.Linear(258, width, bias=False)
+            nn.init.zeros_(self.phase_projection.weight)
 
     def budget_weights(self, condition):
         # Continuous piecewise-linear interpolation avoids hard band seams.
@@ -76,13 +95,31 @@ class RestorationHead(nn.Module):
         output, state, _ = self.forward_details(original, context, condition, state)
         return output, state
 
-    def forward_details(self, original, context, condition, state):
+    def forward_details(
+        self, original, context, condition, state, *, detach_budget_auxiliary=False
+    ):
         magnitude = torch.pow(10.0, original[:, 0] / 20)
         if self.arm == "anchored":
             amplitude, state = self.backbone(magnitude, context, condition, state)
             return amplitude_features(amplitude, original, burn=0), state, None
-        latent, scale, state = self.backbone.encode(magnitude, context, condition, state)
-        delta = 2 * torch.tanh(self.residual_slope * self.backbone.decoder(latent))
+        encoder_residual = None
+        if self.phase_input:
+            phase_scale = magnitude.square().mean(-1, keepdim=True).clamp_min(1e-20).sqrt()
+            # Subtract the feature floor so exact digital silence carries no phase.
+            carrier = torch.log1p((magnitude - 1e-10).clamp_min(0) / phase_scale)
+            phase = original[:, 1]
+            encoder_residual = self.phase_projection(
+                torch.cat((carrier * phase.cos(), carrier * phase.sin()), dim=-1)
+            )
+        latent, scale, state = self.backbone.encode(
+            magnitude, context, condition, state, encoder_residual=encoder_residual
+        )
+        if self.decoder_normalization:
+            decoder = self.backbone.decoder
+            logits = decoder[2](decoder[1](self.decoder_norm(decoder[0](latent))))
+        else:
+            logits = self.backbone.decoder(latent)
+        delta = 2 * torch.tanh(self.residual_slope * logits)
         # Smooth local units remove independent hard-band normalization. No future frames.
         normalized = magnitude / scale
         power = F.avg_pool1d(F.pad(normalized.square(), (4, 4), mode="replicate"), 9, 1)
@@ -119,16 +156,27 @@ class RestorationHead(nn.Module):
             phase = original[:, 1] + torch.atan2(imag, safe_real)
         else:
             phase = original[:, 1]
-        return torch.stack((db, phase), dim=1), state, budget
+        # Only the auxiliary teacher's route into shared features is detached.
+        # The rendered reconstruction still backpropagates through the live budget.
+        auxiliary_budget = (
+            F.softplus(self.budget_head(latent.detach()))
+            if detach_budget_auxiliary and budget is not None
+            else budget
+        )
+        return torch.stack((db, phase), dim=1), state, auxiliary_budget
 
 
-def predict_budget(model, batch, context, burn=BURN):
+def predict_budget(model, batch, context, burn=BURN, *, detach_auxiliary=False):
     _, _, condition = probe_inputs(batch, context)
     state = model.initial_state(len(context), device=context.device)
     with torch.no_grad():
         _, state = model(batch["x"][:, :, :burn], context[:, :burn], condition[:, :burn], state)
     tail, _, budget = model.forward_details(
-        batch["x"][:, :, burn:], context[:, burn:], condition[:, burn:], state.detach()
+        batch["x"][:, :, burn:],
+        context[:, burn:],
+        condition[:, burn:],
+        state.detach(),
+        detach_budget_auxiliary=detach_auxiliary,
     )
     return torch.cat((batch["x"][:, :, :burn], tail), dim=2), budget
 

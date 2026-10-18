@@ -25,13 +25,16 @@ if not BINARY.exists():
     not BINARY.exists(), reason="build soundex-context-replay for native integration"
 )
 @pytest.mark.parametrize("rate", [44100, 48000])
-def test_real_context_head_preserves_channels_clock_and_past_context(tmp_path, rate):
+@pytest.mark.parametrize("options", [{}, {"decoder_normalization": True}, {"phase_input": True}])
+def test_real_context_head_preserves_channels_clock_and_past_context(tmp_path, rate, options):
     torch.manual_seed(120)
     model = RestorationHead(
-        "complex", width=8, residual_slope=1 / 64, generation_budget=True
+        "complex", width=8, residual_slope=1 / 64, generation_budget=True, **options
     ).eval()
     with torch.no_grad():
         model.backbone.decoder[-1].weight.normal_(0, 0.02)
+        if model.phase_input:
+            model.phase_projection.weight.normal_(0, 0.02)
     path = tmp_path / "probe.onnx"
     export_graph(model, path)
     x = (0.2 * np.sin(np.arange(128 * 96) * 0.17)).astype(np.float32)

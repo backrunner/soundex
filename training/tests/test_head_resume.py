@@ -8,7 +8,7 @@ from evaluation.reporting import write_json_report
 from scripts import run_head_study as runner
 
 
-@pytest.mark.parametrize("configured", (False, True, "joint", "broad"))
+@pytest.mark.parametrize("configured", (False, True, "joint", "detached", "broad"))
 def test_head_study_resumes_exactly_and_rejects_schedule_drift(tmp_path, monkeypatch, configured):
     torch.set_num_threads(1)
 
@@ -48,11 +48,18 @@ def test_head_study_resumes_exactly_and_rejects_schedule_drift(tmp_path, monkeyp
             "small": {"arm": "complex", "width": 96, "residual_slope": 1 / 64}
         }
         config["rates"] = {"small": 1e-5}
-    if configured == "joint":
+    if configured in ("joint", "detached"):
         config["model_configs"]["small"]["generation_budget"] = True
         config["balanced_arms"] = ["small"]
         config["budget_weights"] = {"small": 0.1}
-        monkeypatch.setattr(runner, "predict_budget", lambda m, b, c: (m(c), m(c)))
+        if configured == "detached":
+            config["detached_budget_arms"] = ["small"]
+
+        def predict_budget(model, batch, context, *, detach_auxiliary=False):
+            assert detach_auxiliary == (configured == "detached")
+            return model(context), model(context)
+
+        monkeypatch.setattr(runner, "predict_budget", predict_budget)
         monkeypatch.setattr(runner, "budget_risk", lambda p, b: p.square().mean())
         monkeypatch.setattr(runner, "balanced_risk", lambda o, p: o(p)["total"])
         monkeypatch.setattr(runner, "consistency_loss", lambda p, b, **kw: p.square().mean())

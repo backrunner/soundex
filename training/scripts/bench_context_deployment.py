@@ -44,13 +44,23 @@ def summarize(report, stderr):
     }
 
 
+def final_labels(config, checkpoints):
+    expected = {
+        f"{arm}-{config['primary_endpoint']}-{seed}"
+        for arm in config["arms"]
+        for seed in config["seeds"]
+    }
+    if not expected or not expected.issubset(checkpoints):
+        raise ValueError("incomplete fixed final endpoints")
+    return sorted(expected)
+
+
 def run(args):
     root, binary, study = args.output.resolve(), args.binary.resolve(), args.study.resolve()
     root.mkdir(parents=True, exist_ok=True)
-    labels = sorted(k for k in read(study / "review-registration.json") if "-16192-" in k)
-    if len(labels) != 8:
-        raise ValueError("expected all eight fixed final endpoints")
-    paced_arms = read(study / "registration.json").get("paced_arms", ["control", "budget"])
+    config = read(study / "registration.json")
+    labels = final_labels(config, read(study / "review-registration.json"))
+    paced_arms = config.get("paced_arms", ["control", "budget"])
     schedule = []
     for rate in (44100, 48000):
         for channels in (1, 2):

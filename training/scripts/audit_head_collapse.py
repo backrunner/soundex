@@ -34,8 +34,10 @@ def stats(value):
     }
 
 
-def gradients(model, objective, context, weight):
-    prediction, budget = predict_budget(model, objective.batch, context)
+def gradients(model, objective, context, weight, *, detach_auxiliary=False):
+    prediction, budget = predict_budget(
+        model, objective.batch, context, detach_auxiliary=detach_auxiliary
+    )
     losses = objective(prediction)
     identity = objective.batch["identity"].bool()
     terms = {
@@ -98,8 +100,11 @@ def inspect(model, objective, context):
 
         return hook
 
+    def before_gelu(module, inputs):
+        captured["decoder_pre_activation"] = inputs[0].detach()
+
     hooks = [
-        model.backbone.decoder[0].register_forward_hook(capture("decoder_pre_activation")),
+        model.backbone.decoder[1].register_forward_pre_hook(before_gelu),
         model.backbone.decoder[1].register_forward_hook(capture("decoder_hidden")),
         model.backbone.decoder[2].register_forward_hook(capture("decoder_logits")),
         model.budget_head.register_forward_hook(capture("budget_logits")),
