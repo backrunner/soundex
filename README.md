@@ -12,40 +12,16 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-The [P26 coverage and residual-budget study](docs/broad-budget-study.md) completed
-all eight trajectories, native reviews and 560,000 timing hops. Broader training
-mostly produced identity-like output; no configuration established overall recovery.
-Measured compute stayed below 5 ms, but hop deadlines still missed. No promotion.
+The [P27 mechanism audit](docs/head-collapse-audit.md) locates a largely inactive
+residual decoder in the completed broad-coverage models. The 11.92M-parameter
+route is retired from further scaling; frozen checkpoints remain reproducible.
+The next research direction is a compact causal controller with DSP excitation
+and spectral shaping, informed by upstream implementations. It is not yet a trained model.
 
-The [P25 deployment and coverage audit](docs/context-deployment-audit.md) connects
-experimental heads to a Rust frontend, ORT and production DSP. P24 used only about
-eight minutes of unique supervised music regions, and its budget left a local
-residual path uncontrolled. A full-residual budget candidate passes structural
-checks and completed P26 training; it has not been promoted.
-
-The [P24 generation-budget study](docs/generation-budget-study.md) adds a matched
-640-wide factorial for reference-power normalization and learned input-only
-generation budgets. It retains relative spectral scores alongside absolute PCM
-errors. All training and replay review completed on October 17. The energy branch
-reduced the old weak-band relative failure, but music waveform error and some
-identity perturbations still increased versus identity DSP. Long-run timing also
-showed deadline misses. No weights are qualified; the original frontend mismatch
-remains recorded separately from successful synthesis parity.
-
-The [P23 full-budget capacity study](docs/full-capacity-study.md) completed all
-129,536 updates and 4,450 native Rust role replays. Longer training reduced train
-loss, but no capacity passed the full quality checks. Most development music clips
-improved on paired proxy error; a severe weak-high-band failure dominated the
-aggregate regression. The [absolute-error audit](docs/capacity-outlier-audit.md)
-found small absolute HF generation with strongly amplified relative scores; this
-has not established audible severity or qualified new weights.
-
-The [P22 latency-first extension](docs/latency-capacity-study.md) completed matched
-512-step/two-seed calibration up to 11.92M parameters. Larger models fit the initial
-CPU cost screen but increased identity damage enough to outweigh small restoration
-gains. No candidate passed the training optimization checks. [P21](docs/capacity-calibration-study.md)
-also stopped after calibration; its longer comparison did not start. These early
-training results do not establish final capacity limits or held-out audio quality.
+[P26](docs/broad-budget-study.md) completed eight full trajectories, native reviews
+and 560,000 timing hops without establishing overall recovery. Compute stayed
+below 5 ms in that run, but hop deadlines still missed. No weights were promoted.
+Earlier studies and continuation commands are indexed in [research history](docs/research.md).
 
 The reviewed library contains 300 native-lossless music works plus VCTK speech;
 raw audio, prepared pairs and experimental checkpoints stay local. See the

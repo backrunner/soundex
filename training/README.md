@@ -5,39 +5,20 @@ Use Python 3.12 and FFmpeg with the encoders required by your recipe. Install
 PyTorch for your hardware first; see [environment setup](scripts/environment.md)
 for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
-Latest completed study: [P26 broad coverage × residual budget](../docs/broad-budget-study.md).
-All eight full-budget trajectories, 24 exports, 1,424 full native roles and 560,000
-timing hops completed. Broad arms stayed close to identity DSP; no overall recovery
-was established. Observed compute was below 5 ms, but hop deadlines still missed.
+Current diagnosis: [P27 residual-decoder collapse](../docs/head-collapse-audit.md).
+The 640-wide / 11.92M-parameter P26 route is retired from further training and
+scaling. The diagnostic verifies activation saturation, weighted component
+gradients, per-band applied corrections and target-oracle headroom on fixed
+training crops. No new weights or loss changes are introduced.
 
-Previous diagnosis: [P25 native inference and actual crop coverage](../docs/context-deployment-audit.md).
-The finite P24 bank is not full-library training: 482 seconds of unique music
-supervision and 16 seconds of speech. The experimental `budget_scope="residual"`
-controls the entire residual, while old checkpoints retain `"global"`. This new
-option has structural/export tests and completed P26 training without promotion.
+[P26](../docs/broad-budget-study.md) completed all eight full-budget trajectories,
+24 exports, 1,424 full native roles and 560,000 timing hops. Broad arms stayed close
+to identity DSP; no overall recovery was established. Compute was below 5 ms in
+that run, but hop deadlines still missed. The next compact neural/DSP route is
+specified in P27 and remains unimplemented. Earlier protocols are indexed in
+[research history](../docs/research.md); archived commands in `EXPERIMENTS.md`
+are for reproducing evidence, not recommendations to restart rejected runs.
 
-Previous training study: [P24 generation-budget factorial](../docs/generation-budget-study.md),
-four 640-wide configurations, two seeds and 16,192 updates each. Training and full
-review completed on October 17: 9,078 native role replays, 24 exports, and 74 verified
-completion receipts. The original frontend discrepancy is retained; same-observation
-synthesis parity passes. Budget improves the old weak-band relative failure but
-does not establish overall music restoration or realtime qualification. No promotion.
-
-Previous fully reviewed run: [P23 full-budget capacity comparison](../docs/full-capacity-study.md),
-129,536 updates and 4,450 native Rust role replays. Training loss improved, but all
-capacity comparisons failed full quality checks, with severe weak-band outliers
-dominating aggregate music regressions. No model was promoted; see the full report
-for per-clip improvements, final endpoint costs and remaining validation limits.
-The subsequent [absolute-error audit](../docs/capacity-outlier-audit.md) separates
-small PCM perturbations from inflated weak-band relative scores, without changing
-losses or acceptance thresholds.
-
-The [P22 latency-first extension](../docs/latency-capacity-study.md) completed
-512-step/two-seed calibration up to 11.92M parameters. CPU cost passed, but small
-restoration gains were outweighed by identity damage; no longer run was started.
-[P21](../docs/capacity-calibration-study.md) also finished with calibration rejected.
-Production artifact limits remain unchanged. No new qualified weights or held-out
-quality results were produced by these train-only calibration runs.
 The source library has
 300 reviewed native-lossless music works split into 253 train / 26 validation /
 21 test. [The original training run](../docs/native-training-20261009.md) documents

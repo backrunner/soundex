@@ -24,6 +24,8 @@ data/                      Local artifacts, all ignored
   catalogs/                Local input and final audited selection catalogs
   evidence/                Publisher/acquisition receipts and historical surveys
   reports/                 Quality, inventory and cleanup receipts
+  maintenance/             Local deletion inventories and retention checks
+  research/                Read-only upstream source snapshots; not vendored code
   runs/<run-id>/           Frozen config, source, logs and checkpoints
   archive/runs/            Inactive historical runs and unique audit checkpoints
 ```
@@ -32,9 +34,10 @@ data/                      Local artifacts, all ignored
 references in historical immutable manifests. New runs should use `data/` paths.
 Retained survey receipts are historical evidence, not an approved source catalog.
 Only the current audited catalog selects training inputs.
-The completed [P19 coverage study](music-coverage-study.md) lives under
-`data/runs/music-coverage-p19-20261014/`; `pipeline.json` records the pipeline stage
-and `study/progress.json` the latest training update. Earlier runs are indexed in
+The latest [P27 mechanism audit](head-collapse-audit.md) lives under
+`data/runs/head-collapse-p27-20261019-v2/`. The completed P26 large-model route is
+retired from further training; `data/runs/broad-budget-p26-20261017-v2/` retains
+the frozen source, complete checkpoints, exports and review evidence. Earlier runs are indexed in
 [research history](research.md) and [native-lossless training](native-training-20261009.md). Retired Slakh audio/pairs
 have been removed; their historical manifest and recipe receipts remain under
 `data/evidence/retired-corpora/`. Historical generated audio, duplicate periodic
@@ -148,3 +151,41 @@ copy matching Docker's COPY instructions imported train/export/evaluation module
 successfully; a full CUDA container build/run was not performed. Removed nine
 regenerable cache directories (2,865,011 bytes); active pipeline and child PIDs
 remained 5235 / 5994, and the wide training arm started after cleanup.
+
+## Feature-cache cleanup (2026-10-19)
+
+After P26 and the P27 audit completed, removed **146,013 regenerable NPZ feature
+cache files**, 143.76 GiB of logical data / 144.26 GiB of allocated blocks. Observed
+volume free space increased by about 144.24 GiB during deletion; other processes
+can also affect the volume counter.
+
+| Cache | Files | Logical bytes removed |
+|---|---:|---:|
+| `factor-p6-20261012/study/cache` | 86,902 | 91,870,013,536 |
+| `causal-p2-20261012/cache` | 32,857 | 34,735,368,976 |
+| `causal-p3-20261012/study/cache` | 9,434 | 9,973,322,912 |
+| `causal-p4-20261012/study/cache` | 8,410 | 8,890,782,880 |
+| `envelope-p5-20261012/study/cache` | 8,410 | 8,890,782,880 |
+
+Paths above are relative to `data/runs/`. This cleanup explicitly includes these
+derived caches inside historical run directories; it does not remove their
+immutable source, configuration, reports or checkpoints. A scan of 1,030
+registration/configuration/completion documents found no individual NPZ filename
+references. The old cache directory paths remain valid and empty; loaders can
+reconstruct their contents from retained PCM, crop specifications and Rust detectors.
+
+Deletion inventory, pre-delete inode/size/mtime checks, completion record and
+post-cleanup retention checks are under `data/maintenance/cache-cleanup-20261019/`.
+Raw audio, prepared pairs, rights evidence, manifests, every P26 checkpoint and
+ONNX export, frozen sources and review receipts remain local. No raw data or
+experimental weights are committed. Shared historical model/loss modules remain
+because current imports and reproducible controls use them; deleting them would
+break those workflows. The READMEs now point to current decisions rather than
+repeating a growing list of retired experiments.
+
+Post-cleanup verification passed: all **82 P26 completion receipts and 2,555
+referenced file hashes**, registered inputs and frozen sources remain intact.
+Rebuilding a five-pair diagnostic batch with an empty disk cache reproduced the
+entire prior inspection JSON exactly and left the read-only cache empty.
+Local validation: **548 Python tests passed**, Ruff lint/format and changed-document
+links passed. No new listening, physical-device or model-quality qualification is claimed.
