@@ -5,17 +5,23 @@ Use Python 3.12 and FFmpeg with the encoders required by your recipe. Install
 PyTorch for your hardware first; see [environment setup](scripts/environment.md)
 for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
-Current diagnosis: [P27 residual-decoder collapse](../docs/head-collapse-audit.md).
-The 640-wide / 11.92M-parameter P26 route is retired from further training and
-scaling. The diagnostic verifies activation saturation, weighted component
-gradients, per-band applied corrections and target-oracle headroom on fixed
-training crops. No new weights or loss changes are introduced.
+Current run: [P28 small-model mechanism controls](../docs/small-mechanism-study.md).
+Four 96-wide configurations (431K–456K parameters), two seeds, 2,048 updates each.
+Decoder normalization, budget-auxiliary gradient isolation and observed-phase
+inputs are tested separately against a matched control. The end-to-end training-only
+preflight passed; the frozen-source run includes subsequent native review and timing.
+It is an optimization diagnosis, not full convergence or permission to scale up.
+
+[P27](../docs/head-collapse-audit.md) retired the 640-wide / 11.92M-parameter route.
+Its residual decoder was largely inactive. The new DSP excitation/filter controller
+is still a later experiment; P28 first isolates three mechanisms without changing
+loss values, weights or the deployed DSP chain.
 
 [P26](../docs/broad-budget-study.md) completed all eight full-budget trajectories,
 24 exports, 1,424 full native roles and 560,000 timing hops. Broad arms stayed close
 to identity DSP; no overall recovery was established. Compute was below 5 ms in
-that run, but hop deadlines still missed. The next compact neural/DSP route is
-specified in P27 and remains unimplemented. Earlier protocols are indexed in
+that run, but hop deadlines still missed. The DSP excitation route remains
+unimplemented; P28 addresses the smaller mechanism controls first. Earlier protocols are indexed in
 [research history](../docs/research.md); archived commands in `EXPERIMENTS.md`
 are for reproducing evidence, not recommendations to restart rejected runs.
 

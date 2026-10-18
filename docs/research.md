@@ -1,10 +1,16 @@
 # Research status and experiment history
 
+Current run: [P28 small-model mechanism controls](small-mechanism-study.md),
+96-wide, 431K–456K parameters, four configurations × two seeds × 2,048
+updates. End-to-end train-only preflight passed; formal training and subsequent
+native review/timing run from frozen source. No quality conclusion or scale-up.
+
 Current diagnostic: [P27 residual-decoder collapse and upstream review](head-collapse-audit.md).
 Fixed training crops localize widespread negative GELU saturation; oracle spectra
 still improve the common DSP objective. The 640-wide P26 route is retired from
-further scaling. A compact causal neural/DSP route is specified, not implemented
-or trained. No quality qualification or default-weight change.
+further scaling. A compact causal neural/DSP route is specified; P28 implements only
+the small mechanism controls, while a new DSP excitation branch remains unimplemented.
+No quality qualification or default-weight change.
 
 Latest completed study: [P26 broad coverage × residual budget](broad-budget-study.md),
 four configurations × two seeds × 16,192 updates. Broad arms remained close to

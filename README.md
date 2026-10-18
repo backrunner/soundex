@@ -12,11 +12,15 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-The [P27 mechanism audit](docs/head-collapse-audit.md) locates a largely inactive
-residual decoder in the completed broad-coverage models. The 11.92M-parameter
-route is retired from further scaling; frozen checkpoints remain reproducible.
-The next research direction is a compact causal controller with DSP excitation
-and spectral shaping, informed by upstream implementations. It is not yet a trained model.
+The [P28 small-model mechanism study](docs/small-mechanism-study.md) is running:
+431K–456K parameters, four controlled configurations, two seeds and 2,048 updates
+each. It tests decoder normalization, budget-gradient isolation and observed-phase
+inputs before any further scaling. Full-pipeline preflight passed; trained quality
+and long-stream timing remain pending. No production weights are changed.
+
+The [P27 audit](docs/head-collapse-audit.md) retired the 11.92M-parameter route
+from further scaling after finding widespread residual-decoder inactivity.
+The compact DSP-excitation route remains a later experiment, not a trained model.
 
 [P26](docs/broad-budget-study.md) completed eight full trajectories, native reviews
 and 560,000 timing hops without establishing overall recovery. Compute stayed
