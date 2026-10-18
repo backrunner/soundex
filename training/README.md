@@ -5,19 +5,18 @@ Use Python 3.12 and FFmpeg with the encoders required by your recipe. Install
 PyTorch for your hardware first; see [environment setup](scripts/environment.md)
 for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
-Current training: [P26 broad coverage × residual budget](../docs/broad-budget-study.md).
-Eight fresh full-budget trajectories are queued, with bounded lazy loading and
-frozen source-time-isolated schedules. Planned unique music supervision is about
-330–331 minutes per broad seed, versus eight minutes in the repaired finite pool.
-All endpoints freeze before review. There is no new trained quality result yet.
+Latest completed study: [P26 broad coverage × residual budget](../docs/broad-budget-study.md).
+All eight full-budget trajectories, 24 exports, 1,424 full native roles and 560,000
+timing hops completed. Broad arms stayed close to identity DSP; no overall recovery
+was established. Observed compute was below 5 ms, but hop deadlines still missed.
 
 Previous diagnosis: [P25 native inference and actual crop coverage](../docs/context-deployment-audit.md).
 The finite P24 bank is not full-library training: 482 seconds of unique music
 supervision and 16 seconds of speech. The experimental `budget_scope="residual"`
 controls the entire residual, while old checkpoints retain `"global"`. This new
-option has structural/export tests and is now included in P26 training.
+option has structural/export tests and completed P26 training without promotion.
 
-Latest completed training study: [P24 generation-budget factorial](../docs/generation-budget-study.md),
+Previous training study: [P24 generation-budget factorial](../docs/generation-budget-study.md),
 four 640-wide configurations, two seeds and 16,192 updates each. Training and full
 review completed on October 17: 9,078 native role replays, 24 exports, and 74 verified
 completion receipts. The original frontend discrepancy is retained; same-observation

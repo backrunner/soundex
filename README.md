@@ -12,16 +12,16 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-The [P26 coverage and residual-budget study](docs/broad-budget-study.md) has started:
-four configurations, two seeds and 16,192 updates each. Frozen broader schedules
-cover about 330–331 minutes of unique supervised music, versus eight minutes in
-the finite pool. All trajectories finish before endpoint review; no quality result yet.
+The [P26 coverage and residual-budget study](docs/broad-budget-study.md) completed
+all eight trajectories, native reviews and 560,000 timing hops. Broader training
+mostly produced identity-like output; no configuration established overall recovery.
+Measured compute stayed below 5 ms, but hop deadlines still missed. No promotion.
 
 The [P25 deployment and coverage audit](docs/context-deployment-audit.md) connects
 experimental heads to a Rust frontend, ORT and production DSP. P24 used only about
 eight minutes of unique supervised music regions, and its budget left a local
 residual path uncontrolled. A full-residual budget candidate passes structural
-checks and is now included in P26 training; it has not been promoted.
+checks and completed P26 training; it has not been promoted.
 
 The [P24 generation-budget study](docs/generation-budget-study.md) adds a matched
 640-wide factorial for reference-power normalization and learned input-only

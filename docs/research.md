@@ -1,8 +1,9 @@
 # Research status and experiment history
 
-Current training: [P26 broad coverage × residual budget](broad-budget-study.md),
-four configurations × two seeds × 16,192 updates. Frozen schedules expand actual
-source-time coverage; no quality conclusion before all endpoints complete.
+Latest completed study: [P26 broad coverage × residual budget](broad-budget-study.md),
+four configurations × two seeds × 16,192 updates. Broad arms remained close to
+identity DSP; full native review did not establish overall restoration. All 560,000
+timing hops were below 5 ms, but per-hop deadlines still missed. No promotion.
 
 Previous diagnostic: [P25 native inference and coverage audit](context-deployment-audit.md).
 All fixed final P24 endpoints undergo native frontend → ORT → DSP review. The
@@ -11,7 +12,7 @@ the old budget leaves a local residual. A continuous full-residual budget is
 implemented as an untrained candidate. Complete-chain CPU costs are measured
 separately; no default weight or release qualification changes.
 
-Latest completed study: [P24 generation-budget factorial](generation-budget-study.md),
+Previous completed study: [P24 generation-budget factorial](generation-budget-study.md),
 four matched 640-wide configurations, two seeds and full 16,192-step budgets.
 All training and review completed on October 17: 9,078 native role replays and 24
 exports. Same-observation synthesis parity passes; one original frontend failure
