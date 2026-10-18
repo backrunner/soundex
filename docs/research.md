@@ -1,5 +1,11 @@
 # Research status and experiment history
 
+Current diagnostic: [P27 residual-decoder collapse and upstream review](head-collapse-audit.md).
+Fixed training crops localize widespread negative GELU saturation; oracle spectra
+still improve the common DSP objective. The 640-wide P26 route is retired from
+further scaling. A compact causal neural/DSP route is specified, not implemented
+or trained. No quality qualification or default-weight change.
+
 Latest completed study: [P26 broad coverage × residual budget](broad-budget-study.md),
 four configurations × two seeds × 16,192 updates. Broad arms remained close to
 identity DSP; full native review did not establish overall restoration. All 560,000
@@ -8,8 +14,8 @@ timing hops were below 5 ms, but per-hop deadlines still missed. No promotion.
 Previous diagnostic: [P25 native inference and coverage audit](context-deployment-audit.md).
 All fixed final P24 endpoints undergo native frontend → ORT → DSP review. The
 finite bank provides only 482 seconds of unique music supervision, and zeroing
-the old budget leaves a local residual. A continuous full-residual budget is
-implemented as an untrained candidate. Complete-chain CPU costs are measured
+the old budget leaves a local residual. A continuous full-residual budget was
+implemented and subsequently trained in P26 without promotion. Complete-chain CPU costs are measured
 separately; no default weight or release qualification changes.
 
 Previous completed study: [P24 generation-budget factorial](generation-budget-study.md),
