@@ -5,10 +5,16 @@ Use Python 3.12 and FFmpeg with the encoders required by your recipe. Install
 PyTorch for your hardware first; see [environment setup](scripts/environment.md)
 for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
+Current experiment: [P31 phase input and residual coordinates](../docs/phase-coordinates-study.md).
+Four small configurations, two seeds, 512 steps each on the same P29 fitted crops,
+with the same direct objective. Independent preflight and 608 tests passed;
+the registered run is active, with full native review and timing queued afterward.
+This is early learnability, not full-corpus training or generalization evidence.
+
 Latest audit: [P30 HF amplitude/phase swaps](../docs/phase-swap-audit.md).
 All eight P29 endpoints, 20 fitted crops and 1,320 native DSP roles completed.
 Reference-assisted diagnostics identify phase and fusion constraints; no new
-training or model promotion. Small phase-input/complex-coordinate controls are proposed.
+training or model promotion in P30; P31 implements the proposed controlled comparison.
 
 Latest diagnostic: [P29 direct spectrum versus deployed supervision](../docs/direct-spectrum-study.md).
 Four matched 431K-parameter configurations, two seeds, 512 updates each on 20 fixed
