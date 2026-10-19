@@ -1,5 +1,10 @@
 # Research status and experiment history
 
+Current experiment: [P32 spectrum-first multi-resolution supervision](spectrum-priority-study.md).
+All arms share architecture and initialization. Six fixed 1,024-step trajectories
+are running after preflight; common raw/native spectral shape, energy and dynamics
+come first, with phase/PCM as auxiliary evidence. No restoration gains claimed yet.
+
 Latest completed experiment: [P31 phase input and residual coordinates](phase-coordinates-study.md).
 All eight fixed endpoints, 320 native roles and 560,000 timing hops completed.
 Amplitude improvements did not establish phase/PCM restoration; Cartesian residuals
@@ -10,7 +15,7 @@ Latest audit: [P30 high-frequency amplitude/phase swaps](phase-swap-audit.md).
 All 1,320 native DSP roles completed on P29 fitted training crops. Reference phase
 reduces PCM error, while reference amplitude with predicted phase increases it.
 The existing fusion also limits reference-assisted recovery. These are nondeployable
-oracle diagnostics, not new model gains; small phase/coordinate controls are next.
+oracle diagnostics, not new model gains; the subsequent P31 controls are recorded above.
 
 Latest diagnostic: [P29 direct clean-spectrum supervision](direct-spectrum-study.md).
 All eight small-model endpoints and 320 native roles completed. Direct supervision

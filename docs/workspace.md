@@ -34,6 +34,12 @@ data/                      Local artifacts, all ignored
 references in historical immutable manifests. New runs should use `data/` paths.
 Retained survey receipts are historical evidence, not an approved source catalog.
 Only the current audited catalog selects training inputs.
+The active [P32 spectrum-first study](spectrum-priority-study.md) is under
+`data/runs/spectrum-priority-p32-20261020/`, with frozen source/configuration and
+background supervision. Its independent preflight, reference checks and isolated
+FFmpeg test environment are under `data/runs/spectrum-priority-p32-preflight-20261020/`.
+No original audio or local experimental checkpoints are published.
+
 The completed [P31 phase/coordinate study](phase-coordinates-study.md) is under
 `data/runs/phase-coordinates-p31-20261019/`, with frozen source, registration,
 supervisor exit records and all eight checkpoints. The read-only assessment and
