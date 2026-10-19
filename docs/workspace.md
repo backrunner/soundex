@@ -34,6 +34,10 @@ data/                      Local artifacts, all ignored
 references in historical immutable manifests. New runs should use `data/` paths.
 Retained survey receipts are historical evidence, not an approved source catalog.
 Only the current audited catalog selects training inputs.
+The completed [P30 phase-swap audit](phase-swap-audit.md) is under
+`data/runs/phase-swap-p30-20261019-v2/`, with frozen source/configuration, all
+reference-assisted native reports and completion integrity evidence. These are
+training-only oracle diagnostics, not deployable model artifacts.
 The completed [P29 direct-spectrum diagnostic](direct-spectrum-study.md) lives under
 `data/runs/direct-spectrum-p29-20261019/`, with frozen source, registration,
 validation receipts, completion audit and successful supervisor exit. Its fixed crops are training

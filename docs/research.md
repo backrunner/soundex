@@ -1,5 +1,11 @@
 # Research status and experiment history
 
+Latest audit: [P30 high-frequency amplitude/phase swaps](phase-swap-audit.md).
+All 1,320 native DSP roles completed on P29 fitted training crops. Reference phase
+reduces PCM error, while reference amplitude with predicted phase increases it.
+The existing fusion also limits reference-assisted recovery. These are nondeployable
+oracle diagnostics, not new model gains; small phase/coordinate controls are next.
+
 Latest diagnostic: [P29 direct clean-spectrum supervision](direct-spectrum-study.md).
 All eight small-model endpoints and 320 native roles completed. Direct supervision
 improved HF energy reconstruction and produced larger residuals, but complex,

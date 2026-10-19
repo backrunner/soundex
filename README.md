@@ -12,6 +12,10 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
+[P30](docs/phase-swap-audit.md) completed 1,320 native DSP diagnostic roles.
+Reference-assisted HF swaps identify phase fidelity and spectral fusion as
+remaining constraints. These oracle results are not deployable model gains.
+
 [P29](docs/direct-spectrum-study.md) completed the small-model, fixed-training-crop
 diagnostic. Direct spectrum supervision improved HF energy reconstruction and
 produced larger residuals, but complex-spectrum, transient and final PCM fidelity
