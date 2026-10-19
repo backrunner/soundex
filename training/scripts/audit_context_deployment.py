@@ -86,7 +86,10 @@ def run(args):
         if not set(p.relative_to(source).parts) & {".venv", "tests", "__pycache__", "outputs"}
     }
     registration = {
-        "scope": "post-hoc reused development; all final endpoints; no model selection or release",
+        "scope": config.get(
+            "review_scope",
+            "post-hoc reused development; all final endpoints; no model selection or release",
+        ),
         "input_hashes": inputs,
         "source_hashes": hashes,
         "cases": paths,
@@ -98,10 +101,12 @@ def run(args):
     old_inputs = [Path(p) for p in config["input_hashes"]]
     rows, _ = load_sources([p for p in old_inputs if p.name == "manifest.jsonl"])
     detector = next(p for p in old_inputs if p.name == "soundex-gain-data")
-    parent = next(p for p in old_inputs if "rendered-p10" in str(p) and p.name == "config.json")
-    clips = EnvelopeClips(
-        rows, detector, Path(config.get("cache_path", read(parent)["cache_path"]))
-    )
+    if "cache_path" in config:
+        cache_path = Path(config["cache_path"])
+    else:
+        parent = next(p for p in old_inputs if "rendered-p10" in str(p) and p.name == "config.json")
+        cache_path = Path(read(parent)["cache_path"])
+    clips = EnvelopeClips(rows, detector, cache_path)
     pool = Pool(config["development"], clips)
     for label, value in sorted(paths.items()):
         records = []
