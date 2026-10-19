@@ -1,8 +1,10 @@
 # Research status and experiment history
 
-Current experiment: [P31 phase input and residual coordinates](phase-coordinates-study.md).
-The small 2×2, two-seed, fixed-512-step diagnostic is running after an independent
-integration preflight. Quality, full native compute and generalization remain unproven.
+Latest completed experiment: [P31 phase input and residual coordinates](phase-coordinates-study.md).
+All eight fixed endpoints, 320 native roles and 560,000 timing hops completed.
+Amplitude improvements did not establish phase/PCM restoration; Cartesian residuals
+remained near zero without decoder saturation. Compute had nine >5 ms outliers and
+79 paced completion misses. This remains training-only diagnosis, with no promotion.
 
 Latest audit: [P30 high-frequency amplitude/phase swaps](phase-swap-audit.md).
 All 1,320 native DSP roles completed on P29 fitted training crops. Reference phase

@@ -12,9 +12,11 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-[P31](docs/phase-coordinates-study.md) has started a fixed 2×2 phase-input/residual-coordinate
-diagnostic: four small configurations, two seeds, 512 updates each. Integration
-preflight passed; learned quality and full compute timing are still pending.
+[P31](docs/phase-coordinates-study.md) completed all eight 512-step endpoints,
+320 full native roles and 560,000 timing hops. Phase inputs improved some amplitude
+metrics but worsened PCM error; global Cartesian groups remained near identity.
+No restoration gain was established. Nine compute calls exceeded 5 ms (max 14.10 ms);
+79 paced completions were late. No model was promoted.
 
 [P30](docs/phase-swap-audit.md) completed 1,320 native DSP diagnostic roles.
 Reference-assisted HF swaps identify phase fidelity and spectral fusion as

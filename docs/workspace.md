@@ -34,9 +34,10 @@ data/                      Local artifacts, all ignored
 references in historical immutable manifests. New runs should use `data/` paths.
 Retained survey receipts are historical evidence, not an approved source catalog.
 Only the current audited catalog selects training inputs.
-The active [P31 phase/coordinate study](phase-coordinates-study.md) is under
+The completed [P31 phase/coordinate study](phase-coordinates-study.md) is under
 `data/runs/phase-coordinates-p31-20261019/`, with frozen source, registration,
-background supervision and checkpoints. Its separate four-step preflight is under
+supervisor exit records and all eight checkpoints. The read-only assessment and
+mechanism diagnostics are in its `evaluation-20261020/` subdirectory. Its separate four-step preflight is under
 `data/runs/phase-coordinates-p31-preflight-20261019/` and passed all 160 native roles.
 These are training diagnostics, not production weights or independent quality evidence.
 

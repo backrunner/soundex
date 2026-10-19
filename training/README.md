@@ -5,11 +5,12 @@ Use Python 3.12 and FFmpeg with the encoders required by your recipe. Install
 PyTorch for your hardware first; see [environment setup](scripts/environment.md)
 for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
-Current experiment: [P31 phase input and residual coordinates](../docs/phase-coordinates-study.md).
-Four small configurations, two seeds, 512 steps each on the same P29 fitted crops,
-with the same direct objective. Independent preflight and 608 tests passed;
-the registered run is active, with full native review and timing queued afterward.
-This is early learnability, not full-corpus training or generalization evidence.
+Latest completed experiment: [P31 phase input and residual coordinates](../docs/phase-coordinates-study.md).
+All eight 512-step endpoints, 320 full native roles and 560,000 timing hops completed.
+Relative phase-input models traded amplitude improvement for worse PCM fidelity;
+global Cartesian models learned almost no residual. No promotion or generalization
+claim. Compute p99 stayed below 1 ms per case, but nine hops exceeded 5 ms and
+79 paced completions were late. Independent preflight, 608 tests and code CI passed.
 
 Latest audit: [P30 HF amplitude/phase swaps](../docs/phase-swap-audit.md).
 All eight P29 endpoints, 20 fitted crops and 1,320 native DSP roles completed.
