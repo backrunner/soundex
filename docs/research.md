@@ -1,5 +1,9 @@
 # Research status and experiment history
 
+Current investigation: [P29 direct clean-spectrum supervision](direct-spectrum-study.md).
+Small-model training-only fit controls compare deployed, direct, joint and fixed-budget
+objectives. This is an early learnability diagnostic, not a new independent evaluation.
+
 Latest completed study: [P28 small-model mechanism controls](small-mechanism-study.md),
 96-wide, 431K–456K parameters, four configurations × two seeds × 2,048
 updates. Training, native review and 560,000 timing hops completed. No intervention

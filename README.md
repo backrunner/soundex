@@ -12,6 +12,10 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
+[P29](docs/direct-spectrum-study.md) is testing direct clean-spectrum supervision
+against deployed and joint objectives in the same small model. This is a fixed
+training-crop learnability diagnostic; results and generalization remain pending.
+
 The [P28 small-model mechanism study](docs/small-mechanism-study.md) is complete:
 431K–456K parameters, four controlled configurations, two seeds and 2,048 updates
 each. It tests decoder normalization, budget-gradient isolation and observed-phase

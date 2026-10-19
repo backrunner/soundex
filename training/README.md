@@ -5,6 +5,13 @@ Use Python 3.12 and FFmpeg with the encoders required by your recipe. Install
 PyTorch for your hardware first; see [environment setup](scripts/environment.md)
 for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
+Current run: [P29 direct spectrum versus deployed supervision](../docs/direct-spectrum-study.md).
+Four matched 431K-parameter configurations, two seeds, 512 updates each on 20 fixed
+training crops. Direct clean amplitude/complex/envelope/dynamics supervision is
+tested separately and jointly with the old deployed objective, plus a fixed-budget
+control. This is early learnability diagnosis, not full training or generalization.
+The full pipeline preflight passed; final candidate results remain pending.
+
 Latest completed run: [P28 small-model mechanism controls](../docs/small-mechanism-study.md).
 Four 96-wide configurations (431K–456K parameters), two seeds, 2,048 updates each.
 Decoder normalization, budget-auxiliary gradient isolation and observed-phase
