@@ -170,9 +170,16 @@ def train(arm, seed, root, config, batches):
     if (directory / "complete.json").exists():
         verify_receipt(directory, "files")
         return
-    model = make_model(seed, arm)
+    if "model_configs" in config:
+        torch.manual_seed(seed)
+        model = RestorationHead(**config["model_configs"][arm])
+    else:
+        model = make_model(seed, arm)
     initial = tensor_digest(model)
-    registered({"initial_sha256": initial}, root / f"initialization-{seed}.json")
+    initial_name = (
+        f"initialization-{arm}-{seed}" if "model_configs" in config else f"initialization-{seed}"
+    )
+    registered({"initial_sha256": initial}, root / f"{initial_name}.json")
     optimizer = torch.optim.Adam(
         [p for p in model.parameters() if p.requires_grad], lr=config["rate"]
     )
@@ -192,7 +199,7 @@ def train(arm, seed, root, config, batches):
         optimizer.zero_grad(set_to_none=True)
         prediction, budget = predict_budget(model, objective.batch, context)
         terms = objective_terms(prediction, budget, objective, config["weight"])
-        loss = optimized_loss(arm, terms)
+        loss = optimized_loss(config.get("optimization_arms", {}).get(arm, arm), terms)
         if not torch.isfinite(loss):
             raise ValueError("nonfinite training objective")
         loss.backward()
@@ -210,7 +217,7 @@ def train(arm, seed, root, config, batches):
             state = {
                 "arm": arm,
                 "step": step,
-                "model_config": MODEL,
+                "model_config": config.get("model_configs", {}).get(arm, MODEL),
                 "model": model.state_dict(),
                 "optimizer": optimizer.state_dict(),
                 "history": history,
@@ -307,13 +314,13 @@ def oracle_audit(batches):
     }
 
 
-def run(args):
+def run(args, *, register_study=register, completion_stage="complete"):
     torch.set_num_threads(1)
     root = args.output.resolve()
     root.mkdir(parents=True, exist_ok=True)
     with (root / "run.lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        config = register(args, root)
+        config = register_study(args, root)
         if args.prepare_only:
             return
         paths = [Path(p) for p in config["input_hashes"]]
@@ -324,11 +331,11 @@ def run(args):
         batches = [pool.select(list(range(i, i + 5))) for i in range(0, len(pool.specs), 5)]
         write_json_report(oracle_audit(batches), root / "oracle.json")
         for seed in config["seeds"]:
-            for arm in ARMS:
+            for arm in config["arms"]:
                 train(arm, seed, root, config, batches)
         checkpoints = {}
         for seed in config["seeds"]:
-            for arm in ARMS:
+            for arm in config["arms"]:
                 path = root / f"{arm}-{seed}/step-{config['steps']}.pth"
                 checkpoints[f"{arm}-{config['steps']}-{seed}"] = {
                     "arm": arm,
@@ -404,7 +411,7 @@ def run(args):
         audit_native(
             SimpleNamespace(study=root, output=root / "native-audit", binary=args.native_binary)
         )
-        progress(root, stage="complete", preflight=args.preflight)
+        progress(root, stage=completion_stage, preflight=args.preflight)
 
 
 if __name__ == "__main__":

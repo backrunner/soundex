@@ -25,6 +25,7 @@ class RestorationHead(nn.Module):
         budget_scope="global",
         decoder_normalization=False,
         phase_input=False,
+        residual_coordinates="input_relative",
     ):
         super().__init__()
         if arm not in ARMS:
@@ -37,6 +38,10 @@ class RestorationHead(nn.Module):
             raise ValueError("generation budget requires the complex head")
         if (decoder_normalization or phase_input) and arm != "complex":
             raise ValueError("mechanism interventions require the complex head")
+        if residual_coordinates not in {"input_relative", "global_cartesian"} or (
+            residual_coordinates != "input_relative" and arm != "complex"
+        ):
+            raise ValueError("global Cartesian residual coordinates require the complex head")
         if budget_scope not in {"global", "residual"} or (
             budget_scope == "residual" and not generation_budget
         ):
@@ -48,6 +53,7 @@ class RestorationHead(nn.Module):
         self.budget_scope = budget_scope
         self.decoder_normalization = decoder_normalization
         self.phase_input = phase_input
+        self.residual_coordinates = residual_coordinates
         self.backbone = make_rendered_model("rendered_balanced", width)
         self.state_size = self.backbone.state_size
         if arm != "anchored":
@@ -138,11 +144,20 @@ class RestorationHead(nn.Module):
             if self.budget_scope == "residual"
             else scale * (power + generation.square()).sqrt()
         )
-        real = magnitude + units * delta[..., :129]
+        delta_real = delta[..., :129]
+        delta_imag = delta[..., 129:] * self.interior if self.arm == "complex" else None
+        if self.residual_coordinates == "global_cartesian":
+            # The decoder predicts physical real/imaginary residuals. Rotate only
+            # for the common polar output conversion, not to anchor the residual
+            # direction to an unreliable observed phase. Zero stays exact identity.
+            phase = original[:, 1]
+            delta_real, delta_imag = (
+                delta_real * phase.cos() + delta_imag * phase.sin(),
+                -delta_real * phase.sin() + delta_imag * phase.cos(),
+            )
+        real = magnitude + units * delta_real
         imag = (
-            units * delta[..., 129:] * self.interior
-            if self.arm == "complex"
-            else torch.zeros_like(real)
+            units * delta_imag * self.interior if self.arm == "complex" else torch.zeros_like(real)
         )
         epsilon = torch.full_like(scale, 1e-15)
         amplitude = (real.square() + imag.square() + epsilon.square()).sqrt()

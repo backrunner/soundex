@@ -105,6 +105,7 @@ def export_graph(model, path, *, experimental_unbounded=False):
             "soundex.budget_scope": model.budget_scope,
             "soundex.decoder_normalization": str(model.decoder_normalization).lower(),
             "soundex.phase_input": str(model.phase_input).lower(),
+            "soundex.residual_coordinates": model.residual_coordinates,
         },
     )
     onnx.checker.check_model(graph, full_check=True)
