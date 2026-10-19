@@ -34,9 +34,10 @@ data/                      Local artifacts, all ignored
 references in historical immutable manifests. New runs should use `data/` paths.
 Retained survey receipts are historical evidence, not an approved source catalog.
 Only the current audited catalog selects training inputs.
-The current [P28 small-model study](small-mechanism-study.md) lives under
+The completed [P28 small-model study](small-mechanism-study.md) lives under
 `data/runs/small-mechanisms-p28-20261019/`, with committed frozen source,
-`study/progress.json`, `pipeline.log` and a detached `supervisor.json` status.
+`study/progress.json`, `pipeline.log` and `supervisor.json` recording successful exit.
+`completion-audit-20261019.json` records the final artifact integrity check.
 Its separate discarded preflight is under `data/runs/small-mechanisms-p28-preflight-20261019/`.
 The [P27 mechanism audit](head-collapse-audit.md) remains under
 `data/runs/head-collapse-p27-20261019-v2/`. The completed P26 large-model route is

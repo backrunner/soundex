@@ -5,11 +5,13 @@ Use Python 3.12 and FFmpeg with the encoders required by your recipe. Install
 PyTorch for your hardware first; see [environment setup](scripts/environment.md)
 for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
-Current run: [P28 small-model mechanism controls](../docs/small-mechanism-study.md).
+Latest completed run: [P28 small-model mechanism controls](../docs/small-mechanism-study.md).
 Four 96-wide configurations (431K–456K parameters), two seeds, 2,048 updates each.
 Decoder normalization, budget-auxiliary gradient isolation and observed-phase
-inputs are tested separately against a matched control. The end-to-end training-only
-preflight passed; the frozen-source run includes subsequent native review and timing.
+inputs were tested separately against a matched control. All eight endpoints,
+1,424 full native roles and 560,000 timing hops completed. No intervention passed
+the two-seed improvement screen; near-identity output persists without GELU collapse
+on the diagnostic crops. All compute stayed below 5 ms, but hop deadlines still missed.
 It is an optimization diagnosis, not full convergence or permission to scale up.
 
 [P27](../docs/head-collapse-audit.md) retired the 640-wide / 11.92M-parameter route.

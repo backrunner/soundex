@@ -1,9 +1,11 @@
 # Research status and experiment history
 
-Current run: [P28 small-model mechanism controls](small-mechanism-study.md),
+Latest completed study: [P28 small-model mechanism controls](small-mechanism-study.md),
 96-wide, 431K–456K parameters, four configurations × two seeds × 2,048
-updates. End-to-end train-only preflight passed; formal training and subsequent
-native review/timing run from frozen source. No quality conclusion or scale-up.
+updates. Training, native review and 560,000 timing hops completed. No intervention
+passed the two-seed improvement screen. The diagnostic crops show no GELU collapse,
+yet output remains near identity DSP. Compute stayed below 5 ms, with five service
+overruns and 32 paced completion misses. No promotion or scale-up.
 
 Current diagnostic: [P27 residual-decoder collapse and upstream review](head-collapse-audit.md).
 Fixed training crops localize widespread negative GELU saturation; oracle spectra
@@ -12,7 +14,7 @@ further scaling. A compact causal neural/DSP route is specified; P28 implements 
 the small mechanism controls, while a new DSP excitation branch remains unimplemented.
 No quality qualification or default-weight change.
 
-Latest completed study: [P26 broad coverage × residual budget](broad-budget-study.md),
+Previous completed study: [P26 broad coverage × residual budget](broad-budget-study.md),
 four configurations × two seeds × 16,192 updates. Broad arms remained close to
 identity DSP; full native review did not establish overall restoration. All 560,000
 timing hops were below 5 ms, but per-hop deadlines still missed. No promotion.
