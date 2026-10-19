@@ -12,9 +12,10 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-[P29](docs/direct-spectrum-study.md) is testing direct clean-spectrum supervision
-against deployed and joint objectives in the same small model. This is a fixed
-training-crop learnability diagnostic; results and generalization remain pending.
+[P29](docs/direct-spectrum-study.md) completed the small-model, fixed-training-crop
+diagnostic. Direct spectrum supervision improved HF energy reconstruction and
+produced larger residuals, but complex-spectrum, transient and final PCM fidelity
+did not improve together. No model was promoted; generalization remains untested.
 
 The [P28 small-model mechanism study](docs/small-mechanism-study.md) is complete:
 431K–456K parameters, four controlled configurations, two seeds and 2,048 updates
