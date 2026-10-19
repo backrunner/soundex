@@ -54,7 +54,7 @@ def protocol(parent, *, preflight=False):
     }
 
 
-def register(args, root):
+def register(args, root, *, make_protocol=protocol, parent_format="soundex-direct-spectrum-fit-v1"):
     destination = root / "registration.json"
     if destination.exists():
         config = read(destination)
@@ -65,14 +65,14 @@ def register(args, root):
     parent_path = args.parent.resolve()
     parent = read(parent_path / "registration.json")
     if (
-        parent["format"] != "soundex-direct-spectrum-fit-v1"
+        parent["format"] != parent_format
         or read(parent_path / "progress.json")["stage"] != "complete"
     ):
-        raise ValueError("completed P29 parent required")
+        raise ValueError("completed parent with matching protocol required")
     for rel, expected in parent["source_hashes"].items():
         if sha256_file(parent_path.parent / "source/training" / rel) != expected:
             raise ValueError("parent frozen source drift")
-    config = protocol(parent, preflight=args.preflight)
+    config = make_protocol(parent, preflight=args.preflight)
     inputs = dict(parent["input_hashes"])
     for p in (
         parent_path / "registration.json",
@@ -98,8 +98,8 @@ def register(args, root):
             torch.manual_seed(seed)
             models[arm] = RestorationHead(**options)
             config["parameters"][arm] = sum(p.numel() for p in models[arm].parameters())
-        for arm in ARMS[1:]:
-            for key, value in models[ARMS[0]].state_dict().items():
+        for arm in list(models)[1:]:
+            for key, value in models[next(iter(models))].state_dict().items():
                 if not torch.equal(value, models[arm].state_dict()[key]):
                     raise ValueError("unmatched common initialization")
     verify_inputs(config)

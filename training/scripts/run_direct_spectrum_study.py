@@ -164,7 +164,7 @@ def register(args, root):
     return config
 
 
-def train(arm, seed, root, config, batches):
+def train(arm, seed, root, config, batches, *, training_terms=None):
     directory = root / f"{arm}-{seed}"
     directory.mkdir(exist_ok=True)
     if (directory / "complete.json").exists():
@@ -198,8 +198,12 @@ def train(arm, seed, root, config, batches):
         objective, context = batches[(step - 1) % len(batches)]
         optimizer.zero_grad(set_to_none=True)
         prediction, budget = predict_budget(model, objective.batch, context)
-        terms = objective_terms(prediction, budget, objective, config["weight"])
-        loss = optimized_loss(config.get("optimization_arms", {}).get(arm, arm), terms)
+        terms = (training_terms or objective_terms)(prediction, budget, objective, config["weight"])
+        loss = (
+            sum(weight * terms[name] for name, weight in config["loss_routes"][arm].items())
+            if "loss_routes" in config
+            else optimized_loss(config.get("optimization_arms", {}).get(arm, arm), terms)
+        )
         if not torch.isfinite(loss):
             raise ValueError("nonfinite training objective")
         loss.backward()
@@ -314,7 +318,7 @@ def oracle_audit(batches):
     }
 
 
-def run(args, *, register_study=register, completion_stage="complete"):
+def run(args, *, register_study=register, completion_stage="complete", training_terms=None):
     torch.set_num_threads(1)
     root = args.output.resolve()
     root.mkdir(parents=True, exist_ok=True)
@@ -332,7 +336,7 @@ def run(args, *, register_study=register, completion_stage="complete"):
         write_json_report(oracle_audit(batches), root / "oracle.json")
         for seed in config["seeds"]:
             for arm in config["arms"]:
-                train(arm, seed, root, config, batches)
+                train(arm, seed, root, config, batches, training_terms=training_terms)
         checkpoints = {}
         for seed in config["seeds"]:
             for arm in config["arms"]:
