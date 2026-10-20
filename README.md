@@ -12,6 +12,11 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
+[P33](docs/broad-spectrum-study.md) is training broad-coverage control versus added
+multi-resolution supervision: four fresh 431K-parameter trajectories, 16,192
+updates each, 253 training music recordings and recording-isolated reused validation.
+Preflight and 632 tests passed; broader recovery gains are not yet established.
+
 [P32](docs/spectrum-priority-study.md) completed six 1,024-step spectrum-first
 diagnostics. Adding multi-resolution supervision reduced native music spectrum
 error by 2.02–2.35% against the matched control on fitted training crops; transient

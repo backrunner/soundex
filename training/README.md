@@ -5,6 +5,12 @@ Use Python 3.12 and FFmpeg with the encoders required by your recipe. Install
 PyTorch for your hardware first; see [environment setup](scripts/environment.md)
 for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
+Current running experiment: [P33 broad spectrum supervision](../docs/broad-spectrum-study.md).
+Four fresh 431K-parameter trajectories, 16,192 updates each, paired broad schedules
+covering 253 training music recordings and 193 speech recordings. All endpoints
+freeze before recording-isolated reused validation. No new independent-test claim,
+mid-run selection or promotion. Preflight and 632 Python tests passed.
+
 Latest completed experiment: [P32 spectrum-first multi-resolution supervision](../docs/spectrum-priority-study.md).
 Three matched 431K-parameter models, two seeds and 1,024 steps each on fixed training
 crops. Control, added MR and primary MR objectives are scored with the same
@@ -13,7 +19,7 @@ waveform loss is optimized. All six endpoints and native reviews completed.
 Added MR reduced native music spectrum error by 2.02–2.35% versus matched control
 on fitted crops; dynamics/PCM and generalization remain unresolved. All 420,000
 timing hops are retained, including 91 >5 ms calls (max 45.00 ms). No promotion.
-Preflight and 620 tests passed; no subsequent training has started.
+P32 preflight and its 620 tests passed; P33 now extends actual training coverage.
 
 Previous experiment: [P31 phase input and residual coordinates](../docs/phase-coordinates-study.md).
 All eight 512-step endpoints, 320 full native roles and 560,000 timing hops completed.
