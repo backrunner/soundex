@@ -5,13 +5,17 @@ Use Python 3.12 and FFmpeg with the encoders required by your recipe. Install
 PyTorch for your hardware first; see [environment setup](scripts/environment.md)
 for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
-Current experiment: [P32 spectrum-first multi-resolution supervision](../docs/spectrum-priority-study.md).
+Latest completed experiment: [P32 spectrum-first multi-resolution supervision](../docs/spectrum-priority-study.md).
 Three matched 431K-parameter models, two seeds and 1,024 steps each on fixed training
 crops. Control, added MR and primary MR objectives are scored with the same
 256/1024/2048-point spectrum metrics before auxiliary phase/PCM checks. No samplewise
-waveform loss is optimized. Preflight and 620 tests passed; the frozen run is active.
+waveform loss is optimized. All six endpoints and native reviews completed.
+Added MR reduced native music spectrum error by 2.02–2.35% versus matched control
+on fitted crops; dynamics/PCM and generalization remain unresolved. All 420,000
+timing hops are retained, including 91 >5 ms calls (max 45.00 ms). No promotion.
+Preflight and 620 tests passed; no subsequent training has started.
 
-Latest completed experiment: [P31 phase input and residual coordinates](../docs/phase-coordinates-study.md).
+Previous experiment: [P31 phase input and residual coordinates](../docs/phase-coordinates-study.md).
 All eight 512-step endpoints, 320 full native roles and 560,000 timing hops completed.
 Relative phase-input models traded amplitude improvement for worse PCM fidelity;
 global Cartesian models learned almost no residual. No promotion or generalization

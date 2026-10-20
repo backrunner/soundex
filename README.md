@@ -12,11 +12,12 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-[P32](docs/spectrum-priority-study.md) is running a spectrum-first supervision
-comparison: three identical small architectures, two seeds and 1,024 updates each.
-It adds 256/1024/2048-point spectral shape, energy and dynamics supervision;
-samplewise waveform error is auxiliary evaluation, not the main training target.
-Preflight and 620 tests passed; restoration gains remain unverified.
+[P32](docs/spectrum-priority-study.md) completed six 1,024-step spectrum-first
+diagnostics. Adding multi-resolution supervision reduced native music spectrum
+error by 2.02–2.35% against the matched control on fitted training crops; transient
+and PCM fidelity remain unresolved, and generalization is untested. Across 420,000
+timing hops, 91 exceeded 5 ms (max 45.00 ms); realtime tails remain unqualified.
+Preflight and 620 tests passed. No model was promoted.
 
 [P31](docs/phase-coordinates-study.md) completed all eight 512-step endpoints,
 320 full native roles and 560,000 timing hops. Phase inputs improved some amplitude

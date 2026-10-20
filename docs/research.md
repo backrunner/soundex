@@ -1,11 +1,13 @@
 # Research status and experiment history
 
-Current experiment: [P32 spectrum-first multi-resolution supervision](spectrum-priority-study.md).
+Latest completed experiment: [P32 spectrum-first multi-resolution supervision](spectrum-priority-study.md).
 All arms share architecture and initialization. Six fixed 1,024-step trajectories
-are running after preflight; common raw/native spectral shape, energy and dynamics
-come first, with phase/PCM as auxiliary evidence. No restoration gains claimed yet.
+and all native reviews completed. Added MR reduced native music spectral error
+by 2.02–2.35% versus control on fitted crops, with inconsistent dynamics and higher
+PCM error. Primary MR weakened speech results. Generalization remains untested;
+91 of 420,000 compute calls exceeded 5 ms. No promotion or subsequent training.
 
-Latest completed experiment: [P31 phase input and residual coordinates](phase-coordinates-study.md).
+Previous experiment: [P31 phase input and residual coordinates](phase-coordinates-study.md).
 All eight fixed endpoints, 320 native roles and 560,000 timing hops completed.
 Amplitude improvements did not establish phase/PCM restoration; Cartesian residuals
 remained near zero without decoder saturation. Compute had nine >5 ms outliers and
