@@ -12,6 +12,13 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
+[P34](docs/risk-balance-study.md) completed three debugging rounds on one 431k-parameter
+architecture, five matched 1,024-step endpoints. Smooth risk compression removed gradient
+clipping; an intermediate identity weight improved native music MR error by 0.305% on
+unfitted training-domain crops, with remaining dynamics/identity regressions. An added
+overshoot guard did not improve the overall tradeoff. These are single-seed, finite-pool
+diagnostics, not independent generalization or qualified restoration weights.
+
 [P33](docs/broad-spectrum-study.md) completed all four 16,192-step broad-coverage
 trajectories and native reviews. Added MR supervision did not improve music over
 matched control on recording-isolated reused validation; speech spectral means
