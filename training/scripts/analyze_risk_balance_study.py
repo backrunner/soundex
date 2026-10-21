@@ -86,7 +86,12 @@ def run(root):
             raise ValueError("incomplete training")
         cases[label]["clipped_updates"] = sum(r["gradient_norm"] > 5 for r in history)
         cases[label]["gradient_max"] = max(r["gradient_norm"] for r in history)
-    control = next(label for label in labels if label.startswith("control-"))
+    if config.get("followup"):
+        reference = read(Path(config["control_assessment"]))
+        for label, value in reference["cases"].items():
+            if label != "initial":
+                cases[label] = value
+    control = next(label for label in cases if label.startswith("control-"))
     for label in labels:
         for group, score in cases[label]["spectral"].items():
             original = group.rsplit("/", 1)[0] + "/input"

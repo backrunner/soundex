@@ -37,6 +37,8 @@ def training_terms(prediction, budget, objective, weight):
         "compressed": reconstruction_risk(*args, compress=True) + auxiliary,
         "compressed_identity": reconstruction_risk(*args, compress=True, identity_weight=0.1)
         + auxiliary,
+        "compressed_identity_mid": reconstruction_risk(*args, compress=True, identity_weight=0.3)
+        + auxiliary,
         "raw": direct["total"],
         "multires": multires["total"],
         "budget": auxiliary,

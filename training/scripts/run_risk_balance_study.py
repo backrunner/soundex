@@ -34,25 +34,27 @@ from scripts.run_head_study import progress
 ARMS = ("control", "compressed", "compressed_identity")
 
 
-def protocol(parent, *, preflight=False):
+def protocol(parent, *, preflight=False, followup=False):
     steps = 2 if preflight else 1024
+    arms = ("compressed_identity_mid",) if followup else ARMS
     return {
         "format": "soundex-risk-balance-diagnostic-v1",
         "scope": "single architecture/seed fixed train-crop diagnosis; not convergence or capacity ranking",
         "review_scope": "fitted and unfitted TRAINING-domain crops, separated by registered scope; no independent test or promotion",
-        "arms": list(ARMS),
+        "arms": list(arms),
         "seeds": [20261012],
         "steps": steps,
         "primary_endpoint": steps,
         "smoke": preflight,
-        "model_configs": {arm: dict(MODEL) for arm in ARMS},
-        "loss_routes": {arm: {arm: 1} for arm in ARMS},
+        "followup": followup,
+        "model_configs": {arm: dict(MODEL) for arm in arms},
+        "loss_routes": {arm: {arm: 1} for arm in arms},
         "rate": 1e-4,
         "weight": 0.0,
         "multires_loss": parent["multires_loss"],
-        "paced_arms": list(ARMS),
+        "paced_arms": list(arms),
         "optimization": "fresh shared initialization; Adam 1e-4 no decay, clip 5; identical cyclic batches, 4 music/1 speech and identities; true 80-frame no-grad warmup; paired coefficient .5 fixed",
-        "contrasts": "control=direct+MR+0.1 budget; compressed=log1p of each per-example direct/MR risk; compressed_identity additionally changes identity coefficient .5 to .05, budget unchanged",
+        "contrasts": "control=direct+MR+0.1 budget; compressed=log1p of each per-example direct/MR risk; compressed_identity changes identity coefficient .5 to .05; followup compressed_identity_mid uses .15; budget unchanged",
         "selection": "all final endpoints frozen before scoring; identical fixed budgets; no mid-run selection or validation access; common uncompressed MR v1, recording and crop summaries, every outlier retained",
         "stop_policy": "nonfinite/integrity/runtime failure only; no early performance stopping",
     }
@@ -62,7 +64,7 @@ def register(args, root):
     destination = root / "registration.json"
     if destination.exists():
         config = read(destination)
-        if config["smoke"] != args.preflight:
+        if config["smoke"] != args.preflight or config.get("followup", False) != args.followup:
             raise ValueError("preflight/full drift")
         verify_inputs(config)
         return config
@@ -72,7 +74,7 @@ def register(args, root):
         raise ValueError("P33 parent required")
     if read(parent_path / "progress.json")["stage"] != "complete":
         raise ValueError("completed P33 parent required")
-    config = protocol(parent, preflight=args.preflight)
+    config = protocol(parent, preflight=args.preflight, followup=args.followup)
     required = {
         "manifest.jsonl",
         "soundex-gain-data",
@@ -136,6 +138,30 @@ def register(args, root):
         }
         for scope, specs in (("fitted", fit), ("unfitted_train", transfer))
     }
+    if args.followup:
+        if args.control_study is None:
+            raise ValueError("completed equal-budget control study required")
+        control_root = args.control_study.resolve()
+        control = read(control_root / "registration.json")
+        if read(control_root / "progress.json")["stage"] != "complete":
+            raise ValueError("control study incomplete")
+        for key in ("steps", "seeds", "fit_specs", "transfer_specs", "multires_loss"):
+            if control[key] != config[key]:
+                raise ValueError(f"unequal control {key}")
+        if any(value != MODEL for value in control["model_configs"].values()):
+            raise ValueError("different control architecture")
+        config["control_assessment"] = str(control_root / "assessment.json")
+        config["review_scope"] += (
+            "; followup selected after first-round results: diagnostic development, not fresh holdout"
+        )
+        for path in (
+            control_root / "assessment.json",
+            control_root / "registration.json",
+            control_root / "review-registration.json",
+        ):
+            inputs[str(path)] = sha256_file(path)
+        for endpoint in read(control_root / "review-registration.json").values():
+            inputs[endpoint["path"]] = endpoint["sha256"]
     for p in (parent_path / "registration.json", schedule_path, args.native_binary.resolve()):
         inputs[str(p)] = sha256_file(p)
     for s in fit + transfer:
@@ -179,11 +205,11 @@ def run(args):
         # Finite diagnostic pool: retain immutable tensors, no random crop or disk-cache growth.
         batches = [pool.select(list(range(i, i + 5))) for i in range(0, len(pool.rows), 5)]
         seed = config["seeds"][0]
-        for arm in ARMS:
+        for arm in config["arms"]:
             progress(root, stage="training_start", arm=arm, seed=seed)
             train(arm, seed, root, config, batches, training_terms=training_terms)
         endpoints = {}
-        for arm in ARMS:
+        for arm in config["arms"]:
             path = root / f"{arm}-{seed}/step-{config['steps']}.pth"
             endpoints[f"{arm}-{config['steps']}-{seed}"] = {
                 "arm": arm,
@@ -229,6 +255,8 @@ if __name__ == "__main__":
     for name in ("parent", "output", "native-binary"):
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--preflight", action="store_true")
+    parser.add_argument("--followup", action="store_true")
+    parser.add_argument("--control-study", type=Path)
     args = parser.parse_args()
     try:
         run(args)

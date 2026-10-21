@@ -83,3 +83,8 @@ def test_protocol_is_one_architecture_fixed_seed_equal_budget_and_train_only():
     assert config["loss_routes"] == {a: {a: 1} for a in ARMS}
     assert "TRAINING" in config["review_scope"]
     assert protocol({"multires_loss": {}}, preflight=True)["steps"] == 2
+    followup = protocol({"multires_loss": {}}, followup=True)
+    assert followup["arms"] == ["compressed_identity_mid"] and followup["steps"] == 1024
+    assert (
+        followup["model_configs"]["compressed_identity_mid"] == config["model_configs"]["control"]
+    )
