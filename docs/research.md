@@ -1,12 +1,14 @@
 # Research status and experiment history
 
-Current running experiment: [P33 broad spectrum supervision](broad-spectrum-study.md).
+Latest completed experiment: [P33 broad spectrum supervision](broad-spectrum-study.md).
 Matched control/mr_add, two seeds and 16,192 steps each, fresh initialization,
-full broad schedules and recording-isolated reused validation. No promotion.
+full broad schedules and recording-isolated reused validation. All four trajectories
+completed; no added-MR music advantage, speech means improved with worse dynamics.
+Two compute calls exceeded 5 ms. No promotion or subsequent training.
 Companion P32 stage analysis localizes most raw-to-native spectral loss to fusion;
 the scheduling diagnostic separately compares the same binary under two policies.
 
-Latest completed experiment: [P32 spectrum-first multi-resolution supervision](spectrum-priority-study.md).
+Previous experiment: [P32 spectrum-first multi-resolution supervision](spectrum-priority-study.md).
 All arms share architecture and initialization. Six fixed 1,024-step trajectories
 and all native reviews completed. Added MR reduced native music spectral error
 by 2.02–2.35% versus control on fitted crops, with inconsistent dynamics and higher

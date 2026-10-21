@@ -34,9 +34,11 @@ data/                      Local artifacts, all ignored
 references in historical immutable manifests. New runs should use `data/` paths.
 Retained survey receipts are historical evidence, not an approved source catalog.
 Only the current audited catalog selects training inputs.
-The running [P33 broad spectrum study](broad-spectrum-study.md) is under
+The completed [P33 broad spectrum study](broad-spectrum-study.md) is under
 `data/runs/broad-spectrum-p33-20261020/`, including frozen update sequences,
-source dependencies and background supervisor. The completed preflight is under
+source dependencies, four final endpoints, native reviews and 280,000 timing hops.
+`evaluation-20261021/` verifies 731 evidence files and records per-recording
+spectral comparisons, regressions and timing tails. The completed preflight is under
 `data/runs/broad-spectrum-p33-preflight-20261020-v2/`; the earlier preparation-only
 attempt remains as failure evidence. P32 stage attribution and scheduling
 comparisons are separately retained in `data/runs/spectrum-stages-p32-20261020/`

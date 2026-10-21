@@ -12,10 +12,11 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-[P33](docs/broad-spectrum-study.md) is training broad-coverage control versus added
-multi-resolution supervision: four fresh 431K-parameter trajectories, 16,192
-updates each, 253 training music recordings and recording-isolated reused validation.
-Preflight and 632 tests passed; broader recovery gains are not yet established.
+[P33](docs/broad-spectrum-study.md) completed all four 16,192-step broad-coverage
+trajectories and native reviews. Added MR supervision did not improve music over
+matched control on recording-isolated reused validation; speech spectral means
+improved 0.86–1.26%, with worse dynamics. Music restoration remains weak.
+Two of 280,000 compute calls exceeded 5 ms (max 8.445 ms). No model was promoted.
 
 [P32](docs/spectrum-priority-study.md) completed six 1,024-step spectrum-first
 diagnostics. Adding multi-resolution supervision reduced native music spectrum
