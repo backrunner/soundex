@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Frozen P32 stage attribution using actual Rust frontend/ORT predictions.
+"""Frozen study stage attribution using actual Rust frontend/ORT predictions.
 
 No DSP override is deployed. Unlimited stages are diagnostic counterfactuals.
 """
@@ -67,7 +67,8 @@ def run(args):
         if not set(p.relative_to(source).parts) & {".venv", "outputs", "tests", "__pycache__"}
     }
     registration = {
-        "scope": "post-hoc stage diagnosis on all fitted P32 crops/endpoints, original unclipped clean reference; not an optimization or deployment change",
+        "scope": "post-hoc stage diagnosis on all registered crops/endpoints, original unclipped clean reference; not an optimization or deployment change",
+        "parent_review_scope": config["review_scope"],
         "stages": ["raw_ola", "fused_ola", "gated_unlimited", "limited_output", "native_output"],
         "reference": "original clean for paired AND identity",
         "input_hashes": inputs,

@@ -87,24 +87,34 @@ def protocol(parent, *, preflight=False):
     }
 
 
-def register(args, root):
+def register(
+    args,
+    root,
+    *,
+    make_protocol=protocol,
+    parent_format="soundex-broad-spectrum-v1",
+    study_format="soundex-broad-risk-v1",
+    reference_files=(),
+):
     destination = root / "registration.json"
     if destination.exists():
         config = read(destination)
-        if config["smoke"] != args.preflight or config["format"] != "soundex-broad-risk-v1":
+        if config["smoke"] != args.preflight or config["format"] != study_format:
             raise ValueError("protocol drift")
         verify_inputs(config)
         return config
     parent_root = args.parent.resolve()
     parent = read(parent_root / "registration.json")
-    if parent["format"] != "soundex-broad-spectrum-v1" or parent["steps"] != STEPS:
-        raise ValueError("full P33 parent required")
+    if parent["format"] != parent_format or parent["steps"] != STEPS:
+        raise ValueError("matched full-budget parent required")
     if read(parent_root / "progress.json")["stage"] != "complete":
         raise ValueError("completed parent required")
     for name, expected in parent["source_hashes"].items():
         if sha256_file(parent_root.parent / "source/training" / name) != expected:
             raise ValueError("parent frozen source drift")
-    config = protocol(parent, preflight=args.preflight)
+    config = make_protocol(parent, preflight=args.preflight)
+    if config["format"] != study_format:
+        raise ValueError("protocol format mismatch")
     required = {
         "manifest.jsonl",
         "soundex-gain-data",
@@ -117,6 +127,7 @@ def register(args, root):
         parent_root / "registration.json",
         parent_root / "progress.json",
         args.native_binary.resolve(),
+        *reference_files,
     ):
         inputs[str(path)] = sha256_file(path)
     rows, _ = load_sources([Path(p) for p in inputs if Path(p).name == "manifest.jsonl"])
@@ -182,7 +193,7 @@ def register(args, root):
     }
     for seed in config["seeds"]:
         initials = []
-        for arm in ARMS:
+        for arm in config["arms"]:
             torch.manual_seed(seed)
             model = RestorationHead(**config["model_configs"][arm])
             if sum(p.numel() for p in model.parameters()) != config["parameters"][arm]:
@@ -190,6 +201,9 @@ def register(args, root):
             initials.append(tensor_digest(model))
         if len(set(initials)) != 1:
             raise ValueError("initialization mismatch")
+        expected = config.get("reference_initializations", {}).get(str(seed))
+        if expected is not None and initials[0] != expected:
+            raise ValueError("reference initialization mismatch")
     config["input_hashes"] = inputs
     verify_inputs(config)
     for name in config["source_hashes"]:
@@ -200,13 +214,13 @@ def register(args, root):
     return config
 
 
-def run(args):
+def run(args, *, register_study=register, training_objective=training_terms, assessment=assess):
     torch.set_num_threads(1)
     root = args.output.resolve()
     root.mkdir(parents=True, exist_ok=True)
     with (root / "run.lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        config = register(args, root)
+        config = register_study(args, root)
         if args.prepare_only:
             return
         paths = [Path(p) for p in config["input_hashes"]]
@@ -219,13 +233,13 @@ def run(args):
         for seed in config["seeds"]:
             schedule = read(Path(config["schedule_files"][str(seed)]))
             batches = ScheduledBatches(LazyPool(schedule["specs"], clips), schedule["draws"])
-            for arm in ARMS:
+            for arm in config["arms"]:
                 progress(root, stage="training_start", arm=arm, seed=seed, end=config["steps"])
-                train(arm, seed, root, config, batches, training_terms=training_terms)
+                train(arm, seed, root, config, batches, training_terms=training_objective)
         verify_inputs(config)
         endpoints = {}
         for seed in config["seeds"]:
-            for arm in ARMS:
+            for arm in config["arms"]:
                 path = root / f"{arm}-{seed}/step-{config['steps']}.pth"
                 endpoints[f"{arm}-{config['steps']}-{seed}"] = {
                     "arm": arm,
@@ -267,7 +281,7 @@ def run(args):
                 SimpleNamespace(study=root, output=root / "native-cost", binary=args.native_binary)
             )
         verify_inputs(config)
-        assess(root)
+        assessment(root)
         progress(root, stage="complete", preflight=args.preflight)
 
 

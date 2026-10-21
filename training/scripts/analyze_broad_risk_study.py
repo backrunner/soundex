@@ -12,11 +12,11 @@ from scripts.run_capacity_study import verify_inputs
 from scripts.run_consistency_followup import read
 
 
-def run(root):
+def collect_cases(root, *, study_format="soundex-broad-risk-v1"):
     root = root.resolve()
     config = read(root / "registration.json")
-    if config["format"] != "soundex-broad-risk-v1":
-        raise ValueError("P35 protocol required")
+    if config["format"] != study_format:
+        raise ValueError("unexpected study protocol")
     verify_inputs(config)
     endpoints = read(root / "review-registration.json")
     expected = {f"{a}-{config['steps']}-{s}" for a in config["arms"] for s in config["seeds"]}
@@ -74,6 +74,12 @@ def run(root):
             }
             for group, rows in pcm.items()
         }
+    return config, cases, evidence
+
+
+def run(root):
+    root = root.resolve()
+    config, cases, evidence = collect_cases(root)
     comparisons = {}
     for seed in config["seeds"]:
         control = cases[f"control-{config['steps']}-{seed}"]
