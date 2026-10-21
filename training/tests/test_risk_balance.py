@@ -3,7 +3,7 @@ import torch
 
 from models.direct_spectrum_objective import direct_spectrum_loss
 from models.multires_spectrum import multires_spectrum_loss
-from models.risk_balance import reconstruction_risk
+from models.risk_balance import deficit_overshoot_risk, reconstruction_risk
 from scripts.run_risk_balance_study import ARMS, protocol
 from tests.test_multires_spectrum import feature_batch
 
@@ -88,3 +88,42 @@ def test_protocol_is_one_architecture_fixed_seed_equal_budget_and_train_only():
     assert (
         followup["model_configs"]["compressed_identity_mid"] == config["model_configs"]["control"]
     )
+
+
+@pytest.mark.parametrize("level", [1e-7, 0.05])
+def test_overshoot_guard_preserves_underfill_and_reference_and_has_correct_derivative(level):
+    torch.manual_seed(34)
+    reference = torch.randn(2, 8192, dtype=torch.float64) * level
+    rates = torch.tensor([44100, 48000])
+    original = reference * 0.4
+    for factor in (0.7, 1.0):
+        p = (reference * factor).requires_grad_()
+        score = deficit_overshoot_risk(p, original, reference, rates).sum()
+        score.backward()
+        assert score.abs() < 1e-14 and p.grad.abs().max() < 1e-12
+    p = (reference * 1.5).requires_grad_()
+    loss = deficit_overshoot_risk(p, original, reference, rates).sum()
+    loss.backward()
+    assert loss > 0 and (p.grad * reference).sum() > 0
+    index = (0, 4096)
+    eps = level * 1e-4
+    with torch.no_grad():
+        plus, minus = p.clone(), p.clone()
+        plus[index] += eps
+        minus[index] -= eps
+        numeric = (
+            deficit_overshoot_risk(plus, original, reference, rates).sum()
+            - deficit_overshoot_risk(minus, original, reference, rates).sum()
+        ) / (2 * eps)
+    torch.testing.assert_close(p.grad[index], numeric, rtol=0.002, atol=1e-6)
+
+
+def test_overshoot_guard_does_not_replace_silence_or_excess_input_supervision():
+    reference = torch.zeros(2, 8192, dtype=torch.float64)
+    p = torch.full_like(reference, 1e-7, requires_grad=True)
+    score = deficit_overshoot_risk(p, reference, reference, torch.tensor([44100, 48000]))
+    score.sum().backward()
+    assert torch.isfinite(p.grad).all() and p.grad.abs().max() == 0
+    assert score.abs().max() < 1e-14
+    cfg = protocol({"multires_loss": {}}, followup=True, overshoot_guard=True)
+    assert cfg["arms"] == ["compressed_identity_guard"] and cfg["steps"] == 1024

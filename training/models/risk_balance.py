@@ -7,9 +7,46 @@ audibility threshold. It reduces gradients on large errors, including difficult
 restoration examples; this tradeoff must be evaluated with uncompressed metrics.
 """
 
+import torch
+
 from models.budget_objective import budget_risk
 from models.direct_spectrum_objective import direct_spectrum_loss
-from models.multires_spectrum import multires_spectrum_loss
+from models.multires_spectrum import multires_spectrum_loss, supervised_waves
+
+
+def deficit_overshoot_risk(wave, original, reference, rates):
+    """One-sided MR guard on bins deficient in the original input.
+
+    Below-reference predictions get no auxiliary gradient. The original losses
+    still supervise missing energy, excess-input bins, silence and dynamics.
+    Reference/input masks are detached, with no candidate-dependent thresholds.
+    """
+    if wave.ndim != 2 or wave.shape != original.shape or wave.shape != reference.shape:
+        raise ValueError("aligned PCM required")
+    reference, original = reference.detach(), original.detach()
+    values = wave.new_zeros(len(wave))
+    for size in (256, 1024, 2048):
+        window = torch.hann_window(size, dtype=wave.dtype, device=wave.device)
+        sides = wave.new_full((size // 2 + 1,), 2)
+        sides[0] = sides[-1] = 1
+        scale = (sides / (size * window.square().sum())).sqrt()
+
+        def amplitude(x, size=size, window=window, scale=scale):
+            return (torch.fft.rfft(x.unfold(-1, size, size // 4) * window) * scale).abs()
+
+        predicted = amplitude(wave)
+        with torch.no_grad():
+            target, observed = amplitude(reference), amplitude(original)
+            deficit = target > observed
+            floor = target.square().sum(-1).mean(-1) * 1e-4 + 1e-12
+        positive_error = (predicted - target).clamp_min(0).square() * deficit
+        hz = torch.arange(size // 2 + 1, device=wave.device)[None] * rates.reshape(-1, 1) / size
+        for low, high in ((4000, 8000), (8000, 12000), (12000, 16000), (16000, 24001)):
+            mask = ((hz >= low) & (hz < high))[:, None]
+            denominator = (target.square() * mask).sum(-1).mean(-1) + floor
+            power = (positive_error * mask).sum(-1).mean(-1)
+            values = values + ((power / denominator + 1e-6).sqrt() - 1e-3) / 12
+    return values
 
 
 def reconstruction_risk(direct, multires, identity, *, compress=False, identity_weight=1.0):
@@ -32,6 +69,14 @@ def training_terms(prediction, budget, objective, weight):
     multires = multires_spectrum_loss(prediction, batch)
     args = (direct["per_example"], multires["per_example"], batch["identity"])
     auxiliary = 0.1 * budget_risk(budget, batch)
+    wave, target = supervised_waves(prediction, batch)
+    original = batch["dry"][:, objective.region]
+    overshoot = (
+        0.05
+        * deficit_overshoot_risk(wave, original, target, batch["rate"])[
+            ~batch["identity"].bool()
+        ].mean()
+    )
     return {
         "control": reconstruction_risk(*args) + auxiliary,
         "compressed": reconstruction_risk(*args, compress=True) + auxiliary,
@@ -40,6 +85,10 @@ def training_terms(prediction, budget, objective, weight):
         "compressed_identity_mid": reconstruction_risk(*args, compress=True, identity_weight=0.3)
         + auxiliary,
         "raw": direct["total"],
+        "compressed_identity_guard": reconstruction_risk(*args, compress=True, identity_weight=0.3)
+        + auxiliary
+        + overshoot,
+        "overshoot": overshoot,
         "multires": multires["total"],
         "budget": auxiliary,
     }

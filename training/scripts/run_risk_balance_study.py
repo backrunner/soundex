@@ -34,9 +34,15 @@ from scripts.run_head_study import progress
 ARMS = ("control", "compressed", "compressed_identity")
 
 
-def protocol(parent, *, preflight=False, followup=False):
+def protocol(parent, *, preflight=False, followup=False, overshoot_guard=False):
     steps = 2 if preflight else 1024
-    arms = ("compressed_identity_mid",) if followup else ARMS
+    if overshoot_guard and not followup:
+        raise ValueError("overshoot guard requires a frozen followup control")
+    arms = (
+        (("compressed_identity_guard" if overshoot_guard else "compressed_identity_mid"),)
+        if followup
+        else ARMS
+    )
     return {
         "format": "soundex-risk-balance-diagnostic-v1",
         "scope": "single architecture/seed fixed train-crop diagnosis; not convergence or capacity ranking",
@@ -47,6 +53,7 @@ def protocol(parent, *, preflight=False, followup=False):
         "primary_endpoint": steps,
         "smoke": preflight,
         "followup": followup,
+        "overshoot_guard": overshoot_guard,
         "model_configs": {arm: dict(MODEL) for arm in arms},
         "loss_routes": {arm: {arm: 1} for arm in arms},
         "rate": 1e-4,
@@ -64,7 +71,11 @@ def register(args, root):
     destination = root / "registration.json"
     if destination.exists():
         config = read(destination)
-        if config["smoke"] != args.preflight or config.get("followup", False) != args.followup:
+        if (
+            config["smoke"] != args.preflight
+            or config.get("followup", False) != args.followup
+            or config.get("overshoot_guard", False) != args.overshoot_guard
+        ):
             raise ValueError("preflight/full drift")
         verify_inputs(config)
         return config
@@ -74,7 +85,16 @@ def register(args, root):
         raise ValueError("P33 parent required")
     if read(parent_path / "progress.json")["stage"] != "complete":
         raise ValueError("completed P33 parent required")
-    config = protocol(parent, preflight=args.preflight, followup=args.followup)
+    config = protocol(
+        parent,
+        preflight=args.preflight,
+        followup=args.followup,
+        overshoot_guard=args.overshoot_guard,
+    )
+    if args.overshoot_guard:
+        config["contrasts"] += (
+            "; guard adds .1 times paired coefficient .5 times HF deficit-bin positive overshoot risk, fixed MR windows/scales; no gradient below reference"
+        )
     required = {
         "manifest.jsonl",
         "soundex-gain-data",
@@ -256,6 +276,7 @@ if __name__ == "__main__":
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--preflight", action="store_true")
     parser.add_argument("--followup", action="store_true")
+    parser.add_argument("--overshoot-guard", action="store_true")
     parser.add_argument("--control-study", type=Path)
     args = parser.parse_args()
     try:
