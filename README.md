@@ -12,10 +12,12 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-[P35](docs/broad-risk-study.md) is now training the same small architecture with broad
-coverage: matched uncompressed and intermediate-identity objectives, two seeds and
-16,192 steps per trajectory. Preflight and 646 tests passed. All four endpoints must
-finish before the common spectral, native DSP and timing review; quality results are pending.
+[P35](docs/broad-risk-study.md) completed all four 16,192-step trajectories and native
+reviews. The candidate reduced native music MR error by 1.12–2.13% and speech error
+by 3.07–4.34% against matched controls across two seeds on reused validation.
+Dynamics and some identity metrics regressed, so the registered screen failed and
+no model was promoted. Across 280,000 hops, max compute was 1.948 ms with zero ≥5 ms
+calls and one paced completion delay; fixed buffering remains separate.
 
 [P34](docs/risk-balance-study.md) completed three debugging rounds on one 431k-parameter
 architecture, five matched 1,024-step endpoints. Smooth risk compression removed gradient
