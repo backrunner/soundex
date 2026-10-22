@@ -12,10 +12,11 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-[P36](docs/risk-attribution-study.md) is running the two missing compression/identity-weight
-combinations, with the same small architecture, two seeds and matched 16,192-step budgets.
-Frozen P35 stage and gradient audits found both model-side tradeoffs and a smaller fusion
-contribution. Preflight and 651 tests passed; final factorial results are pending.
+[P36](docs/risk-attribution-study.md) completed all four new matched-budget trajectories.
+Risk compression alone reduced native music MR error by 1.27–1.42% across two seeds;
+identity downweighting alone improved music by 1.03–1.14% with larger fidelity costs.
+Both still failed dynamics/identity gates on reused validation, so no model was promoted.
+Across 280,000 hops, max compute was 1.278 ms, with zero ≥5 ms calls and one paced delay.
 
 [P35](docs/broad-risk-study.md) completed all four 16,192-step trajectories and native
 reviews. The candidate reduced native music MR error by 1.12–2.13% and speech error
