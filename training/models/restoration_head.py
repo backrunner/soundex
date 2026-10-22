@@ -26,8 +26,12 @@ class RestorationHead(nn.Module):
         decoder_normalization=False,
         phase_input=False,
         residual_coordinates="input_relative",
+        detector_condition="native",
     ):
         super().__init__()
+        if detector_condition not in {"native", "fixed"}:
+            raise ValueError("unknown detector condition policy")
+        self.detector_condition = detector_condition
         if arm not in ARMS:
             raise ValueError("unknown restoration head")
         if not math.isfinite(residual_slope) or not 0 < residual_slope <= 1:
@@ -104,6 +108,11 @@ class RestorationHead(nn.Module):
     def forward_details(
         self, original, context, condition, state, *, detach_budget_auxiliary=False
     ):
+        if self.detector_condition == "fixed":
+            # Apply inside the exported model, including every warmup frame.
+            # Sample rate remains live; detector state and runtime gating do not change.
+            rate = condition[..., :1]
+            condition = torch.cat((rate, torch.full_like(rate, 0.5), torch.ones_like(rate)), -1)
         magnitude = torch.pow(10.0, original[:, 0] / 20)
         if self.arm == "anchored":
             amplitude, state = self.backbone(magnitude, context, condition, state)

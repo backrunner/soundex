@@ -82,7 +82,9 @@ def comparisons(cases):
 
 
 @torch.no_grad()
-def run(args):
+def run(
+    args, *, endpoint_arms=("compressed",), cases=CASES, expected_endpoints=2, require_complete=True
+):
     torch.set_num_threads(1)
     study, root = args.study.resolve(), args.output.resolve()
     root.mkdir(parents=True, exist_ok=True)
@@ -90,16 +92,17 @@ def run(args):
         raise ValueError("do not overwrite prior audit; choose a new output directory")
     cfg = read(study / "registration.json")
     verify_inputs(cfg)
-    if read(study / "progress.json")["stage"] != "complete":
+    if require_complete and read(study / "progress.json")["stage"] != "complete":
         raise ValueError("completed frozen parent required")
     endpoints = {
         k: v
         for k, v in read(study / "review-registration.json").items()
-        if v["arm"] == "compressed"
+        if v["arm"] in endpoint_arms
     }
-    if len(endpoints) != 2:
-        raise ValueError("both fixed compressed seeds required")
+    if len(endpoints) != expected_endpoints:
+        raise ValueError("all requested frozen endpoints required")
     source = Path(__file__).resolve().parents[1]
+    repository = Path(cfg.get("repository_root", source.parent))
     sources = {
         str(p.relative_to(source)): sha256_file(p)
         for p in source.rglob("*.py")
@@ -121,20 +124,20 @@ def run(args):
         hashes[str(onnx)] = read(onnx.parent / "report.json")["onnx_sha256"]
     indices = [0, 10] if args.preflight else list(range(len(cfg["specs"])))
     registration = {
-        "scope": __doc__,
+        "scope": cfg.get("fusion_review_scope", __doc__),
         "parent": str(study),
         "preflight": args.preflight,
-        "cases": CASES,
+        "cases": cases,
         "endpoints": endpoints,
         "indices": indices,
         "hashes": hashes,
         "source_hashes": sources,
         "resource_hashes": resources,
         "rust_source_hashes": {
-            str(p.relative_to(source.parent)): sha256_file(p)
-            for p in (source.parent / "crates").rglob("*.rs")
+            str(p.relative_to(repository)): sha256_file(p)
+            for p in (repository / "crates").rglob("*.rs")
         },
-        "cargo_lock_sha256": sha256_file(source.parent / "Cargo.lock"),
+        "cargo_lock_sha256": sha256_file(repository / "Cargo.lock"),
         "reference": "original unclipped clean for both roles",
         "selection": "all cases frozen before review; no automatic promotion or formal retraining selection; preserve raw/native spectral, dynamics, identity, band PCM and every recording",
         "condition_scope": "fixed cutoff=.5 and active=1 from first warmup hop; input metadata only, unchanged runtime detector/gate; out-of-distribution sensitivity, not no-condition retraining",
@@ -158,11 +161,12 @@ def run(args):
             Path(cfg["cache_path"]),
         ),
     )
+    interventions = cases
     cases, evidence = {}, {}
     for label in endpoints:
         cases[label] = {}
         prediction_hashes = {}
-        for fusion, condition in CASES:
+        for fusion, condition in interventions:
             variant = fusion + "--" + condition
             path = root / label / f"{variant}.json"
             records, parity, signatures = [], [], {}
@@ -270,7 +274,7 @@ def run(args):
                 {
                     "stage": "reviewing",
                     "completed_cases": len(evidence),
-                    "total_cases": len(CASES) * len(endpoints),
+                    "total_cases": len(interventions) * len(endpoints),
                     "label": label,
                     "variant": variant,
                 },
@@ -286,7 +290,7 @@ def run(args):
     verify_inputs(cfg)
     write_json_report(
         {
-            "scope": __doc__,
+            "scope": registration["scope"],
             "status": "complete",
             "promotion": False,
             "registration_sha256": sha256_file(root / "registration.json"),
