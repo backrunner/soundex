@@ -296,6 +296,49 @@ impl ChannelProcessor {
         Ok(())
     }
 
+    /// Explicit offline intervention. The production finish_hop never calls this.
+    #[cfg(any(feature = "ort-backend", test))]
+    pub(crate) fn finish_hop_ablation(
+        &mut self,
+        prediction: ArrayView3<'_, f32>,
+        config: &SoundExConfig,
+        mode: crate::diagnostics::ablation::FusionAblation,
+    ) -> Result<ProcessInfo> {
+        use crate::diagnostics::ablation::FusionAblation;
+        if mode == FusionAblation::Current {
+            return self.finish_hop(Some(prediction), config);
+        }
+        if config.high_band_gain != HighBandGain::Model
+            || config.enhancement_mode != EnhancementMode::Neural
+            || config.phase_policy != PhasePolicy::Model
+        {
+            return Err(SoundExError::InvalidInput(
+                "ablation requires neural model gain/phase".into(),
+            ));
+        }
+        if mode == FusionAblation::SafetyOnly {
+            // Called only after context warmup. Does not alter the input condition,
+            // which was captured before this output-side intervention.
+            self.needs_enhancement = true;
+        }
+        if !self.needs_enhancement {
+            return self.finish_hop(Some(prediction), config);
+        }
+        self.enhance(Some(prediction), config)?;
+        for bin in 0..self.synthesis.phase.len() {
+            if mode != FusionAblation::MagnitudeOnly {
+                self.synthesis.log_magnitude[bin] = prediction[[0, 0, bin]].clamp(-200.0, 100.0);
+            }
+            if mode != FusionAblation::PhaseOnly {
+                self.synthesis.phase[bin] = prediction[[1, 0, bin]];
+            }
+        }
+        self.synthesizer
+            .synthesize_into(&self.synthesis, &mut self.wet);
+        self.limiter.process_buffer(&mut self.wet);
+        Ok(self.info())
+    }
+
     /// Offline diagnostic access to the exact observed frame, not a second detector.
     pub(crate) fn observed_spectrum(&self) -> &SpectralFrame {
         &self.original
@@ -391,6 +434,63 @@ fn apply_generated_gain(generated_magnitude: &mut [f32], weights: &[f32], gain: 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn diagnostic_fusion_separates_magnitude_phase_and_input_bypass() {
+        use crate::diagnostics::ablation::FusionAblation as F;
+        let config = SoundExConfig {
+            high_band_gain: HighBandGain::Model,
+            ..Default::default()
+        };
+        let prediction = Array3::from_shape_fn((2, 1, 129), |(feature, _, bin)| {
+            if feature == 0 {
+                -40.0
+            } else {
+                0.4 + bin as f32 * 0.002
+            }
+        });
+        let mut frames = Vec::new();
+        for mode in [
+            F::Current,
+            F::MagnitudeOnly,
+            F::PhaseOnly,
+            F::Unfused,
+            F::SafetyOnly,
+        ] {
+            let mut channel = ChannelProcessor::new(&config, 1);
+            for hop in 0..12 {
+                let input: Vec<_> = (0..128)
+                    .map(|i| 0.1 * ((hop * 128 + i) as f32 * 0.13).sin())
+                    .collect();
+                channel.analyze_hop(&input, &config).unwrap();
+                // Exercise moving crossover and active/inactive frames explicitly.
+                channel.detected_bandwidth_hz = 7000.0 + hop as f32 * 53.0;
+                channel.needs_enhancement = hop != 10;
+                channel
+                    .finish_hop_ablation(prediction.view(), &config, mode)
+                    .unwrap();
+                assert!(channel.wet.iter().all(|x| x.is_finite() && x.abs() <= 0.95));
+                if hop == 10 && mode != F::SafetyOnly {
+                    assert_eq!(channel.synthesis.phase, channel.original.phase);
+                    assert_eq!(
+                        channel.synthesis.log_magnitude,
+                        channel.original.log_magnitude
+                    );
+                }
+            }
+            frames.push(channel.synthesis.clone());
+        }
+        assert_eq!(frames[0].log_magnitude, frames[1].log_magnitude);
+        assert_eq!(frames[0].phase, frames[2].phase);
+        for bin in 0..129 {
+            for index in [2, 3, 4] {
+                assert_eq!(frames[index].log_magnitude[bin], prediction[[0, 0, bin]]);
+            }
+            for index in [1, 3, 4] {
+                assert_eq!(frames[index].phase[bin], prediction[[1, 0, bin]]);
+            }
+        }
+    }
 
     #[test]
     fn phase_ablation_preserves_candidate_magnitude_gain_and_retained_bins() {

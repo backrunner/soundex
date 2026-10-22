@@ -55,7 +55,13 @@ impl Drop for DiagnosticScheduling {
 
 #[cfg(feature = "ort-backend")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use soundex_core::{diagnostics::context_head::ContextHeadStream, SoundExConfig};
+    use soundex_core::{
+        diagnostics::{
+            ablation::{ConditionAblation, FusionAblation},
+            context_head::ContextHeadStream,
+        },
+        SoundExConfig,
+    };
     use std::{
         path::Path,
         time::{Duration, Instant},
@@ -89,7 +95,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .sample_rate(input.sample_rate)
         .channels(input.channels);
     let load = Instant::now();
-    let mut stream = ContextHeadStream::new(Path::new(&args[1]), config)?;
+    let fusion: FusionAblation = std::env::var("SOUNDEX_DIAGNOSTIC_FUSION")
+        .unwrap_or_else(|_| "current".into())
+        .parse()?;
+    let condition: ConditionAblation = std::env::var("SOUNDEX_DIAGNOSTIC_CONDITION")
+        .unwrap_or_else(|_| "native".into())
+        .parse()?;
+    let mut stream =
+        ContextHeadStream::with_ablation(Path::new(&args[1]), config, fusion, condition)?;
     let load_ms = load.elapsed().as_secs_f64() * 1000.0;
     let width = input.channels as usize * 128;
     let mut output = vec![0.0; input.samples.len()];
@@ -135,7 +148,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let wall_seconds = started.elapsed().as_secs_f64();
     drop(scheduling);
     let report = serde_json::json!({
-        "schema_version": 1, "scope": "experimental Rust frontend + CPU ORT + production DSP; optional paced scheduling diagnostic; no realtime callback/transport/device qualification",
+        "schema_version": 1, "scope": "experimental Rust frontend + CPU ORT + production DSP by default, with explicit optional diagnostic ablations; optional paced scheduling diagnostic; no realtime callback/transport/device qualification",
+        "fusion_ablation": fusion.as_str(), "condition_ablation": condition.as_str(),
         "sample_rate": input.sample_rate, "channels": input.channels,
         "hop_samples": 128, "lookahead_samples": 0, "dsp_delay_samples": 128,
         "realtime_fixed_buffer_samples": 256, "warmup_hops": 80,

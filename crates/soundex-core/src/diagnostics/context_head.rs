@@ -18,6 +18,7 @@ use soundex_dsp::{
 
 use crate::{
     channel::ChannelProcessor,
+    diagnostics::ablation::{ConditionAblation, FusionAblation},
     processor::{validate_config, GateMixer},
     HighBandGain, SoundExConfig,
 };
@@ -108,10 +109,26 @@ pub struct ContextHeadStream {
     wet: Vec<f32>,
     hops: usize,
     failed: bool,
+    fusion_ablation: FusionAblation,
+    condition_ablation: ConditionAblation,
 }
 
 impl ContextHeadStream {
-    pub fn new(path: &Path, mut config: SoundExConfig) -> Outcome<Self> {
+    pub fn new(path: &Path, config: SoundExConfig) -> Outcome<Self> {
+        Self::with_ablation(
+            path,
+            config,
+            FusionAblation::Current,
+            ConditionAblation::Native,
+        )
+    }
+
+    pub fn with_ablation(
+        path: &Path,
+        mut config: SoundExConfig,
+        fusion_ablation: FusionAblation,
+        condition_ablation: ConditionAblation,
+    ) -> Outcome<Self> {
         validate_config(&config)?;
         if config.fft_size != 256 || config.hop_size != 128 {
             return Err("diagnostic context head requires FFT256/hop128".into());
@@ -166,6 +183,8 @@ impl ContextHeadStream {
                 ),
         );
         Ok(Self {
+            fusion_ablation,
+            condition_ablation,
             channels: (0..count)
                 .map(|_| ChannelProcessor::new(&config, 1))
                 .collect(),
@@ -227,6 +246,8 @@ impl ContextHeadStream {
                 channel.info().detected_bandwidth_hz / (self.config.sample_rate as f32 / 2.0),
                 f32::from(self.hops >= CONDITION_WARMUP && channel.needs_enhancement()),
             ]);
+            self.condition_ablation
+                .apply(&mut self.condition.extract_tensor_mut().1[c * 3..(c + 1) * 3]);
         }
         let frontend = start.elapsed();
         let inference_start = Instant::now();
@@ -266,8 +287,16 @@ impl ContextHeadStream {
                     .unwrap()
                     .copy_from_slice(observed);
             }
-            let info =
-                channel.finish_hop(Some(self.prediction.slice(s![c, .., .., ..])), &self.config)?;
+            let mode = if self.hops < WARMUP {
+                FusionAblation::Current
+            } else {
+                self.fusion_ablation
+            };
+            let info = channel.finish_hop_ablation(
+                self.prediction.slice(s![c, .., .., ..]),
+                &self.config,
+                mode,
+            )?;
             active |= !info.bypassed;
             for n in 0..128 {
                 self.dry[n * count + c] = channel.dry()[n];
