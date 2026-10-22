@@ -12,6 +12,13 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
+[P37](docs/fusion-boundary-audit.md) completed 2,848 frozen-model native ablations.
+Removing magnitude fusion while retaining phase fusion reduced music MR error by
+0.12–0.14% against the same weights/current DSP, with small dynamics gains and identity
+regressions. This isolates a fusion cost but does not solve model restoration.
+Across 120,000 hops, max compute was 0.992 ms with no hop overruns or paced delays.
+No weights were promoted; the next training is not started due to a local Metal service failure.
+
 [P36](docs/risk-attribution-study.md) completed all four new matched-budget trajectories.
 Risk compression alone reduced native music MR error by 1.27–1.42% across two seeds;
 identity downweighting alone improved music by 1.03–1.14% with larger fidelity costs.

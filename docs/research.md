@@ -1,6 +1,19 @@
 # Research status and experiment history
 
-Latest completed experiment: [P33 broad spectrum supervision](broad-spectrum-study.md).
+Latest completed diagnostic: [P37 fusion boundaries](fusion-boundary-audit.md).
+Frozen P36 weights, two seeds, eight interventions and 2,848 native replays on reused
+validation. Removing magnitude fusion improves spectral/dynamics means slightly;
+identity and local-band regressions remain. 120,000 timing hops stayed below 5 ms
+with no hop overruns or paced delays. No promotion or new training; local Metal
+compiler service failure blocks the next MPS experiment.
+
+Latest completed training: [P36 factorial attribution](risk-attribution-study.md),
+following [P35 broad risk](broad-risk-study.md) and [P34 small risk](risk-balance-study.md).
+Both new P36 arms completed two 16,192-step seeds. Compression alone retains spectral
+gains, but dynamics/identity gates still fail. The subsequent
+[DSP boundary review](dsp-model-boundary-review.md) motivates P37 before further training.
+
+Previous completed experiment: [P33 broad spectrum supervision](broad-spectrum-study.md).
 Matched control/mr_add, two seeds and 16,192 steps each, fresh initialization,
 full broad schedules and recording-isolated reused validation. All four trajectories
 completed; no added-MR music advantage, speech means improved with worse dynamics.
