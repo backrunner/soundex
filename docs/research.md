@@ -1,5 +1,11 @@
 # Research status and experiment history
 
+Current intervention: [P46 original-reference preservation](reference-preservation-pilot.md).
+It separates a corrected finite-step policy from adding absolute-reference MSE
+gradients to the update direction. All three fixed precision rulers, both small
+starts and the full 128-attempt budget remain registered. Exact P45 Adam controls
+are reused; intermediate acceptance is not a quality result.
+
 Latest measurement: [P44 absolute PCM calibration](pcm-fidelity-calibration.md).
 Both small-model starts have mean identity errors hundreds of times larger than
 clean-feature roundtrip noise; low-band counterexamples remain. The

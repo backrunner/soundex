@@ -20,6 +20,11 @@ and stricter arms accept none. Some rejected low-band corrections reduce error
 against the clean reference; the preservation policy needs revision. No candidate
 is qualified or promoted.
 
+[P46](docs/reference-preservation-pilot.md) tests original-reference preservation
+with separate policy-only and additional-gradient controls, retaining all three
+precision rulers and matched small-model exposure. It is an experimental method
+pilot; final assessment waits for every registered trajectory.
+
 [P43](docs/spectral-priority-update-audit.md) gives a positive spectrum-priority
 diagnostic: at fixed radius 0.001, amplitude improves on 28/32 reused-training
 transfer batches and MR on 29/32, versus 13/32 and 14/32 in the P42 control.
