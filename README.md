@@ -12,12 +12,14 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-[P39](docs/objective-conflict-audit.md) found opposed parameter gradients concentrated
-in the shared encoder despite mostly aligned high-band output-coordinate gradients. This
-is a frozen-model diagnosis, not a new quality gain. The [balanced timing audit](docs/interleaved-timing-audit.md)
-retained three ≥5 ms calls among 160,000 hops (max 9.280 ms), so real-time qualification
-remains open. Consult the [failed-experiment registry](docs/failed-experiments.md)
-before repeating a route. All maintained project documentation is in English.
+[P40](docs/update-direction-audit.md) confirms that the recorded Adam update can
+lower total loss while worsening complex-spectrum and identity errors on the same
+training batch. Balanced gradient directions improve the local tradeoff but do not
+pass all fidelity checks. These are reversible diagnostics, not new restoration
+weights. The [CPU attribution run](docs/cpu-time-attribution.md) separates calling-
+thread CPU time, enclosing wall time and wakeup delays. Historical real-time failures
+remain open. Consult the [failure registry](docs/failed-experiments.md) before repeating
+a route. All maintained project documentation is in English.
 
 [P38](docs/detector-condition-study.md) completed all four 16,192-step CPU trajectories
 and native reviews. Fixed detector conditions worsened music MR by 0.19–0.56% versus

@@ -106,6 +106,10 @@ response and per-example contributions before proposing a new head or loss weigh
 
 ## Decision
 
+The follow-up [P40 update-direction audit](update-direction-audit.md) now measures
+actual reversible Adam responses and separates detached warmup from full forward
+perturbations. It retains the unresolved preservation and generalization limits.
+
 Keep native conditioning, the original lossless target and current production
 weights. Do not launch a larger version of the rejected fixed-detector route, remove
 complex fidelity, or claim a quality improvement from this audit. The next small-model

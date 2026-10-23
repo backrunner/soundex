@@ -1,6 +1,12 @@
 # Research status and experiment history
 
-Latest completed diagnostics: [P39 objective gradients](objective-conflict-audit.md)
+Latest optimizer diagnosis: [P40 reversible update directions](update-direction-audit.md).
+Actual Adam lowers total loss on every fixed training batch but often raises complex
+and identity errors. A balanced amplitude/complex direction improves the local
+tradeoff without passing all checks. No new training or promotion. The separate
+[CPU-clock attribution](cpu-time-attribution.md) preserves all old timing failures.
+
+Previous completed diagnostics: [P39 objective gradients](objective-conflict-audit.md)
 and [balanced-order CPU timing](interleaved-timing-audit.md). Shared encoder gradients
 conflict while high-band output-coordinate gradients mostly align. The >16 kHz
 dB-only chain also reverses after the encoder Jacobian, so removing phase supervision
