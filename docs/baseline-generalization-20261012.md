@@ -1,128 +1,96 @@
-# 基线泛化与 DSP 归因复核
+# Baseline Generalization and DSP Attribution Recheck
 
-2026-10-12。结论：不能把旧 shape-small 当成恢复目标，也没有足够证据断言它已经
-过拟合。当前已确认的是：旧基线、新模型和应用链路各有问题，现有比较混合了训练预算、
-高频增益策略和限幅失真。应以无损参考判断恢复，以压缩输入和恒等 DSP 分离新增损伤。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 基线是否过拟合
+2026-10-12. Conclusion: It is not valid to treat the old `shape-small` as a restoration target, and there is insufficient evidence to assert that it has overfit. What is currently confirmed is that the old baseline, the new model, and the application pipeline each have issues. The current comparisons mix training budgets, high-frequency gain strategies, and clipping distortion. Restoration should be judged against lossless references, with compressed inputs and identity DSP used to isolate newly introduced artifacts.
 
-旧 shape-small 来自原模型 epoch 168，再经过 8 epoch、V4 4 epoch 和本阶段 4 epoch
-选优的连续初始化历史。它与 P2 从头训练的 4096 次更新不等预算，不能用两者差距认定
-TCN/GRU 架构更差。P2 内部同预算旧主干才是架构控制组。
+## Is the Baseline Overfit?
 
-最后一次 shape-small 的 8 epoch 日志中，训练 loss 为 1.299–1.393，验证为 1.342–1.388；
-没有明显的持续 train 下降而 validation 上升。随机训练样本与固定验证的分布不同，
-这段曲线既不是过拟合证明，也不能排除前期过拟合。
+The old `shape-small` derives from the original epoch-168 model and subsequent continuation; its inherited training budget differs from the fresh P2 runs. The exact historical initialization chain is recorded in the linked study and provenance reports. It is not under budget parity with the P2 model, which was trained from scratch with 4096 updates. Therefore, the performance gap between the two cannot be used to conclude that the TCN/GRU architecture is inferior. The internal baseline of P2 under the same training budget serves as the architectural control group.
 
-本轮 track、源 checksum、work_group/split_group 隔离检查未发现跨训练/验证/测试泄漏。
-但开发集已经反复用于结构、loss 和候选选择，历史 test 也多次用于诊断，不能再称为
-全新独立测试。未见来源的泛化仍未被证明。更准确的结论是：**存在泛化及选择偏差风险，
-尚不足以把旧基线的问题归因为过拟合；应用链路退化已有直接证据。**
+In the final 8-epoch log of `shape-small`, the training loss ranged from 1.299 to 1.393, and the validation loss from 1.342 to 1.388. There is no clear trend of training loss decreasing while validation loss increases. The distribution of random training samples differs from that of fixed validation samples. Thus, this curve neither proves overfitting nor rules out early-stage overfitting.
 
-## 同一输入上的实际 Rust 对照
+Cross-checks for leakage across track, source checksum, and `work_group/split_group` isolation have found no evidence of cross-contamination between training, validation, and test sets. However, the development set has been repeatedly reused for structural evaluation, loss analysis, and candidate selection, and historical test data has been used multiple times for diagnostics. As such, it cannot be considered a truly independent and fresh test set. Generalization to unseen sources has not been established. A more accurate conclusion is: **There is a risk of generalization and selection bias, and it remains insufficient to attribute the issues of the old baseline to overfitting; degradation in the application pipeline has been directly observed.**
 
-冻结模型、Rust 二进制、增益策略与样本列表后处理完整配对文件（2–4 秒素材段，非整首）。
-统一评分区间从第 72 hop 开始，末尾去掉 256 样本；44.1/48 kHz 原生采样率。
-与此前 32768 样本中心裁剪报告的窗口不同，不拼接两份报告作增益计算。
+## Actual Rust Comparison on the Same Input
 
-- 训练域探针：40 个录音，32 音乐、8 语音，仅诊断、不选权重。
-- 开发复核：89 条 / 80 个录音；其中音乐 33 条 / 26 个录音。
-- 历史留出复核：78 条 / 39 个录音，每录音一个训练中已见编码与一个保留 AAC160 编码；
-  其中音乐 42 条 / 21 个录音。录音本身不在训练集中。
-- 恒等 DSP：真实 Rust 加 `low-latency-identity.onnx`，Model gain，模型预测不改输入。
-  它用于测量合成、门控和安全限幅的影响，与产生新高频的 spectral DSP 模式不同。
+A frozen model, Rust binary, gain strategy, and post-processing script were fully paired with sample lists for complete end-to-end comparison (2–4 second audio segments, not full tracks). Evaluation started from the 72nd hop, with the final 256 samples removed. All samples are at 44.1/48 kHz native sample rates.
 
-下面是音乐条目等权均值；高频谱形/瞬态/能量误差越小越好，SI-SDR 差值越大越好。
+- **Training probe set**: 40 recordings, 32 music, 8 speech; used only for diagnosis, not for weight selection.
+- **Development recheck**: 89 entries / 80 recordings; 33 music entries / 26 recordings.
+- **Historical held-out recheck**: 78 entries / 39 recordings; one training-encountered encoding and one preserved AAC160 encoding per recording; 42 music entries / 21 recordings. The recordings themselves were not part of the training set.
+- **Identity DSP**: Real Rust output with `low-latency-identity.onnx`, model gain, and no modification to the input. This is used to measure the impact of synthesis, gating, and safety clipping, and differs from spectral DSP operations that generate new high-frequency content.
 
-| 历史留出路径 | 高频谱形误差 | 高频瞬态误差 | 高频能量误差 dB | SI-SDR 相对输入 dB |
+Below are the music entries, averaged equally; lower error in high-frequency spectral shape, transient, and energy is better, while higher SI-SDR relative to input is better.
+
+| Historical Held-Out Path | High-Frequency Spectral Shape Error | High-Frequency Transient Error | High-Frequency Energy Error (dB) | SI-SDR Relative to Input (dB) |
 | --- | ---: | ---: | ---: | ---: |
-| 压缩输入 | 0.74064 | 0.89945 | 4.01805 | 0 |
-| 恒等 DSP | 0.74182 | 0.92589 | 3.70158 | −0.73523 |
-| 旧 shape-small / MatchEdge | 0.76051 | 1.13067 | 2.92218 | −1.16909 |
-| 同一旧权重 / Model gain | 0.70575 | 0.97294 | 4.04358 | −1.08951 |
-| P2 同预算旧主干 / Model gain | 0.85224 | 1.09783 | 3.83411 | −1.18089 |
+| Compressed Input         | 0.74064 | 0.89945 | 4.01805 | 0 |
+| Identity DSP             | 0.74182 | 0.92589 | 3.70158 | −0.73523 |
+| Old shape-small / MatchEdge | 0.76051 | 1.13067 | 2.92218 | −1.16909 |
+| Same Old Weights / Model Gain | 0.70575 | 0.97294 | 4.04358 | −1.08951 |
+| P2 Same Budget Old Backbone / Model Gain | 0.85224 | 1.09783 | 3.83411 | −1.18089 |
 | P2 TCN / Model gain | 0.77669 | 0.98618 | 3.23143 | −1.01688 |
 
-旧 MatchEdge 降低高频能量误差，同时损伤谱形、瞬态与波形；切换同一权重到 Model gain
-改善谱形，能量误差则不再改善。这不是单一指标就能确定的质量排名。
-恒等 DSP 本身的 SI-SDR 差为 −0.735 dB，21 录音聚类 bootstrap 的 95% 区间
-为 [−1.469,−0.108] dB；旧 MatchEdge 为 −1.169 [−2.095,−0.378] dB，
-TCN 为 −1.017 [−1.919,−0.264] dB。区间未校正多重比较，也不是独立试验的保证。
-不能将整个差值都算作网络误差；同样不能把 dB 差的比例解释成线性能量归因比例。
+The old MatchEdge reduces high-frequency energy error but degrades spectral shape, transient, and waveform fidelity. Switching to the same weights with Model Gain improves spectral fidelity, but energy error does not improve. This demonstrates that no single metric can definitively rank quality.
+The Identity DSP has a baseline SI-SDR degradation of −0.735 dB, with a 95% bootstrap interval across 21 recordings of [−1.469, −0.108] dB. For the old MatchEdge, the interval is [−2.095, −0.378] dB; for TCN, it is [−1.919, −0.264] dB. These intervals are uncorrected for multiple comparisons and do not constitute independent experimental validation.
+It is not valid to attribute the entire difference to network error. Similarly, the dB difference cannot be interpreted as a linear proportion of energy degradation.
 
-| 域 / 路径 | 输入高频谱形 | 输出高频谱形 | SI-SDR 相对输入 dB |
+| Domain / Path            | Input High-Frequency Spectral Shape | Output High-Frequency Spectral Shape | SI-SDR Relative to Input (dB) |
 | --- | ---: | ---: | ---: |
-| 训练探针 / 旧 MatchEdge | 0.73900 | 0.70265 | −0.19256 |
-| 开发 / 旧 MatchEdge | 0.84266 | 0.89908 | −0.96549 |
-| 历史留出 / 旧 MatchEdge | 0.74064 | 0.76051 | −1.16909 |
-| 训练探针 / TCN | 0.73900 | 0.65589 | −0.08722 |
-| 开发 / TCN | 0.84266 | 1.31585 | −0.37492 |
-| 历史留出 / TCN | 0.74064 | 0.77669 | −1.01688 |
+| Training Probe / Old MatchEdge | 0.73900 | 0.70265 | −0.19256 |
+| Development / Old MatchEdge | 0.84266 | 0.89908 | −0.96549 |
+| Historical Held-Out / Old MatchEdge | 0.74064 | 0.76051 | −1.16909 |
+| Training Probe / TCN     | 0.73900 | 0.65589 | −0.08722 |
+| Development / TCN        | 0.84266 | 1.31585 | −0.37492 |
+| Historical Held-Out / TCN | 0.74064 | 0.77669 | −1.01688 |
 
-两类模型都存在训练域与未见录音的效果差异。但素材、编码和响度分布不完全匹配，
-加上恒等 DSP 自身的失真，不能把这张表直接解释为记忆了训练集。
+Both models exhibit differences in performance between training-domain and unseen recordings. However, the material, encoding, and loudness distributions are not perfectly aligned, and the inherent distortion of the Identity DSP further complicates interpretation. This table cannot be taken as evidence that the model has memorized the training set.
 
-历史留出音乐的已见编码 / 未见 AAC160 两层中，输入高频谱形为 0.70456 / 0.77671；
-旧 MatchEdge 为 0.68436 / 0.83666，同权重 Model gain 为 0.65967 / 0.75183，
-TCN 为 0.68440 / 0.86899。旧 MatchEdge 的部分优势不迁移到保留编码，而同权重
-切换增益策略后结论不同，明确说明应用策略也是变量。每层只有 21 条，且采样率、
-截取时间等条件并非严格相同；这不是只改变编码的完整因果实验。
+In the historical held-out music set, comparing seen vs. unseen AAC160 encodings, input high-frequency spectral shape was 0.70456 (seen) / 0.77671 (unseen); for old MatchEdge: 0.68436 (seen) / 0.83666 (unseen); for same weights with Model Gain: 0.65967 (seen) / 0.75183 (unseen); for TCN: 0.68440 (seen) / 0.86899 (unseen). The partial advantage of the old MatchEdge does not transfer to the preserved AAC160 encoding. When the same weights are switched to Model Gain, the result changes—demonstrating that the application strategy is a variable. Each layer has only 21 entries, and conditions such as sample rate, time crop, and duration are not strictly identical. This is not a complete, causal experiment that isolates encoding change.
 
-语音另行记录：历史留出输入高频谱形 0.50819，旧 MatchEdge 0.54600、TCN 0.48288；
-对应 SI-SDR 差 −0.11139 / −0.07285 dB。不把语音与音乐混合均值掩盖音乐退化。
+Speech results are recorded separately: historical held-out input high-frequency spectral shape was 0.50819; for old MatchEdge: 0.54600; for TCN: 0.48288; corresponding SI-SDR differences: −0.11139 dB (old MatchEdge), −0.07285 dB (TCN). Speech and music are not mixed in average—this prevents masking degradation in music.
 
-## 定位限幅器与额外生成
+## Limiting and Additional Generation Localization
 
-现有 sample-wise limiter 从 0.855 开始压缩，天花板 0.95。它不是透明的安全兜底：
-合法峰值也会改变，且非线性会产生新频谱。以下对照用恒等模型的 Rust 输出，
-与逐样本解析限幅公式比较，统一使用相同稳态窗口。
+The current sample-wise limiter begins compression at 0.855 and caps at 0.95. It is not merely a transparent safety fallback: legitimate peaks are also altered, and nonlinearity introduces new spectral content. The following comparison uses Rust output from an identity model and compares it against per-sample parsed limiter formulas, using the same steady-state window.
 
-| 诊断片段 | 参考高频 RMS dBFS | 输入 | 恒等 DSP | P2 TCN |
+| Diagnostic Fragment       | Reference High-Frequency RMS (dBFS) | Input | Identity DSP | P2 TCN |
 | --- | ---: | ---: | ---: | ---: |
-| 弱高频 AAC192 | −81.99 | −81.70 | −72.74 | −59.02 |
-| 弱高频 Vorbis q3 | −77.23 | −77.39 | −77.39 | −66.66 |
+| Weak High-Frequency AAC192 | −81.99 | −81.70 | −72.74 | −59.02 |
+| Weak High-Frequency Vorbis q3 | −77.23 | −77.39 | −77.39 | −66.66 |
 
-AAC 片段 0.0901% 的稳态样本超过 0.855，仅恒等 DSP 就抬高约 8.97 dB 高频功率级。
-Rust 恒等输出与解析限幅输出的最大差为 2.38e−7、RMS 差 3.90e−8，
-支持这一片段的 DSP 失真主要来自限幅。Vorbis 峰值只有 0.7243，没有触发限幅；
-恒等路径基本透明，而 TCN 多出约 10.73 dB 高频，仍有真正的模型额外生成问题。
-历史留出中恒等 SI-SDR 最差的一条，二者最大差也只有 3.58e−7。
-这是事后诊断定位，不代表所有素材，也没有完成盲听，不能据此断言可闻程度。
+For the AAC fragment, 0.0901% of steady-state samples exceed 0.855. The Identity DSP raises the high-frequency power level by approximately 8.97 dB. The maximum difference between Rust identity output and parsed limiter output is 2.38e−7, RMS difference is 3.90e−8—indicating that the DSP distortion in this fragment is primarily due to limiting. For Vorbis, the peak is only 0.7243 and does not trigger limiting. The identity path is nearly transparent, while the TCN introduces an additional ~10.73 dB of high-frequency content—indicating a genuine problem of model-generated content. In the historical held-out set, the worst Identity SI-SDR entry shows a maximum difference of only 3.58e−7. This is a post-hoc diagnosis and does not represent all materials, nor has blind listening been performed. Therefore, it cannot be used to assert perceptibility.
 
-这里更正此前首种子报告的归因：报告中的数值是模型 **加 DSP** 的输出；
-AAC 的额外高频不能全部归于网络。两类缺陷并存，统一降低增强量不能解决根因。
+Correction to the prior baseline report attribution: the values reported were outputs of the model **plus DSP**. The additional high-frequency content in AAC cannot be fully attributed to the network. Both types of defects coexist, and a uniform reduction in enhancement cannot resolve the root cause.
 
-## Loss 的含义与后续控制
+## Meaning of Loss and Subsequent Control
 
-数值测试通过不等于目标已完全合理。当前训练代理复现了部署限幅，因此不是
-“训练没有模拟部署”的单一问题：clean→clean 经过限幅也可能产生误差；参考峰值
-超过输出天花板时，完全重建更不可能。`prelimit_excess` 对参考中原本合法的峰值也施加
-惩罚，这个安全目标与波形/弱高频恢复之间存在取舍，不能宣称整个 loss 在无损参考处恒为零。
-P3 新增的过量功率项在正确参考处为零，仅指该项本身。
+Numerical testing does not imply that the target is fully reasonable. The current training objective reproduces the deployed limiter, so it is not a single issue of "training not simulating deployment." Even clean→clean paths passing through limiting can introduce errors. When reference peaks exceed the output ceiling, full reconstruction becomes impossible. The `prelimit_excess` term penalizes peaks that were originally valid, introducing a trade-off between safety and waveform/weak high-frequency restoration. It is incorrect to claim that the loss is exactly zero at lossless reference points. The P3-added excess power term is zero at correct reference points, but only for that specific term.
 
-已启动的 [P3](weak-band-study-20261012.md) 保持原部署链路冻结，以三个等预算组、
-两个种子隔离弱高频监督和恒等训练的作用，不中途改变运行中的实验定义。
-即使 P3 改善，也不能认为限幅问题已修复。
+The [P3](weak-band-study-20261012.md) experiment has been initiated with the original deployment pipeline frozen. It maintains three equally budgeted groups and two seed isolations, with weak high-frequency supervision and identity training held in place. The experiment definition is not altered during execution. Even if P3 improves, it does not imply that the limiter issue has been resolved.
 
-下一轮 DSP 对照需单独冻结：以透明区间、平滑峰值控制和安全天花板为约束，验证恒等、
-合法大峰值、过载、瞬态、声像、换块及故障恢复，同时更新可微代理与 parity。
-不可直接删限幅来换评分，也不能把无损参考预先限幅后冒充“恢复原始音频”。
-之后再交叉验证模型/两种增益/DSP，报告原始预测与最终波形，并重新测试实时开销。
+The next round of DSP comparison must be conducted with a separate freeze: under constraints of transparent intervals, smooth peak control, and safe ceiling, verify identity, legitimate large peaks, overload, transients, stereo, block switching, and fault recovery. The loss proxy and parity must also be updated.
+It is not valid to remove the limiter to improve scores, nor to claim that a lossless reference pre-limited constitutes "restoration of original audio." Subsequently, cross-validate the model, two gain strategies, and DSP. Report the original prediction and final waveform, and retest real-time overhead.
 
-泛化补充仍须包括未参与开发的独立来源和缺失风格。当前训练音乐 253 首，validation
-26 首、test 21 首；validation 无 country/pop/hiphop/funk，test 无中国、country/hiphop/jazz。
-在这些缺口补齐前，不承诺通用性或不存在过拟合，不晋升权重。
+Generalization must still include independent sources and missing styles. The current training set contains 253 music tracks, 26 validation tracks, and 21 test tracks. Validation lacks country, pop, hip-hop, funk; test lacks Chinese, country, hip-hop, jazz. Until these gaps are closed, no claims of generalization or absence of overfitting can be made. No weight promotion is authorized.
 
-## 可追溯证据
+## Traceable Evidence
 
-本地忽略目录 `data/reports/baseline-audit-20261012/`：`registration.json`、
-`summary.json`、逐路径/域 JSON、`identity-registration.json`、`identity-summary.json`、
-`limiter-audit.json`，以及生成脚本 `audit.py` / `identity_audit.py` / `limiter_audit.py`。
-逐输入校验 checksum，区间按 track_id 聚类（2000 次）。素材与报告不推送。
+Local directory `data/reports/baseline-audit-20261012/` is ignored: `registration.json`, `summary.json`, per-path/domain JSONs, `identity-registration.json`, `identity-summary.json`, `limiter-audit.json`, and the generation scripts `audit.py`, `identity_audit.py`, `limiter_audit.py`.
+Each input is individually verified via checksum, and intervals are clustered by `track_id` (2000 instances). Materials and reports are not pushed.
 
-- 旧权重 SHA-256：`bdef9d1269ea4b8b1e8e5e04bd6d25032b817f5401e13c51e2c064d721503782`
-- P2 TCN：`cb02a6f15055e4423e6403cf3bd4b18b50007209452502c760d09007fc2958d9`
-- Rust 评分器：`07f9373faaed7d448396025e076c5466a9bf10ede5a98797dd1c693f395faac4`
+- Old weights SHA-256: `bdef9d1269ea4b8b1e8e5e04bd6d25032b817f5401e13c51e2c064d721503782`
+- P2 TCN: `cb02a6f15055e4423e6403cf3bd4b18b50007209452502c760d09007fc2958d9`
+- Rust scorer: `07f9373faaed7d448396025e076c5466a9bf10ede5a98797dd1c693f395faac4`
 
-`independent_test=false`，`listening_performed=false`。本轮没有模型晋升，也没有在训练
-并发运行时用 CPU benchmark 宣称实时合格。
+`independent_test=false`, `listening_performed=false`. No model promotion occurred in this round, and no CPU benchmark during concurrent training was used to claim real-time qualification.
+
+This steady-state window differs from the earlier 32768-sample center-crop report;
+do not combine the reports to calculate gains. Historical held-out SI-SDR changes
+are −1.169 dB for old MatchEdge and −1.017 dB for TCN, with the confidence intervals
+reported above.
+
+The historical initialization chain specifically includes 8 continuation epochs, V4 epoch 4 and this stage's selected epoch 4 after the original epoch-168 model; these are not matched to P2's fresh budget.

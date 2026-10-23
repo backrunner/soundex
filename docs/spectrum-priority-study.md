@@ -1,79 +1,56 @@
-# P32：频谱优先的多分辨率监督
+# P32: Spectral-First Multi-Resolution Supervision
 
-2026-10-20。按用户确认，**以频谱契合度作为训练和评估的主要目标，波形误差作为
-辅助保真证据**。不能仅因逐采样波形误差小幅增加就否定候选；也不能把同频带总能量
-接近等同于谱形、瞬态或音质恢复。此前 [P31](phase-coordinates-study.md) 的全部
-波形和频谱结果保留，新优先级不追溯修改旧实验协议或结论。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 新监督目标
+2026-10-20. As confirmed by user, **spectrum fidelity is now the primary training and evaluation objective, with waveform error serving as auxiliary evidence of perceptual quality**. It is not valid to reject a candidate solely due to a minor increase in per-sample waveform error. Nor should approximate energy per band be equated to spectral shape, transient fidelity, or audio quality restoration. All waveform and spectral results from [P31](phase-coordinates-study.md) are retained. The new priority does not retroactively modify prior experimental protocols or conclusions.
 
-预测的 FFT256 复数谱先经过与现有原始 OLA 一致的合成，再用 **256、1024、2048**
-点 Hann STFT 分析，hop 为各自 FFT 大小的四分之一。PCM 是获取多分辨率频谱的
-中间表示，不计算逐采样波形拟合项。这也使监督关注可合成的音频频谱，避免仅在
-模型输出的单帧谱上取得改善。
+## New Supervision Objective
 
-参考是严格对齐的**原始、未限幅 clean PCM**，不经过 DSP 检测掩码、gate、limiter
-或模型预测。paired 与 clean identity 等权；所有候选使用相同参考和归一化。
+The predicted FFT256 complex spectrum is first synthesized using the same OLA (Overlapping and Adding) process as the original reference, then analyzed using 256, 1024, and 2048-point Hann STFTs with hop sizes equal to one-fourth of the FFT size. PCM serves as an intermediate representation for multi-resolution spectral analysis, and no per-sample waveform fitting term is computed. This ensures supervision focuses on synthesizeable audio spectra, avoiding improvements that only appear on a single-frame spectrum output.
 
-| 频谱项 | 权重 | 目的 |
+The reference is strictly aligned **original, unclipped clean PCM**, without any DSP processing such as detection masking, gating, limiting, or model prediction. Paired and clean identity are treated equally in weighting; all candidates use the same reference and normalization.
+
+| Spectral Component | Weight | Purpose |
 |---|---:|---|
-| 幅度谱相对误差 | 1.0 | 恢复正确频率位置的能量及谱形 |
-| 平滑对数谱误差 | 0.25 | 补充较弱谐波／频谱细节的监督 |
-| 逐频带能量包络误差 | 0.1 | 恢复能量随时间的变化 |
-| 幅度谱时间差分误差 | 0.25 | 跟随参考瞬态，不奖励抹平真实变化 |
+| Relative magnitude spectrum error | 1.0 | Recover correct energy at frequency locations and spectral shape |
+| Smoothed log-spectrum error | 0.25 | Provide additional supervision for weak harmonics or spectral details |
+| Per-band energy envelope error | 0.1 | Recover time-varying energy dynamics |
+| Magnitude spectrum time-differential error | 0.25 | Track transient dynamics of the reference, not reward smoothing of real changes |
 
-三个尺度等权。频带沿用 0–4、4–8、8–12、12–16、16–24 kHz，按物理采样率
-44.1/48 kHz 分配频点；低频权重 0.25，高频各带权重 1，统一除以 4.25。
-单边频谱按 Parseval 和 Hann 窗能量校准到每频点 RMS 单位。
-分母地板固定为参考全频平均功率的 1e-4 加 1e-12（绝对功率），仅由参考决定；
-对数项使用对应频带每频点地板。平滑范数为 `sqrt(x + 1e-6) - 1e-3`。
-地板不是事后针对曲目设置的放行阈值，所有弱频带仍分别报告相对及绝对误差。
+All three scales are equally weighted. Frequency bands remain 0–4, 4–8, 8–12, 12–16, and 16–24 kHz, allocated according to physical sampling rates of 44.1/48 kHz; low-frequency bands are assigned 0.25 weight, while higher bands are assigned 1.0, normalized by 4.25. Single-sided spectra are calibrated to RMS per bin using Parseval and Hann window energy normalization.
+The denominator floor is fixed at 1e-4 plus 1e-12 (absolute power), derived solely from the reference; log terms use per-band per-bin floors. Smoothed norm is defined as `sqrt(x + 1e-6) - 1e-3`.
+This floor is not a post-hoc pass threshold per track; all weak bands report both relative and absolute errors.
 
-监督区域固定为 `[89*128, frames*128-128)`，与原生复核一致。分析 `center=False`，
-不补零、不越出区域，最少要求每个尺度有两个完整窗口。首个样本包含前一帧 OLA
-的贡献；该帧属于预测保护区，不是 80 帧无梯度模型预热。参考正确时的合成舍入误差
-单独验证，不能通过平移或限幅参考去制造零误差。
+The supervision region is fixed at `[89*128, frames*128-128)` and matches the original native recheck. Analysis uses `center=False`, no zero-padding, no out-of-bounds extension, and at least two full windows per scale. The first sample includes the contribution from the previous OLA frame; this frame falls within the prediction protection zone and is not part of the 80-frame warmup. Reference-synthesized rounding errors are independently verified and cannot be artificially zeroed by shifting or clipping the reference.
 
-2048 点窗只用于离线训练／评分，**不增加部署的 FFT、前瞻或缓冲**。
-模型仍按因果 FFT256/hop128 推理，性能与连续流要求独立实测。
+The 2048-point window is used only for offline training and scoring; **it does not increase deployment FFT size, lookahead, or buffering**. The model continues to infer using causal FFT256/hop128, and performance under continuous streaming is independently measured.
 
-## 固定对照
+## Fixed Baselines
 
-| 组 | 优化目标 |
+| Group | Optimization Target |
 |---|---|
-| control | P29/P31 raw 直接目标＋原预算辅助项 |
-| mr_add | 原直接目标＋新多分辨率频谱目标＋原预算辅助项 |
-| mr_primary | 新多分辨率频谱目标＋0.02 直接复数保真项＋原预算辅助项 |
+| control | P29/P31 raw direct objective + original budget auxiliary terms |
+| mr_add | Original direct objective + new multi-resolution spectral objective + original budget auxiliary terms |
+| mr_primary | New multi-resolution spectral objective + 0.02 direct complex fidelity term + original budget auxiliary terms |
 
-所有组使用同一个 **431,015 参数、宽度 96 的相对坐标模型**，相位输入关闭；
-共同参数和初始化逐项一致。每组两个种子 20261012/20261013、各 **1,024 步**，
-Adam 1e-4、梯度范数上限 5，预算辅助项均为 0.1。
-不根据中途成绩选择模型、提前停止某一组或延长单独候选。
+All groups use the **same 431,015-parameter, 96-width relative coordinate model**, with phase input disabled; shared parameters and initialization are identical. Each group runs for **1,024 steps**, Adam with learning rate 1e-4, gradient norm capped at 5, and budget auxiliary term set to 0.1.
+No model is selected based on intermediate performance, no early stopping, and no extension of any single candidate.
 
-control→mr_add 隔离“增加多分辨率监督”；mr_add→mr_primary 同时移除旧单尺度
-幅度／包络／动态项并将直接复数项从 0.1 降为 0.02，是明确的组合优先级变更，
-不能称为纯粹单项权重消融。没有优化 DSP 后的旧总分或逐采样波形距离。
+`control → mr_add` isolates the addition of multi-resolution supervision; `mr_add → mr_primary` removes the old single-scale magnitude, envelope, and dynamic terms and reduces the direct complex term from 0.1 to 0.02—this is a clear re-prioritization, not a simple weight ablation. No optimization of DSP-posted scores or per-sample waveform distance is performed.
 
-继续使用 P29/P31 的全部 20 个固定训练裁剪：16 音乐、4 语音，每步四音乐＋一语音，
-再加 clean identity，四批循环。独立监督时长仍约音乐 7.32 秒、语音 1.85 秒。
-这是**监督可学习性诊断，不是完整曲库训练、收敛或泛化证明**。先验证频谱目标能否
-有效学习，再决定完整跨录音训练；不以反复复核这些裁剪证明没有过拟合。
+The full set of 20 fixed training clips from P29/P31 is retained: 16 music, 4 speech, with four music and one speech per batch, plus clean identity. Each batch cycles four times. Supervision duration remains approximately 7.32 seconds for music and 1.85 seconds for speech.
+This is a **diagnostic of learnability, not a proof of full corpus training, convergence, or generalization**. First, we verify whether the spectral objective can be learned, then decide whether to proceed to full cross-recording training. Repeated rechecks of these clips do not constitute proof of overfitting.
 
-## 统一评估与复现
+## Unified Evaluation and Reproducibility
 
-先冻结全部六个最终端点，再统一评分。`spectrum-review/` 将以下四条路径按同一
-多分辨率频谱目标比较：未处理输入、恒等 DSP、原始模型 OLA、实际 Rust 前端→
-ORT→DSP 输出。每个尺度、频带、分项及逐录音结果全部保留，音乐／语音、paired／
-identity 分开；不只看一个加权总分，也不直接比较各组不同的优化总分。
+All six final endpoints are frozen before unified scoring. The `spectrum-review/` directory compares the following four paths under the same multi-resolution spectral objective: unprocessed compressed input, identity DSP, original model OLA, and actual Rust frontend → ORT → DSP output. Per-scale, per-band, per-component, and per-track results are preserved separately for music/speech, paired/identity; no single weighted score is considered, nor are different group totals directly compared.
 
-频谱总分与幅度、谱形、能量、动态是主要恢复证据。相位、PCM、低频、绝对高频
-误差、声道和连续性仍作辅助与完整性证据，波形小幅退步不能单独否定频谱收益。
-本轮不自动晋级权重，也不把训练裁剪得分当听感或独立测试结论。
+Spectral total score and magnitude, shape, energy, and dynamic fidelity are primary evidence of recovery. Phase, PCM, low-frequency, high-frequency (absolute), channel consistency, and continuity remain auxiliary and integrity indicators. Minor waveform degradation does not negate spectral gains.
+No automatic weight promotion occurs, and training clip scores are not interpreted as perceptual or independent test conclusions.
 
-原有 240 个完整原生角色复核后，额外运行 240 个完整原生角色计算多分辨率频谱。
-之后全部六个端点进行 mono/stereo、44.1/48 kHz、额外两轮 stereo 48 kHz 和
-paced stereo 测试，共 420,000 个计时 hop，保留所有 >5 ms 和逐 hop 超时。
-固定 256 帧缓冲单独报告；新 loss 无部署开销不等于实际尾延迟达标。
+After 240 full native rechecks, an additional 240 full native rechecks are run for multi-resolution spectral evaluation. Subsequently, all six endpoints undergo mono/stereo, 44.1/48 kHz, and two additional stereo 48 kHz tests, plus paced stereo, totaling 420,000 timed hops. All results with >5 ms or hop-level timeouts are preserved. A fixed 256-frame buffer is reported separately; the new loss has no deployment overhead and does not imply actual tail latency meets specification.
 
 ```bash
 rtk proxy env PYTHONPATH=training training/.venv/bin/python \
@@ -84,124 +61,108 @@ rtk proxy env PYTHONPATH=training training/.venv/bin/python \
   --prepare-only
 ```
 
-登记后按 `source_hashes` 复制完整 `source/training`，从冻结快照运行并移除
-`--prepare-only`。源码、数据、二进制与端点哈希均绑定登记；失败保留证据，不覆盖。
+After registration, the full `source/training` is copied using `source_hashes`, and the frozen snapshot is executed with `--prepare-only` removed. Source code, data, binaries, and endpoint hashes are all bound to registration; failures are preserved as evidence and not overwritten.
 
-## 当前验证状态
+## Current Verification Status
 
-实现、定向数值测试与独立四步预检已完成。真实 20 对裁剪的正确参考检查：
-最大 MR 频谱损失 **1.91e-8**，最大梯度绝对值 **2.49e-7**，全部有限值，
-80 帧预热梯度为零。合成信号测试覆盖正确参考／静音、弱能量有限差分、
-同能量错频率、真实瞬态、相位反转不改变幅度谱，以及 DSP 掩码独立性。
+Implementation, targeted numerical testing, and independent four-step prechecks have been completed. True 20-track clip reference validation confirms:
+- Maximum multi-resolution spectral loss: **1.91e-8**
+- Maximum gradient magnitude: **2.49e-7**
+- All finite values; 80-frame warmup gradient is zero.
 
-全量测试首次出现两个素材预处理失败，原因是系统 FFmpeg 缺少
-`libx265.216.dylib`；使用项目现有 imageio-ffmpeg 7.1 作隔离复核，实际环境路径
-和测试输出保存在预检目录；隔离复核 **620 项测试全部通过**（新增 12 项）。
-Ruff lint/format 通过。未改动系统依赖或现有训练配对数据。
+Synthetic signal testing covers correct reference, silence, weak energy finite-difference, equal energy at wrong frequency, real transients, phase reversal without magnitude change, and DSP masking independence.
 
-预检目录为 `data/runs/spectrum-priority-p32-preflight-20261020/`。三组各四步、
-120 个原生一致性角色与另外 120 个多分辨率原生评分角色均完成；合成最大误差
-2.38e-7、零容差失败。control 前四步的全部原有 loss／梯度记录与 P31 完全相同。
-预检端点不参加正式对照，也不用于选组。
+A total of two pre-processing failures occurred during full testing, due to the system FFmpeg lacking `libx265.216.dylib`. Isolated revalidation using the project's existing imageio-ffmpeg 7.1 passed all 620 test cases (including 12 new ones). Test environment paths and outputs are preserved in the precheck directory.
+Isolated revalidation passed **620 test cases** (12 new). Ruff lint/format passed. No system dependencies or existing training pair data were modified.
 
-**六条 1,024 步诊断及全部复核已完成**：`data/runs/spectrum-priority-p32-20261020/`。
-冻结 178 个源码／配置依赖，代码提交
-`9050d4a82417881341129742719329ff92e5c075`，登记 SHA-256 为
-`96256e92472c7a36b54e107059e4af4a65d87a3513fcc5133a5f5d05ea1d5748`。
-2026-10-20 04:45:06（新加坡）结束，完整流程约 33 分 34 秒，监督进程退出码 0。
-代码与登记文档的远程 CI 均通过。事后汇总脚本及结果保存在本地
-`evaluation-20261020/`，重新校验 307 个哈希绑定，包括 178 个冻结源码／配置、
-输入数据、六个端点、评分报告和 42 个原始计时报告。默认权重未替换。
+Precheck directory: `data/runs/spectrum-priority-p32-preflight-20261020/`. All three groups completed four-step, 120 native consistency roles and 120 multi-resolution native scoring roles; maximum synthesis error was 2.38e-7, with zero tolerance failure.
+The first four steps of control show identical loss and gradient records as in P31. Precheck endpoints are not included in the official comparison and are not used for group selection.
 
-## 完成结果：频谱改善成立，范围仅限拟合裁剪
+**All six 1,024-step diagnostics and full rechecks are complete**: `data/runs/spectrum-priority-p32-20261020/`.
+178 source code and configuration dependencies are frozen. Code commit: `9050d4a82417881341129742719329ff92e5c075`. Registration SHA-256: `96256e92472c7a36b54e107059e4af4a65d87a3513fcc5133a5f5d05ea1d5748`.
+Ended at 04:45:06 (Singapore time), total process duration ~33 minutes 34 seconds. Supervision process exit code: 0. Remote CI for code and documentation passed. Post-hoc aggregation scripts and results are saved locally at `evaluation-20261020/`. 307 hash bindings were re-verified, including 178 frozen source codes/configurations, input data, six endpoints, scoring reports, and 42 raw timing reports. Default weights were not replaced.
 
-下表均为相同 MR v1 目标、原始无损参考下的逐录音均值，越低越好；两列数字
-依次对应种子 20261012／20261013。没有跨优化目标比较训练总 loss。
+## Final Results: Spectral Improvement Confirmed, Scope Limited to Fitting Clips
 
-| 路径／配置 | 音乐原始模型 OLA | 音乐实际 Rust＋ORT＋DSP | 语音实际 Rust＋ORT＋DSP |
+The table below shows per-track mean values under the same MR v1 objective and original, lossless reference. Lower is better. The two numbers per row correspond to seeds 20261012 and 20261013. No cross-optimization target comparison of total loss is performed.
+
+| Path / Configuration | Music (Original OLA) | Music (Actual Rust + ORT + DSP) | Speech (Actual Rust + ORT + DSP) |
 |---|---:|---:|---:|
-| 未处理压缩输入 | 0.230262 | 0.230262 | 0.229617 |
-| 恒等 DSP 控制 | — | 0.229449 | 0.229617 |
+| Unprocessed Compressed Input | 0.230262 | 0.230262 | 0.229617 |
+| Identity DSP (Control) | — | 0.229449 | 0.229617 |
 | control | 0.190957 / 0.190064 | 0.194972 / 0.194151 | 0.215313 / 0.214404 |
 | mr_add | **0.182656 / 0.182574** | **0.190388 / 0.190225** | **0.212683 / 0.211707** |
 | mr_primary | 0.183585 / 0.184070 | 0.190942 / 0.191822 | 0.217605 / 0.219406 |
 
-`mr_add` 相对同预算 control，音乐原始 OLA 误差下降 **4.35%／3.94%**，实际部署
-输出下降 **2.35%／2.02%**，语音部署输出下降 **1.22%／1.26%**。相对未处理输入，
-音乐部署频谱分数下降 17.32%／17.39%，这是训练裁剪上的目标误差改善，不能解释为
-整体音质提升百分比。16 首音乐中，部署输出优于 control 的为 10／11 首，持平
-1／1 首，退步 5／4 首；优于输入为 14／15 首。4 条语音各有 3 条优于 control。
-音乐逐曲相对 control 最差增幅为 1.14%／1.15%，全部反例保留，没有按阈值剔除。
+`mr_add` shows a **4.35% / 3.94% reduction** in magnitude spectrum error compared to the same budget control for music original OLA, and a **2.35% / 2.02% reduction** for actual deployed output. For speech, the deployed output shows a **1.22% / 1.26% reduction**. Relative to unprocessed input, music deployment spectral scores dropped by **17.32% / 17.39%**, representing training clip-level error improvement—not a general audio quality improvement percentage.
+Of the 16 music tracks, 10/11 outperformed control, 1/1 matched, and 5/4 degraded. 14/15 outperformed the input. For speech, 3 out of 4 tracks outperformed control.
+The worst relative increase over control for music was only **1.14% / 1.15%**, with all counterexamples preserved and no threshold-based filtering applied.
 
-`mr_add` 音乐实际部署的分项变化如下，相对同种子 control，负值表示改善：
+Per-component changes for music actual deployment under `mr_add`, relative to the same seed control, with negative values indicating improvement:
 
-| 分项 | 种子 20261012 | 种子 20261013 |
+| Component | Seed 20261012 | Seed 20261013 |
 |---|---:|---:|
-| 幅度谱误差 | -2.30% | -1.83% |
-| 对数谱形误差 | -3.94% | -3.47% |
-| 能量包络误差 | -11.74% | -7.53% |
-| 真实时间变化误差 | **+0.76%** | -0.31% |
+| Magnitude spectrum error | -2.30% | -1.83% |
+| Log-spectrum shape error | -3.94% | -3.47% |
+| Energy envelope error | -11.74% | -7.53% |
+| True time variation error | **+0.76%** | -0.31% |
 
-三个分析尺度的 8–12、12–16、16–24 kHz 幅度误差均在两种子改善；逐格降幅约
-1.97%–6.34%。不是只改善一个 FFT 的频带总能量。但时间变化收益尚不稳定，而且
-两种子的动态误差均高于未处理输入（输入 0.111535，mr_add 0.115889／0.115655）。
-不能因此宣称瞬态已经恢复。0–4 kHz 幅度误差变化接近零（约 -0.001% 至 +0.011%），
-仍保留绝对 PCM 低频误差检查。
+Across all three FFT analysis scales, the 8–12, 12–16 and 16–24 kHz bands show magnitude error improvements in both seeds, with per-bin reductions ranging from ~1.97% to 6.34%. This is not limited to total energy in a single FFT band. However, time-variation gains remain unstable, and both seeds show higher dynamic errors than the unprocessed input (input: 0.111535, mr_add: 0.115889 / 0.115655).
+Thus, we cannot claim transient recovery has been achieved. 0–4 kHz magnitude error changes are near zero (-0.001% to +0.011%), and absolute PCM low-frequency error remains under review.
 
-`mr_primary` 的音乐总分也低于 control，但语音均值退步 **1.06%／2.33%**，两种子
-的四条语音全部不如 control；其中一个种子的 FFT256 16–24 kHz 音乐幅度误差
-增加 6.11%。因此当前证据支持继续验证 **mr_add 的组合监督**，不支持把旧频谱
-监督和复数保真项一并大幅弱化。该比较是组合变更，不足以单独归因于相位权重。
+`mr_primary` shows a lower music total score than control, but speech scores increase by **1.06% / 2.33%**. All four speech tracks under `mr_primary` underperform control. One seed shows a 6.11% increase in 16–24 kHz magnitude error for music.
+Therefore, current evidence supports further validation of the **mr_add combination supervision**, and does not support a significant weakening of the prior spectral supervision and complex fidelity term. This comparison represents a combination change and cannot be attributed solely to phase weighting.
 
-原始 OLA 到部署输出的音乐总分差，control 为约 0.0040，mr_add 为约 0.0077。
-完整部署链保留了部分收益，但也抵消了一部分；这尚不能定位到某个 gate、预算头
-或限幅器，需要保持同一端点进行组件消融。不得直接取消 DSP 或改参考来提高分数。
+The difference in music total score from original OLA to deployed output: control ≈ 0.0040, mr_add ≈ 0.0077.
+The full deployment chain retains partial gains but also offsets some—this cannot yet be attributed to any specific gate, budget header, or limiter. Component-level ablation is required.
+No direct removal of DSP or alteration of reference should be used to improve scores.
 
-## 波形、保真与一致性辅助证据
+## Waveform, Fidelity, and Consistency Auxiliary Evidence
 
-音乐全带 PCM RMS 误差：输入 0.009219998，恒等 DSP 0.009223736，control
-0.009684719／0.009706785，mr_add **0.009927955／0.009896091**，mr_primary
-0.009992523／0.009992904。mr_add 相对 control 增加约 2.51%／1.95%，相对输入
-增加约 7.68%／7.33%。这是需要保留和继续处理的相位／波形代价，不能冒称已经
-改善，也不单凭这一项否定已测到的频谱收益。
+Music full-band PCM RMS error:
+- Input: 0.009219998
+- Identity DSP: 0.009223736
+- Control: 0.009684719 / 0.009706785
+- `mr_add`: **0.009927955 / 0.009896091**
+- `mr_primary`: 0.009992523 / 0.009992904
 
-mr_add 的 0–4 kHz 绝对 PCM RMS 误差为 0.005953493／0.005952591，与 control 的
-0.005952284／0.005952965 接近。各带 RMS/dBFS、逐曲结果和原始参考功率均在原生
-报告保留；MR 相对谱分数不是 dBFS，也不能据此推断弱频带噪声是否可闻。
-clean identity 音乐部署 MR 为 0.006214／0.006148，恒等 DSP 自身为 0.005492；
-语音分别为 2.13e-5／9.07e-6，说明仍会对不需要修复的输入产生变化。
+`mr_add` shows a ~2.51% / 1.95% increase relative to control and a ~7.68% / 7.33% increase relative to input. This represents a phase and waveform cost that must be retained and addressed further. It cannot be claimed as improved, nor can this metric alone be used to deny spectral gains.
 
-240 个原生一致性角色全部通过合成容差，最大合成误差 2.98e-7；另 240 个实际原生
-角色完成多分辨率评分。这是代码路径与数值证据，不是盲听、物理设备或独立录音
-泛化证明。1024 步只完成预登记预算，末段日志仍有变化，不宣称已收敛。
+`mr_add` 0–4 kHz absolute PCM RMS error: 0.005953493 / 0.005952591, very close to control's 0.005952284 / 0.005952965.
+Per-band RMS/dBFS, per-track results, and original reference power are preserved in native reports.
+MR spectral score is not dBFS and cannot be used to infer whether weak-band noise is audible.
 
-## 实时性能：典型耗时低，长尾未达标
+Clean identity music deployment MR: 0.006214 / 0.006148; identity DSP itself: 0.005492.
+Speech: 2.13e-5 / 9.07e-6. This confirms that the system still produces changes on inputs that do not require repair.
 
-| 范围 | hop 数 | 各测试 p99 范围 | 最大计算时间 | >5 ms 次数 | 超自身 hop 周期次数 |
+All 240 native consistency roles passed synthesis tolerance, with maximum synthesis error 2.98e-7. An additional 240 actual native roles completed multi-resolution scoring. This is code-path and numerical evidence—not blind listening, physical device, or independent recording generalization.
+1024 steps only completed pre-registration budget; end logs still show variation, so convergence is not claimed.
+
+## Real-Time Performance: Low Typical Latency, Long-Tail Not Met
+
+| Scope | Hops | p99 Range | Max Computation Time | >5 ms Count | >1 hop period count |
 |---|---:|---:|---:|---:|---:|
-| 六端点全部 42 个测试 | 420,000 | 0.169–1.406 ms | **45.003 ms** | **91** | **221** |
-| 其中 48 kHz stereo paced | 60,000 | 0.651–1.060 ms | **8.330 ms** | **7** | **36** |
+| All six endpoints, 42 tests | 420,000 | 0.169–1.406 ms | **45.003 ms** | **91** | **221** |
+| Among 48 kHz stereo paced | 60,000 | 0.651–1.060 ms | **8.330 ms** | **7** | **36** |
 
-paced 共 619 次完成迟到，最大迟到 12.713 ms；完成迟到含调度等待，不能与计算
-超周期简单相加，也不能直接等同物理设备爆音。mr_add 的两次 paced p99 为
-0.683／0.651 ms，均无 >5 ms 计算，但所有场景各有 12 次 >5 ms，不能只选 paced
-结果宣布它达标。全测试输出有限，进程峰值 RSS 为 30.88–33.30 MiB；paced CPU
-约单核心的 10.42%–17.73%（进程 user＋system / wall，含初始化与预热），不是模型
-净增内存或整机 CPU 占比。没有固定时间约束调度或空闲主机对照，不能把长尾归因
-为模型计算、系统调度或外部负载中的某一项。
+Paced mode had 619 late completions, maximum delay 12.713 ms; completion latency includes scheduling wait and cannot be simply added to computation time, nor can it be equated directly to physical device clipping.
+`mr_add` paced p99 values were 0.683 / 0.651 ms, both below 5 ms, but each scenario had 12 instances of >5 ms.
+No single paced result can be used to claim compliance.
+All test outputs are finite; peak RSS was 30.88–33.30 MiB. Paced CPU usage was ~10.42%–17.73% (user+system/wall, including initialization and warmup), not net model memory or overall system CPU.
+No fixed time constraints, idle host, or load comparison was performed—thus, long-tail cannot be attributed to model computation, system scheduling, or external load.
 
-固定缓冲仍为 256 帧，即 48 kHz 下 5.333 ms、44.1 kHz 下 5.805 ms，另有计算
-与调度时间；多分辨率 loss 没增加部署缓冲。**典型计算有余量，但严格 <5 ms 和
-持续逐 hop 交付没有通过本次全部测试。**
+Fixed buffer remains at 256 frames, i.e., 5.333 ms at 48 kHz and 5.805 ms at 44.1 kHz, plus computation and scheduling overhead. Multi-resolution loss does not increase deployment buffer.
+**Typical computation has margin, but strict <5 ms and continuous hop-by-hop delivery has not passed all tests.**
 
-## 后续方向
+## Next Steps
 
-保留 mr_add 与匹配 control，下一轮先登记更广训练／开发录音划分、相同充分预算
-和固定频谱指标，重点验证跨录音收益以及瞬态退步；不在这 20 个拟合裁剪上继续
-调到最好后宣称通用性。并行工作方向是固定端点的 DSP 组件消融，以及带调度／
-负载证据的实时长尾定位。待泛化、瞬态、连续流与盲听证据补齐再考虑正式权重。
-本次只完成结果复核与归档，未启动下一轮训练，未自动晋级模型。
+Retain `mr_add` and match `control`. The next round will first register a broader training/development audio split, with identical sufficient budget and fixed spectral metrics. Focus will be on validating cross-recording gains and transient degradation.
+No further optimization on these 20 fitting clips will be pursued before claiming generalization.
+Parallel work will focus on component-level ablation of fixed-endpoint DSP modules, and on locating real-time long-tail with scheduling and load evidence.
+Generalization, transient recovery, continuous stream, and blind listening evidence will be required before formal weight promotion.
+This round only completed result validation and archiving; no training has been initiated, and no model has been promoted.
 
-后续更新：用户授权继续后，[P33 广覆盖对照](broad-spectrum-study.md)已启动，
-保留 control/mr_add、相同初始化和更充分预算；另完成 P32 实际原生分阶段定位。
-上述 P32 原始结果与协议保持不变。
+**Next update**: Upon user authorization, the [P33 Broad-Spectrum Study](broad-spectrum-study.md) has been launched, retaining `control`/`mr_add`, identical initialization, and more generous budget. Additionally, P32 actual native performance has been completed in phased localization.
+All original P32 results and protocols remain unchanged.
+
+The historical protocol date is 2026-10-20. Both seeds 20261012 / 20261013 were retained for every arm. The per-bin magnitude reductions of 1.97%–6.34% are improvements; the range is not a positive error increase.

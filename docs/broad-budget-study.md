@@ -1,165 +1,145 @@
-# P26：扩大实际训练覆盖与完整残差预算
+# P26: Expanded Actual Training Coverage and Complete Residual Budget
 
-2026-10-19 决策：本轮 640 宽度大模型退出后续扩训，保留冻结端点作为历史对照。
-后续机制定位、外部方法调研及新路线边界见 [P27](head-collapse-audit.md)。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-2026-10-17 登记并启动，2026-10-18 18:15（UTC+8）完成训练及自动验证；
-2026-10-19 核验完成记录与报告哈希。代码基于 `4b06399` 的冻结副本；
-本地证据目录为 `data/runs/broad-budget-p26-20261017-v2/`。
-八条轨迹全部完成，但没有候选取得整体恢复收益，不替换默认权重。
+2026-10-19 Decision: The 640-width large model is retired from future expansion training; the frozen endpoint remains as historical baseline.
+Future mechanism positioning, external method research, and new path boundaries are detailed in [P27](head-collapse-audit.md).
 
-## 完成结果
+2026-10-17 Registration and initiation; completed training and automated validation by 18:15 (UTC+8) on 2026-10-18;
+2026-10-19 Verification of records and report hashes completed.
+Codebase based on the frozen snapshot `4b06399`;
+Local evidence directory: `data/runs/broad-budget-p26-20261017-v2/`.
+All eight trajectories completed, but no candidate achieved overall recovery gains—default weights remain unchanged.
 
-已完成 129,536 次更新、冻结 24 个端点，核验 **82 份完成回执**。
-端点代理／DSP 复核完成，另有八个最终端点的 **1,424 次完整 Rust 前端 → ORT → DSP
-角色回放**及 **56 个独立成本进程、560,000 个测量 hop**。任务 exit code 为 0。
-所有完整回放的 detector condition 一致，使用相同 Rust 观测的合成最大误差
-`2.980232e-7`，未超过既定 `2e-5`；部署合成差异不足以解释本轮质量停滞。
+## Final Results
 
-最终端点的音乐复核结果如下，均为两个种子、33 个音乐片段的 clip 均值；
-高频谱指标来自预测经过真实 DSP 的回放，PCM 来自完整 Rust 前端及 ORT 路径。
-所有指标越低越好，不能跨指标直接比较，也不能把复用录音称为独立泛化测试。
+129,536 updates completed, 24 endpoints frozen, and 82 completion confirmations verified.
+Endpoint proxy/DSP rechecks completed; for eight final endpoints, **1,424 full Rust frontend → ORT → DSP replay sessions** and **56 independent cost processes, 560,000 measured hops** were executed. Task exit code: 0.
+All full replays show consistent detector conditions, with identical Rust observations. The maximum synthetic error across all metrics is `2.980232e-7`, below the specified threshold of `2e-5`. The observed deployment divergence is insufficient to explain the current quality stagnation.
 
-| 路径 | 原始无损参考 PCM RMS 误差 | 高频谱收敛误差 | 高频变化误差 | 高频能量误差 dB |
+Final endpoint music recheck results are presented below, representing mean values across two seeds and 33 music clips.
+High-frequency spectral metrics derive from predictions replayed through real DSP; PCM data comes from the full Rust frontend and ORT path.
+Lower values are better; no direct cross-metric comparison is valid, and reuse of recordings cannot be considered independent generalization testing.
+
+| Path | RMS Error (Original Unclipped Reference PCM) | High-Frequency Spectral Convergence Error | High-Frequency Change Error | High-Frequency Energy Error (dB) |
 | --- | ---: | ---: | ---: | ---: |
-| 压缩输入不处理 | 0.01240408 | 0.54787658 | 0.71375772 | 8.84387 |
-| 恒等模型 + DSP | 0.01251822 | 0.54876080 | 0.71716419 | 8.48012 |
+| Compressed Input, Unprocessed | 0.01240408 | 0.54787658 | 0.71375772 | 8.84387 |
+| Identity Model + DSP | 0.01251822 | 0.54876080 | 0.71716419 | 8.48012 |
 | finite_global | 0.01253625 | 0.55228936 | 0.72667301 | 7.62436 |
 | finite_residual | 0.01253075 | 0.55275789 | 0.72480686 | 7.89268 |
 | broad_global | 0.01251822 | 0.54874172 | 0.71716622 | 8.47238 |
 | broad_residual | 0.01251822 | 0.54838372 | 0.71720389 | 8.43005 |
 
-广覆盖两组的音乐输出与恒等 DSP 的平均 PCM 差异，分别只有约 `8.63e-8` 和
-`1.22e-7` RMS；这是接近不增强的行为，不能因为更少损伤原音就判为修复成功。
-有限池组改善部分高频能量，但音乐谱形、变化误差及波形误差出现退化；种子差异
-明显。有限池两组的音乐 identity 额外扰动最大 RMS 分别为 `0.001663`、`0.001822`。
-广覆盖的微小相对谱指标改善没有转化为整体波形恢复，所有预登记双种子综合对照
-均未通过。语音广覆盖输出也基本与恒等 DSP 相同，未证明语音恢复收益。
+The music output from the broad coverage groups differs from the identity DSP by only approximately `8.63e-8` and `1.22e-7` RMS, respectively—behavior close to no enhancement. Such minimal degradation does not constitute successful restoration.
+The finite pool group shows partial improvement in high-frequency energy, but degradation occurs in spectral shape, change error, and waveform error; seed differences are evident. The maximum RMS perturbation in identity for the finite pool groups is `0.001663` and `0.001822`, respectively.
+The marginal relative spectral improvements in the broad coverage group fail to translate into overall waveform recovery. All pre-registered dual-seed comparative analyses failed to pass.
+Voice output under broad coverage remains nearly identical to the identity DSP, with no demonstrated voice restoration benefit.
 
-这支持下一步检查共同目标是否鼓励接近恒等的解，尤其恢复项、identity 约束与预算
-监督之间的梯度竞争；目前尚未证明是哪一项造成，也不能据此否定容量或广覆盖数据。
-应先做训练集上的目标／梯度及可拟合性诊断，避免直接重复更长训练或针对复核曲目调阈值。
-盲听、真实设备连续性及新留出录音验证仍未完成。
+This supports the next step of investigating whether the shared objective encourages solutions close to identity—particularly the interaction between residual terms, identity constraints, and gradient competition among budget supervision. The root cause remains unconfirmed, and neither the capacity nor the broad coverage data can be dismissed.
+Prior to further training, a diagnostic of training set objectives, gradients, and fit should be conducted to avoid repeating longer training or adjusting thresholds for specific validation tracks.
+Blind listening, real-device continuity, and new held-out recordings remain unverified.
 
-成本测试中，**560,000 个测量 hop 均低于 5 ms，观测最大为 4.532 ms**。
-48 kHz 双声道不节拍三轮的 p99 为 1.121–1.171 ms，最大 3.252 ms；paced 的
-p99 为 2.200–2.352 ms，最大 4.532 ms。双声道峰值进程 RSS 为 84.2–84.7 MiB；
-paced 的进程 CPU 时间／墙钟时间约为一个核心的 68.0–72.5%，含加载与预热。
-这些是本机本次观测，不能保证所有主机／负载都满足 5 ms，也不能把与 P25 的差异
-直接归因为结构优化。
+Cost testing shows that **all 560,000 measured hops are below 5 ms**, with a maximum observed value of 4.532 ms.
+For 48 kHz stereo, three rounds without pacing: p99 = 1.121–1.171 ms, peak = 3.252 ms; paced: p99 = 2.200–2.352 ms, peak = 4.532 ms.
+Peak RSS for stereo channels: 84.2–84.7 MiB; paced process CPU time/wall-clock time is approximately 68.0–72.5% of a single core, including loading and warmup.
+These are local observations and do not guarantee performance across all hosts or loads. Differences from P25 cannot be directly attributed to structural optimization.
 
-全部测量仍有 **136 次单次计算超过相应 hop 周期**；其中 48 kHz 双声道 paced
-的 80,000 hop 有 131 次计算超 2.667 ms、375 次包含唤醒调度的完成迟到，最大
-迟到 2.267 ms。实际回调队列、过期丢弃、dry 回退和设备 xrun 未纳入此基准，
-所以计算 <5 ms 的观测不等于实时连续性合格。固定 256 帧缓冲仍单独计算。
+All measurements still show **136 individual updates exceeding their corresponding hop period**. Among them, 80,000 hops in the 48 kHz stereo paced case have 131 instances exceeding 2.667 ms, with 375 including wake-up scheduling delays, maximum delay 2.267 ms.
+Actual callback queues, expired discards, dry backoffs, and device xruns are not included in this baseline. Therefore, a computation <5 ms does not equate to real-time continuity compliance. The 256-frame fixed buffer is separately evaluated.
 
-证据：`study/summary.json`、`comparisons.json`、`native-audit/summary.json`、
-`native-cost/summary.json`；原始报告与全部权重保持本地忽略，不修改冻结实验。
+Evidence: `study/summary.json`, `comparisons.json`, `native-audit/summary.json`, `native-cost/summary.json`; original reports and all weights remain locally ignored and unmodified, preserving the frozen experiment.
 
-P25 发现两个问题：有限诊断池仅提供约 8 分钟独立音乐监督；旧生成预算为零时，
-局部功率仍允许模型修改输入。本轮分别对照数据覆盖和预算作用范围，判断扩大
-音频曝光与约束整个残差是否有效。减少原音扰动仍不等于恢复成功，须同时改善
-相对原始无损参考的高频谱形、能量、瞬态和完整输出误差。
+P25 identified two issues: the finite diagnostic pool provided only about 8 minutes of independent music supervision; when the original generation budget was zero, local power still allowed model modifications to input.
+This round contrasts data coverage and budget scope to determine whether expanded audio exposure and full residual constraints are effective.
+Reduced original signal perturbation does not equate to successful restoration—improvements in relative high-frequency spectral shape, energy, transient behavior, and full output error must also be achieved.
 
-## 固定实验
+## Fixed Experiments
 
-| 组 | 训练样本 | 生成预算作用范围 |
+| Group | Training Sample | Budget Scope |
 | --- | --- | --- |
-| finite_global | 修正隔离后的有限池 | 历史 global 路径 |
-| broad_global | 广覆盖抽样 | 历史 global 路径 |
-| finite_residual | 相同有限池 | 完整残差 |
-| broad_residual | 相同广覆盖抽样 | 完整残差 |
+| finite_global | Corrected finite pool | Historical global path |
+| broad_global | Broad coverage sampling | Historical global path |
+| finite_residual | Same finite pool | Full residual |
+| broad_residual | Same broad coverage sampling | Full residual |
 
-四组均为 640 宽度、约 1,192 万参数的 complex head，两种子
-`20261012/20261013`，每条轨迹从头训练 **16,192 步**，合计 **129,536 次更新**。
-同一种子共享骨干初始化，数据因素相同时共享全部抽样序列；不复用 P24 权重。
-端点固定为 2,048 / 8,192 / 16,192 步，最终端点是主要比较对象。
-八条轨迹全部完成、24 个端点哈希冻结后才评分留出复核数据，不挑中途最好模型。
+All four groups are 640-width, approximately 1,192M parameter complex heads, with two sub-versions: `20261012` and `20261013`. Each trajectory trains from scratch for **16,192 steps**, totaling **129,536 updates**.
+Shared backbone initialization; identical data factors and sampling sequences; no reuse of P24 weights.
+Endpoint fixed at 2,048 / 8,192 / 16,192 steps; final endpoints are primary comparison targets.
+All eight trajectories completed, and only after 24 endpoint hashes were frozen were the held-out recheck datasets scored. No intermediate model was selected.
 
-Loss、权重和优化器保持相同：历史 rendered main +
-`0.1365237430457469 × clean complex auxiliary + 0.1 × budget auxiliary`；
-Adam 学习率 `1e-4`，无 weight decay，梯度范数上限 5。
-两种预算定义在预算值为 1 时相同；新定义在预算值为 0 时关闭完整残差。
-本轮不同时更换损失归一化或扩大模型，以便解释两个实验因素。
+Loss, weights, and optimizer remain identical: historical rendered main + `0.1365237430457469 × clean complex auxiliary + 0.1 × budget auxiliary`;
+Adam learning rate `1e-4`, no weight decay, gradient norm capped at 5.
+Both budget definitions are identical when budget value is 1; the new definition disables full residual when budget value is 0.
+This round does not alter loss normalization or expand model size, to isolate the two experimental factors.
 
-每次更新固定四首不同音乐加一段语音，paired / identity 等权，无新增增益扰动。
-这是延续 P24 的 **20% 语音实验抽样比例**，不是把该比例重新定义为所有产品训练
-的永久标准。广覆盖按录音打乱循环，在录音内依据 manifest 权重抽编码／声道／
-配对行，再均匀抽合法起点。它同时扩大源位置、编码、声道和语音录音覆盖，不能
-把组间效果单独归因于其中一个子因素。
+Each update includes four distinct music clips and one speech segment, paired/identity-weighted, with no added gain perturbation.
+This continues the **20% speech sampling ratio** from P24, not establishing it as a permanent standard for all product training.
+Broad coverage uses randomized loop over recordings, within each recording, sampling encoding/channel/pairing rows by manifest weights, then uniformly selecting start offsets. It simultaneously expands source position, encoding, channel, and speech recording coverage—no single subfactor can be isolated as the cause of group-level performance.
 
-## 实际计划覆盖
+## Actual Coverage Scope
 
-以下为训练前冻结序列的覆盖，**不代表这些音频已经全部训练完毕**。时间取监督区间
-`[89×128, 32768−128)`，按原始 source 时间合并跨编码、采样率及声道视图的重叠；
-paired 与 identity 共用参考，不重复计时。它比 channel-view 时长更保守。
+The following represents the training-time frozen sequence coverage—**this does not imply that all audio has been fully trained**. Time spans the supervision interval `[89×128, 32768−128)`, merged across encoding, sample rate, and channel views using original source time; paired and identity share reference, with no overlap counting. This is more conservative than channel-view duration.
 
-| 抽样组／种子 | 音乐录音 | 音乐独立监督分钟 | 语音录音 | 语音独立监督分钟 |
+| Sampling Group / Seed | Music Recording | Independent Music Supervision (minutes) | Speech Recording | Independent Speech Supervision (minutes) |
 | --- | ---: | ---: | ---: | ---: |
-| 修正有限池，两种子共用 | 253 | 8.01 | 8 | 0.262 |
-| 广覆盖 20261012 | 253 | 331.14 | 193 | 14.94 |
-| 广覆盖 20261013 | 253 | 330.40 | 193 | 14.95 |
+| Corrected Finite Pool (shared across two seeds) | 253 | 8.01 | 8 | 0.262 |
+| Broad Coverage 20261012 | 253 | 331.14 | 193 | 14.94 |
+| Broad Coverage 20261013 | 253 | 330.40 | 193 | 14.95 |
 
-每个广覆盖种子有 64,768 次音乐裁剪和 16,192 次语音裁剪；音乐涉及
-40,138 / 40,333 条配对行，包含 9 个编码档位、44.1/48 kHz、mono/left/right/mid/side。
-这是已有配对库的更充分使用，没有新增来源或改变原素材授权记录。
-相邻更新独立构造历史，不把不同时刻的 left/right 当作同一立体声片段。
+Each broad coverage seed includes 64,768 music clips and 16,192 speech clips; music spans 40,138 / 40,333 paired rows, including 9 encoding levels, 44.1/48 kHz, mono/left/right/mid/side.
+This represents more thorough use of existing paired databases, with no new sources or changes to original material licensing.
+Adjacent updates are independently constructed; left/right at different times are not considered the same stereo segment.
 
-训练音乐地区标签：China 25、Japan 41、Korea 50、Europe 27、North America 79、
-unknown 31。它们是来源／作者曲库标签，不保证当地流行风格代表性。
-曲风仍不均衡：rock 49、electronic 48、classical 47、ambient 27、folk 22、
-pop 13、blues 7、jazz 6、country 5、hiphop 2、funk 1、unlabeled 26。
-广覆盖不会凭空补齐稀少风格；既有 test 划分没有中国音乐，不能据此宣称各地区均已
-取得独立泛化证据。反复用于诊断的 validation/test 仍只称留出复核。
+Training music region tags: China 25, Japan 41, Korea 50, Europe 27, North America 79, unknown 31. These are source/author library tags and do not guarantee local stylistic representation.
+Genre distribution remains unbalanced: rock 49, electronic 48, classical 47, ambient 27, folk 22, pop 13, blues 7, jazz 6, country 5, hip-hop 2, funk 1, unlabeled 26.
+Broad coverage does not artificially balance rare genres. The existing test split contains no Chinese music, so claims of regional generalization cannot be made.
+Repeated validation/test sets remain only considered held-out rechecks.
 
-## 隔离与加载
+## Isolation and Loading
 
-按 recording、source checksum 和 work group 检查训练／验证／测试划分。
-同录音 shifted probe 的完整输入时间区间在所有编码、声道、采样率之间共同保护；
-使用精确分数换算采样时钟，且计入 codec alignment 裁掉的 clean 前缀。
-训练输入的预热部分也不能与保护区间重叠。
+Training/validation/testing splits are verified by recording, source checksum, and work group.
+For each recording, the full input time interval of shifted probe is protected across all encodings, channels, and sample rates; precise fractional conversion of sample clocks is used, with codec alignment truncation of clean prefix accounted for.
+The pre-warmup portion of training input must not overlap with protected intervals.
 
-旧有限池原本只禁止监督部分重叠，明确允许预热重叠。本次发现 **27 个裁剪／19 条
-配对行**需要按更严格规则移动，其中音乐 24 个、语音 3 个。这不能直接称为旧标签
-泄漏。本轮在查看新模型分数前，按几何距离移到最近未使用合法起点，保留原 row、
-codec、声道、录音与抽样索引；共同训练诊断池同步修正。全部修正存于
-`study/coverage.json`，因此 finite 是修正后的对照，不是 P24 的逐样本精确复现。
+Previously, the finite pool only restricted supervision overlap, explicitly allowing pre-warmup overlap. This round identified **27 clips and 19 paired rows** requiring stricter movement rules—24 music, 3 speech. This cannot be directly attributed to old label leakage.
+Prior to evaluating new model scores, these were moved to the nearest unused valid start point based on geometric distance, preserving original row, codec, channel, recording, and sampling index.
+The shared training diagnostic pool was also corrected accordingly. All corrections are stored in `study/coverage.json`, so the finite group is now a corrected baseline, not a point-by-point replication of P24.
 
-数据按批次惰性加载；最多缓存 128 个 prepared clip，复用既有磁盘缓存，不为新
-随机裁剪持续写入 NPZ。每个首次读取的 PCM 文件检查 manifest checksum，裁剪生成
-检查采样率、长度、有限值与对齐单声道几何。已有素材质量／授权审查继续有效，
-实际每条新裁剪的检查发生在读取时，不能把短运行检查称为所有数据已逐条读完。
+Data is loaded in batches with lazy loading; up to 128 prepared clips are cached, reusing existing disk cache, and no new random clips are written to NPZ.
+On first read, each PCM file checks manifest checksum; clip generation checks sample rate, length, finite values, and mono-channel geometry.
+Existing material quality and licensing reviews remain valid; actual per-clip checks occur at read time, and short-run checks cannot be interpreted as full data traversal.
 
-## 运行与验收
+## Execution and Acceptance
 
-四组真实数据各 4 步的训练集集成检查已通过，检查了实际 loss、反向传播、有限梯度、
-保存及读取；其权重保留为本地诊断证据，不用于正式轨迹，也不是早停／质量筛选。
-训练会每 64 步保存恢复状态；每 2,048 步及固定端点只评分共同的 320-crop 训练诊断池，
-不把该分数称为整个广覆盖池风险。恢复时核对模型初值、优化器、RNG、配置及序列哈希。
+Four groups each completed a 4-step training set integration check, verifying actual loss, backpropagation, finite gradients, saving, and loading.
+Weights are retained as local diagnostic evidence and are not used in official trajectories, nor for early stopping or quality filtering.
+Training saves recovery state every 64 steps; at 2,048 steps and fixed endpoints, a common 320-crop training diagnostic pool is scored—this score is not considered indicative of overall broad coverage risk.
+At recovery, model initial values, optimizer, RNG, configuration, and sequence hash are cross-verified.
 
-自动队列顺序：
+Automated queue order:
 
-1. 八条完整训练轨迹，冻结 24 个预登记端点。
-2. 统一代理指标与使用 Rust 观测的 DSP 合成复核，分别报告音乐／语音、paired／identity。
-3. 全部端点导出、状态与逐 hop ORT 检查；八个最终端点执行完整 Rust 前端 → ORT → DSP。
-4. 串行测完整计算链：44.1/48 kHz、单／双声道；48 kHz 双声道重复三轮，所有最终
-   端点再做 paced 长测，共 56 进程、560,000 个测量 hop。报告模型 + DSP 计算、
-   逐 hop deadline、积压、CPU/RSS；真实 callback／设备连续性及盲听仍另需验收。
+1. Eight full training trajectories, 24 pre-registered endpoints frozen.
+2. Unified proxy metrics and Rust-observed DSP synthesis rechecks, reporting music/voice, paired/identity.
+3. Full export of endpoints, status, and per-hop ORT checks; eight final endpoints perform full Rust frontend → ORT → DSP.
+4. Sequential test of full computation chain: 44.1/48 kHz, mono/stereo; 48 kHz stereo repeated three times, all final endpoints undergo paced long-term testing, totaling 56 processes, 560,000 measured hops. Reports include model + DSP computation, per-hop deadlines, backlog, CPU/RSS; real callback, device continuity, and blind listening remain to be verified.
 
-非有限数、输入漂移或运行错误会停下并写错误记录，不悄悄减少预算。完成步数不等于
-收敛，低 loss 不等于合格音质，也不能代替用户要求的计算 <5 ms 和持续吞吐验证。
-固定 256 帧输出缓冲仍另报，不计入用户定义的模型 + DSP 计算耗时。
+Non-finite counts, input drift, or runtime errors halt execution and write error logs—no silent budget reduction occurs.
+Number of completed steps does not imply convergence; low loss does not imply acceptable audio quality, nor can it substitute for user-defined requirements of computation <5 ms and sustained throughput validation.
+The 256-frame fixed output buffer is reported separately and not included in user-defined model + DSP computation time.
 
-本地状态入口：`supervisor.json`、`pipeline.log`、`study/progress.json`；若失败，
-另看 `study/pipeline-error.json`。只提交代码与来源／协议文档，训练音频、抽样序列、
-检查点和实验报告继续保留在忽略目录。注册 SHA-256：
-`48301b33c361931b1cb4843874f00a1f517eee2c98c3d0f0c8cad977bf2eb5b7`。
+Local state entry: `supervisor.json`, `pipeline.log`, `study/progress.json`; if failure, see `study/pipeline-error.json`.
+Only code and source/protocol documentation are submitted; training audio, sampling sequences, checkpoints, and experiment reports remain in the ignored directory.
+Registration SHA-256: `48301b33c361931b1cb4843874f00a1f517eee2c98c3d0f0c8cad977bf2eb5b7`.
 
-启动核查发现首版注册缺少最终分析器所需的 `native_count`，因此在首条轨迹保存至
-256 步后主动停止，保留原目录和 `superseded.json`。v2 补齐回放数量契约并加入
-实际登记／哈希漂移回归测试，重新冻结代码和登记、从头运行全部预算；没有修改旧
-登记或按模型分数改变计划，也没有使用首版权重续训。
+On startup verification, the first registration was missing the required `native_count` for the final analyzer. As a result, the first trajectory was automatically stopped after 256 steps, preserving the original directory and `superseded.json`.
+Version 2 added hop count contract fulfillment and included actual registration and hash drift regression testing, re-freezing code and registration, and restarting all budget from scratch.
+No modifications to prior registration or model scores were made, and no use of the first version weights for continuation training.
 
-启动时验证：全量 Python 测试 **548 项通过**，Ruff 与格式检查通过。
-本次结果更新核对了完成回执和原始报告哈希、文档链接及 diff 格式；未变更训练代码。
-完整训练及自动复核已完成，真实设备连续性与听感仍未验收。
+Startup validation: **548 full Python tests passed**, Ruff and formatting checks passed.
+This round confirmed completion receipts and original report hashes, document links, and diff format; no changes to training code were made.
+Full training and automated recheck completed; real device continuity and perceptual validation remain unverified.
+
+The exact registered seeds are `20261012/20261013`. These workstation observations
+do not guarantee compute below 5 ms on every host or background load.

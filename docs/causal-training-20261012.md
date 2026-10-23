@@ -1,134 +1,133 @@
-# P2：统一目标的三主干训练
+# P2: Training with a Unified Objective Using Three Main Branches
 
-2026-10-12，[P0/P1](causal-prototypes-20261011.md) 后续。训练源码冻结于
-`50dd268c621acad9e48a446eda3ed786c058afec`。已在本机 MPS 启动正式对照，
-**六组现已完成，不代表已超越基线或可以发布**。默认权重未替换。
-后续 [P3 弱高频与泛化控制](weak-band-study-20261012.md)已启动。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 固定实验
+October 12, 2026, following [P0/P1](causal-prototypes-20261011.md). Code is frozen at
+`50dd268c621acad9e48a446eda3ed786c058afec`. Formal ablation testing has been initiated on the local MPS hardware.
+**Six runs have been completed, which does not imply surpassing the baseline or readiness for release**. Default weights were not replaced.
+[P3: Weak High-Frequency and Generalization Control](weak-band-study-20261012.md) has been launched.
 
-| 项目 | 注册值 |
+## Fixed Experiment Setup
+
+| Item | Value |
 | --- | --- |
-| 主干 | 从头初始化的旧 shape-small、原创 GRU、原创 TCN |
-| 参数量 | 905,734 / 643,458 / 639,906 |
-| 种子 | 20261012、20261013 |
-| 每组预算 | 4096 optimizer updates，batch 4，共 16384 次成对裁剪 |
-| 裁剪 | 32768 样本，256 hop，原生 44.1/48 kHz |
-| 模型预热 | 新主干前 64 hop 无梯度，随后 detach state |
-| 监督区域 | 原始频谱 192 hop；重建波形跳过前 65 hop，保留 191 hop |
-| 优化器 | AdamW，lr 3e-4，weight decay 1e-4，余弦降至 0.1 倍，梯度范数上限 5 |
-| 检查点 | 每 512 步及结束，保存 last / 最低固定验证分数 best |
-| DSP 策略 | Model gain + Model phase，无参考音频驱动运行时决策 |
-| 验证 | 原有固定 89 条开发验证选择，每条中心裁剪；音乐与语音分别报告 |
-| 选择规则 | 音乐均值 ×253/254 + 语音均值 ×1/254；不自动晋升 |
+| Main Branch | Freshly initialized from the original `shape-small`, original GRU, original TCN |
+| Parameter Count | 905,734 / 643,458 / 639,906 |
+| Seed | 20261012、20261013 |
+| Budget per Group | 4096 optimizer updates, batch size 4, total 16,384 paired crops |
+| Cropping | 32,768 samples, 256 hop, native 44.1/48 kHz |
+| Model Warmup | First 64 hops with no gradients; subsequent state detach |
+| Supervised Region | Raw spectral input at 192 hops; waveform reconstruction skips first 65 hops, retains 191 hops |
+| Optimizer | AdamW, learning rate 3e-4, weight decay 1e-4, cosine decay to 0.1, gradient norm capped at 5 |
+| Checkpointing | Every 512 steps and at end; saves `last` and `best` (lowest fixed validation score) |
+| DSP Strategy | Model gain + Model phase; runtime decisions driven by no reference audio |
+| Validation | Fixed 89 development validation tracks selected as before; each centered and cropped; separate reporting for music and speech |
+| Selection Rule | Music mean ×253/254 + speech mean ×1/254; no automatic promotion |
 
-旧主干使用原 shape-small 的双流结构与 gain/shape refiner，关闭交互与圆周输入；
-训练时仅监督区域更新 BatchNorm，验证使用冻结统计。它没有历史状态。
-新主干显式携带每个物理声道独立的历史，状态预热不增加输出延迟。
-本轮比较固定训练预算下的路线，不声称已穷尽各架构的优化器或容量上限。
+The legacy main branch uses the dual-stream structure of original `shape-small`, with gain/shape refiner, interaction and circular input disabled.
+During training, only the supervised region updates BatchNorm; validation uses frozen statistics. It has no historical state.
+The new main branch explicitly maintains per-channel physical history, with warmup state not introducing output latency.
 
-沿用已审核的音乐/语音 manifest，recipe
-`7fda9e58ab583617f3514f9dd9cfcf87f29871ae0587e91ca29ac0ddaf6b29d4`。
-音乐目录总计 300 首，其中训练划分 253 首；语音训练划分 193 个录音。
-音乐按录音均衡，音乐/语音来源概率保持 253/254 与 1/254。
-每个种子预先冻结 row、起点、共同增益（−6 到 +3 dB），三个主干完全复用；
-实际来源抽样数、覆盖录音数及有效监督秒数写入 `draws-<seed>.json`，概率不是精确配额。
-首个种子固定 16,318 次音乐、66 次语音裁剪，覆盖 314 个音乐/语音录音；
-每组有效波形监督累计约 145.20 分钟（重复裁剪累计，不是新增独立素材）。
-按 track ID 和原始 checksum 拒绝跨划分泄漏，首次读取的成对 PCM 校验 checksum、
-采样率、长度、有限值，读取已有缓存前也检查 PCM。MUSDB、Slakh、FMA 均未重新引入。
+This round evaluates performance under a fixed training budget, without claiming to have exhausted the optimizer or capacity limits of any architecture.
 
-## 新目标 causal-reconstruction-v1
+The previously approved music/speech manifest is reused, with recipe
+`7fda9e58ab583617f3514f9dd9cfcf87f29871ae0587e91ca29ac0ddaf6b29d4`.
+There are 300 music tracks in total, with 253 assigned to training; 193 speech recordings are used for training.
+Music tracks are evenly distributed, maintaining a music-to-speech source probability of 253/254 and 1/254 respectively.
+Each seed pre-froze row, start point, and common gain (−6 dB to +3 dB); all three main branches are fully reused.
+Actual source sampling count, covered recordings, and effective supervised seconds are logged in `draws-<seed>.json`; probabilities are not exact quotas.
+The first seed uses 16,318 music and 66 speech crops, covering 314 unique music/speech recordings.
+Each group accumulates approximately 145.20 minutes of waveform supervision (cumulative over repeated crops, not new independent material).
+Cross-split leakage is prevented by track ID and original checksum; the first read of paired PCM is verified for checksum, sample rate, length, and finite value.
+Prior cached data is also checked for PCM integrity. MUSDB, Slakh, and FMA datasets were not re-introduced.
 
-这是独立版本，不能与 V5/V7 的总 loss 直接比较。所有主干使用相同的权重与归一化。
+## New Objective: causal-reconstruction-v1
 
-| 分量 | 权重 |
+This is an independent version and cannot be directly compared to the total loss of V5/V7. All main branches use identical weights and normalization.
+
+| Component | Weight |
 | --- | --- |
-| 原始高频幅度 / 复数 / 能量 / 时间变化 | 1 / 0.2 / 0.1 / 0.25 |
-| 原始保留频段复数恒等 | 0.1 |
-| 实际合成代理的波形误差 | 1 |
-| 输出高频幅度 / 时间变化 / 能量 | 1 / 0.5 / 0.1 |
-| 输出保留频段复数恒等 | 1 |
-| 限幅前超量惩罚 | 0.1 |
+| Raw high-frequency magnitude / complex / energy / time variation | 1 / 0.2 / 0.1 / 0.25 |
+| Raw preserved band complex identity | 0.1 |
+| Waveform error of synthesized proxy | 1 |
+| Output high-frequency magnitude / time variation / energy | 1 / 0.5 / 0.1 |
+| Output preserved band complex identity | 1 |
+| Overlimit penalty before clipping | 0.1 |
 
-多分辨率输出频谱使用 256、512、2048 点分析，hop 为各窗口的四分之一；
-时间约束匹配无损参考的变化，避免用静态平滑代替瞬态恢复。
-高频与波形项以无损参考为目标；保留频段以观测输入为恒等约束。
-归一化使用参考或输入的固定尺度与能量下限，不允许通过增大预测量压低分数。
-波形项以原始有损误差归一化，带 1% 参考 RMS 和绝对下限，避免近恒等/静音发散。
+Multi-resolution output spectra use 256, 512, and 2048-point analysis with hop size set to one-fourth of each window;
+temporal constraints match the lossless reference for change, avoiding static smoothing in place of transient recovery.
+High-frequency and waveform components target lossless references; preserved bands are constrained to identity with respect to input.
+Normalization uses fixed scale and energy floor from reference or input, and no prediction amplification is allowed to suppress scores.
+Waveform term is normalized by original lossy error, with 1% reference RMS and absolute floor to prevent divergence near identity or silence.
 
-代理逐 hop 使用实际 Rust 检测器的 cutoff/active，复现频带幅度与单位相量混合、
-Hann overlap-add、软限幅和淡入/释放。检测器只看到输入；向 trace 工具的两个参数
-都传入相同的有损 PCM，避免 clean 标签进入输入条件。
-**dry 与无损波形目标直接采用对齐的 PCM**，不经 STFT 再合成。
+The proxy per-hop uses actual Rust detector cutoff/active thresholds, reproducing band magnitude and complex vector mixing, Hann overlap-add, soft clipping, and fade-in/fade-out.
+The detector sees only the input; both parameters passed to the trace tool use the same lossy PCM to avoid clean labels entering the input condition.
+**Dry and lossless waveform targets directly use aligned PCM**, without STFT re-synthesis.
 
-代理的已知范围：
+Known bounds of the proxy:
 
-- MR loss 的频带权重采用监督区域的平均 cutoff；合成路径仍逐 hop 使用实际 cutoff。
-- 每个裁剪从冷 DSP 状态开始，前 64 hop 关闭增强并预热；这不是长流状态测试。
-- 单声道及立体声的独立角色裁剪均按 mono 训练，不拼成假立体声。
-  同步立体声声像、切换与长期连续性仍须在真实配对流上单独验证。
-- 浮点分析器、FFT 和窗口实现存在差异，不能宣称整条代理逐位一致。
-- 旧主干运行时没有 64 hop 状态等待；训练采用共同的监督区间，实际 Rust 评分同时报告
-  全片和跳过 72 hop 后的共同稳态区间，避免启动差异混入架构结论。
+- MR loss band weights use average cutoff from the supervised region; synthesis path still uses actual cutoff per hop.
+- Each crop starts from cold DSP state; the first 64 hops disable enhancement and are warmed up; this is not a long stream state test.
+- Mono and stereo tracks are trained independently per channel, not combined into a pseudo-stereo output.
+  Stereo imaging, panning, and long-term continuity must be separately validated on real paired streams.
+- Floating-point analyzer, FFT, and windowing implementations have minor differences; no claim of bit-level consistency across the entire proxy.
+- The legacy main branch does not wait for 64-hop state during runtime; training uses a common supervised region, and actual Rust scoring reports both full track and a stable interval after 72 hops, to avoid startup differences from contaminating architectural conclusions.
 
-## 启动前实测
+## Pre-Run Verification
 
-8 updates × batch 4 × 1 seed 的短训练，三个主干均完成有限梯度、检查点、导出
-及实际 Rust 波形评分。ONNX 大小为 3,722,892 / 2,590,696 / 2,599,024 bytes，
-均符合参数 ≤2M、单文件 <8 MiB。短训练不作为架构优劣或音质提升证据。
+A short training run (8 updates × batch 4 × 1 seed) was conducted for all three main branches, completing limited gradient updates, checkpointing, export, and actual Rust waveform scoring.
+ONNX sizes are 3,722,892 / 2,590,696 / 2,599,024 bytes, all within parameter ≤2M and single-file <8 MiB.
+This short run does not serve as evidence of architectural superiority or audio quality improvement.
 
-训练代理与 Rust 外部预测回放的压力输入包括过满幅纯音、静音和重新激活：
+Pressure inputs for the training proxy and external Rust prediction playback include saturated pure tones, silence, and reactivation:
 
-| 采样率 | 波形最大绝对误差 | RMS 误差 |
+| Sample Rate | Max Absolute Waveform Error | RMS Error |
 | --- | --- | --- |
 | 44.1 kHz | 9.996e-5 | 3.724e-6 |
 | 48 kHz | 9.435e-5 | 3.305e-6 |
 
-测试同时约束 peak atol 2e-4（rtol 2e-5）和 RMS <2e-5。纯音接近零的观测频点
-相位对 FP32 窗口误差敏感，再与非零生成能量混合，因此不要求未定义的弱频点相位相等。
-有限值、0.95 限幅、静音尾部及 OLA 一致性另行断言，未放宽语义或时间轴检查。
+Test constraints: peak atol 2e-4 (rtol 2e-5), RMS <2e-5.
+Pure tone observations at near-zero frequency points are sensitive to FP32 window phase errors, and when mixed with non-zero generated energy, exact phase equality is not required.
+Finite values, 0.95 clipping, silence tails, and OLA consistency are separately asserted; no relaxation of semantic or temporal checks.
 
-固定权重、一个真实缓存裁剪的 CPU/MPS 前向及反向探针：三主干总 loss 的最大差
-3.815e-6，梯度相对 L2 差 2.20e-6 / 3.61e-6 / 2.88e-6，均有限。
-这是单批数值探针，不是长期训练一致性保证。PyTorch MPS FFT 仍打印内部 resize
-弃用警告，当前计算与反向成功；环境版本被写入不可变配置，未静默启用 CPU fallback。
+Fixed weights, one real cached crop, forward and backward pass probing on CPU/MPS:
+maximum difference in total loss across the three main branches is 3.815e-6, gradient relative L2 differences are 2.20e-6 / 3.61e-6 / 2.88e-6, all small.
+This is a single-batch numerical probe and does not guarantee long-term training consistency.
+PyTorch MPS FFT still prints internal resize deprecation warnings; current computation and backward pass succeeded.
+Environment version is recorded in immutable configuration and not silently enabled with CPU fallback.
 
-本地检查：291 项 Python 测试通过，Rust workspace 测试通过（原有 30 分钟压力测试
-默认 ignored，本轮未重跑），Ruff、rustfmt、Clippy 和 no-default-features 全目标检查通过。
-断点恢复测试在 CPU 上验证中断/连续训练参数逐位一致；不据此宣称 MPS 跨运行逐位一致。
+## Local Execution and Post-Training Thresholds
 
-## 本地运行与后续门槛
+Run directory: `data/runs/causal-p2-202612/`
 
-运行目录 `data/runs/causal-p2-20261012/`：
+- `launch.json` records PID, UID, start time, command, and source code SHA; `train.log` contains continuous runtime logs.
+- `config.json` and `provenance.json` store fixed objectives, environment, source code, manifest, selection, and binary hash.
+- `progress.json` tracks current group and training step; per-group saves checkpoint, validation details, `best.onnx`, and `rust-validation.json`; only after all six groups complete is the overall `summary.json` marked as `complete`.
+- On failure, a `failure.json` is written; identical commands can be resumed, but changes in configuration or source code are rejected; file locking prevents duplicate launches.
+  On recovery, original failure records are preserved. No cached data, raw data, or experimental weights are submitted.
 
-- `launch.json` 记录 PID、UID、开始时间、命令、源码 SHA；`train.log` 为持续日志。
-- `config.json` / `provenance.json` 固定目标、环境、源码、manifest、选择和二进制哈希。
-- `progress.json` 记录当前组和训练步数；每组保存 checkpoint、验证明细、best.onnx、
-  `rust-validation.json`，六组结束才写入整体 `summary.json` 的 complete 状态。
-- 失败会写 `failure.json`；相同命令可恢复，配置/源码变化会被拒绝；文件锁防止重复启动。
-  恢复时保留原失败记录。缓存与原始数据、实验权重均不提交。
+Pre-run evidence is stored in `data/reports/causal-p2-20261012/smoke-final/` and `numeric-audit.json`.
+Source code and methodology documentation are released under Apache-2.0; no new external data or model licenses were introduced.
 
-启动前证据位于 `data/reports/causal-p2-20261012/smoke-final/` 和
-`numeric-audit.json`。源码与方法文档按 Apache-2.0 提交，未引入新外部数据或模型许可。
+After each group, a real Rust Model-gain path score is automatically computed and reports results for high-frequency, energy, transient, low-frequency, and music/speech.
+Current reporting is bootstrapped by segment; a [recheck of the first seed](causal-p2-review-20261012.md) identified and corrected the issue to report per-track clustering intervals, without altering the frozen training source code.
+Repeatedly used development data is not claimed as independent validation.
+Post-training, candidate models must be frozen and uniformly rechecked against baseline, original compressed input, DSP paths, historical ablation, true stereo, full segments, blind listening, and per-hop CPU, RSS, and real-time availability.
+`listening_performed` remains `false`. Before full post-training weight validation is completed, no claims of P1-level performance or release readiness are made.
+Real-time software target remains under 8 ms, redline under 10 ms, with no inference, allocation, or blocking during callback.
 
-每组结束后自动通过真实 Rust Model-gain 路径评分，分别报告高频、能量、瞬态、低频和
-音乐/语音结果。自动报告目前为按片段 bootstrap；[首种子复核](causal-p2-review-20261012.md)
-已发现并以独立报告修正为按录音聚类区间，未改变运行中的冻结训练源码。已反复使用的开发数据不冒称独立测试。
-训练后还需要冻结候选，统一复核旧基线/原始压缩输入/DSP/模型路径、历史消融、
-真实立体声与完整片段、盲听以及逐 hop CPU、RSS 和实时可用率。
-`listening_performed` 保持 false。未重新测完训练后权重之前，不沿用 P1 成本宣称发布达标；
-实时软件目标仍为 <8 ms，红线 <10 ms，回调不推理、不分配、不阻塞。
+## Final Validation Results for Two Seeds
 
-
-## 两个种子的最终验证选择
-
-| 主干 | seed 20261012 | seed 20261013 |
+| Main Branch | seed 20261012 | seed 20261013 |
 | --- | ---: | ---: |
-| legacy | 2.662400（4096 步） | 2.675942（3584 步） |
-| GRU | 2.485908（2048 步） | 2.483496（3584 步） |
-| TCN | 2.462378（4096 步） | 2.476988（4096 步） |
+| legacy | 2.662400 (4096 steps) | 2.675942 (3584 steps) |
+| GRU | 2.485908 (2048 steps) | 2.483496 (3584 steps) |
+| TCN | 2.462378 (4096 steps) | 2.476988 (4096 steps) |
 
-六组均训练至 4096 步；表内为固定规则选中的最佳检查点。新主干的同目标代理优势
-在两个种子上复现，但这不等于真实输出全面优于旧模型或压缩输入。P3 选择 TCN 作为
-受控续训载体，不宣称已证明 TCN 音质显著优于 GRU。
+All six groups trained to 4096 steps; values in the table represent the best checkpoint selected under fixed rules.
+The new main branch demonstrates superior performance in the same objective across both seeds, though this does not imply that the output is universally superior to the old model or compressed input.
+P3 selects TCN as the controlled continuation carrier, without claiming that TCN audio quality is significantly better than GRU.
+
+Exact registered geometry: seed 20261012 (and 20261013), 4096 updates at batch four, 16384 paired draws per arm; each crop has 32768 samples and 256 hops. Local validation passed 291 Python tests; the existing 30-minute stress test remained ignored. These checks do not replace the <10 ms historical software redline or device qualification. The retained run directory is `data/runs/causal-p2-20261012/`.

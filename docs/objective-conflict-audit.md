@@ -1,8 +1,9 @@
 # P39: objective gradients and shared representation
 
 Completed 2026-10-23. The frozen small models show a strong **parameter-space conflict**
-between magnitude reconstruction and complex fidelity. However, their gradients in
-high-band output magnitude and phase coordinates are aligned. The evidence therefore
+between magnitude reconstruction and complex fidelity. However, their aggregate gradients in
+high-band output magnitude and phase coordinates are aligned; a band-level follow-up
+retains exceptions above 16 kHz. The evidence therefore
 does **not** justify deleting phase/complex supervision or claiming the targets are
 intrinsically incompatible. It points to shared representation and gradient
 conditioning as the next mechanism to test.
@@ -66,8 +67,42 @@ Each cell is a separate median, so shares need not sum exactly to 100%. These ar
 parameter-coordinate-dependent local gradients, not architecture-independent capacity
 scores. Positive output-coordinate cosines over paired high bands coexist with
 negative shared-parameter cosines; one cannot infer from the latter alone that phase
-must be sacrificed to improve amplitude. Full-band aggregation, sample coupling and
-the learned Jacobian still require separation.
+must be sacrificed to improve amplitude. The following attribution separates band and output-channel contributions;
+sample coupling and the learned Jacobian still need controlled directional checks.
+
+## Band and coordinate-chain follow-up
+
+Two further read-only probes reuse precisely the same 32 training draws and frozen
+controls. They split direct amplitude/complex gradients into the five registered
+frequency bands, then split each complex gradient into contributions through output
+dB and phase coordinates before propagating them into the shared encoder. Sums of
+band gradients must reconstruct the unsplit gradient; dB plus phase contributions
+must reconstruct each complex gradient. All assertions pass. Maximum coordinate-
+chain reconstruction errors are `1.28e-9 / 2.21e-9`.
+
+| Band | Output dB amplitude/complex cosine | Encoder amplitude/complex-dB cosine | Encoder amplitude/complex-phase cosine |
+| --- | ---: | ---: | ---: |
+| 0–4 kHz | +0.997 / +0.997 | +0.995 / +0.999 | −0.118 / +0.017 |
+| 4–8 kHz | +0.985 / +0.988 | +0.850 / +0.595 | −0.716 / −0.006 |
+| 8–12 kHz | +0.970 / +0.978 | +0.694 / +0.635 | −0.794 / −0.772 |
+| 12–16 kHz | +0.958 / +0.957 | +0.395 / +0.048 | −0.817 / −0.553 |
+| 16 kHz–Nyquist | +0.739 / +0.782 | −0.952 / −0.950 | −0.697 / −0.781 |
+
+These are separate medians, seed 20261012 / 20261013. Above 16 kHz, the output dB
+comparison is negative in **1/16 draws per seed**, while its encoder-chain comparison
+is negative in **14/16 and 15/16**. The retained exceptions prevent calling output
+objectives universally compatible. The sign reversal also persists through the
+complex term's **dB-only** chain, so deleting its phase gradient would not remove
+this measured conflict. At 8–16 kHz the phase-chain conflict is stronger, but these
+local gradients do not demonstrate that dropping phase improves restoration.
+
+Within-band encoder amplitude/complex medians above 16 kHz are −0.956 / −0.955.
+Cross-band pairs account for 32.78% / 47.29% of the sum of negative dot contributions
+across all draws; this is not a fraction of net error or a causal effect estimate.
+The largest aggregate negative pair is 16 kHz–Nyquist against the same band. Thus
+cross-band spill alone cannot explain the parameter conflict. A shared encoder can
+reweight and couple bins and examples even within one band. Check local directional
+response and per-example contributions before proposing a new head or loss weight.
 
 ## Decision
 
@@ -89,6 +124,8 @@ establish generalization, convergence or audible improvement.
 - `data/runs/objective-conflicts-p39-20261023/`: initial decomposition.
 - `data/runs/objective-conflicts-p39-coordinates-20261023/`: added output dB cosines.
 - `data/runs/objective-conflicts-p39-groups-20261023/`: encoder/temporal/decoder/budget attribution.
+- `data/runs/objective-conflicts-p39-bands-20261023/`: band-pair attribution.
+- `data/runs/objective-conflicts-p39-coordinate-chain-20261023/`: dB/phase chain attribution.
 - Each directory retains registration, per-draw results, summary and executed source.
 - Entry point: `training/scripts/audit_objective_conflicts.py`.
 

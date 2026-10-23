@@ -1,44 +1,44 @@
-# 频谱表示与容量实验：训练、音质和实时成本
+# Spectral Representation and Capacity Experiment: Training, Audio Quality, and Real-Time Cost
 
-本轮完成三组原创结构实验及 V6 control 重算。近期论文与设计取舍见
-[架构调研](architecture-research-20261011.md)。所有候选保持本地实验状态，未替换默认权重。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 固定协议
+Three original structural experiments and a V6 control re-computation were completed in this round. Recent paper insights and design trade-offs are referenced in [Architecture Survey](architecture-research-20261011.md). All candidates remain in local experimental state and have not replaced default weights.
 
-- 训练源码 `7cfaf78490f385712a65fbcb5f198b49622fc593`；父模型为 V4 epoch4。
-- 三组各 8 epochs / 1,024 updates，同一 V6 loss、LR 2e-5、warmup128/cosine、clip1、冻结 BN、无 GAN。
-- 同一 300 首已审查音乐与 VCTK，music/speech 抽样 253/254 与 1/254；不引入外部权重、数据或教师目标。
-- FFT256/hop128，模型逐帧独立，8 帧用于重建 loss；没有新增前瞻、模型状态或 DSP 缓冲。
-- control 复用相同配置、父模型和采样设置的 V6 run；本轮 CPU 重算、导出及 parity 与原结果一致。不是多种子重复实验。
-- 每组按验证 total 选 epoch；再按同一 CPU FP32 896 行 total 选择候选，先冻结哈希，再评分历史留出集。
-- 录音级 cluster bootstrap：2,000 次，95% 区间；未作多模型/多指标的多重比较校正，结论属于探索性实验。
+## Fixed Protocol
 
-## 模型与 CPU 验证
+- Training code: `7cfaf78490f385712a65fbcb5f198b49622fc593`; parent model is V4 epoch4.
+- Each group runs 8 epochs / 1,024 updates, under the same V6 loss, LR 2e-5, warmup128/cosine, clip1, frozen BN, and no GAN.
+- Same 300 songs of reviewed music and VCTK; music/speech sampling at 253/254 and 1/254; no external weights, data, or teacher targets introduced.
+- FFT256/hop128; model processes frames independently; 8 frames used for reconstruction loss; no new lookahead, model state, or DSP buffering added.
+- The control reuses the identical configuration, parent model, and sampling setup from the V6 run; this round involves CPU re-computation, export, and parity verification, matching the original results exactly. This is not a multi-seed replication experiment.
+- Each group is selected by validation total; then, within the same CPU FP32 896-line total, candidates are chosen based on the same hash freeze, followed by historical held-out set scoring.
+- Recording-level cluster bootstrap: 2,000 iterations, 95% confidence interval; no multiple-comparison correction across models or metrics; conclusions are exploratory.
 
-| 路径 | 参数 | ONNX MiB | best epoch | V6 total | 相对 control |
+## Model and CPU Verification
+
+| Path | Parameters | ONNX MiB | best epoch | V6 total | Relative to Control |
 |---|---:|---:|---:|---:|---:|
 | control | 806,276 | 3.156 | 4 | 1.348875 | +0.000% |
 | polar-small | 905,734 | 3.550 | 4 | 1.342853 | -0.446% |
 | shape-small | 905,734 | 3.550 | 4 | 1.342215 | -0.494% |
 | shape-large | 1,399,942 | 5.436 | 4 | 1.340974 | -0.586% |
 
-固定规则选中 **shape-large**。每组 13 项 PyTorch/ORT/Rust parity 通过；162 个父 BN 缓冲逐位一致，全部参数有限。
+Fixed selection: **shape-large**. All 13 components passed PyTorch/ORT/Rust parity checks; 162 parent BN buffers matched bit-by-bit, with all parameters bounded.
 
-| 路径 | 检查点 SHA-256 | ONNX SHA-256 |
+| Path | Checkpoint SHA-256 | ONNX SHA-256 |
 |---|---|---|
 | control | `22c39a78baca386c2b30d34641f02dea7cf83a331f00eefd8390d769f0a8a433` | `18ea464cfcc4c978b252f1b6ad04ce5e1fc427dc225b58759b6a8e69d2b57336` |
 | polar-small | `aa1cdf23610e286e0783ea4f75c7305e2e5569e7774f94ccf5f56ba6a5cfba04` | `9fccf1068e8958b2d51abb3af2f7e0dbfcc8fd529e73c738327a6dbd69c2a630` |
 | shape-small | `a5166a6f56239a31a48986725188aa19c1c199c565904c76aca0f160a19f393a` | `bdef9d1269ea4b8b1e8e5e04bd6d25032b817f5401e13c51e2c064d721503782` |
 | shape-large | `8d5795cfe62a572e2221c657997951f6fb3b843911219087584e006b2218a53c` | `a9a5096d1cc87eaf3c151ce9d25fc4dc1f4abe33db84b7a94076739c66fa78d3` |
 
-## 原始预测与可微 DSP 代理
+## Raw Predictions and Differentiable DSP Proxy
 
-以下为同一 896 行 CPU FP32 验证的未乘权重分项，均为越低越好；不同分项单位/尺度不同，不可直接相加。
-前七项约束原始模型预测；`reconstruction_*` 在增益、融合、OLA 后重建，`spectral_consistency` 衡量频谱自洽。
-各项定义及归一化见 [V6 loss](inpainting-objective.md#v6-deployment-aware-continuation-experimental)。
-代理使用静态截止频率、短片段首帧增益初始化；在线检测、增益历史、gate、limiter 和回退仍与真实 Rust 处理不同。
+The following are per-frame, unweighted, CPU FP32 validation results for the same 896-line test. All are lower is better; units and scales differ across components and cannot be directly summed. The first seven constrain raw model predictions; `reconstruction_*` terms are post-processed with gain, fusion, and OLA; `spectral_consistency` measures spectral coherence. Definitions and normalization are as defined in [V6 Loss](inpainting-objective.md#v6-deployment-aware-continuation-experimental). The proxy uses static cutoff frequency, short fragment first-frame gain initialization; online detection, gain history, gating, limiting, and fallback still differ from the real Rust processing.
 
-| 分项 | control | polar-small | shape-small | shape-large |
+| Metric | control | polar-small | shape-small | shape-large |
 |---|---:|---:|---:|---:|
 | high_band_magnitude | 5.475147 | 5.457680 | 5.430957 | 5.422090 |
 | high_band_energy | 1.598176 | 1.583369 | 1.599671 | 1.587778 |
@@ -52,153 +52,133 @@
 | reconstruction_temporal | 0.276602 | 0.270178 | 0.273999 | 0.274598 |
 | spectral_consistency | 0.193432 | 0.193712 | 0.187107 | 0.186872 |
 
-选中候选的原始高频幅度与能量误差下降，但重建高频能量误差反而略增；总 loss 改善并不意味着各目标同时改善。
+Selected candidate shows reduced high-frequency magnitude and energy errors, but a slight increase in reconstructed high-energy error; overall loss improvement does not imply simultaneous improvement across all objectives.
 
-## 实际 Rust 开发音频
+## Actual Rust-Developed Audio
 
-固定 89 行/80 段录音：音乐 33 行/26 段，语音 56 行/54 段；Neural/MatchEdge 默认处理。
-前三项越低越好，SI-SDR 越高越好。各 arm 使用同一输入校验和、相同二进制与配置。
+Fixed 89 lines / 80 segments: 33 lines / 26 music segments, 56 lines / 54 speech segments; Neural/MatchEdge default processing. First three metrics are lower is better; SI-SDR higher is better. All arms use the same input checksum, identical binary, and configuration.
 
-### 音乐
+### Music
 
-| 路径 | HF 谱收敛 | HF 能量误差 dB | HF flux 误差 | SI-SDR dB |
+| Path | HF Spectral Convergence | HF Energy Error (dB) | HF Flux Error | SI-SDR dB |
 |---|---:|---:|---:|---:|
 | control | 0.904906 | 3.895419 | 1.405710 | 26.598670 |
 | polar-small | 0.901904 | 4.043868 | 1.385432 | 26.622565 |
 | shape-small | 0.896469 | 3.916874 | 1.391960 | 26.597193 |
 | shape-large | 0.906221 | 3.913919 | 1.398139 | 26.601327 |
 
-### 语音
+### Speech
 
-| 路径 | HF 谱收敛 | HF 能量误差 dB | HF flux 误差 | SI-SDR dB |
+| Path | HF Spectral Convergence | HF Energy Error (dB) | HF Flux Error | SI-SDR dB |
 |---|---:|---:|---:|---:|
 | control | 0.655987 | 4.634038 | 0.807928 | 29.271228 |
 | polar-small | 0.661214 | 4.826734 | 0.809219 | 29.274686 |
 | shape-small | 0.654183 | 4.641319 | 0.808059 | 29.270062 |
 | shape-large | 0.654774 | 4.687198 | 0.808060 | 29.268554 |
 
-## 历史留出复核
+## Historical Held-Out Recheck
 
-78 行/39 段录音（21 段音乐、18 段语音，每段两个条件），包含 44.1/48 kHz 与 AAC160。
-这些录音此前已用于诊断，**不是新的独立测试**；核对 track、split_group、source checksum 均与 train/validation 隔离，未声称 artist 隔离。
-留出音乐缺少中国、country、hiphop、jazz 等覆盖；不能外推全部地区和曲风。
-表中 `candidate` 为 shape-large，`original` 为原生 epoch168，`parent` 为 V4 epoch4，`v6` 为本轮 control。
+78 lines / 39 segments (21 music, 18 speech; two conditions per segment), including 44.1/48 kHz and AAC160. These recordings were previously used for diagnosis; **this is not a new independent test**. Track, split_group, and source checksums were verified to be isolated from training/validation. Artist isolation is not claimed.
+Music lacks coverage in Chinese, country, hip-hop, jazz, and other genres; cannot extrapolate to all regions or styles.
 
-### 音乐
+Table below shows `candidate` = shape-large, `original` = native epoch168, `parent` = V4 epoch4, `v6` = current control.
 
-| 路径 | HF 谱收敛 | HF 能量误差 dB | HF flux 误差 | SI-SDR dB |
+### Music
+
+| Path | HF Spectral Convergence | HF Energy Error (dB) | HF Flux Error | SI-SDR dB |
 |---|---:|---:|---:|---:|
 | candidate | 0.725250 | 2.824839 | 1.080050 | 25.770295 |
 | original | 0.745696 | 2.503481 | 1.119915 | 25.751111 |
 | parent | 0.742269 | 2.876600 | 1.117913 | 25.760181 |
 | v6 | 0.733257 | 2.782127 | 1.092556 | 25.770247 |
 
-候选减去 V6 control 的配对变化（95% CI）：
+Pairwise differences (candidate minus V6 control), 95% CI:
 
-| 指标 | 均值变化 | 区间 |
+| Metric | Mean Change | Interval |
 |---|---:|---|
 | enhanced_high_spectral_convergence | -0.008006 | [-0.033373, +0.007345] |
 | enhanced_high_band_energy_error_db | +0.042712 | [-0.044855, +0.116463] |
 | enhanced_high_flux_error | -0.012506 | [-0.051913, +0.010046] |
 | enhanced_si_sdr_db | +0.000048 | [-0.006876, +0.006199] |
 
-### 语音
+### Speech
 
-| 路径 | HF 谱收敛 | HF 能量误差 dB | HF flux 误差 | SI-SDR dB |
+| Path | HF Spectral Convergence | HF Energy Error (dB) | HF Flux Error | SI-SDR dB |
 |---|---:|---:|---:|---:|
 | candidate | 0.544562 | 3.222398 | 0.692287 | 30.016262 |
 | original | 0.553484 | 2.934310 | 0.684675 | 30.009073 |
 | parent | 0.538776 | 3.188172 | 0.694500 | 30.017263 |
 | v6 | 0.547228 | 3.208142 | 0.691184 | 30.016087 |
 
-候选减去 V6 control 的配对变化（95% CI）：
+Pairwise differences (candidate minus V6 control), 95% CI:
 
-| 指标 | 均值变化 | 区间 |
+| Metric | Mean Change | Interval |
 |---|---:|---|
 | enhanced_high_spectral_convergence | -0.002666 | [-0.004364, -0.000989] |
 | enhanced_high_band_energy_error_db | +0.014256 | [-0.024662, +0.061573] |
 | enhanced_high_flux_error | +0.001103 | [-0.000763, +0.003256] |
 | enhanced_si_sdr_db | +0.000176 | [-0.001304, +0.001940] |
 
-## 连续性与声道检查
+## Continuity and Channel Check
 
-四组开发输出及所选候选留出输出均有限；固定 128 帧与不规则 31/512/997/7 分块相对 offline 的最大差值均为 0。
-另用两首原始同步立体声 rock/electronic 音乐，先完整 MP3 编解码/对齐，再截取 12 秒、两种采样率比较声像；10 个静音/脉冲/单边输入案例单独核查。
-匿名 24-bit WAV 和评分页位于 `data/reports/architecture-study-20261011/listening/index.html`。整段 RMS 匹配加共同峰值保护，不是 LUFS 匹配；评分表尚未填写，不能声称通过听感验收。
+All developed outputs and selected candidate held-out outputs show limited deviation; fixed 128-frame and irregular 31/512/997/7 block comparisons against offline processing show maximum differences of zero.
+Two original stereo rock/electronic music tracks were used: full MP3 encode/decode and alignment performed first, then 12-second segments compared at two sample rates for stereo imaging. Ten silence/pulse/single-side input cases were individually verified.
+Anonymous 24-bit WAV and scoring sheets are available at `data/reports/architecture-study-20261011/listening/index.html`. RMS matching with peak protection is used; not LUFS-based. Scoring sheets remain unfilled and cannot be used to claim perceptual approval.
 
-## CPU 推理与流式资源
+## CPU Inference and Streaming Resource
 
-M5 Max，CPU ORT 单线程。所有训练和质量评估进程结束后测量。
-同步测试为 4 模型 × 2 采样率 × mono/stereo × 3 轮，各处理 10 秒真实压缩音乐；交错模型顺序。
-下面是各自 12 次运行的范围，包含不同声道/采样率，不能把范围两端当作同条件配对加速比。
+M5 Max, CPU ORT single-thread. Resource measurements taken after all training and quality assessment processes complete.
+Synchronous test: 4 models × 2 sample rates × mono/stereo × 3 rounds; each processing 10 seconds of real compressed music; model order interleaved.
+Below are the 12-run ranges, across different channel/sample rate configurations; the extremes cannot be interpreted as paired performance ratios.
 
-| 路径 | 同步处理 p99 ms 范围 | 最大进程 RSS MiB |
+| Path | Synchronous Processing p99 ms Range | Max RSS MiB |
 |---|---:|---:|
 | control | 0.558–1.425 | 35.84 |
 | polar-small | 0.699–1.438 | 37.88 |
 | shape-small | 0.586–1.534 | 38.12 |
 | shape-large | 0.710–1.501 | 44.16 |
 
-control 与选中候选各做四种组合 × 60 秒 wall-clock pacing。使用同一套 61 秒真实 MP3 音乐 PCM、默认预热和调度请求。
+Control and selected candidate each run four combinations × 60 seconds wall-clock pacing. Same 61-second real MP3 music PCM used, default warmup and scheduling request.
 
-| 路径 | 软件新增延迟 ms | CPU %（单核归一） | 峰值 RSS MiB | callback p99 μs | callback max μs | worker miss |
+| Path | Software Added Latency (ms) | CPU % (single-core normalized) | Peak RSS MiB | callback p99 μs | callback max μs | worker miss |
 |---|---:|---:|---:|---:|---:|---:|
 | control | 5.341–5.814 | 29.53 | 36.20 | 2.167 | 9.709 | 0 |
 | candidate | 5.342–5.817 | 37.97 | 48.55 | 2.708 | 12.042 | 0 |
 
-CPU/RSS 是整个四案例 benchmark 进程的资源，包含 ORT、DSP、测试器及报告缓存；CPU 为四种场景的整体平均。
-固定 256 帧延迟保持不变。callback 原始时间数组、miss 位图、输入/模型/二进制哈希另行复核。
-八项 paced 案例的 <8 ms 目标、<10 ms 红线、callback 与增强可用率检查全部通过，
-原始数据重算结果一致。以上为新增软件处理延迟，不包含声卡、系统或宿主额外缓冲。
-这是短期模拟时钟测试；没有物理声卡测试，也不替代 30 分钟 Apple Silicon/x86_64 发布验收。未选中分支仅完成同步性能筛选。
+CPU/RSS represents the entire four-case benchmark process, including ORT, DSP, tester, and report caching; CPU is the average across all four scenarios. Fixed 256-frame latency remains unchanged. Raw callback time arrays, miss bitmaps, and input/model/binary hashes are separately verified.
+All eight paced cases passed the <8 ms target, <10 ms redline, callback and enhanced availability checks. Raw data re-computation results are consistent. These represent added software processing latency, excluding sound card, system, or host buffering.
+This is a short-term simulated clock test; no physical sound card testing was performed, and results do not substitute for 30-minute Apple Silicon/x86_64 release validation. The unselected branch only passed synchronous performance screening.
 
-## 结果判断与下一步
+## Result Judgment and Next Steps
 
-**本轮没有足以替换基线的综合音质收益。** 三个新分支均学到了非零修正，CPU
-验证 total 下降 0.45%–0.59%，但总分排序没有稳定转化为实际音乐质量排序。
-不能声称达到 SOTA，也不能把这次单种子、8 轮续训当成某种模型结构的性能上限。
+**This round does not yield sufficient overall audio quality improvements to replace the baseline.** All three new branches learned non-zero corrections; CPU validation total decreased by 0.45%–0.59%, but no stable ranking of performance translates into actual musical quality improvement.
+We cannot claim to have reached SOTA, nor can we treat this single-seed, 8-round continuation as a performance ceiling for any model structure.
 
-- 表示对照：`shape-small` 相对同参数 `polar-small` 的音乐高频能量误差平均
-  下降 0.127 dB，但 95% CI 为 [-0.313, +0.055]，仍不确定；音乐 SI-SDR 下降
-  0.0254 dB，CI [-0.0557, -0.0028]。语音谱收敛与能量改善，SI-SDR 则轻微下降。
-  圆周编码有局部价值，尚不能认定其在音乐上全面更优。
-- 容量对照：`shape-large` 相对 `shape-small` 的音乐谱收敛、能量、flux 和 SI-SDR
-  变化区间全部跨零。语音能量误差增加 0.0459 dB，CI [+0.0191, +0.0739]。
-  相对 V6 增加 73.6% 参数，没有换来明确的综合收益；这次结果不支持继续优先加宽。
-- 选中候选相对 V6 的历史留出音乐四项主要指标区间均跨零；语音谱收敛略有改善。
-  相对原生 epoch168，留出音乐谱收敛下降 0.02045、flux 下降 0.03986，但高频
-  能量误差增加 0.32136 dB，CI [+0.05322, +0.58591]。保留原基线及实验状态。
-- 相对压缩输入直接播放，留出音乐高频能量误差下降 1.120 dB，CI [-1.805, -0.438]，
-  但 flux 误差增加 0.20573，CI [+0.07539, +0.41170]，SI-SDR 下降 1.176 dB，
-  CI [-2.201, -0.432]。留出语音的谱收敛和 flux 也退步。补出了能量不等于补对细节；
-  单独很大的 LSD 改善不能掩盖这些问题。
+- **Representation Comparison**: `shape-small` shows a 0.127 dB average reduction in music high-frequency energy error compared to `polar-small` with same parameter count; 95% CI is [-0.313, +0.055], still uncertain. Music SI-SDR decreased by 0.0254 dB (CI: [-0.0557, -0.0028]). Speech spectral convergence and energy improved, but SI-SDR slightly decreased. Circular encoding shows local value but is not yet proven superior in music.
+- **Capacity Comparison**: `shape-large` vs. `shape-small` shows all music metrics—spectral convergence, energy, flux, and SI-SDR—show zero-crossing intervals. Speech energy error increased by 0.0459 dB (CI: [+0.0191, +0.0739]). With a 73.6% increase in parameters over `shape-small`, no clear benefit is observed. This result does not support further expansion.
+- **Selected Candidate vs. V6**: On historical held-out music, four key metrics show zero-crossing confidence intervals; speech spectral convergence slightly improved. Compared to native epoch168, held-out music shows a 0.02045 drop in spectral convergence, 0.03986 drop in flux, and a 0.32136 dB increase in high-frequency energy error (CI: [+0.05322, +0.58591]). The baseline and experimental state are retained.
+- **Compressed Input vs. Output**: Held-out music shows a 1.120 dB reduction in high-frequency energy error (CI: [-1.805, -0.438]), but a 0.20573 dB increase in flux error (CI: [+0.07539, +0.41170]) and a 1.176 dB drop in SI-SDR (CI: [-2.201, -0.432]). Speech spectral convergence and flux also degraded. Energy gain does not equal detail correction; a large isolated LSD gain cannot mask these issues.
 
-低频诊断在 57 条真实 mono/left/right 留出行上测量，相对压缩输入的低频绝对
-功率增益误差均值 0.00339 dB、最大 0.06088 dB；低频残差功率比最大为 -27.916 dB
-（V6 为 -28.453 dB），没有新增 full-scale 溢出。这说明变化较小，并非严格恒等。
-低频 mask 为实测截止点以下 500 Hz，按 FFT256/hop128 计算并裁去边缘。
+Low-frequency diagnosis on 57 real mono/left/right held-out segments shows average absolute power gain error of 0.00339 dB, maximum 0.06088 dB; maximum low-frequency residual power ratio is -27.916 dB (V6: -28.453 dB); no full-scale overflow. This indicates small changes, not strict identity.
+The low-frequency mask ends 500 Hz below the measured cutoff, computed from FFT256/hop128 and edge-cropped.
 
-四个同步立体声片段中，候选相对无损参考的声像宽度误差为 0.02070–0.05961 dB，
-声道相关性误差为 0.000955–0.002170，声道相位误差为 0.01651–0.07954 rad。
-宽度和相关性比 V6 略低，但 electronic 的相位误差略高，且只覆盖两首录音。
-10 个边界案例输出长度正确且有限，静音和空声道严格为零；这些检查不能替代盲听。
+In four stereo segments, candidate's stereo imaging width error vs. lossless reference ranges from 0.02070 to 0.05961 dB; channel correlation error from 0.000955 to 0.002170; phase error from 0.01651 to 0.07954 rad. Width and correlation slightly underperform V6, though electronic phase error is slightly higher and only two tracks are covered.
+Ten boundary cases show correct output length and finite bounds; silence and empty channels are strictly zero. These checks do not constitute blind listening validation.
 
-性能测试期间本项目训练/质量评估已结束，但主机仍有游戏、浏览器和 Spotlight 等
-后台负载，环境快照已保存。三轮同步测试交错模型顺序，有助于观察波动，仍不是
-隔离环境的显著性实验。不要把不同采样率/声道的极值相除当成加速比。
+During performance testing, the project's training and quality assessment has concluded, though the host still has background loads from games, browsers, and Spotlight. Environment snapshot is preserved.
+Three rounds of synchronous testing with interleaved model order help observe variance, but are not a significant isolation experiment. Do not divide extreme values across different sample rates/channels to infer acceleration.
 
-下一轮优先采用**小型因果时间上下文 + 更长的多分辨率重建监督**，再单独研究
-与实际 DSP 对齐的可学习频带增益。过去帧可提供包络、谐波演变和瞬态线索；
-当前分支加宽只扩大静态映射，没有增加观测信息。时间状态需要训练 warmup、
-导出协议、每声道 reset 和丢帧恢复共同实现，仍受 <=2M 参数、<8 MiB 和实时标准约束。
-本页实验时这项结构尚未实现；后续实现与实测见[因果上下文实验](causal-context-20261011.md)，
-本页结果不计入其收益。进一步扩大训练前，需要新的独立录音、
-补齐缺失曲风/地区并进行盲听，避免继续针对反复复核的开发材料调参。
+Next round will prioritize **small-scale causal temporal context + longer multi-resolution reconstruction supervision**, followed by independent study of learnable band-specific gain alignment with actual DSP. Past frames provide envelope, harmonic evolution, and transient cues; current branch expansion only increases static mapping, not observation. Time state requires training warmup, export protocol, per-channel reset, and frame drop recovery to be realized; still constrained by ≤2M parameters, <8 MiB, and real-time standards. This structure was not yet implemented in this round; future implementation and empirical validation will be reported in [Causal Context Experiment](causal-context-20261011.md). Results from this page are not included in its evaluation. Before further expansion, new independent recordings are needed, missing genre/region coverage must be supplemented, and blind listening must be conducted to avoid continued tuning on repeatedly rechecked development materials.
 
+## Evidence Location
 
-## 证据位置
+- `data/runs/architecture-study-20261011/experiments/`: configurations, training logs, best/final checkpoints.
+- `data/reports/architecture-study-20261011/`: selection rules/hashes, CPU verification, parity, actual audio comparisons, cross-arm analysis, and raw resource records.
+- CI: Run [38081774072](https://github.com/backrunner/soundex/actions/runs/38081774072), Rust and export-contract both succeeded; local Python passed 260 tests.
+- Training audio, experimental checkpoints, ONNX, and reports remain in Git ignored directory.
 
-- `data/runs/architecture-study-20261011/experiments/`：配置、训练日志、best/final 检查点。
-- `data/reports/architecture-study-20261011/`：选择规则/哈希、CPU 验证、parity、实际音频对照、跨 arm 比较和资源原始记录。
-- 代码 CI：运行 [38081774072](https://github.com/backrunner/soundex/actions/runs/38081774072)，Rust 与 export-contract 均成功；本地 Python 260 项测试通过。
-- 训练音频、实验检查点、ONNX 和报告仍在 Git 忽略目录。
+The fixed 128-frame and irregular 31/512/997/7 block outputs both match offline
+output with maximum difference 0. The separate stereo probe includes 10 silence,
+impulse and one-sided-input cases. All 10 boundary cases preserve output length and
+finite values; silence and empty channels are exactly zero. These are numerical
+checks, not blind listening.

@@ -1,138 +1,88 @@
-# 2026-10-11 训练目标、分支交互与实时启动优化
+# 2026-10-11 Training Objectives, Branch Interactions, and Real-Time Startup Optimization
 
-## 目标与固定条件
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-继续以缺失高频频谱 inpainting、结合 DSP 后尽量接近原始无损音频为目标。
-本轮隔离三件事：部署电平策略、复数重建/频谱一致性训练目标、幅度/相位分支
-交互。新目标和结构定义见[目标设计](inpainting-objective.md)。
+## Objectives and Fixed Conditions
 
-两组续训均从 V3 epoch8 生成器初始化，父 checkpoint SHA-256 为
-`74c0e6fecaa8c968d94b37e6bd4f9b2e77c608f3b9e4fe53158013d996021942`；原 epoch168
-继续作为基线，没有将 V3 自动提升为发布权重。数据、配方、划分和抽样保持不变：
-音乐/语音 253/254 与 1/254，未新增或重新引入 MUSDB/Slakh 数据。
-配方 SHA-256 为 `7fda9e58ab583617f3514f9dd9cfcf87f29871ae0587e91ca29ac0ddaf6b29d4`，
-manifest set 为 `a14019181a6303417a72285b45f4e28988b349ab9d164f39b64b82f44150dab4`。
+Continuing the goal of high-frequency spectral inpainting and aiming to closely approximate original lossless audio through DSP post-processing. This round isolates three key components: deployment level control, complex reconstruction/spectral consistency training objectives, and amplitude/phase branch interaction. New objectives and architecture definitions are defined in [Objective Design](inpainting-objective.md).
 
-V4 控制组训练源码冻结在 `22a3999`，结构组冻结在 `adc3030`，均为相同 seed、
-6 轮/768 updates、8 个训练因果帧、冻结 BatchNorm、无 GAN、新 optimizer。
-一组只使用 V4，另一组同时增加编码层分支交互。结构组先前试跑发现新增投影的
-初始化会额外消耗 RNG，影响随后训练裁剪，已停止并保留审计记录，不参与候选
-比较。`adc3030` 将零投影构造隔离于 CPU RNG；测试确认 legacy 与新结构初始
-基础参数、后续 RNG 状态及裁剪随机数逐位相同。格式整理不改变训练模块 AST；
-control 分支的训练逻辑未变化，运行中源码与原 checkpoint 均未改写。
+Both continuation training runs are initialized from the V3 generator at epoch 8. The parent checkpoint SHA-256 is:
+`74c0e6fecaa8c968d94b37e6bd4f9b2e77c608f3b9e4fe53158013d996021942`; the original epoch168 baseline remains unchanged and was not automatically promoted to release weights. Data, recipe, split, and sampling remain unchanged: 253/254 music/speech and 1/254, with no new or reintroduced MUSDB/Slakh datasets.
+The recipe SHA-256 is `7fda9e58ab583617f3514f9dd9cfcf87f29871ae0587e91ca29ac0ddaf6b29d4`, manifest set is `a14019181a6303417a72285b45f4e28988b349ab9d164f39b64b82f44150dab4`.
 
-## 部署电平对照
+The V4 control group training code is frozen at `22a3999`, and the structure group at `adc3030`. Both use the same seed, 6 rounds / 768 updates, 8 training causal frames, frozen BatchNorm, no GAN, and a new optimizer. One group uses only V4, while the other adds interaction from the encoding layer branches. Prior trial runs in the structure group revealed that the initialization of additional projections introduces extra RNG consumption, affecting subsequent training clipping—this has been halted and audit records preserved, and is not included in candidate comparisons. The `adc3030` branch isolates zero-projection construction in CPU RNG; testing confirms that legacy and new structure initialization parameters, subsequent RNG states, and clipping random numbers are bit-identical. Format reorganization does not alter the training module AST; the control branch training logic remains unchanged, and no source code or checkpoint modifications occurred during runtime.
 
-固定之前已选的 89 行/80 录音（音乐 33 行/26 录音，语音 56 行/54 录音），
-同一 Rust 二进制、相同模型、仅改变高频电平策略：
+## Deployment Level Comparison
 
-| 部署指标 | epoch168 edge | epoch168 model | V3 edge | V3 model |
+Fixed at 89 rows/80 recordings (33 rows/26 music, 56 rows/54 speech), using the same Rust binary, identical model, and only varying the high-frequency level strategy:
+
+| Deployment Metric | epoch168 edge | epoch168 model | V3 edge | V3 model |
 |---|---:|---:|---:|---:|
-| 高频 LSD dB | 20.297498 | 20.540240 | 18.735151 | 18.780958 |
-| 高频谱收敛 | 0.764139 | 0.742517 | 0.748853 | 0.728236 |
-| 高频能量误差 dB | 4.121040 | 4.968638 | 3.992897 | 4.896352 |
-| 高频 flux 误差 | 1.045593 | 0.980123 | 1.048841 | 0.982692 |
+| High-frequency LSD dB | 20.297498 | 20.540240 | 18.735151 | 18.780958 |
+| High-frequency spectral convergence | 0.764139 | 0.742517 | 0.748853 | 0.728236 |
+| High-frequency energy error dB | 4.121040 | 4.968638 | 3.992897 | 4.896352 |
+| High-frequency flux error | 1.045593 | 0.980123 | 1.048841 | 0.982692 |
 | SI-SDR dB | 28.261367 | 28.326201 | 28.239244 | 28.318059 |
-| 保留低频 LSD dB | 3.940090 | 3.762295 | 4.114803 | 3.928191 |
+| Retained low-frequency LSD dB | 3.940090 | 3.762295 | 4.114803 | 3.928191 |
 
-`edge` 是既有截止边缘匹配（目标 -6 dB），`model` 是保留模型预测电平，其他
-检测、分频、相位、OLA、限幅、湿干流程相同。模型电平并非全链路移除 DSP。
+`edge` refers to the existing cutoff edge matching (target -6 dB), `model` refers to the retained model-predicted level. All other processing—detection, frequency separation, phase, OLA, clipping, wet/dry—remains identical. The model-level adjustment does not imply full removal of the DSP chain.
 
-V3 的 model 相对 edge，配对录音聚类名义 95% 区间：音乐 flux 误差下降
-0.169183 [-0.299764, -0.052240]，SI-SDR 增加 0.187464 [0.058281, 0.360202]，
-低频保留误差下降 0.224433 [-0.369913, -0.087962]；但是音乐高频能量误差增加
-1.085755 [0.413926, 1.836600]。总体高频能量误差增加 0.903454
-[0.576024, 1.213531]，语音高频谱收敛和 LSD 也退化。
+Compared to `edge`, the V3 `model` shows a paired recording clustering 95% confidence interval: for music, flux error decreases by 0.169183 [-0.299764, -0.052240], SI-SDR increases by 0.187464 [0.058281, 6.0202], and low-frequency retention error decreases by 0.224433 [-0.369913, -0.087962]. However, music high-frequency energy error increases by 1.085755 [0.413926, 1.836600]. Overall, high-frequency energy error increases by 0.903454 [0.576024, 1.213531], and speech spectral convergence and LSD also degrade.
 
-因此保留显式诊断选项，不直接改变默认电平策略。它证明部署响度处理影响了
-恢复结果，但不能将所有不足归因于该环节。覆盖总体与实际播放/训练比例不同，
-必须看音乐和语音分层，不能将总体均值当作音乐产品得分。
+Thus, explicit diagnostic options are retained and no default level strategy is changed. This demonstrates that deployment loudness processing impacts restoration results, but cannot attribute all shortcomings solely to this stage. Coverage differs from actual playback and training ratios, and must be analyzed per music and speech separately—generalized averages cannot serve as a valid metric for music product performance.
 
-## 对照训练结果
+## Benchmark Training Results
 
-两组均完成 6 轮/768 updates，按各组固定目标选出的最佳 epoch 均为 4。候选保持实验状态。
-同一 CPU FP32、单线程、896 验证行、V4 全部权重重新计分；V3 也重新按 V4 计分，
-没有直接比较跨版本 total。完整 Rust 链另用前述固定 89 行做对照。
+Both groups complete 6 rounds / 768 updates. The best epoch selected per group, based on fixed objectives, is epoch 4. Candidates remain in experimental status. Same CPU FP32, single-threaded, 896 validation rows, V4 weights are re-scored; V3 is also re-scored against V4, without direct cross-version total comparison. Full Rust chain is independently validated using the previously fixed 89 rows.
 
-V4 控制组相对 V3 的训练内验证：total 1.132916 → 1.127071（下降 0.516%），
-复数高频重建误差 0.364203 → 0.356900，重建低频损伤 0.000917255 → 0.000873758
-（下降 4.74%），频谱一致性 0.155117 → 0.138621（下降 10.63%）。高频能量项
-1.518960 → 1.587272，说明一致性改善不能代替能量校准。
+V4 control group vs. V3 in internal validation: total score drops from 1.132916 → 1.127071 (a 0.516% decrease), complex high-frequency reconstruction error decreases from 0.364203 → 0.356900, low-frequency damage decreases from 0.000917255 → 0.000873758 (a 4.74% drop), spectral consistency drops from 0.155117 → 0.138621 (a 10.63% drop). High-frequency energy term increases from 1.518960 → 1.587272, indicating that improved consistency does not replace energy calibration.
 
-完整 Rust Neural/MatchEdge 输出（同一 binary SHA-256
-`ed36f7d9186fdd064bc0b89913a5eebdb7513aa1f706d812e1c365cc69172305`）：
+Full Rust Neural/MatchEdge output (same binary SHA-256 `ed36f7d9186fdd064bc0b89913a5eebdb7513aa1f706d812e1c365cc69172305`):
 
-| 总体指标 | epoch168 | V3 | V4 控制组 | V4 + 交互 |
+| Overall Metric | epoch168 | V3 | V4 Control Group | V4 + Interaction |
 |---|---:|---:|---:|---:|
-| 高频 LSD dB ↓ | 20.297498 | 18.735151 | 18.624710 | 18.727317 |
-| 高频谱收敛 ↓ | 0.764139 | 0.748853 | 0.747230 | 0.742148 |
-| 高频能量误差 dB ↓ | 4.121040 | 3.992897 | 4.310981 | 4.282062 |
-| 高频 flux 误差 ↓ | 1.045593 | 1.048841 | 1.030345 | 1.029359 |
+| High-frequency LSD dB ↓ | 20.297498 | 18.735151 | 18.624710 | 18.727317 |
+| High-frequency spectral convergence ↓ | 0.764139 | 0.748853 | 0.747230 | 0.742148 |
+| High-frequency energy error dB ↓ | 4.121040 | 3.992897 | 4.310981 | 4.282062 |
+| High-frequency flux error ↓ | 1.045593 | 1.048841 | 1.030345 | 1.029359 |
 | SI-SDR dB ↑ | 28.261367 | 28.239244 | 28.258130 | 28.248918 |
-| 保留低频 LSD dB ↓ | 3.940090 | 4.114803 | 4.064021 | 4.038035 |
+| Retained low-frequency LSD dB ↓ | 3.940090 | 4.114803 | 4.064021 | 4.038035 |
 
-控制组相对 V3 的音乐分层：谱收敛下降 0.014663 [-0.028615, -0.000761]、
-flux 下降 0.051552 [-0.076747, -0.023767]，SI-SDR 增加 0.031656
-[0.005967, 0.056321]；能量误差增加 0.323052 [0.147936, 0.516934]。
-总体低频保留误差下降 0.050782 [-0.088921, -0.015641]，但相对原 epoch168
-仍增加 0.123931 [0.008546, 0.238353]。语音谱收敛相对 V3 增加 0.006061
-[0.002418, 0.009643]。这些取舍阻止直接替换基线。
+Control group vs. V3, music-specific: spectral convergence drops by 0.014663 [-0.028615, -0.000761], flux drops by 0.051552 [-0.076747, -0.023767], SI-SDR increases by 0.031656 [0.005967, 0.056321]; energy error increases by 0.323052 [0.147936, 0.516934]. Low-frequency retention error decreases by 0.050782 [-0.088921, -0.015641], though still increases relative to original epoch168 by 0.123931 [0.008546, 0.238353]. Speech spectral convergence increases by 0.006061 [0.002418, 0.009643]. These trade-offs prevent direct replacement of the baseline.
 
-结构组同一 CPU FP32 验证总分为 1.121569，相对 V3 下降 1.002%，相对控制组下降
-0.488%。缺失频带谱收敛 0.248394、时间误差 0.247262 均优于控制组
-0.251008/0.249465；相位误差则从控制组 0.854260 增至 0.860808。
-重建复数高频项 0.357208 与控制组 0.356900 接近，不能仅凭更低 total 宣称结构
-全面改善。两个完成的 checkpoint 均保留父模型的全部 162 个 BatchNorm buffer，
-新增 8 个交互投影均已学到非零权重。
+Structure group achieves a total score of 1.121569, a 1.002% drop from V3 and a 0.488% drop from the control group. Missing band spectral convergence (0.248394) and time error (0.247262) both outperform the control group (0.251008/0.249465); phase error increases from 0.854260 to 0.860808. Complex high-frequency reconstruction (0.357208) is nearly identical to the control group (0.356900), so a lower total score does not prove overall structural improvement. Both final checkpoints retain all 162 BatchNorm buffers from the parent model, and all 8 new interaction projections have learned non-zero weights.
 
-区间均为按录音聚类、固定 seed、2,000 次 bootstrap 的名义 95% 区间；开发集已
-多次用于优化，不能据此宣称独立泛化或听感改善。
+All intervals are nominal 95% confidence intervals derived from recording clustering, fixed seed, and 2,000 bootstrap samples. The development set has been used multiple times for optimization and cannot be used to claim independent generalization or perceptual improvement.
 
-结构组相对控制组：音乐六项指标的名义区间均跨 0，未证明额外结构有稳定音乐
-收益。语音谱收敛下降 0.004145 [-0.007566, -0.000224]、flux 下降 0.003261
-[-0.006705, -0.000301]，但高频 LSD 增加 0.146335 [0.061137, 0.241098]、
-SI-SDR 下降 0.008808 [-0.017085, -0.002319]。整体相对控制组，LSD 增加 0.102606
-[0.015817, 0.189517]，SI-SDR 下降 0.009213 [-0.018550, -0.000602]。
-不能因为 total 更低或总体谱收敛均值更好就启用该结构为默认。
+Structure group vs. control group: all six music metrics show nominal intervals crossing zero, providing no evidence of stable musical benefit. For speech, spectral convergence decreases by 0.004145 [-0.007566, -0.000224], flux decreases by 0.003261 [-0.006705, -0.000301], but high-frequency LSD increases by 0.146335 [0.061137, 0.241098], SI-SDR decreases by 0.008808 [-0.017085, -0.002319]. Overall, LSD increases by 0.102606 [0.015817, 0.189517], SI-SDR decreases by 0.009213 [-0.018550, -0.000602]. No structural benefit can be claimed based on lower total or better average spectral convergence.
 
-两候选实际输出均为有限值；分块 128 及不规则 31/512/997/7 与同步输出的最大
-绝对差均为 0。结构组全部行峰值最大 0.893697，低于 0.95 上限；这些是正确性
-检查，不能代替声像和听感验证。报告完整保存逐 codec、采样率、角色与品类分层。
-下一步质量优化优先处理高频能量校准、相位/重建约束与实际电平链的偏差，继续
-保留独立的结构开关和固定数据对照，不优先盲目增加训练轮数或网络规模。
+Both candidates produce finite outputs; block-level differences of 128 and irregular 31/512/997/7 with synchronized output show maximum absolute differences of zero. The structure group achieves a peak value of 0.893697 across all rows, below the 0.95 upper bound. These are correctness checks and do not replace sonic or perceptual validation. Full per-codec, per-sample rate, per-role, and per-category breakdowns are preserved. Next-phase quality optimization will prioritize high-frequency energy calibration, phase/ reconstruction constraints, and deviations from actual level chains. Independent structural toggle and fixed-data validation remain in place; no blind pursuit of additional training rounds or network scale expansion is recommended.
 
-## 本地导出与来源
+## Local Export and Sources
 
-| 候选 | 参数数 | ONNX 大小 | ONNX SHA-256 |
+| Candidate | Parameter Count | ONNX Size | ONNX SHA-256 |
 |---|---:|---:|---|
-| V4 控制组 | 806,276 | 3,309,786 字节（3.16 MiB） | `8255ea58ac2c05c9f6602972e95e667aeb4bdfed907139b8b604e4cad2ae6e06` |
-| V4 + 交互 | 848,900 | 3,464,970 字节（3.30 MiB） | `59bcdaa1a918b8dcb15737107050fc7dedc90518e1b40d7cad580ed49db7748a` |
+| V4 Control Group | 806,276 | 3,309,786 bytes (3.16 MiB) | `8255ea58ac2c05c9f6602972e95e667aeb4bdfed907139b8b604e4cad2ae6e06` |
+| V4 + Interaction | 848,900 | 3,464,970 bytes (3.30 MiB) | `59bcdaa1a918b8dcb15737107050fc7dedc90518e1b40d7cad580ed49db7748a` |
 
-每组分别通过 13 项 PyTorch/ORT/Rust 一致性案例；按既定单位与相位误差预算放行，
-不是要求浮点逐位相等。训练 checkpoint SHA-256 分别为
-`a152f00c6907221a4af80986364f621c1d884e9df0af22ba001ff419a574ccab` 与
-`9c9798247253e5197ae1f778b191043d7c3b32f2303c321c7ec7084fae00c219`。
-模型、checkpoint 和原始报告仅保留本地，均未提升为正式权重。
+Each group passes 13 PyTorch/ORT/Rust consistency test cases; approved under defined unit and phase error budgets, not requiring floating-point bit-for-bit equality. Training checkpoint SHA-256s are respectively:
+`a152f00c6907221a4af80986364f621c1d884e9df0af22ba001ff419a574ccab` and
+`9c9798247253e5197ae1f778b191043d7c3b32f2303c321c7ec7084fae00c219`.
+Model, checkpoint, and original reports are retained locally and have not been promoted to official weights.
 
-## 实时启动准备
+## Real-Time Startup Preparation
 
-启动时在 worker 上、请求原生实时调度前预热可能的 active batch=1/2，各 4 次
-推理；不推进分析/合成/DSP 历史。构造线程等待 worker 完成准备，最长 10 秒，
-音频回调不读取就绪通道、不等待、不增加缓冲。故障准备仍释放构造线程并进入
-既有连续干声回退；超时停止请求返回初始化错误，不在回调中 join。
+At startup, on the worker, prior to native real-time scheduling, a warmup of up to 2 active batches (batch=1/2) is performed, 4 times per batch; no analysis, synthesis, or DSP history is advanced. A thread is constructed to wait for worker completion, with a maximum timeout of 10 seconds. Audio callbacks do not read from ready channels, do not wait, and do not buffer. On failure, the construction thread is released and the system falls back to existing continuous dry audio. On timeout, the request returns an initialization error; no join occurs in the callback.
 
-固定延迟仍为 256 样本：44.1 kHz 为 5.805 ms，48 kHz 为 5.333 ms。
-预热次数和时间独立报告，排除于流输入 hop 的处理/排队直方图。显式诊断可通过
-`SOUNDEX_REALTIME_WARMUP=0` 关闭预热，不用于默认集成。
+Fixed latency remains at 256 samples: 5.805 ms at 44.1 kHz, 5.333 ms at 48 kHz. Warmup count and time are reported independently and excluded from the stream input hop processing and queuing histogram. Explicit diagnostics can be disabled via `SOUNDEX_REALTIME_WARMUP=0`, though this is not used in default integration.
 
-## 计算与内存诊断
+## Computational and Memory Diagnostics
 
-Apple M5 Max；训练与数值评分均结束后执行，每项新建进程，用同一真实 PCM，
-Neural/MatchEdge、32 个预热 hop、10 秒音频加速处理。采集 `/usr/bin/time -l`。
-这是一次带其他桌面负载的诊断，不是受控多次性能差异实验；未终止其他应用。
-环境收据包含进程 CPU 快照及 `pmset`，不据此宣称无后台负载或固定电源模式。
+Apple M5 Max; diagnostics executed after training and numerical scoring, each in a new process, using the same real PCM, Neural/MatchEdge, 32 pre-warmup hops, 10-second audio acceleration. Measured via `/usr/bin/time -l`. This is a single-run diagnostic under desktop load, not a controlled experiment for performance variance; no other applications were terminated. Environmental receipts include per-process CPU snapshots and `pmset` data, and no claims of zero background load or fixed power mode are made.
 
-| 模型 | 采样率/声道 | hop p99 ms | 最大 ms | processing RTF | user+sys 秒 | 峰值 RSS MiB |
+| Model | Sample Rate/Channels | hop p99 ms | Max ms | processing RTF | User+Sys seconds | Peak RSS MiB |
 |---|---|---:|---:|---:|---:|---:|
 | V3 | 44100/1 | 0.811 | 1.456 | 0.186 | 1.89 | 35.38 |
 | V3 | 44100/2 | 1.462 | 2.335 | 0.359 | 3.63 | 35.45 |
@@ -142,75 +92,57 @@ Neural/MatchEdge、32 个预热 hop、10 秒音频加速处理。采集 `/usr/bi
 | V4 | 44100/2 | 1.525 | 2.635 | 0.361 | 3.63 | 35.70 |
 | V4 | 48000/1 | 0.561 | 0.778 | 0.195 | 1.99 | 35.44 |
 | V4 | 48000/2 | 1.381 | 1.897 | 0.385 | 3.90 | 35.62 |
-| V4 + 交互 | 44100/1 | 0.804 | 1.047 | 0.194 | 1.97 | 36.28 |
-| V4 + 交互 | 44100/2 | 1.258 | 1.725 | 0.362 | 3.69 | 36.59 |
-| V4 + 交互 | 48000/1 | 0.758 | 1.092 | 0.209 | 2.13 | 36.64 |
-| V4 + 交互 | 48000/2 | 1.547 | 2.770 | 0.408 | 4.11 | 36.59 |
+| V4 + Interaction | 44100/1 | 0.804 | 1.047 | 0.194 | 1.97 | 36.28 |
+| V4 + Interaction | 44100/2 | 1.258 | 1.725 | 0.362 | 3.69 | 36.59 |
+| V4 + Interaction | 48000/1 | 0.758 | 1.092 | 0.209 | 2.13 | 36.64 |
+| V4 + Interaction | 48000/2 | 1.547 | 2.770 | 0.408 | 4.11 | 36.59 |
 
-runtime/bench 源码为 `1bcb091`；`adc3030` 只调整 Python 初始化 RNG 与测试，
-Rust 不变。保存的同步/持续 bench binary SHA-256 分别为
-`2a59104812d649808be5be153de71a92f0998e3d39144d4242a2b7e772b27736`、
-`1bd0d12b73e8e3e31e20a6edffbe28187d0a356bb552955987d24416f9961e4c`。
+Runtime/bench source code version is `1bcb091`; `adc3030` only adjusts Python initialization RNG and testing, with Rust unchanged. Saved synchronized/continuous bench binary SHA-256s are respectively:
+`2a59104812d649808be5be153de71a92f0998e3d39144d4242a2b7e772b27736` and
+`1bd0d12b73e8e3e31e20a6edffbe28187d0a356bb552955987d24416f9961e4c`.
 
-RTF 是逐 hop 处理墙钟时间/音频时长，不是 CPU 使用率。CPU 秒与 RSS 是整进程
-（包括装载、预热、PCM 和测试工具），不能直接当作库独占成本。结构增加参数
-5.29%，本次 RSS 比控制组增加约 0.86–1.20 MiB；p99 的单次波动不能证明变快。
-48 kHz 双声道结构组最大处理 2.770 ms 超过 2.667 ms hop 周期，仍须看持续流的
-实际超期率与回退，而不能只用 p99 宣称实时通过。
+RTF is wall-clock time per hop divided by audio duration, not CPU usage. CPU seconds and RSS refer to the entire process (including loading, warmup, PCM, and test tools), and cannot be directly interpreted as per-library overhead. The structure addition increases parameters by 5.29%, and RSS increases by approximately 0.86–1.20 MiB compared to the control group. Single-hop p99 fluctuations do not prove faster performance. At 48 kHz stereo, the structure group reaches a maximum 2.770 ms, exceeding the 2.667 ms hop period; actual stream performance, including sustained overruns and fallback, must be evaluated, not just p99.
 
-## 持续流诊断
+## Continuous Stream Diagnostics
 
-同一 bench binary 和真实 PCM，FFT256/hop128/回调128，无额外接入缓冲。
-V3 冷/预热每项 20 秒，两个候选预热每项 30 秒，全部四种采样率/声道组合。
-此次显式请求 `SOUNDEX_REALTIME_PRODUCER_RT=1`，模拟 producer 与 worker 原生
-实时请求均获接受。与之前普通 producer 的短测条件不同，不能归因于预热改善。
+Same bench binary and real PCM, FFT256/hop128/callback128, no additional buffer access. V3 cold/start and warm-start each run 20 seconds, while both candidates run 30 seconds per item, across all four sample rate/channel combinations. This run explicitly requests `SOUNDEX_REALTIME_PRODUCER_RT=1`, simulating native real-time producer requests, all of which are accepted. Unlike previous short tests, which used a non-interactive producer, this result cannot be attributed to warmup improvements.
 
-| 路径 | 采样率/声道 | 回调 p99/max µs | worker p99 上界 ms | 超期数 | 最大连错 ms | 固定延迟+回调最大 ms |
+| Path | Sample Rate/Channels | Callback p99/max µs | Worker p99 upper bound ms | Overrun Count | Max consecutive error ms | Fixed latency + callback max ms |
 |---|---|---:|---:|---:|---:|---:|
-| V3 冷启动 | 44100/1 | 2.208/5.208 | 0.650 | 0 | 0.000 | 5.810 |
-| V3 冷启动 | 44100/2 | 2.000/5.500 | 1.350 | 0 | 0.000 | 5.810 |
-| V3 冷启动 | 48000/1 | 2.208/10.583 | 0.800 | 0 | 0.000 | 5.344 |
-| V3 冷启动 | 48000/2 | 2.042/4.625 | 1.100 | 0 | 0.000 | 5.338 |
-| V3 预热 | 44100/1 | 1.959/5.833 | 0.650 | 0 | 0.000 | 5.811 |
-| V3 预热 | 44100/2 | 2.083/5.334 | 1.275 | 0 | 0.000 | 5.810 |
-| V3 预热 | 48000/1 | 2.000/6.834 | 0.825 | 0 | 0.000 | 5.340 |
-| V3 预热 | 48000/2 | 2.125/6.917 | 1.225 | 0 | 0.000 | 5.340 |
-| V4 预热 | 44100/1 | 2.167/12.667 | 0.800 | 0 | 0.000 | 5.818 |
-| V4 预热 | 44100/2 | 2.042/7.958 | 1.375 | 0 | 0.000 | 5.813 |
-| V4 预热 | 48000/1 | 1.959/8.250 | 0.875 | 0 | 0.000 | 5.342 |
-| V4 预热 | 48000/2 | 2.042/6.084 | 1.150 | 0 | 0.000 | 5.339 |
-| 交互预热 | 44100/1 | 2.125/8.250 | 0.950 | 0 | 0.000 | 5.813 |
-| 交互预热 | 44100/2 | 2.042/6.292 | 1.425 | 0 | 0.000 | 5.811 |
-| 交互预热 | 48000/1 | 2.000/7.084 | 0.850 | 0 | 0.000 | 5.340 |
-| 交互预热 | 48000/2 | 2.167/5.291 | 1.225 | 0 | 0.000 | 5.339 |
+| V3 Cold Start | 44100/1 | 2.208/5.208 | 0.650 | 0 | 0.000 | 5.810 |
+| V3 Cold Start | 44100/2 | 2.000/5.500 | 1.350 | 0 | 0.000 | 5.810 |
+| V3 Cold Start | 48000/1 | 2.208/10.583 | 0.800 | 0 | 0.000 | 5.344 |
+| V3 Cold Start | 48000/2 | 2.042/4.625 | 1.100 | 0 | 0.000 | 5.338 |
+| V3 Warmup | 44100/1 | 1.959/5.833 | 0.650 | 0 | 0.000 | 5.811 |
+| V3 Warmup | 44100/2 | 2.083/5.334 | 1.275 | 0 | 0.000 | 5.810 |
+| V3 Warmup | 48000/1 | 2.000/6.834 | 0.825 | 0 | 0.000 | 5.340 |
+| V3 Warmup | 48000/2 | 2.125/6.917 | 1.225 | 0 | 0.000 | 5.340 |
+| V4 Warmup | 44100/1 | 2.167/12.667 | 0.800 | 0 | 0.000 | 5.818 |
+| V4 Warmup | 44100/2 | 2.042/7.958 | 1.375 | 0 | 0.000 | 5.813 |
+| V4 Warmup | 48000/1 | 1.959/8.250 | 0.875 | 0 | 0.000 | 5.342 |
+| V4 Warmup | 48000/2 | 2.042/6.084 | 1.150 | 0 | 0.000 | 5.339 |
+| Interaction Warmup | 44100/1 | 2.125/8.250 | 0.950 | 0 | 0.000 | 5.813 |
+| Interaction Warmup | 44100/2 | 2.042/6.292 | 1.425 | 0 | 0.000 | 5.811 |
+| Interaction Warmup | 48000/1 | 2.000/7.084 | 0.850 | 0 | 0.000 | 5.340 |
+| Interaction Warmup | 48000/2 | 2.167/5.291 | 1.225 | 0 | 0.000 | 5.339 |
 
-独立重算全部 16 项原始 `callback_samples_ns` 与 `worker_presentation_missed`：
-计数、p99、最大连错、延迟/可用率政策均与报告一致。每项零超期、零 queue overflow、
-零回调周期超时，输出帧数完整、有限、峰值 <=0.95，均满足此次短测软件政策。
-worker 直方图以 25 µs 分桶，上表为 p99 上界。V3 冷/预热都零超期，因此不能宣称
-这次对照证明预热降低了超期；预热提供构造完成前的明确就绪边界。
+All 16 original `callback_samples_ns` and `worker_presentation_missed` values were independently recalculated: counts, p99, maximum consecutive error, and latency/availability policy metrics match the report. Zero overruns, zero queue overflow, zero callback period timeout, complete frame output, finite duration, peak ≤0.95—all meet the short-term software policy. Worker histograms are binned at 25 µs; the table above shows p99 upper bounds. V3 cold and warm-start both show zero overruns, so this test cannot claim that warmup reduces overruns; warmup provides a clear readiness boundary before construction completion.
 
-进程级资源按每组四项顺序运行汇总，CPU 比为 user+sys/墙钟时长，相对于一个核，
-包含测试工具及 producer/worker，不能当作每个声道组合的 CPU 峰值：
+Per-process resource totals are aggregated in order across the four configurations. CPU usage is user+sys time divided by total wall-clock time, normalized per core, including test tools and producer/worker—this does not represent peak per-channel CPU usage:
 
-| 组 | 墙钟秒 | CPU 秒 | 平均一个核占比 | 峰值 RSS MiB |
+| Group | Wall-clock seconds | CPU seconds | Avg per core % | Peak RSS MiB |
 |---|---:|---:|---:|---:|
-| V3 冷启动 | 80.55 | 23.61 | 29.31% | 35.91 |
-| V3 预热 | 80.13 | 23.89 | 29.81% | 36.09 |
-| V4 预热 | 120.12 | 35.78 | 29.79% | 36.17 |
-| 交互预热 | 120.13 | 37.49 | 31.21% | 37.14 |
+| V3 Cold Start | 80.55 | 23.61 | 29.31% | 35.91 |
+| V3 Warmup | 80.13 | 23.89 | 29.81% | 36.09 |
+| V4 Warmup | 120.12 | 35.78 | 29.79% | 36.17 |
+| Interaction Warmup | 120.13 | 37.49 | 31.21% | 37.14 |
 
-本轮最多 30 秒/项，为模拟时序，不接声卡，不是 30 分钟实际设备无 xrun 证明；
-也没有 x86_64 性能证据。真实集成若增加缓冲，须重新计入 <10 ms 红线。完成记录
-位于本地 `cost/raw-audit.json`，绑定原模型、PCM、二进制与原始记录。
+This round runs at a maximum of 30 seconds per item, simulating timing, not actual device performance under 30 minutes of continuous playback. No xrun evidence on x86_64 hardware is available. Real-world integration would require reevaluation if additional buffering is introduced, as it must respect the <10 ms latency threshold. Full records are stored locally at `cost/raw-audit.json`, tied to the original model, PCM, binary, and raw logs.
 
-## 工程与证据边界
+## Engineering and Evidence Boundaries
 
-新增交互结构实际 ONNX 动态 batch 导出测试通过。
-Rust 回调分配、故障回退、重置与信号连续性检查通过。远程初次检查发现遗漏的
-Python formatter 检查，已修复；`adc3030` 的 Rust 与 Python 两项远程 CI 均通过（run 38070448340）；
-Python 240 passed / 1 skipped，优化 Python 下的契约检查也通过。
+The added interaction structure passes dynamic ONNX batch export testing. Rust callback allocation, failure fallback, reset, and signal continuity checks pass. A remote initial check uncovered a missed Python formatter check, which has since been fixed. Both Rust and Python components of `adc3030` passed remote CI (run 38070448340); Python: 240 passed / 1 skipped, and contract validation in Python passed.
 
-原始报告、CPU/MPS 指标、权重、二进制与来源收据保存在
-`data/reports/optimization-20261011/` 和 `data/runs/`，忽略于 Git。未经独立音质测试、
-盲听和真实声卡持续运行，不能声称正式恢复权重合格；不推送训练原始音频。
+Original reports, CPU/MPS metrics, weights, binaries, and source receipts are preserved in `data/reports/optimization-20261011/` and `data/runs/`, and are excluded from Git. Without independent audio quality testing, blind listening, or continuous real-world playback on actual audio hardware, no claim of official restoration weights is made. Training raw audio is not pushed.
+
+The V4 control versus V3 music SI-SDR change was +0.187464 dB, with nominal interval [0.058281, 0.360202]. Both candidates had maximum chunking differences of 0 for 128-frame and irregular chunks. All six music intervals for the interaction model versus control crossed 0.

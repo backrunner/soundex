@@ -1,175 +1,174 @@
-# 输入条件化高频增益校准
+# Input-conditioned High-Frequency Gain Calibration
 
-本轮针对V7发现的固定MatchEdge目标比例，保持shape-small神经权重不变，
-拟合仅10个系数的输入条件化校准器。拟合与开发质量验证已经完成，实际高频恢复退步，不替换默认策略。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 结论
+This round addresses the fixed MatchEdge target proportion identified in V7, maintaining the shape-small neural weights unchanged. A calibration module with only 10 coefficients is fitted for input-conditioned adjustment. Development and quality validation have been completed, but actual high-frequency recovery has regressed—no replacement of the default strategy is made.
 
-不采用本轮校准参数作为默认值。内部目标MAE下降约20%，但实际音乐/语音高频能量
-误差增加0.7394/0.5189dB，两者配对95%CI均不跨0；高频谱收敛也变差。
-瞬态和SI-SDR略有改善，这部分收益伴随更弱的高频填充，不能称为达成恢复目标。
+## Conclusion
 
-这轮验证了训练目标的一个缺口：逐帧clean高频RMS/输入edge的拟合不等于最终波形
-的重建收益。实际路径还包含增益clamp与平滑、交叉区、相位和OLA，且检测cutoff
-与质量评分中的缺失频带边界不相同。现有结果不能把退步唯一归因给某一项。
-下一轮应直接对连续重建后的高频谱形、能量与瞬态联合优化，审计保留频点和相位，
-而不是按原始能量比继续加大校准器或神经网络。此后续改动尚未实施。
+The calibrated parameters are not adopted as default values. While internal target MAE decreased by approximately 20%, the actual error in high-frequency energy for music and speech increased by 0.7394 dB and 0.5189 dB, respectively. The 95% confidence intervals (CI) for both differences do not cross zero; spectral convergence at high frequencies also deteriorated.
 
-## 固定协议
+Transient and SI-SDR performance improved slightly, though this gain comes at the cost of weaker high-frequency filling and cannot be considered a successful recovery of the target. This round confirms a gap in the training objective: fitting per-frame clean high-frequency RMS or input edge does not necessarily translate into improved waveform reconstruction performance. The actual reconstruction path includes gain clamping and smoothing, crossover regions, phase, and OLA (overlap-add), and the detection cutoff and quality scoring do not align with the same frequency boundary. The degradation cannot be attributed to any single factor.
 
-- 使用实际ChannelProcessor逐hop分析，包含因果填充、静音reset、检测和context就绪。
-  无损信号仅生成标签，不参与特征或门控；不是移植一套近似检测器。
-- 特征为bias、cutoff/nyquist、sample_rate/48000、六个保留子带相对边缘的RMS，
-  以及残留高频相对边缘RMS；dB特征除20、截断到[-3,3]。
-- 训练标签是clean高频/输入edge的dB比相对原−6dB目标的偏移，截断±24dB。
-  拟合10系数Huber ridge（3dB阈值、8次IRLS）；输出修正限制±6dB，最终目标[-12,0]dB。
-  原非静音目标增益[0.25,2]边界、0.1平滑、低频融合、相位、限幅和固定输出时间轴保持不变。
-- 仅抽取train录音，每录音每采样率最多两种codec，各前4秒，跳过前32hop、每8hop取一帧；
-  active且edge>1e-4、clean_high>1e-7才参与拟合。每录音等权，音乐/语音253/254与1/254。
-  训练集内按录音hash划出约20%校准验证，选ridge 0.001/0.01/0.1/1，再用全部抽样train重拟合。
-- 神经图固定为shape-small，SHA-256 `bdef9d1269ea4b8b1e8e5e04bd6d25032b817f5401e13c51e2c064d721503782`。
-  校准器文件哈希在实际Rust质量评估前冻结。既有89行开发集仅用于之后的真实输出评分，
-  不以这些结果回改系数或正则选择，也不称为独立测试。
-- 同素材比较旧MatchEdge与校准器；质量、数值、连续性、实时成本和听感分别判断。
-  这只校准增益目标，没有解决神经预测相位或谱形，也没有改变截止频率检测器。
+The next iteration should directly optimize the high-frequency spectral shape, energy, and transient characteristics in a joint manner, auditing preserved frequency points and phase information—rather than continuing to increase the gain calibrator or neural network based on raw energy ratios. This subsequent change has not yet been implemented.
 
-## 复现与接入
+## Fixed Protocol
 
-构建`cargo build --release -p soundex-core --bin soundex-gain-data --bin soundex-stream-eval`。
-在training目录使用`scripts/fit_gain_calibration.py --manifest <music-manifest> --manifest
-<speech-manifest> --binary ../target/release/soundex-gain-data --output <new-directory> --context 1`。
-输入必须是项目已经审查并按录音划分的配对清单；原始音频未包含在Git。
+- Use actual ChannelProcessor per-hop analysis, including causal padding, silence reset, detection, and context readiness.
+  Lossless signals are used only for label generation and do not participate in feature extraction or gating. They are not a ported approximation of a detector.
+- Features include bias, cutoff/nyquist, sample_rate/48000, six relative RMS values per preserved subband to edge, and residual high-frequency relative to edge RMS. dB features are divided by 20 and truncated to [-3, 3].
+- Training labels are the dB difference between clean high-frequency and input edge, relative to a baseline of −6 dB, clipped to ±24 dB.
+  A 10-coefficient Huber ridge regression is fitted (3 dB threshold, 8th-order IRLS); output is clipped to ±6 dB, final target range [-12, 0] dB.
+  The non-silent gain target remains in the [0.25, 2] range, with 0.1 smoothing, low-frequency fusion, phase, clipping, and fixed output time axis preserved.
+- Only training recordings are used; per recording and per sample rate, up to two codecs are selected, with first 4 seconds, skipping first 32 hops, and sampling every 8 hops.
+  Only active segments with edge > 1e-4 and clean_high > 1e-7 are included in fitting. All recordings are equally weighted, with music/voice ratio 253/254 and 1/254.
+  Approximately 20% of the training set is reserved for calibration validation, split by recording hash. Ridge values tested: 0.001, 0.01, 0.1, 1.0. Final re-fitting is performed on the full training set.
+- Neural topology remains fixed at shape-small, SHA-256 `bdef9d1269ea4b8b1e8e5e04bd6d25032b817f5401e13c51e2c064d721503782`.
+  The calibration file hash is frozen prior to actual Rust quality assessment. The existing 89-line development set is reserved for subsequent real output scoring and is not used to re-tune coefficients or select regularization—nor is it considered an independent test.
+- For the same material, compare the old MatchEdge and calibrated version; evaluate quality, numerical values, continuity, real-time cost, and perceptual quality separately.
+  This calibration adjusts gain only; it does not address neural phase or spectral shape prediction, nor does it modify the cutoff frequency detector.
 
-实验接入在控制线程调用`calibration::read_gain_calibration(path)`，赋给
-`SoundExConfig.gain_calibration`；默认为None，不改变已有应用输出。只支持
-Neural/MatchEdge、FFT256/hop128/crossover1000。校准JSON不是ONNX替代品，须同时绑定
-对应模型、配方、来源及验证记录；未知schema、错误特征契约或非有限系数会拒绝加载。
+## Reproduction and Integration
 
-本地拟合、开发评分与资源记录写入`data/reports/gain-calibration-20261011/`。
-未加入新音频、外部教师或预训练模型；校准参数保留为未发布实验产物。
+Build with: `cargo build --release -p soundex-core --bin soundex-gain-data --bin soundex-stream-eval`.
+Run in training directory: `scripts/fit_gain_calibration.py --manifest <music-manifest> --manifest <speech-manifest> --binary ../target/release/soundex-gain-data --output <new-directory> --context 1`.
+Input must be a pre-reviewed, per-recording paired list; original audio is not included in Git.
 
-## 拟合与实际结果
+Integration occurs in the control thread via `calibration::read_gain_calibration(path)`, assigned to `SoundExConfig.gain_calibration`. Default is `None`, so existing application output remains unchanged. Only supports Neural/MatchEdge, FFT256/hop128/crossover1000.
+The calibration JSON is not an ONNX alternative and must be loaded alongside the corresponding model, recipe, source, and validation record. Unknown schema, invalid feature contracts, or unbounded coefficients will cause loading rejection.
 
-实现/拟合源码：`cb5ab5642aee81ce0808b6f212516a5f4a6bdac2`，拟合时工作区干净。
-采集器SHA-256 `ca96497e646823ae49838c47be68fb318762b1e59019c1b1f0e4f578691cd1ca`。
-训练253段音乐录音、193段语音录音，共1784个配对片段、188871有效帧；
-354段录音用于内部拟合，92段用于内部选择，两者无录音交集。选择后在全部抽样train重拟合。
-此处语音录音数量不决定其训练权重：总语音权重仍为1/254。
+Local fitting, development scoring, and resource logging are written to `data/reports/gain-calibration-20261011/`.
+No new audio, external teachers, or pre-trained models are introduced; calibration parameters remain unpublicized experimental results.
 
-| ridge | 内部验证目标MAE dB |
+## Fitting and Actual Results
+
+Source code implementation: `cb5ab5642aee81ce0808b6f212516a5f4a6bdac2`, clean workspace during fitting.
+Acquisitioner SHA-256: `ca96497e646823ae49838c47be68fb318762b1e59019c1b1f0e4f578691cd1ca`.
+Trained on 253 music and 193 speech recordings, totaling 1784 paired segments, 188,871 valid frames.
+354 recordings used for internal fitting, 92 for internal selection—no overlap in recordings. After selection, re-fitted on full training set.
+Speech recording count does not determine training weight: total speech weight remains 1/254.
+
+| ridge | Internal Validation MAE (dB) |
 |---|---:|
-| 固定−6dB目标 | 7.864431 |
+| Fixed −6 dB target | 7.864431 |
 | 0.001 | 6.402326 |
 | 0.01 | 6.289884 |
 | 0.1 | 6.336464 |
 | 1.0 | 6.945389 |
 
-选择ridge=0.01。最终JSON仅455bytes，10个系数，SHA-256
-`5b1db4881a2ca8780fca22c46e335efe31919bc73c784bf6941effe40482b55c`。神经图仍为905,734参数、3.550MiB。
-没有重新训练、导出或改动神经权重；因此这次没有新的神经网络loss或ONNX数值资格结论。
-未加权训练帧预测修正均值-2.568dB，
-约27.21%触及−6dB边界、2.61%触及+6dB边界。
-这提示校准器主要在衰减候选；不能把较低回归MAE视为有效高频补全。
+Selected ridge = 0.01. Final JSON is 455 bytes, 10 coefficients, SHA-256 `5b1db4881a2ca8780fca22c46e335efe31919bc73c784bf6941effe40482b55c`.
+Neural graph remains 905,734 parameters, 3.550 MiB.
+No retraining, export, or neural weight modification occurred—thus, no new neural network loss or ONNX numerical qualification conclusions are drawn.
+Unweighted training frame prediction correction mean: −2.568 dB.
+Approximately 27.21% of predictions reached the −6 dB boundary, 2.61% reached the +6 dB boundary.
+This suggests the calibrator primarily acts as a suppressor—not a successful high-frequency enhancement.
 
-### 实际Rust输出
+### Actual Rust Output
 
-89行/80段既有开发录音；音乐33行/26段、语音56行/54段。没有新增独立测试，
-音乐开发评分仍缺pop/country/hiphop/funk。两条路径使用相同神经图、解码音频与检测参数。
-HF误差越低越好，SI-SDR越高越好。配对95%CI按录音cluster bootstrap 2000次，未校正多重比较。
-旧策略89行×52个公共指标与上一轮旧二进制结果完全一致（不等同于对保存PCM做字节校验）。
+89 lines / 80 segments from existing development set; 33 lines / 26 music, 56 lines / 54 speech.
+No new independent test cases were added. Music development scoring still lacks pop, country, hip-hop, funk.
+Both paths use the same neural graph, decoding, and detection parameters.
+Higher HF spectral convergence is better; higher SI-SDR is better.
+Pairwise 95% CI computed via bootstrap over 2000 samples per recording cluster; no multiplicity correction applied.
+Old strategy on 89 lines × 52 common metrics matches exactly with previous binary results (not equivalent to byte-level PCM checksum).
 
-#### 音乐
+#### Music
 
-| 路径 | HF谱收敛 | HF能量误差dB | HF flux | SI-SDR dB |
+| Path | HF Spectral Convergence | HF Energy Error (dB) | HF flux | SI-SDR dB |
 |---|---:|---:|---:|---:|
-| 压缩输入 | 0.839516 | 5.488903 | 1.051229 | 27.563202 |
-| 旧MatchEdge | 0.896469 | 3.916874 | 1.391960 | 26.597193 |
-| 校准MatchEdge | 0.905943 | 4.656305 | 1.376495 | 26.634760 |
+| Compressed Input | 0.839516 | 5.488903 | 1.051229 | 27.563202 |
+| Old MatchEdge | 0.896469 | 3.916874 | 1.391960 | 26.597193 |
+| Calibrated MatchEdge | 0.905943 | 4.656305 | 1.376495 | 26.634760 |
 
-| 指标 | 校准减旧策略 | 95% CI |
+| Metric | Calibrated vs. Old Strategy | 95% CI |
 |---|---:|---|
 | enhanced_high_spectral_convergence | +0.009474 | [+0.003466, +0.015112] |
 | enhanced_high_band_energy_error_db | +0.739431 | [+0.443927, +1.100273] |
 | enhanced_high_flux_error | -0.015464 | [-0.032971, -0.001463] |
 | enhanced_si_sdr_db | +0.037567 | [+0.012677, +0.076037] |
 
-#### 语音
+#### Speech
 
-| 路径 | HF谱收敛 | HF能量误差dB | HF flux | SI-SDR dB |
+| Path | HF Spectral Convergence | HF Energy Error (dB) | HF flux | SI-SDR dB |
 |---|---:|---:|---:|---:|
-| 压缩输入 | 0.723740 | 5.673287 | 0.804808 | 29.381521 |
-| 旧MatchEdge | 0.654183 | 4.641319 | 0.808059 | 29.270062 |
-| 校准MatchEdge | 0.663640 | 5.160244 | 0.807289 | 29.281420 |
+| Compressed Input | 0.723740 | 5.673287 | 0.804808 | 29.381521 |
+| Old MatchEdge | 0.654183 | 4.641319 | 0.808059 | 29.270062 |
+| Calibrated MatchEdge | 0.663640 | 5.160244 | 0.807289 | 29.281420 |
 
-| 指标 | 校准减旧策略 | 95% CI |
+| Metric | Calibrated vs. Old Strategy | 95% CI |
 |---|---:|---|
 | enhanced_high_spectral_convergence | +0.009457 | [+0.005823, +0.013140] |
 | enhanced_high_band_energy_error_db | +0.518926 | [+0.317933, +0.722585] |
 | enhanced_high_flux_error | -0.000770 | [-0.002068, +0.000515] |
 | enhanced_si_sdr_db | +0.011357 | [+0.004834, +0.020089] |
 
-### 启动段以外
+### Beyond the Start Segment
 
-先处理完整片段，再按预定规则去除前0.25秒、尾256samples；不是重新选择片段。
+Full segments are processed first, then the first 0.25 seconds and last 256 samples are removed according to predefined rules—not by reselecting segments.
 
-| 语料 | 指标 | 校准减旧策略 | 95% CI |
+| Corpus | Metric | Calibrated vs. Old Strategy | 95% CI |
 |---|---|---:|---|
-| 音乐 | enhanced_high_spectral_convergence | +0.009702 | [+0.003496, +0.015679] |
-| 音乐 | enhanced_high_band_energy_error_db | +0.713398 | [+0.413505, +1.046030] |
-| 音乐 | enhanced_high_flux_error | -0.010776 | [-0.019981, -0.003060] |
-| 音乐 | enhanced_si_sdr_db | +0.038667 | [+0.010468, +0.083219] |
-| 语音 | enhanced_high_spectral_convergence | +0.009395 | [+0.005880, +0.013209] |
-| 语音 | enhanced_high_band_energy_error_db | +0.528269 | [+0.317477, +0.736792] |
-| 语音 | enhanced_high_flux_error | -0.000793 | [-0.001948, +0.000227] |
-| 语音 | enhanced_si_sdr_db | +0.011491 | [+0.004898, +0.019704] |
+| Music | enhanced_high_spectral_convergence | +0.009702 | [+0.003496, +0.015679] |
+| Music | enhanced_high_band_energy_error_db | +0.713398 | [+0.413505, +1.046030] |
+| Music | enhanced_high_flux_error | -0.010776 | [-0.019981, -0.003060] |
+| Music | enhanced_si_sdr_db | +0.038667 | [+0.010468, +0.083219] |
+| Speech | enhanced_high_spectral_convergence | +0.009395 | [+0.005880, +0.013209] |
+| Speech | enhanced_high_band_energy_error_db | +0.528269 | [+0.317477, +0.736792] |
+| Speech | enhanced_high_flux_error | -0.000793 | [-0.001948, +0.000227] |
+| Speech | enhanced_si_sdr_db | +0.011491 | [+0.004898, +0.019704] |
 
-### 连续性、声像与试听
+### Continuity, Imaging, and Listening
 
-校准路径89行的固定128及31/512/997/7不规则分块与整段处理最大误差均为0，
-没有NaN/Inf。另有两首完整立体声MP3配对后截取12秒，覆盖44.1/48kHz。
-10个静音、脉冲、单边输入案例帧数一致、有限，静音和静默声道保持0。
-这些是软件检查，尚未完成听感或真实设备验收。
+The calibrated path has zero error across all 89 lines, with maximum error at 128 and 31/512/997/7 irregular blockings and full segment processing. No NaN/Inf values.
+Two full stereo MP3 pairs were truncated to 12 seconds, covering 44.1kHz and 48kHz.
+Ten cases of silence, pulse, and mono input show consistent frame counts and finite behavior; silence and mono channels remain at zero.
+These are software-level checks; no listening or real-device validation has been completed.
 
-| 曲风 | 采样率Hz | 声像宽度误差dB | 声道相关误差 | 声道相位误差rad |
+| Genre | Sample Rate (Hz) | Imaging Width Error (dB) | Channel Correlation Error | Channel Phase Error (rad) |
 |---|---:|---:|---:|---:|
 | rock | 44100 | 0.0057220 | 0.0005639 | 0.0075224 |
 | rock | 48000 | 0.0004005 | 0.0000348 | 0.0075130 |
 | electronic | 44100 | 0.0022278 | 0.0001718 | 0.0045250 |
 | electronic | 48000 | 0.0019050 | 0.0001609 | 0.0049484 |
 
-本地`data/reports/gain-calibration-20261011/listening/index.html`提供4片段×4条件：
-压缩输入、无损参考、旧策略和校准策略。24-bit WAV，整段RMS匹配、共同峰值保护，
-不是LUFS匹配；评分表为空，`listening_performed: false`。
+Local file `data/reports/gain-calibration-20261011/listening/index.html` provides 4 segments × 4 conditions: compressed input, lossless reference, old strategy, and calibrated strategy.
+24-bit WAV, full segment RMS matched, peak protection enforced—no LUFS matching.
+Scoring sheet is empty, `listening_performed: false`.
 
-## 工程验证
+## Engineering Verification
 
-273项Python测试、Rust工作区测试、Clippy与无默认特性构建通过。
-[实现CI](https://github.com/backrunner/soundex/actions/runs/38138687327)的Rust和export-contract均成功。
-零系数校准与旧路径逐样本相同；重置恢复一致，静默声道不泄漏，错误配置拒绝启用。
-采集接口与生产处理器的逐hopcutoff/gate精确一致，改动clean标签不改变输入特征或门控。
+273 Python tests, Rust workspace tests, Clippy, and no-default-feature builds passed.
+[Rust and export-contract CI](https://github.com/backrunner/soundex/actions/runs/38138687327) passed successfully.
+Zero-coefficient calibration matches the old path sample-by-sample; reset recovery is consistent, silent channels do not leak, and invalid configurations are rejected.
+Acquisition interface and production processor exhibit identical per-hop cutoff/gate behavior; changes to clean labels do not alter input features or gating.
 
-## 实时资源与限制
+## Real-Time Resource and Limitations
 
-M5 Max/CPU ORT单线程；拟合、实际质量与立体声检查结束后测量。
-同PCM、2采样率×mono/stereo，每组3轮交错同步处理，每案例10秒。
-压测将min_bandwidth_ratio设为1，增加增强处理覆盖，质量评估仍为生产默认0.85。
-测试保留机器背景负载快照，没有停止无关用户进程。
+M5 Max / CPU ORT, single-threaded; measured after fitting, actual quality, and stereo checks.
+Same PCM, 2 sample rates × mono/stereo, 3 rounds of interleaved synchronous processing, 10 seconds per case.
+Stress test sets `min_bandwidth_ratio` to 1 to expand enhancement coverage; quality assessment remains at production default 0.85.
+Machine background load snapshot preserved; no unrelated user processes stopped.
 
-| 策略 | 同步处理p99 ms范围 | 同步RSS MiB峰值 |
+| Strategy | Synchronous Processing (p99 ms range) | Peak RSS (MiB) |
 |---|---:|---:|
 | baseline | 0.576–1.323 | 37.92 |
 | calibrated | 0.566–1.298 | 37.92 |
 
-每组另做4案例×60秒wall-clock pacing，固定256samples输出延迟、同PCM与预热。
+Additional 4 cases × 60 seconds wall-clock pacing, fixed 256-sample output latency, same as PCM and pre-warmup.
 
-| 策略 | 软件新增延迟ms | CPU%单核归一 | RSS MiB峰值 | callback p99 μs | worker miss | 最长miss段ms |
+| Strategy | Software Added Latency (ms) | CPU% (per core, normalized) | RSS Peak (MiB) | callback p99 μs | worker miss | Longest Miss Segment (ms) |
 |---|---:|---:|---:|---:|---:|---:|
 | baseline | 5.352–5.825 | 48.36 | 38.77 | 5.125 | 0 | 0.000 |
 | calibrated | 5.346–5.822 | 48.15 | 42.75 | 4.708 | 0 | 0.000 |
 
-八案例均满足8ms目标、10ms红线、回调与增强可用率预算。
-CPU/RSS为整个进程（四案例），含推理、DSP与报告缓存。三轮结果不用于断言校准器更快；
-机器背景负载与门控会影响测量。校准不引入前瞻或新缓冲。原始回调数组、miss位图、
-输入/模型/二进制哈希及实际加载系数均复核；不以平均推理时间代替持续交付。
-软件延迟不包含声卡、驱动或宿主原有缓冲；新增接入缓冲需另计。
-本轮只有短期模拟节拍测试，没有真实设备30分钟、x86_64性能或主观听感验收。
+All eight cases met the 8ms target, stayed within 10ms red line, and satisfied callback and enhancement availability budget.
+CPU/RSS values represent the entire process (four cases), including inference, DSP, and report buffering.
+The three rounds are not used to assert faster inference; background load and gating affect measurements.
+Calibration introduces no lookahead or new buffering. Raw callback arrays, miss maps, input/model/binary hashes, and actual loaded coefficients were all verified.
+Average inference time is not used as a proxy for continuous delivery.
+Software latency does not include sound card, driver, or host buffer overhead; any added buffer must be accounted for separately.
+This round includes only short-term pacing simulations—no real device 30-minute, x86_64 performance, or subjective listening validation has been conducted.
+
+All 89 calibrated outputs match whole-file processing under both fixed and irregular blocks with maximum error 0. The 10 silence/impulse/one-sided-input cases preserve frame counts and finite output; silent material and empty channels remain 0. Stress timing sets min_bandwidth_ratio to 1, while quality evaluation retains 0.85; the reported 0-miss short test is not device qualification.

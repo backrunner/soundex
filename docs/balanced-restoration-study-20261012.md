@@ -1,93 +1,86 @@
-# P4：平滑 DSP、参考峰值与双向高频能量监督
+# P4: Smooth DSP, Reference Peak, and Bidirectional High-Frequency Energy Supervision
 
-2026-10-12。本轮为受控训练实验，不替换默认权重，也不宣称已经解决泛化或听感问题。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 动机与固定对照
+2026-10-12. This round is a controlled training experiment; default weights are not replaced, and no claims are made regarding generalization or perceptual quality improvements.
 
-[P3](weak-band-study-20261012.md) 的单向过量能量约束减少了不必要的高频，
-但也削弱部分缺失能量的恢复；[限幅对照](limiter-study-20261012.md) 则表明旧 DSP
-本身就会改变原本正确的信号。因此本轮同时固定新的平滑 DSP 和共同训练预算，
-区分峰值监督冲突与高频恢复不足，避免把旧基线当作正确答案。
+## Motivation and Fixed Baselines
 
-| 训练组 | 部署与训练代理 | 峰值约束 | 附加高频能量项 |
+[P3](weak-band-study-20261012.md) introduced unidirectional excess energy constraints that reduced unnecessary high-frequency content, but also weakened recovery of missing energy. The [limiter baseline](limiter-study-20261012.md) demonstrated that the original DSP itself alters the correct signal. Thus, this round fixes both a new smoothing DSP and shared training budget, differentiating between peak supervision conflicts and high-frequency recovery deficiencies, and avoids treating the old baseline as correct.
+
+| Training Group | Deployment & Training Proxy | Peak Constraint | Additional High-Frequency Energy Term |
 | --- | --- | --- | --- |
-| `smooth_control` | `smooth-knee` | 原绝对阈值 0.855 | P3 单向过量能量 |
-| `reference_peak` | `smooth-knee` | 放行参考本身的对应峰值 | P3 单向过量能量 |
-| `balanced` | `smooth-knee` | 放行参考本身的对应峰值 | 双向对数频带功率差 |
+| `smooth_control` | `smooth-knee` | Original absolute threshold 0.855 | Unidirectional excess energy from P3 |
+| `reference_peak` | `smooth-knee` | Allow reference's own corresponding peak | Unidirectional excess energy from P3 |
+| `balanced` | `smooth-knee` | Allow reference's own corresponding peak | Bidirectional log-band power difference |
 
-三组使用相同的 12.5% 恒等输入控制，并以对应种子的 P3 **control** 检查点开始。
-父权重没有根据留出复核结果择优。种子固定为 20261012、20261013；每组 1024 次更新，
-batch 4，新的 AdamW，学习率从 1e-4 余弦下降到约 1e-5，梯度裁剪 5。
-每种子使用同一份冻结抽样序列（seed + 20000），保持音乐/语音基础抽样比重 253/254、1/254。
-恒等控制替换每两次更新中的一个样本，不改变来源抽样比例。
+All groups use the same 12.5% identity input control and start from the corresponding seed's P3 **control** checkpoint. Parent weights are not selected based on held-out recheck results. Seeds are fixed at 20261012 and 20261013; each group undergoes 1024 updates, batch size 4, with a new AdamW optimizer, learning rate decaying from 1e-4 to approximately 1e-5 via cosine schedule, and gradient clipping set to 5.
+Each seed uses the same frozen sampling sequence (seed + 20000), maintaining a music/speech base sampling ratio of 253/254, 1/254.
+The identity control replaces one sample every two updates, without altering the source sampling proportion.
 
-模型仍是原 TCN：639,906 参数、256/128 FFT/hop、显式因果历史、原生 44.1/48 kHz；
-没有引入额外前瞻或运行时参考信号，导出约 2.48 MiB。新的 loss 只用于训练。
+The model remains the original TCN: 639,906 parameters, 256/128 FFT/hop, explicit causal history, native 44.1/48 kHz; no additional lookahead or runtime reference signal is introduced. Output size is approximately 2.48 MiB. The new loss is used solely for training.
 
-## Loss 定义与局限
+## Loss Definition and Limitations
 
-基础谱形、复数频谱、能量、参考瞬态和低频保真项沿用 P2 权重。
-峰值的新容许值为 `max(0.855, abs(clean[t]))`，只惩罚合成信号超过该值的部分。
-此项不再要求模型压低无损参考本身的合法峰值；部署安全限幅仍保留 0.95 上限。
-**参考音频不经过限幅**，安全上限和原始参考冲突时，波形误差依然如实计入。
-逐点幅度容许值不约束符号和相位，后者由基础复数频谱与波形项共同监督。
+Base spectral shape, complex spectra, energy, reference transient, and low-frequency fidelity terms retain P2 weights.
+The new peak tolerance is defined as `max(0.855, abs(clean[t]))`, penalizing only the portion of the synthesized signal exceeding this value.
+This term no longer requires the model to suppress legitimate peaks in the unclipped reference; a deployment safety limiter remains at a 0.95 upper bound.
+**The reference audio is not clipped**, and when a safety upper bound conflicts with the original reference, waveform error is still truthfully included.
+Per-sample amplitude tolerances do not constrain sign or phase; phase is jointly supervised by the base complex spectrum and waveform term.
 
-双向项使用 256/512/2048 点周期 Hann 的单边 Parseval 功率，固定覆盖
-8–10、10–12、12–14、14–16、16–18、18–20、20–24 kHz（截至 Nyquist）。
-逐帧、逐频带比较：
+The bidirectional term uses single-sided Parseval power from a 256/512/2048-point Hann window, fixed coverage across 8–10, 10–12, 12–14, 14–16, 16–18, 18–20, and 20–24 kHz (up to Nyquist). Frame-by-frame, band-by-band comparison:
 
 `abs(log1p(predicted_power / floor) - log1p(reference_power / floor))`
 
-`floor = max(reference_full_frame_power * 1e-6, 1e-10)`，参考端 floor 停止梯度。
-按频带、帧、样本及三个分析尺寸平均，附加权重 0.25 与 P3 保持一致。
-高于 floor 时，同等倍率的多补与少补近似等价；floor 附近不声称严格对称。
-正确参考对应零附加误差、零附加梯度；静音保持有限。
-功率项本身不能确定相位，也不能证明真实细节正确，必须联合其他误差和听感判断。
+`floor = max(reference_full_frame_power * 1e-6, 1e-10)`, with gradient stop applied at the reference end.
+Averaged across bands, frames, samples, and three analysis dimensions, with an additional weight of 0.25, consistent with P3.
+Above the floor, proportional over- and under-compensation are approximately equivalent; near the floor, strict symmetry is not claimed.
+The correct reference yields zero additional error and zero additional gradient; silence is preserved with limited fidelity.
+The power term cannot determine phase, nor can it verify correct fine details—joint supervision with other errors and perceptual judgment is required.
 
-训练代理使用真实 Rust 输入检测轨迹、gate 与频带掩码；监督排除 64 帧 warmup
-再加一帧完整 OLA 支撑。最终选出的模型另行通过 Rust 实际处理评估。
+The training proxy uses real Rust input detection traces, gating, and band masking; supervision excludes a 64-frame warmup plus one full OLA support frame. Final selected models are separately evaluated using actual Rust processing.
 
-## 选择与泛化边界
+## Selection and Generalization Boundaries
 
-所有组以同一 `causal-balanced-band-v1` 目标选择检查点：
-`0.875 * paired_validation + 0.125 * identity_validation`，每 256 步评分。
-新旧版本总 loss 不可直接比较。父权重在更新前也用这一共同目标评分。
-训练域探针固定为 32 首音乐、8 个语音录音，不参与选择。
-开发验证仍为 89 个配对片段 / 80 个录音，按原始录音隔离；另外核查作品组和原始文件哈希隔离。
+All groups use the same `causal-balanced-band-v1` target selection checkpoint:
+`0.875 * paired_validation + 0.125 * identity_validation`, scored every 256 steps.
+The total loss across new and old versions is not directly comparable. Parent weights were also scored using this common target prior to update.
+Training domain probes are fixed at 32 music tracks and 8 speech recordings, not involved in selection.
+Development validation remains at 89 paired segments / 80 recordings, isolated by original recording; additional verification includes workgroup and original file hash isolation.
 
-选好检查点后，固定 SHA 才评分历史留出复核：每录音取一个固定配对文件，共
-39 个录音（21 音乐、18 语音），处理整个 2–4 秒配对文件，**不是整首歌曲**。
-这些录音在历史研究中已用于诊断，不能作为新独立测试，也不能据此保证没有过拟合。
-报告按来源、编解码器、采样率、声道角色、曲风、地区分层，置信区间按录音重采样。
-独立 mono/left/right 片段不会拼成伪立体声；这套指标不代替成对立体声验证。
-验证集仍缺乡村、流行、嘻哈、放克；复核集缺中国、乡村、嘻哈、爵士，覆盖结论受限。
+After selecting the checkpoint, a fixed SHA is used to score historical held-out rechecks: one paired file per recording, totaling 39 recordings (21 music, 18 speech), processed over the full 2–4 second paired file. **This is not the entire song.**
+These recordings were previously used in prior diagnostic studies and cannot be considered independent test cases, nor can they guarantee absence of overfitting.
+Reports are stratified by source, codec, sample rate, channel role, genre, and region; confidence intervals are computed under resampling.
+Independent mono/left/right segments are not stitched into pseudo-stereo; this metric does not replace paired stereo validation.
+The validation set lacks country, pop, hip-hop, funk; the recheck set lacks Chinese, country, hip-hop, jazz—conclusion coverage is thus limited.
 
-实际输出比较使用相同 `steady_*` 指标与窗口：去除开头 72 hops 与末尾 256 samples。
-同时保留全片段指标，二者不混用。对照包含原始压缩输入、P3 父权重加新 DSP、
-三个 P4 训练组。更低能量误差不能掩盖谱形、瞬态、低频或恒等保真的退步。
+Actual output comparisons use identical `steady_*` metrics and windows: 72 hops and 256 samples are removed from the start and end, respectively. Full-segment metrics are retained, and the two are not mixed.
+Comparisons include the original compressed input, P3 parent weights with new DSP, and the three P4 training groups.
+Lower energy error cannot mask degradation in spectral shape, transient, low-frequency, or identity fidelity.
 
-## 运行与验证
+## Execution and Validation
 
-正式训练于 2026-10-12 10:50（新加坡时间）在本地 MPS 启动，PID 7865。
-六组均已完成 1024 步、导出和实际 Rust 评分，训练及 caffeinate 进程已退出。
-`summary.json` 为 `complete`；没有权重晋级。
+Formal training began at 10:50 (Singapore time) on 2026-10-12 at local MPS, PID 7865.
+All six groups completed 1024 steps, exported, and underwent actual Rust scoring. Training and caffeinate processes have since terminated.
+`summary.json` is marked as `complete`; no weight promotion occurred.
 
-源码冻结于 `6fefd0416531ec5775a1a8add00b0608244758d3`；独立 worktree：
-`data/runs/causal-p4-20261012/source`。训练材料和结果仅保存在本地忽略目录。
+Source code is frozen at `6fefd0416531ec5775a1a8add00b0608244758d3`; independent worktree:
+`data/runs/causal-p4-20261012/source`. Training materials and results are stored only in the local ignore directory.
 
-- 正式结果：`data/runs/causal-p4-20261012/study/`
-- 日志：`data/runs/causal-p4-20261012/train.log`
-- 启动凭据：`data/runs/causal-p4-20261012/launch.json`（PID、UID、启动时间、命令）
-- 配置、数据清单、源码、父权重、抽样和独立复制的 Rust 二进制均登记哈希；不匹配时拒绝续跑。
-- 本地完整 Python 回归 **313 passed**，含新 loss 解析值、有限差分、静音、恢复方向、峰值语义、
-  Rust DSP 回放和 CPU/MPS 对照；Ruff 检查通过。
-- 三组 MPS 4 步 smoke 均完成训练、共同验证、ONNX/ORT 导出校验与实际 Rust 评分。
-- CPU/MPS 探针的 loss 数值一致；梯度在可微区域以相对范数误差 <0.002 检查。
-  L1 精确零误差折点不要求相同次梯度；未放宽波形或 loss 误差容差。
-- 本轮未改推理结构，上一轮性能数字仅是先前权重的诊断证据；新权重晋级仍需绑定新 SHA
-  重新测量实时性能、持续流稳定性、双声道和听感，不能继承发布资格。
+- **Formal results**: `data/runs/causal-p4-20261012/study/`
+- **Logs**: `data/runs/causal-p4-20261012/train.log`
+- **Launch credentials**: `data/runs/causal-p4-20261012/launch.json` (PID, UID, start time, command)
+- **Configuration, data manifests, source code, parent weights, sampling, and independent copies of the Rust binary** are all registered with hashes; any mismatch prevents continuation.
+- **Local full Python regression**: 313 passed, including new loss parsing, finite differences, silence, recovery direction, peak semantics, Rust DSP replay, and CPU/MPS cross-checks; Ruff checks passed.
+- All three MPS 4-step smoke runs completed training, validation, ONNX/ORT export validation, and actual Rust scoring.
+- CPU/MPS probe loss values are consistent; gradients in differentiable regions are verified with relative norm error <0.002.
+  L1 exact zero-error breakpoints do not require identical second-order gradients; waveform or loss error tolerances were not relaxed.
+- The inference structure remains unchanged; prior performance metrics are diagnostic evidence from previous weights only.
+  New weight promotion requires binding to a new SHA and re-measurement of real-time performance, continuous stream stability, stereo, and perceptual quality—no inheritance of release status.
 
-复现命令（从仓库根目录，父 P3 已完成）：
+Replication command (from repository root, P3 completed):
 
 ```bash
 PYTHONPATH=training training/.venv/bin/python -m scripts.run_balanced_study \
@@ -97,14 +90,14 @@ PYTHONPATH=training training/.venv/bin/python -m scripts.run_balanced_study \
   --detector data/runs/causal-p3-20261012/study/binaries/soundex-gain-data
 ```
 
-正式续跑须使用冻结 worktree，并保持原登记配置；上述路径供首次运行示例。
+A formal continuation requires a frozen worktree and preserved original registration configuration; the above path is provided as an example for first-time runs.
 
-## 完整结果：不晋级，也不据此追加相同配方的训练预算
+## Complete Results: No Promotion, No Extension of the Same Recipe
 
-六组最优检查点均为第 1024 步；这个末步位置本身不能作为继续训练的理由。
-共同 loss 的改变仍然没有稳定转化为完整音质收益。
+All six groups achieve their optimal checkpoints at step 1024. This endpoint alone is not a justification for further training.
+Changes in the common loss have not yet stabilized into overall audio quality gains.
 
-| 种子 | 组 | 父权重共同 loss | 最优共同 loss | 配对验证 | 恒等验证 | 训练探针 |
+| Seed | Group | Parent Weight Common Loss | Optimal Common Loss | Paired Validation | Identity Validation | Training Probe |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
 | 20261012 | smooth_control | 2.35421 | 2.36112 | 2.62992 | 0.47955 | 2.78284 |
 | 20261012 | reference_peak | 2.35421 | 2.36122 | 2.63001 | 0.47970 | 2.78277 |
@@ -113,13 +106,13 @@ PYTHONPATH=training training/.venv/bin/python -m scripts.run_balanced_study \
 | 20261013 | reference_peak | 2.39020 | 2.35498 | 2.63493 | 0.39533 | 2.82192 |
 | 20261013 | balanced | 2.39020 | 2.35154 | 2.62306 | 0.45091 | 2.79126 |
 
-下表为历史留出复核的 **21 个音乐录音**，每录音一个配对文件、相同稳定区域。
-SC、flux、能量误差越低越好；ΔSI-SDR 为相对压缩输入的变化，越高越好。
-这不是独立测试或盲听分数。
+The table below presents **21 music recordings** from historical held-out rechecks, one paired file per recording, within a stable region.
+Lower SC and flux error, lower energy error (dB), and higher ΔSI-SDR (dB) are better.
+This is not an independent test or blind listening score.
 
-| 种子 | 路径 | 高频 SC | 高频 flux error | 高频能量误差 dB | ΔSI-SDR dB |
+| Seed | Path | High-Frequency SC | High-Frequency Flux Error | High-Frequency Energy Error (dB) | ΔSI-SDR dB |
 | --- | --- | ---: | ---: | ---: | ---: |
-| — | 压缩输入 | 0.69998 | 0.86321 | 4.48301 | 0.00000 |
+| — | Compressed Input | 0.69998 | 0.86321 | 4.48301 | 0.00000 |
 | 20261012 | P3 control + smooth DSP | 0.67436 | 0.89514 | 3.25407 | -0.14791 |
 | 20261012 | smooth_control | 0.68574 | 0.89178 | 3.45624 | -0.14580 |
 | 20261012 | reference_peak | 0.68582 | 0.89182 | 3.45575 | -0.14581 |
@@ -129,67 +122,67 @@ SC、flux、能量误差越低越好；ΔSI-SDR 为相对压缩输入的变化�
 | 20261013 | reference_peak | 0.66946 | 0.88414 | 3.43168 | -0.14448 |
 | 20261013 | balanced | 0.68658 | 0.89305 | 3.26843 | -0.14813 |
 
-两个种子中，balanced 相对同预算 smooth_control 的能量误差分别减少 **0.1331、0.1633 dB**，
-但高频 SC 分别增加 **0.01722、0.01713**，flux error 分别增加 **0.00944、0.00891**，
-ΔSI-SDR 分别降低 **0.00319、0.00365 dB**；低频保留 LSD 分别增加 **0.08557、0.08398 dB**。
-这些很小的波形差值没有听感显著性证明，不能单独作为否决依据；
-本轮尚未建立谱形、瞬态与能量的整体净收益。进一步归因见[根因审计](restoration-root-cause-20261012.md)。
-相对 P3 父权重，两个种子的 balanced 高频 SC、flux 和 ΔSI-SDR 均退步，能量误差一升一降。
-相对压缩输入，第一种子的 balanced 高频 SC 也略差；两个种子的瞬态误差都仍高于输入。
+Among the two seeds, the `balanced` group shows a **reduction of 0.1331 dB and 0.1633 dB** in energy error compared to the same budget `smooth_control`, respectively.
+However, high-frequency SC increases by **0.01722 and 0.01713**, flux error increases by **0.00944 and 0.00891**, and ΔSI-SDR decreases by **0.00319 and 0.00365 dB**, respectively.
+Low-frequency preservation LSD increases by **0.08557 and 0.08398 dB**, respectively.
+These small waveform differences lack perceptual significance and cannot be used as standalone disqualifications.
+No net gain in spectral shape, transient, or energy is established in this round. Further root cause analysis is provided in [Root Cause Audit](restoration-root-cause-20261012.md).
+Relative to P3 parent weights, both seeds show degradation in high-frequency SC, flux, and ΔSI-SDR for the `balanced` group, with energy error either increasing or decreasing.
+Relative to the compressed input, the `balanced` group shows slightly worse high-frequency SC in the first seed; both seeds show transient errors still above input.
 
-配对录音 bootstrap（10,000 次、每种子单独计算）保存在本地
-`data/reports/p4-analysis-20261012/summary.json`。例如首种子 balanced–control 的
-flux 差值 95% 区间为 **[0.00226, 0.01789]**，能量误差差值为 **[-0.36297, 0.09832] dB**。
-因此不能把均值上的能量改善描述为已确认的稳定收益。区间是探索性分析，未做多重比较校正。
-开发集有每录音多个片段，主报告点估计按片段平均，配对分析先按录音平均，两种点估计不混用。
-所有父子报告的压缩输入基线逐行精确一致，已检查窗口、录音集合与指标口径匹配。
+Pairwise recording bootstrap (10,000 iterations, per seed independently computed) is saved locally at
+`data/reports/p4-analysis-20261012/summary.json`. For example, the `balanced–control` flux difference for the first seed has a 95% confidence interval of **[0.00226, 0.01789]**, and energy error difference of **[-0.36297, 0.09832] dB**.
+Thus, the mean energy improvement cannot be described as a confirmed stable gain. The intervals are exploratory and not subjected to multiple comparison correction.
+Development set includes multiple segments per recording; main report point estimates are averaged per segment, while paired analysis first averages per recording—these two estimation methods are not mixed.
+All parent-child baseline comparisons for compressed input are line-by-line identical, and have been verified for window, recording set, and metric consistency.
 
-开发音乐的 balanced 高频 SC 为 **1.28395 / 1.19048**，明显差于压缩输入约 **0.69958**，
-不具备推广依据；这也说明只展示留出音乐的平均能量补偿会掩盖反例。
-语音单独保留在报告中，不用极低的语音抽样比重或综合均值掩盖音乐的退步。
-训练域探针与开发集的变化存在种子差异；此次没有新的独立录音，不能证明过拟合已排除，
-也没有证据把结果简单归因为旧基线过拟合或模型容量不足。
+The development music `balanced` high-frequency SC is **1.28395 / 1.19048**, significantly worse than the compressed input of **0.69958**, lacking generalizability.
+This also demonstrates that showing only average energy compensation in held-out music can mask counterexamples.
+Speech results are preserved separately and are not masked by extremely low speech sampling ratios or overall mean.
+Variations in training domain probes and development set exist across seeds; no new independent recordings were conducted, so overfitting cannot be ruled out, nor is there evidence that results stem from overfitting to the old baseline or model capacity limits.
 
-结论：峰值约束的语义修正可以保留为实验能力，但不是本轮主要收益来源；
-双向功率项在数学与数值检查上通过，仍无法确保填入正确的谱形和瞬态细节。
-下一步需优先分离稳定包络、瞬态与相位误差，并在训练域可学习性和独立录音上验证，
-而不是仅继续加能量权重、训练时长或用测试曲目调阈值。默认模型与默认 DSP 配置不变。
+**Conclusion**: Semantic correction of peak constraints can be retained as an experimental capability, but is not the primary gain of this round.
+The bidirectional power term passes both mathematical and numerical checks, yet still cannot ensure correct spectral and transient detail restoration.
+Next steps must prioritize isolating stable envelope, transient, and phase errors, and validate them on training domain learnability and independent recordings—rather than continuing to add energy weights, training duration, or adjusting thresholds based on test tracks.
+Default model and default DSP configuration remain unchanged.
 
-语音分层的 balanced 高频 SC（开发 / 留出复核）分别为 **0.67312 / 0.22408**
-与 **0.68102 / 0.22191**；完整能量、瞬态、波形和低频指标同样保留于本地结果。
-这些结果并不改变音乐的晋级结论。
+Speech-stratified balanced high-frequency SC (development / held-out recheck) are **0.67312 / 0.22408** and **0.68102 / 0.22191**, respectively.
+Complete energy, transient, waveform, and low-frequency metrics are retained in local results.
+These results do not alter the music-based promotion conclusion.
 
-## 新权重的实际 CPU / 实时诊断
+## Real-Time CPU and Diagnostic Performance of New Weights
 
-固定测量 `balanced-20261013`，SHA-256：
-`f07c185fe5502db09bed1add3dcdc897df1d9a776d0c4c0283b5ed61b9a8a29f`。
-模型 639,906 参数，ONNX 2,599,024 bytes（2.48 MiB）。训练进程退出后才运行，
-Apple M5 Max / macOS / AC / lowpowermode=0，ORT 单线程，smooth-knee / Model gain。
+Fixed measurement for `balanced-20261013`, SHA-256:
+`f07c185fe5502db09bed1add3dcdc897df1d9a776d0c4c0283b5ed61b9a8a29f`.
+Model: 639,906 parameters, ONNX 2,599,024 bytes (2.48 MiB).
+The process runs after training completion; Apple M5 Max / macOS / AC / lowpowermode=0, ORT single-thread, smooth-knee / Model gain.
 
-Core 每组合 5 秒、warmup 96 hops：单声道 P99 **0.101–0.105 ms**，
-双声道 P99 **0.185–0.203 ms**，最慢 hop **1.995 ms**，无 hop deadline miss 或非有限输出。
-Core 峰值 RSS **35.52 MiB**。正式门禁仍返回退出码 **2**：这是 diagnostic，且远未达到
-每组合 1800 秒测量要求；不能描述成正式性能发布通过。
+Core: 5 seconds per combination, warmup 96 hops:
+- Mono P99: **0.101–0.105 ms**
+- Stereo P99: **0.185–0.203 ms**
+- Slowest hop: **1.995 ms**
+- No hop deadline miss or non-finite output.
+- Core peak RSS: **35.52 MiB**.
+Formal gate returns exit code **2**—this is diagnostic, and far from meeting the 1800-second per combination measurement requirement; cannot be described as a formal performance pass.
 
-实时 adapter 使用原生 44.1/48 kHz、mono/stereo 真实音乐 PCM，128 帧回调，
-每组合真实墙钟 30 秒。固定对齐缓冲仍为 256 帧；没有新增模型前瞻。
+Real-time adapter uses native 44.1/48 kHz, mono/stereo real music PCM, 128-frame callback,
+real-world wall-clock 30 seconds per combination. Fixed alignment buffer remains at 256 frames; no new model lookahead is introduced.
 
-| 采样率 / 声道 | 回调 P99 µs | 回调最大 µs | 保守软件附加延迟 ms | worker miss |
+| Sample Rate / Channels | Callback P99 (µs) | Callback Max (µs) | Conservative Software Overhead (ms) | worker miss |
 | --- | ---: | ---: | ---: | ---: |
 | 44100 / 1 | 12.667 | 278.625 | 6.084 | 0 |
 | 44100 / 2 | 13.708 | 129.042 | 5.934 | 0 |
 | 48000 / 1 | 12.166 | 104.750 | 5.438 | 0 |
 | 48000 / 2 | 14.041 | 170.125 | 5.503 | 0 |
 
-四组均输出完整期望帧数，无 NaN/Inf、队列溢出、回调 deadline overrun、producer late hop，
-输出采样峰值不超过 **0.942538**，连续输出检查通过。最高附加延迟 **6.084 ms**，
-满足当前 8 ms 目标和 10 ms 红线，但没有达到最初随意提出的 5 ms。
-这仅包含库/adapter 的软件路径，不包括声卡、驱动和宿主额外缓冲。
+All four configurations output full expected frame counts, with no NaN/Inf, queue overflow, callback deadline overrun, or producer late hop.
+Peak output sample values do not exceed **0.942538**, and continuous output passes verification.
+Maximum additional latency is **6.084 ms**, meeting current 8 ms target and 10 ms redline, though not reaching the initially proposed 5 ms.
+This includes only software path (library/adapter); does not include sound card, drivers, or host buffering.
 
-实时进程峰值 RSS **39.81 MiB**；`/usr/bin/time -l` 记录 120.25 秒墙钟，
-22.52 秒 user + 2.33 秒 system，约 **20.7% 的一个 CPU 核**，包含 PCM I/O 和调度，
-并非仅模型算子。指标绑定本次权重与本机；不外推 x86、移动设备或其他宿主。
-所有报告、测量二进制哈希和日志保存在 `data/reports/p4-analysis-20261012/`。
+Real-time process peak RSS: **39.81 MiB**; `/usr/bin/time -l` records 120.25 seconds wall-clock, 22.52 seconds user + 2.33 seconds system, approximately **20.7% of one CPU core**, including PCM I/O and scheduling—this is not solely model operator computation.
+All metrics are bound to this specific weight and host; not extrapolated to x86, mobile devices, or other hosts.
+All reports, measurements, binary hashes, and logs are saved in `data/reports/p4-analysis-20261012/`.
 
-此轮没有进行真声卡长时播放、盲听或新的独立录音测试。短时输出连续性与模型音质资格
-分开判断：目前性能预算可行，音质收益仍不满足晋级条件。
+No actual long-duration playback on real sound cards, blind listening, or new independent recordings were conducted.
+Short-term output continuity and model audio quality eligibility are judged separately: current performance budget is feasible, but audio quality gains do not meet promotion criteria.

@@ -1,88 +1,63 @@
-# 连续重建与多分辨率监督实验
+# Continuous Reconstruction and Multi-Resolution Supervision Experiment
 
-后续已完成[输入条件化增益校准](gain-calibration-20261011.md)：直接采集生产分析器状态，
-检验有界增益目标拟合对最终输出的作用。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-上一轮增加因果历史后，实际高频能量和瞬态仍未取得综合改善。本轮改进训练侧的
-连续重建监督与增益状态初始化，不改变部署结构、FFT256/hop128、因果九帧输入或
-固定256 samples输出时间轴。两组各四轮已完成；整体音质仍有取舍，不替换现有权重。
+The input-conditioned gain calibration has been completed: direct acquisition of production analyzer states, verifying the effectiveness of bounded gain targeting on final output.
 
-## 结论与下一步
+Following the addition of causal history in the prior round, improvements in high-frequency energy and transient response remain unimpressive. In this round, we introduce continuous reconstruction supervision and gain state initialization on the training side, without altering the deployment structure, FFT256/hop128, nine-frame causal input, or the fixed 256-sample output time axis. Two groups have each completed four rounds; overall audio quality still shows trade-offs, and no existing weights are replaced.
 
-多分辨率组的统一CPU total为1.679951，比长序列对照低0.35%，但比未续训父模型高1.21%。
-实际Rust输出中，音乐瞬态误差相对对照下降0.02054（95%CI不跨0），但音乐/语音
-高频能量误差分别增加0.12760/0.07904dB（两者CI均不跨0）。语音能量相对父模型
-改善0.51069dB，同时SI-SDR略降0.01069dB。不能据此认定全面超越基线。
+## Conclusions and Next Steps
 
-本轮已经落实长序列、真实DSP预热与多分辨率监督，仍未取得均衡恢复收益。
-九帧历史敏感性也很小，单种子短训不能据此否定时间结构。
-下一步优先校准训练与部署之间的cutoff和增益状态：固定MatchEdge会抵消模型的部分
-幅度学习，清单cutoff与Rust在线分析也有偏差。应在有界、输入条件化的高频校准中
-保留低频/声像约束，逐项做对照，再决定是否扩容或长训。直接关闭增益并非已验证的解法。
-这些后续策略尚未实现，不能作为本轮收益。
+The multi-resolution group achieves a unified CPU total of 1.679951, which is 0.35% lower than the long-sequence baseline but 1.21% higher than the parent model before this continuation. In actual Rust output, music transient error relative to the baseline decreases by 0.02054 (95% CI does not cross zero), but high-frequency energy errors for music and speech increase by 0.12760 dB and 0.07904 dB, respectively (both CIs do not cross zero). Speech energy improves by 0.51069 dB relative to the parent model, while SI-SDR slightly decreases by 0.01069 dB. These results do not justify a claim of overall superiority over the baseline.
 
-## 改动与边界
+This round has implemented long-sequence, real-time DSP warmup, and multi-resolution supervision, yet no balanced recovery benefits have been achieved. The sensitivity to nine-frame history remains low; a short training session with a single seed does not invalidate the importance of temporal structure. Next, we prioritize calibrating the cutoff and gain state between training and deployment. Fixing MatchEdge at a constant value would suppress part of the model's amplitude learning. Discrepancies between the list cutoff and Rust online analysis remain. We should retain low-frequency and stereo constraints in bounded, input-conditioned high-frequency calibration, conduct item-by-item comparisons, and only then decide whether to expand or perform long training. Simply disabling gain is not a validated solution. These subsequent strategies remain unimplemented and cannot be considered gains from this round.
 
-- V7从8帧模型历史之后继续观察32帧真实DSP历史，再监督32帧输出。MatchEdge从
-  Rust重置值1开始递推；历史预测detach，不用其目标误差训练，且冻结BN统计。
-  这样避免用监督片段第一帧的瞬时目标增益近似整段的前置状态。
-- 32帧DSP预热只提供有限历史；稳定非静音条件下初始状态影响按0.9^32衰减，仍不
-  是整段运行状态。使用清单中的cutoff，尚不包含在线检测变化、门控淡入和limiter。
-- 使用32监督帧完整OLA支持区间（3968 samples），以512/1024/2048点Hann分析。
-  新增高频谱收敛、逐窗能量、相对参考的有符号时间变化误差及保留频带复数约束。
-  高频floor/归一化只依赖参考；超额能量和抹平真实瞬态都会被惩罚。
-- 这些长窗只用于loss。模型仍为923,526参数的有限因果refiner，没有新增前瞻。
-  是否符合性能与连续性要求仍以候选实际导出图的测量为准。
+## Modifications and Boundaries
 
-## 固定协议
+- V7 extends observation from 8-frame model history to 32-frame real DSP history, then supervises 32-frame output. MatchEdge starts from the Rust reset value of 1 and is propagated recursively; historical predictions are detached and not used for target error training, and BN statistics are frozen. This avoids approximating the entire segment's initial state with the first frame's instantaneous target gain.
+- The 32-frame DSP warmup provides only limited history; under non-silent, stable conditions, the initial state influence decays at 0.9^32, still not equivalent to the full runtime state. The cutoff used here does not include online change detection, gating fade-in, or limiter.
+- Full OLA support window of 3968 samples (32 frames × 124 samples) is used for supervision. A 512/1024/2048-point Hann analysis is applied. New metrics include high-frequency spectral convergence, per-window energy, signed time variation relative to reference, and preserved band complex constraints. High-frequency floor and normalization depend solely on the reference; excess energy and smoothing of true transients are penalized.
+- These long windows are used only for loss. The model remains a finite causal refiner with 923,526 parameters, with no added lookahead. Whether it meets performance and continuity requirements will be judged by actual exported waveform measurements.
 
-从同一shape-small父检查点 `a5166a6f56239a31a48986725188aa19c1c199c565904c76aca0f160a19f393a`
-迁移零初始化时间分支。原生无损数据、划分、音乐/语音比例和来源义务保持不变。训练抽样音乐253/254、
-语音1/254；固定验证896行由768音乐+128语音组成。数据配方哈希为
-`7fda9e58ab583617f3514f9dd9cfcf87f29871ae0587e91ca29ac0ddaf6b29d4`，
-清单集哈希为`a14019181a6303417a72285b45f4e28988b349ab9d164f39b64b82f44150dab4`。
-两个arm均冻结BN、无GAN，batch16、每轮2048draws、4轮/512updates、LR2e-5、
-64step warmup/cosine，共262,144监督帧。两组观察相同长度、使用同一采样种子。
+## Fixed Protocol
 
-- `long-control`：长序列与DSP历史，multires四项权重为0。
-- `multires`：在此基础上使用0.5谱收敛、1.0能量（除以20dB尺度）、0.25时间误差、
-  1.0保留频带复数误差。原V6各项权重保持不变。
+From the same `shape-small` parent checkpoint `a5166a6f56239a31a48986725188aa19c1c199c565904c76aca0f160a19f393a`, a zero-initialized time branch is migrated. Native, lossless data, splits, music-to-voice ratios, and source obligations remain unchanged. Training samples: 253/254 music, 1/254 speech; fixed validation set of 896 rows (768 music + 128 speech). Data recipe hash is `7fda9e58ab583617f3514f9dd9cfcf87f29871ae0587e91ca29ac0ddaf6b29d4`, and list set hash is `a14019181a6303417a72285b45f4e28988b349ab9d164f39b64b82f44150dab4`. Both arms freeze BN, use no GAN, batch size 16, 2048 draws per round, 4 rounds / 512 updates, LR 2e-5, 64-step warmup/cosine, total 262,144 supervised frames. Both groups observe identical-length sequences and use the same sampling seed.
 
-只使用预定epoch4/final检查点，不按各自不同权重的total比较best epoch。两组及父模型
-用同一个完整V7 CPU FP32目标、固定896验证行与裁剪重新评分。评分前绑定哈希，再做
-实际Rust开发集音质对照。本轮是开发集实验，反复使用的材料不冒称独立测试。
-低loss、导出数值、实际输出、实时性能和听感分别验收，不自动替换默认权重。
+- `long-control`: long sequence and DSP history; multires weights set to zero.
+- `multires`: on top of the above, uses 0.5 spectral convergence, 1.0 energy (scaled by 20 dB), 0.25 temporal error, and 1.0 preserved band complex error. Original V6 weights remain unchanged.
 
-## 本地产物
+Only the pre-defined epoch 4/final checkpoint is used; best epoch is not selected based on individual training objectives. Both groups and the parent model use the same complete V7 CPU FP32 target, fixed 896 validation rows, and cropped re-evaluation. Before scoring, hash binding is applied, followed by actual Rust development set audio quality comparison. This round is a development set experiment; reused materials are not considered independent tests. Low loss, export values, actual outputs, real-time performance, and listening quality are all verified, and no default weights are automatically replaced.
 
-- `data/runs/multires-reconstruction-20261011/`：冻结源码、配方、训练日志和检查点。
-- `data/reports/multires-reconstruction-20261011/`：真实音频MPS梯度检查、数值、音质与资源报告。
-- 未新增数据来源、外部代码/教师或权重，音频和实验产物继续保留在忽略目录。
+## In-House Outputs
 
-## 训练与统一CPU复核
+- `data/runs/multires-reconstruction-20261011/`: frozen source code, recipe, training logs, and checkpoints.
+- `data/reports/multires-reconstruction-20261011/`: real audio MPS gradient checks, numerical values, audio quality, and resource reports.
+- No new data sources, external code/teacher, or weights are introduced. Audio and experimental outputs remain in the ignored directory.
 
-训练源码 `a27550acc142c7a91441fd1068bd6056df38cd7f`。两组各完成4轮/512updates，
-使用预定final检查点，不选各自训练目标下的best。数据、验证行和最终随机/采样器状态一致；
-每次裁剪位置未额外记录。所有保存张量有限，162个BN缓冲与父模型逐位相同。
+## Training and Unified CPU Recheck
 
-| 模型 | 统一完整V7 total | 参数 | ONNX MiB |
+Training source code: `a27550acc142c7a91441fd1068bd6056df38cd7f`. Both groups complete 4 rounds / 512 updates, using the pre-defined final checkpoint, without selecting best epoch based on individual training objectives. Data, validation rows, and final random/sampler states are consistent; no additional record of crop position is kept. All saved tensors are finite, with 162 BN buffers matching the parent model bit-for-bit.
+
+| Model | Unified Complete V7 Total | Parameters | ONNX MiB |
 |---|---:|---:|---:|
 | parent | 1.65981154 | 905,734 | 3.550 |
 | long-control | 1.68588339 | 923,526 | 3.622 |
 | multires | 1.67995108 | 923,526 | 3.622 |
 
-按预定共同CPU规则选中 `multires`，质量及数值资格仍分开判断。旧V6总分与本表不能直接比较。
+According to the pre-defined common CPU rule, `multires` is selected. Quality and numerical qualifications are still evaluated separately. The previous V6 total cannot be directly compared to this table.
 
-| 模型 | checkpoint SHA-256 | ONNX SHA-256 |
+| Model | checkpoint SHA-256 | ONNX SHA-256 |
 |---|---|---|
 | long-control | `95b1d8efd32dd8bed61f4ad0d36a1be01aef66842d4d25da8de12f40aed6a09c` | `8728b0bb16e7dddeac350207eb495406efbf24a0c6ccdd5e1da53c22df8439c1` |
 | multires | `23ae3b355bdd246d42c77f7c7eef29e81844d8a9c9c323e712cec57cd2a118d8` | `dcff2cf6320ccda229aac1d494c1343b9c7ff9f16c18ca05c3901a69ff6ef121` |
 
-### 原始预测与重建误差
+### Raw Predictions and Reconstruction Errors
 
-各项未乘loss权重；量纲不同，不直接相加。重建是训练代理，不能代替Rust结果。
+All metrics are unweighted; units differ and cannot be directly summed. Reconstruction is a training proxy and does not replace Rust results.
 
-| 指标 | parent | long-control | multires |
+| Metric | parent | long-control | multires |
 |---|---:|---:|---:|
 | high_band_magnitude | 5.471625 | 5.537713 | 5.520186 |
 | high_band_energy | 1.588409 | 1.518020 | 1.515842 |
@@ -95,17 +70,13 @@
 | multires_high_temporal | 0.251973 | 0.258892 | 0.256156 |
 | multires_low_complex | 0.000905 | 0.000958 | 0.000932 |
 
-## 实际Rust开发集结果
+## Actual Rust Development Set Results
 
-89行/80段录音，其中音乐33行/26段、语音56行/54段；Neural/MatchEdge。
-同一材料与处理参数，配对95%CI按录音cluster bootstrap 2000次，未做多重比较校正。
-这是已经反复使用的开发材料，不是独立测试；音乐缺pop/country/hiphop/funk覆盖。
-HF误差越低越好，SI-SDR越高越好。
+89 rows / 80 segments of recordings, including 33 rows / 26 music segments and 56 rows / 54 speech segments; Neural/MatchEdge. Same material and processing parameters, paired with 95% CI bootstrapped across 2000 recording clusters. No multiple comparison correction was performed. This is reused development material, not an independent test. Music lacks coverage in pop, country, hip-hop, and funk. Higher-frequency error is better, higher SI-SDR is better.
 
+### Music
 
-### 音乐
-
-| 路径 | HF谱收敛 | HF能量误差dB | HF flux | SI-SDR dB |
+| Path | HF Spectral Convergence | HF Energy Error dB | HF flux | SI-SDR dB |
 |---|---:|---:|---:|---:|
 | original | 0.932430 | 3.956168 | 1.445967 | 26.577054 |
 | parent | 0.896469 | 3.916874 | 1.391960 | 26.597193 |
@@ -113,18 +84,18 @@ HF误差越低越好，SI-SDR越高越好。
 | long-control | 0.936649 | 3.754156 | 1.470854 | 26.616312 |
 | multires | 0.933971 | 3.881757 | 1.450317 | 26.648028 |
 
-multires减long-control：
+Difference: multires minus long-control
 
-| 指标 | 变化 | 95% CI |
+| Metric | Change | 95% CI |
 |---|---:|---|
 | enhanced_high_spectral_convergence | -0.002678 | [-0.007331, +0.001780] |
 | enhanced_high_band_energy_error_db | +0.127601 | [+0.002676, +0.269719] |
 | enhanced_high_flux_error | -0.020537 | [-0.034334, -0.006820] |
 | enhanced_si_sdr_db | +0.031716 | [+0.006088, +0.065342] |
 
-### 语音
+### Speech
 
-| 路径 | HF谱收敛 | HF能量误差dB | HF flux | SI-SDR dB |
+| Path | HF Spectral Convergence | HF Energy Error dB | HF flux | SI-SDR dB |
 |---|---:|---:|---:|---:|
 | original | 0.664968 | 4.218196 | 0.809657 | 29.253909 |
 | parent | 0.654183 | 4.641319 | 0.808059 | 29.270062 |
@@ -132,145 +103,119 @@ multires减long-control：
 | long-control | 0.646320 | 4.051588 | 0.809396 | 29.255910 |
 | multires | 0.649821 | 4.130626 | 0.810042 | 29.259369 |
 
-multires减long-control：
+Difference: multires minus long-control
 
-| 指标 | 变化 | 95% CI |
+| Metric | Change | 95% CI |
 |---|---:|---|
 | enhanced_high_spectral_convergence | +0.003501 | [+0.002281, +0.004713] |
 | enhanced_high_band_energy_error_db | +0.079039 | [+0.033859, +0.126880] |
 | enhanced_high_flux_error | +0.000646 | [-0.000759, +0.002077] |
 | enhanced_si_sdr_db | +0.003459 | [-0.002030, +0.008905] |
 
-## 去除启动段后的比较
+## Comparison After Removing Startup Segment
 
-先处理完整流，再统一裁去开头0.25秒和结尾256 samples。规则在Rust评分前固定，
-不据此回改候选选择；下面仍是同一开发集。
+Process full stream, then uniformly crop first 0.25 seconds and last 256 samples. Rule is fixed before Rust scoring and does not influence candidate selection. Below remains the same development set.
 
-| 语料 | 指标 | multires减long-control | 95% CI |
+| Corpus | Metric | multires minus long-control | 95% CI |
 |---|---|---:|---|
-| 音乐 | enhanced_high_spectral_convergence | -0.000286 | [-0.004643, +0.003931] |
-| 音乐 | enhanced_high_band_energy_error_db | +0.160368 | [+0.022067, +0.312735] |
-| 音乐 | enhanced_high_flux_error | -0.009124 | [-0.016487, -0.002121] |
-| 音乐 | enhanced_si_sdr_db | +0.036565 | [+0.006286, +0.080934] |
-| 语音 | enhanced_high_spectral_convergence | +0.003691 | [+0.002090, +0.005243] |
-| 语音 | enhanced_high_band_energy_error_db | +0.136789 | [+0.077236, +0.202041] |
-| 语音 | enhanced_high_flux_error | -0.000521 | [-0.001923, +0.000782] |
-| 语音 | enhanced_si_sdr_db | +0.003472 | [-0.002150, +0.008841] |
+| Music | enhanced_high_spectral_convergence | -0.000286 | [-0.004643, +0.003931] |
+| Music | enhanced_high_band_energy_error_db | +0.160368 | [+0.022067, +0.312735] |
+| Music | enhanced_high_flux_error | -0.009124 | [-0.016487, -0.002121] |
+| Music | enhanced_si_sdr_db | +0.036565 | [+0.006286, +0.080934] |
+| Speech | enhanced_high_spectral_convergence | +0.003691 | [+0.002090, +0.005243] |
+| Speech | enhanced_high_band_energy_error_db | +0.136789 | [+0.077236, +0.202041] |
+| Speech | enhanced_high_flux_error | -0.000521 | [-0.001923, +0.000782] |
+| Speech | enhanced_si_sdr_db | +0.003472 | [-0.002150, +0.008841] |
 
-## 历史与DSP诊断
+## Historical and DSP Diagnostics
 
-把九个观察位置全部替换为当前帧，固定模型，在512个真实验证窗口上测量输出变化。
-这是一种分布外敏感性探针，不是消融后重新训练，也不是音质指标。用最大输出变化补充
-总体loss诊断，避免正负误差在均值中抵消。
+Replace all nine observation positions with the current frame, fix the model, and measure output variation across 512 real validation windows. This is an out-of-distribution sensitivity probe, not a post-hoc ablation or audio quality metric. Maximum output variation is used to supplement overall loss diagnosis, avoiding cancellation of positive and negative errors in the mean.
 
-| 模型 | 最大幅度变化dB | 最大相位变化rad | 最大复数相对RMS |
+| Model | Maximum Change dB | Maximum Phase Change rad | Maximum Complex Relative RMS |
 |---|---:|---:|---:|
 | long-control | 0.0012898 | 0.0000486 | 0.0001132 |
 | multires | 0.0012830 | 0.0000467 | 0.0001155 |
 
-固定MatchEdge存在可解释的尺度限制：当目标增益未触及clamp且达到稳态时，
-生成幅度乘以匹配增益后，高频RMS会趋近低频边缘RMS的固定−6dB比例，
-模型整体幅度缩放会被增益抵消。合成常量谱探针中，正确高频幅度为0.8，
-预测幅度变为90%/100%/110%后，32帧预热后的输出均值仅为0.5032/0.5040/0.5047。
-这是机制诊断，不能当作真实音频分数或直接关闭增益的依据。V7没有消除这个限制。
+Fixed MatchEdge exhibits a predictable scaling limit: when the target gain has not reached clamp and reaches steady state, the generated magnitude multiplied by the matched gain leads to high-frequency RMS approaching a fixed −6 dB ratio relative to low-frequency edge RMS. The overall magnitude scaling is then canceled by the gain. In constant-spectrum probes, correct high-frequency magnitude is 0.8; when predicted magnitude is scaled to 90%/100%/110%, the 32-frame warmup output mean is 0.5032/0.5040/0.5047. This is a mechanism-level diagnosis and cannot be used as evidence of audible artifacts or as justification for disabling gain. V7 does not eliminate this limitation.
 
-| 语料 | Rust分析均值cutoff减清单Hz | 分析增强帧比例 |
+| Corpus | Rust Analysis Mean Cutoff vs. List Hz | Analysis Enhanced Frame Ratio |
 |---|---:|---:|
-| 音乐 | -1484.23 | 0.9854 |
-| 语音 | -1534.94 | 0.6418 |
+| Music | -1484.23 | 0.9854 |
+| Speech | -1534.94 | 0.6418 |
 
-此表来自同配置Rust分析器的全片均值，不是完整逐hop轨迹；提示代理几何偏差，
-不能用均值证明每一帧的cutoff一致。
+This table comes from full-spectrum mean of the same configuration Rust analyzer; it is not a per-hop trajectory. It suggests geometric bias in the proxy and cannot be used to prove frame-level cutoff consistency.
 
-## 数值、连续性与试听
+## Numerical, Continuity, and Listening
 
-| 模型 | 13项固定parity | 真实512帧失败batch/256 | 部署数值资格 |
+| Model | 13-item fixed parity | Real 512-frame failure batch / 256 | Deployment Numerical Qualification |
 |---|---|---:|---|
 | long-control | True | 6 | False |
 | multires | True | 4 | False |
 
-没有放宽v2数值预算。两组均通过13项固定导出检查，但扩展真实帧审计仍有超限，均保留为本地诊断图；
-实际音质与资源指标不等于部署资格，数值超预算也不自动证明可听见伪影。
+No relaxation of v2 numerical budget. Both groups pass 13 fixed export checks, but real-frame audits still exceed limits and remain as local diagnostic plots. Actual audio quality and resource metrics do not equate to deployment eligibility. Numerical over-budget does not automatically imply audible artifacts.
 
-| 模型 | 开发行数 | 不规则分块最大误差 | 非有限输出 |
+| Model | Number of Playback Rows | Maximum Irregular Chunk Error | Non-finite Output |
 |---|---:|---:|---:|
 | long-control | 89 | 0.000000000 | 0 |
 | multires | 89 | 0.000000000 | 0 |
 
-另测两首validation来源的同步立体声rock/electronic原音，完整MP3编解码对齐后截取12秒，
-覆盖44.1/48kHz；multires另做10个静音、脉冲、单边声道案例。
-试听页在 `data/reports/multires-reconstruction-20261011/listening/index.html`。
-五条件：无损参考、压缩输入、父模型、长序列对照和multires。整段RMS匹配、共同峰值保护、
-24-bit WAV；不是LUFS匹配。评分表为空，`listening_performed: false`。
+Additional testing on two validation-originated stereo rock/electronic original tracks, fully MP3-encoded and aligned, 12-second segments extracted at 44.1/48 kHz; multires also tested on 10 cases of silence, pulse, and mono-channel. Listening report available at `data/reports/multires-reconstruction-20261011/listening/index.html`. Five conditions: lossless reference, compressed input, parent model, long-sequence baseline, and multires. Full RMS matching, peak protection, 24-bit WAV; not LUFS-matched. Scoring sheet is empty, `listening_performed: false`.
 
-## 实时资源
+## Real-Time Resource
 
-M5 Max，CPU ORT单线程；训练、质量和历史探针结束后测量，保留机器背景负载快照。
-机器并非空载，启动快照包括索引及其他应用负载；未停止无关用户进程。每组2采样率×mono/stereo×3轮交错逐hop处理，每案例10秒真实音乐。
+M5 Max, CPU ORT single-thread; measured after training, quality, and history probing, with machine background load snapshot preserved. The machine is not idle; the startup snapshot includes indexing and other application loads; no unrelated user processes were terminated. Each group performs 2 sample rates × mono/stereo × 3 rounds, interleaved hop-by-hop processing, 10 seconds of real music per case.
 
-| 模型 | 逐hop处理p99 ms范围 | 同步RSS MiB峰值 |
+| Model | Per-hop processing p99 ms range | Synchronous RSS MiB peak |
 |---|---:|---:|
 | long-control | 0.578–1.592 | 38.14 |
 | multires | 0.571–1.802 | 38.16 |
 
-每组另做4案例×60秒wall-clock pacing，预热、44.1/48kHz与mono/stereo，使用同一真实PCM。
+Each group also performs 4 cases × 60 seconds wall-clock pacing, pre-warmup, 44.1/48 kHz, mono/stereo, using the same real PCM.
 
-| 模型 | 软件新增延迟ms | CPU%单核归一 | RSS MiB峰值 | callback p99 μs | worker miss | 最长miss段ms |
+| Model | Software Added Latency ms | CPU% per Core (normalized) | RSS MiB peak | callback p99 μs | worker miss | Longest Miss Segment ms |
 |---|---:|---:|---:|---:|---:|---:|
 | long-control | 5.343–5.819 | 42.52 | 38.52 | 4.292 | 0 | 0.000 |
 | multires | 5.340–5.814 | 38.92 | 38.55 | 3.292 | 0 | 0.000 |
 
-CPU/RSS是整个四案例进程，含推理/DSP/报告缓存；原始callback数组、miss位图、输入/模型/
-二进制哈希与预算公式另行复核。固定256samples软件延迟不包括设备、驱动和宿主已有缓冲。
-可用率不等于每hop都增强，静音/bypass/历史填充仍可输出对齐dry。
-这是短期模拟测试，没有真实声卡、30分钟或x86_64实机性能验收。
+CPU/RSS represents the entire 4-case process, including inference, DSP, and report caching. Raw callback arrays, miss bitmaps, input/model/binary hashes, and budget formulas are separately verified. The fixed 256-sample software latency does not include device, driver, or host buffering. Availability does not imply every hop is enhanced; silence/bypass/history padding can still produce aligned dry outputs. This is a short-term simulation test and does not include real audio cards, 30-minute runtime, or x86_64 real-world performance validation.
 
-八个实时案例均满足8ms目标、10ms红线、回调和增强可用率预算。
-多分辨率组callback最大耗时9.709 μs；原始记录复核通过。
+All eight real-time cases meet 8ms target, 10ms red line, callback, and enhancement availability budget. The multi-resolution group has a maximum callback latency of 9.709 μs; raw records have been verified.
 
-## 代码验证
+## Code Verification
 
-271项Python测试通过，真实音频MPS三步检查的梯度均为有限值；
-[训练源码CI](https://github.com/backrunner/soundex/actions/runs/38122345171)的Rust与export-contract均通过。
-原始音频、检查点和诊断ONNX未推送，源码与结果文档按BackRunner身份提交。
+271 Python tests passed; real audio MPS three-step gradient checks all yield finite values. The Rust and export-contract components of the training source code passed CI at [GitHub Actions Run #38122345171](https://github.com/backrunner/soundex/actions/runs/38122345171). Original audio, checkpoints, and diagnostic ONNX are not pushed. Source code and result documentation are submitted under BackRunner identity.
 
-## 与压缩输入对照及数值误差量级
+## Comparison with Compressed Input and Numerical Error Magnitudes
 
-同一无损参考下的开发集均值；HF误差越低越好，SI-SDR越高越好。
+Development set mean under lossless reference; lower HF error is better, higher SI-SDR is better.
 
-| 语料 | 路径 | HF谱收敛 | HF能量误差dB | HF flux | SI-SDR dB |
+| Corpus | Path | HF Spectral Convergence | HF Energy Error dB | HF flux | SI-SDR dB |
 |---|---|---:|---:|---:|---:|
-| 音乐 | 压缩输入 | 0.839516 | 5.488903 | 1.051229 | 27.563202 |
-| 音乐 | multires | 0.933971 | 3.881757 | 1.450317 | 26.648028 |
-| 语音 | 压缩输入 | 0.723740 | 5.673287 | 0.804808 | 29.381521 |
-| 语音 | multires | 0.649821 | 4.130626 | 0.810042 | 29.259369 |
+| Music | Compressed Input | 0.839516 | 5.488903 | 1.051229 | 27.563202 |
+| Music | multires | 0.933971 | 3.881757 | 1.450317 | 26.648028 |
+| Speech | Compressed Input | 0.723740 | 5.673287 | 0.804808 | 29.381521 |
+| Speech | multires | 0.649821 | 4.130626 | 0.810042 | 29.259369 |
 
-音乐的高频能量缺失减少，但谱收敛、瞬态和整体SI-SDR表现仍劣于压缩输入路径，
-因此不能把能量提升视为已恢复细节。低频LSD相对参考虽下降，输出相对输入的低频
-preservation LSD均值在音乐/语音分别为3.9829/3.9804dB；该对数指标对弱频点敏感，
-不等于低频响度改变约4dB，仍需更完整的保留频带与主观验证。
+Music shows reduced high-frequency energy loss, but spectral convergence, transient, and overall SI-SDR performance remain inferior to the compressed input path. Thus, energy gains cannot be considered a recovery of fine details. Low-frequency LSD relative to reference decreases, though the low-frequency preservation LSD relative to input remains at 3.9829 dB (music) and 3.9804 dB (speech); this logarithmic metric is sensitive to weak frequency points and does not equate to a 4 dB change in low-frequency loudness. More complete band preservation and subjective validation are still required.
 
-| 模型 | 最大幅度差dB | 最大相位差rad | 最大复数相对RMS | 最大逆FFT差 |
+| Model | Maximum Absolute Difference dB | Maximum Phase Difference rad | Maximum Complex Relative RMS | Maximum Inverse FFT Difference |
 |---|---:|---:|---:|---:|
 | long-control | 0.00214481 | 0.00366241 | 0.00031431 | 0.00005560 |
 | multires | 0.00102997 | 0.00337374 | 0.00039626 | 0.00002042 |
 
-两组实际逆FFT误差均小于现有6.1035e-5预算，但特征层仍有超限；多分辨率组的最大
-复数相对RMS约3.96e-4（预算2e-4）。这是已有可解释容差下的结果，不要求逐位一致，
-也不据此声称出现可听伪影。本轮独立存在质量取舍，故没有为放行候选而修改数值政策。
-若另行调整预算，应在候选之外用FP64、端到端波形和跨平台结果建立依据。
+Both groups have actual inverse FFT errors below the existing 6.1035e-5 budget, though feature-level violations remain. The multi-resolution group's maximum complex relative RMS is approximately 3.96e-4 (budget 2e-4). This result operates within existing, explainable tolerances and does not imply audible artifacts. This round's independent quality trade-offs mean no numerical policy changes were made for candidate release. If budget adjustments are made, they should be based on FP64, end-to-end waveform, and cross-platform results outside the candidate set.
 
-## 立体声与边界细项
+## Stereo and Boundary Details
 
-以下仅覆盖两段同步立体声验证录音，不外推完整曲库。
+The following covers only two synchronized stereo validation recordings and does not generalize to full catalog.
 
-| 曲风 | 采样率Hz | 声像宽度误差dB | 声道相关误差 | 声道相位误差rad |
+| Genre | Sample Rate Hz | Stereo Width Error dB | Channel Correlation Error | Channel Phase Error rad |
 |---|---:|---:|---:|---:|
 | rock | 44100 | 0.0057476 | 0.0005662 | 0.0075230 |
 | rock | 48000 | 0.0004083 | 0.0000355 | 0.0075128 |
 | electronic | 44100 | 0.0022256 | 0.0001716 | 0.0045248 |
 | electronic | 48000 | 0.0019247 | 0.0001625 | 0.0049484 |
 
-这些声像误差都略高于相应压缩输入，不能称为声像改善。四个multires同步立体声案例的
-不规则分块误差均为0。10个边界案例输入/输出帧数一致、全部有限；静音与单边输入的
-静默声道保持逐样本0。脉冲峰值约0.8594，没有全幅溢出。这些检查不能代替真实声卡或听感验收。
+These stereo width errors are slightly higher than the corresponding compressed input, indicating no improvement in stereo imaging. All four multires stereo cases show irregular block error 0. All ten boundary cases have consistent input/output frame counts and are finite. Silence and mono inputs maintain zero in silent channels. Pulse peaks are approximately 0.8594, with no full-amplitude overflow. These checks do not replace real audio card or subjective listening validation.
+
+The subsequent [input-conditioned gain calibration](gain-calibration-20261011.md) is a separate 20261011 study and does not retroactively change this experiment. Fixed validation has 768 music +128 speech rows. The four stereo probes have irregular-block difference 0, and the 10 boundary cases retain finite correctly sized output with silent channels at 0. There is no added lookahead: 0 future frames are read, and buffering is still reported separately. These finite probes do not certify 0 deadline misses for every host or replace the historical <10 ms software limit and later model-plus-DSP <5 ms requirement.

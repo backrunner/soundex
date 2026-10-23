@@ -1,44 +1,31 @@
-# P31：相位输入与复数残差坐标对照
+# P31: Phase Input and Complex Residual Coordinates Comparison
 
-2026-10-19，承接 [P30 幅相交换诊断](phase-swap-audit.md)。参考相位改善了波形，
-但参考幅度配预测相位会放大误差；本轮测试模型能否更有效地学习复数高频。
-参考交换不是可部署收益，不能替代本轮训练与实际 Rust 输出的检验。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 固定设计
+2026-10-19, building upon [P30 Phase Swap Diagnosis](phase-swap-audit.md). Reference phase improved waveform fidelity, but pairing reference magnitude with predicted phase amplified errors. This round evaluates whether the model can more effectively learn high-frequency complex signals. Reference phase swapping does not yield deployable benefits and cannot replace the current training and actual Rust output validation.
 
-| 组 | 编码器相位输入 | 残差坐标 | 参数量 |
+## Fixed Design
+
+| Group | Phase Input | Residual Coordinates | Parameter Count |
 |---|---|---|---:|
-| relative | 关闭 | 相对输入相位 | 431,015 |
-| relative_phase | 开启 | 相对输入相位 | 455,783 |
-| cartesian | 关闭 | 全局实部／虚部 | 431,015 |
-| cartesian_phase | 开启 | 全局实部／虚部 | 455,783 |
+| relative | Disabled | Relative input phase | 431,015 |
+| relative_phase | Enabled | Relative input phase | 455,783 |
+| cartesian | Disabled | Global real/imaginary parts | 431,015 |
+| cartesian_phase | Enabled | Global real/imaginary parts | 455,783 |
 
-宽度固定 96。相位输入沿用 P28 的观测复数载波：以全频 RMS 归一化的 log 幅度乘
-sin/cos 相位，通过零初始化投影加入编码器。因此很弱的观测频点仍会提供很弱的相位
-信息；本轮不声称获得缺失频带的真实相位。该分支增加 24,768 个参数（约 5.75%），
-对照能够观察两个因素及交互，但不能完全隔离相位信息与新增容量。
+Fixed width of 96. Phase input follows the observation complex carrier from P28: log-amplitude normalized by RMS across all frequencies, multiplied by sin/cos phase components, and projected into the encoder with zero-initialized projection. Thus, weak observed frequency bins still contribute weak phase information. This round does not claim to recover true phase in missing frequency bands. The phase-aware branch adds 24,768 parameters (~5.75%), enabling comparison of two factors and their interaction, though it cannot fully isolate phase information from added capacity.
 
-全局坐标组直接预测物理实部／虚部方向的残差，再转换到共同的极坐标输出接口。
-这与先预测局部残差、再随输入相位旋转不同。保留相同的幅度单位、预算头、残差斜率、
-DC/Nyquist 实数约束和因果状态；不增加前瞻或缓冲。旧检查点默认仍为相对坐标。
-所有共同张量按种子逐项核对相同；零输出头与零相位投影保持精确恒等初始化。
+The global coordinate group directly predicts residual differences in physical real/imaginary components, then converts to a common polar coordinate output interface. This differs from first predicting local residuals and then rotating them by input phase. The same amplitude units, budget head, residual slope, DC/Nyquist real constraints, and causal state are preserved. No lookahead or buffering is introduced. The old checkpoints remain defaulting to relative coordinates. All shared tensors are verified as identical under seed; zero output head and zero-phase projection maintain exact identity initialization.
 
-每组两个固定种子（20261012、20261013）、每条 **512 步**，Adam 1e-4、梯度范数
-上限 5。全部采用 P29 raw 组的直接频谱 loss 与 0.1 预算监督，版本、分频、归一化、
-幅度／复数／包络／动态权重保持不变。旧 DSP loss 仅用于统一评分，不参与优化。
-完整训练预算为 4 × 2 × 512 次更新；不根据中途成绩选端点或延长某一组。
+Each group uses two fixed seeds (20261012, 20261013), with **512 steps**, Adam optimizer at 1e-4, gradient norm capped at 5. All use the direct spectrum loss from P29 raw group with 0.1 budget supervision. Version, frequency splitting, normalization, magnitude/complex/envelope/dynamic weighting remain unchanged. The old DSP loss is used only for unified scoring and does not participate in optimization. Full training budget is 4 × 2 × 512 updates; no early stopping or extension of any group based on intermediate performance.
 
-沿用 P29 的 20 个已拟合训练裁剪：16 个音乐录音、4 个语音录音，每步四音乐＋一语音，
-加对应 clean identity，循环四批；80 帧真实无梯度预热，统一从第 89 帧监督。
-去重监督音频约音乐 7.32 秒、语音 1.85 秒。**这是早期可学习性诊断，不是完整曲库
-训练、独立测试、收敛证明或架构容量上限。** 原始录音及编码／地区／声道覆盖缺口
-沿用 [P29](direct-spectrum-study.md)，不能从这批材料外推全部音乐。
+Continues to use the 20 pre-fitted training clips from P29: 16 music recordings, 4 speech recordings, one speech per four music steps, with corresponding clean identity references, cycled over four batches; 80-frame warmup with no gradients, supervision starting from frame 89. De-duplicated audio coverage totals approximately 7.32 seconds of music and 1.85 seconds of speech. **This is an early learnability diagnostic, not a full music library training, independent test, convergence proof, or architectural capacity upper bound.** Audio source gaps in recording, region, and channel coverage remain as in [P29](direct-spectrum-study.md) and cannot be extrapolated beyond this dataset.
 
-## 验证与运行
+## Validation and Execution
 
-入口 `training/scripts/run_phase_coordinates_study.py`。登记时绑定父实验来源、音频与
-工具哈希，冻结 Python／JSON／YAML／TOML 运行依赖。预检单独目录、单种子、每组
-四步，其权重只作集成验证，不进入 512 步实验，也不用于选组。
+Entry point: `training/scripts/run_phase_coordinates_study.py`. On registration, binds parent experiment, audio, and tool hashes, and freezes Python/JSON/YAML/TOML runtime dependencies. Pre-check runs in a separate directory, per seed, per group, for four steps; weights are used only for integration validation and do not enter the 512-step experiment or contribute to group selection.
 
 ```bash
 rtk proxy env PYTHONPATH=training training/.venv/bin/python \
@@ -49,127 +36,70 @@ rtk proxy env PYTHONPATH=training training/.venv/bin/python \
   --prepare-only
 ```
 
-登记后把 `source_hashes` 中的依赖复制到 `source/training`，从该冻结快照运行相同
-命令并移除 `--prepare-only`；运行中的源码不跟随工作区变化。检查点可校验恢复，
-已冻结的结果不覆盖。运行失败必须保留错误与已完成证据，不能冒充全流程完成。
+After registration, copies the `source_hashes` dependencies to `source/training`, runs the same command from the frozen snapshot, and removes `--prepare-only`; the runtime code does not follow workspace changes. Checkpoints can be verified for recovery; frozen results are not overwritten. Any run failure must preserve both error logs and completed evidence and cannot be falsely claimed as a full workflow completion.
 
-四组全部训练并冻结端点后，统一执行直接频谱评分、真实 DSP 回放、joint PCM
-复核、ONNX 一致性、Rust 前端→ORT→DSP 的 320 个角色复核，分别报告音乐／语音、
-paired／identity、原始预测／最终输出及全部反例。恒等 DSP 与未处理输入继续保留。
-相位、谱形改善必须结合高频绝对 PCM 误差、瞬态和保留频段判断。
+After full training and freezing of all eight endpoints, a unified set of evaluations are performed: direct spectrum scoring, real DSP playback, joint PCM recheck, ONNX consistency, and 320 role rechecks from Rust frontend → ORT → DSP. Results are reported separately for music/speech, paired/identity, raw prediction vs. final output, and all counterexamples. Identity DSP and unprocessed input remain unchanged. Phase and spectral shape improvements must be validated alongside high-frequency absolute PCM error, transient behavior, and preservation in key frequency bands.
 
-随后对全部八个端点做原生性能测试：mono/stereo、44.1/48 kHz、额外两轮 stereo
-48 kHz，以及每个端点 paced stereo 48 kHz，共 56 万个计时 hop。报告模型＋DSP
-完整计算、CPU/RSS、超过 5 ms 和超过 hop 周期的次数、paced 迟到；256 帧固定缓冲
-单独计入输出延迟。它仍不是实际音频设备连续性、试听或正式制品资格证明。
+Subsequently, all eight endpoints undergo native performance testing: mono/stereo, 44.1/48 kHz, two additional stereo 48 kHz runs, and paced stereo 48 kHz per endpoint, totaling 560,000 hop timings. Reports include full model + DSP computation, CPU/RSS, number of times exceeding 5 ms or hop period, and paced latencies; a fixed 256-frame buffer is separately counted as output delay. This is still not proof of continuous audio device operation, perceptual quality, or formal product qualification.
 
-## 当前状态
+## Current Status
 
-**八条 512 步训练、统一原生复核与性能测试全部完成**，位于
-`data/runs/phase-coordinates-p31-20261019/`。冻结源码对应提交
-`20272ed377814dcdf4e4d75bcf9b015409c9080b`，共 175 个运行依赖文件。
-登记 SHA-256：`d8cae527bfcfbbb497df9202838a8bef7af72ad13c5a764a6daa221388af5937`。
-后台监督进程于 2026-10-19 23:32:55（UTC+8）正常退出，完整流程约 19 分 24 秒。
+**All eight 512-step training runs, unified native rechecks, and performance tests are complete**, located at
+`data/runs/phase-coordinates-p31-20261019/`. Frozen source code corresponds to commit
+`20272ed377814dcdf4e4d75bcf9b015409c9080b`, comprising 175 runtime dependency files.
+Registration SHA-256: `d8cae527bfcfbbb497df9202838a8bef7af72ad13c5a764a6daa221388af5937`.
+Background supervision process exited normally at 23:32:55 UTC+8 on 2026-10-19, with total runtime of approximately 19 minutes and 24 seconds.
 
-本地 **608 项测试通过**（新增 15 项），Ruff lint/format 通过。覆盖零初始化、
-旧检查点兼容、全局残差方向、静音／弱能量／相位绕回梯度、有限差分、因果分块、
-声道隔离、reset 和两个新配置的 320-hop ONNX 顺序一致性检查。
+Locally, **608 test cases passed** (15 new), Ruff lint/format passed. Coverage includes zero initialization, old checkpoint compatibility, global residual direction, silence/low-energy/phase wraparound gradient, finite difference, causal chunking, channel isolation, reset, and two new configurations' 320-hop ONNX sequential consistency checks.
 
-独立预检 `data/runs/phase-coordinates-p31-preflight-20261019/` 已完成四组各四步、
-全部导出与 160 个原生处理角色；合成最大误差 2.98e-7、零合成容差失败。
-真实观测输入的 ORT／Torch 复数输出最大绝对差异 6.10e-5 单独保留；这不是 PCM
-合成误差，不将两种度量混为一个门槛。控制组前四步的 loss／梯度记录与 P29 raw
-完全一致。预检只证明集成可运行，不证明新组音质改善或达到 5 ms 时延要求。
+Independent preflight `data/runs/phase-coordinates-p31-preflight-20261019/` completed four steps per group, all exported, and 160 native processing roles; maximum synthetic error: 2.98e-7, zero synthetic tolerance failed. Maximum absolute difference between real observation input and ORT/Torch complex output: 6.10e-5, retained separately—this is not PCM synthesis error and should not be conflated with a single threshold. The control group's first four steps show identical loss and gradient records to P29 raw. The preflight only proves integration feasibility, not improved audio quality or meeting 5 ms latency requirements.
 
-## 2026-10-20 统一评估
+## Unified Evaluation on 2026-10-20
 
-**本轮没有建立整体音频恢复收益，不晋级任何默认权重。** 以下均为固定训练裁剪的
-描述性复核；八条端点全部保留，没有根据结果改选候选。不能据 512 步否定架构容量，
-也不能将更多高频或更低的训练 loss 单独认定为成功。
+**No overall audio restoration benefit was established; no default weights were promoted.** The following are descriptive rechecks of fixed training clips; all eight endpoints are retained, with no selection based on results. It is not possible to deny architectural capacity based on 512-step results, nor can a lower training loss or higher high-frequency performance be considered a success in isolation.
 
-### 幅度改善仍未转化为复数与波形保真
+### Magnitude Improvement Has Not Translated to Complex or Waveform Fidelity
 
-音乐的 clip mean（16 个不同录音，等同本轮 recording mean），数值均越低越好。
-范围覆盖两个种子，不挑选较好种子。幅谱能量误差是相对指标，不是 PCM dBFS。
+For music, clip mean (across 16 different recordings, equivalent to current recording mean), lower is better.
+Range spans two seeds, no seed selection is made. Spectral energy error is relative, not PCM dBFS.
 
-| 组 | 原始预测高频能量误差 dB | Rust 最终全带 PCM RMS 误差 | Rust 最终高频 PCM RMS 误差 |
+| Group | Original Prediction High-Frequency Energy Error (dB) | Final Rust Full-Band PCM RMS Error | Final Rust High-Frequency PCM RMS Error |
 |---|---:|---:|---:|
-| 未处理压缩输入 | 8.1553 | 0.009219998 | — |
-| 恒等模型＋DSP | — | 0.009223736 | 0.006118215 |
+| Unprocessed Compressed Input | 8.1553 | 0.009219998 | — |
+| Identity Model + DSP | — | 0.009223736 | 0.006118215 |
 | relative | 1.5170～1.7485 | 0.009236265～0.009246550 | 0.006134616～0.006147514 |
 | relative_phase | 1.3312～1.6193 | 0.009248983～0.009267036 | 0.006150753～0.006172374 |
 | cartesian | 8.0676～8.1092 | 0.009223736 | 0.006118214 |
 | cartesian_phase | 8.0563～8.1009 | 0.009223736 | 0.006118213～0.006118214 |
 
-加入相位输入后，相对坐标组的音乐最终波形误差比对应控制增加 **0.138% / 0.222%**，
-比未处理输入增加 **0.314% / 0.510%**。最终高频幅谱 SC 从控制的
-0.391291 / 0.381931 变成 0.397256 / 0.395255，flux 误差从
-0.616682 / 0.606590 变成 0.631848 / 0.631158。幅度能量变好与这些退步同时存在。
+After introducing phase input, the relative coordinate group's music final waveform error increased by **0.138% / 0.222%** compared to the control, and by **0.314% / 0.510%** compared to unprocessed input. Final high-frequency spectral energy SC improved from control's 0.391291 / 0.381931 to 0.397256 / 0.395255, and flux error increased from 0.616682 / 0.606590 to 0.631848 / 0.631158. Improved magnitude energy coexists with these regressions.
 
-统一直接目标的 paired 均值（音乐 80%、语音 20%）从控制的
-0.229088 / 0.225849 降至 0.227525 / 0.222259；但其中复数项从
-0.234412 / 0.236973 升至 0.240113 / 0.242174。数学实现通过数值检查，仍不代表
-当前多目标配比能约束这种取舍。不得跨不同指标单位直接比较分数大小。
+The overall direct objective paired mean (80% music, 20% speech) decreased from control's 0.229088 / 0.225849 to 0.227525 / 0.222259; however, the complex component increased from 0.234412 / 0.236973 to 0.240113 / 0.242174. Numerical validation confirms this, though it does not imply that the current multi-objective weighting can constrain this trade-off. Cross-comparison across different metric units is invalid.
 
-语音单独复核亦未建立波形收益：恒等 DSP 的 PCM RMS 误差为 0.002475175，
-relative 为 0.002478980 / 0.002479879，relative_phase 为
-0.002480731 / 0.002480421；两个全局坐标组近似恒等输入。
-音乐 clean identity 的最终误差均值为：恒等 DSP 0.000487582，relative
-0.000499157 / 0.000500623，relative_phase 0.000500924 / 0.000498563，
-全局坐标各组约 0.000487700～0.000487719。恒等 DSP 本身包含限幅误差，
-并非干净参考为零；所有原始参考及反例保留，没有重新限幅参考。
+Speech-specific recheck also failed to establish waveform benefit: Identity DSP has PCM RMS error of 0.002475175; relative: 0.002478980 / 0.002479879; relative_phase: 0.002480731 / 0.002480421; both global coordinate groups are nearly identical to the input. Final error mean for clean identity music: Identity DSP: 0.000487582; relative: 0.000499157 / 0.000500623; relative_phase: 0.000500924 / 0.000498563; global coordinate groups at ~0.000487700–0.000487719. The Identity DSP itself contains clipping artifacts and is not a clean reference of zero; all original references and counterexamples are preserved and not re-clipped.
 
-### 全局坐标组没有形成有效残差
+### Global Coordinate Group Does Not Form Effective Residuals
 
-评估后另做只读机制诊断，覆盖全部八个端点、四个固定训练批次；不继续拟合。
-全局组的原始复数残差相对输入全频 RMS 归一化后，仅约 **2.75e-5～3.61e-5**；
-相对坐标组各批次约 0.00184～0.0240。进入 DSP 前就已经差异巨大，不能归因于
-DSP 将正确预测全部抵消。
+Post-evaluation, a read-only diagnostic was conducted across all eight endpoints and four fixed training batches; no further fitting occurred. After normalization by full-frequency RMS, the original complex residual of the global group remained only **2.75e-5 to 3.61e-5**; relative group batches ranged from 0.00184 to 0.0240. The divergence is already significant before DSP processing, and cannot be attributed to the DSP correctly canceling all predictions.
 
-全部端点的解码器负区饱和比例为零。全局组仍有非零梯度，相位投影也非零，
-但首个固定批次的直接目标编码器梯度范数约 4.75e-5～1.22e-4，明显弱于相对组。
-预算均值约 0.0238～0.0249，相对组约 0.1396～0.1684，残差 logits 也小得多。
-这些是早期优化停在近恒等解的证据，不能单独证明梯度相消的具体原因或架构上限。
-最后两个 64 步窗口中，全局组 raw loss 仅有微小变化；相对组仍在下降，
-因此不能称全部模型已收敛。
+All endpoints show zero negative saturation in the decoder. The global group retains non-zero gradients, and phase projection is non-zero, though the first fixed batch's encoder gradient norm was only 4.75e-5 to 1.22e-4—significantly weaker than the relative group. Budget mean was 0.0238–0.0249, while relative group averaged 0.1396–0.1684, and residual logits were substantially smaller. These results indicate early optimization stalled near the identity solution and do not individually prove the mechanism of gradient cancellation or architectural limits. In the last two 64-step windows, the global group showed only minor raw loss changes, while the relative group continued to decrease—thus, the model has not converged.
 
-### 性能：典型耗时较低，长尾未达严格要求
+### Performance: Low Typical Latency, Long Tail Falls Short of Strict Requirements
 
-全部 **560,000 个 hop** 完成，输出有限值检查通过。各测试 case 的总计算 p99
-为 0.107～0.965 ms；paced stereo 48 kHz 的 p99 为 **0.490～0.965 ms**。
-不过共 **9 次超过 5 ms、13 次超过对应 hop 周期**，最长 **14.096 ms**。
-其中 paced 80,000 个 hop 有 8 次超过 5 ms、10 次计算超过 hop、
-**79 次完成迟到**，最大完成迟到 15.557 ms。服务耗时、调度后的完成迟到、
-虚拟队列预测以及实际设备 xrun 是不同指标，不能混为一谈。
+All **560,000 hops** completed, with finite value checks passed. Per-test case total computation p99 ranged from 0.107 to 0.965 ms; paced stereo 48 kHz p99 ranged from **0.490 to 0.965 ms**. However, there were **9 instances exceeding 5 ms and 13 instances exceeding the hop period**, with a maximum of **14.096 ms**. Among them, paced stereo at 80,000 hops had 8 instances over 5 ms, 10 over hop, and **79 instances of late completion**, with a maximum completion latency of 15.557 ms. Service latency, scheduling overhead, virtual queue prediction, and actual device xrun are distinct metrics and cannot be conflated.
 
-原生测量进程峰值 RSS 为 **31.03～34.20 MiB**，不是模型净增内存；paced 进程
-CPU 时间／墙钟时间约单核的 **11.4%～20.7%**，包括进程加载与预热。
-非 paced 测试主动满速运行，CPU 占用不能当实际播放占用。
+Peak RSS during native measurement was **31.03 to 34.20 MiB**, not reflecting model memory overhead. Paced process CPU time/wall-clock time was approximately **11.4% to 20.7% of single-core**, including load and pre-warmup. Non-paced tests ran at full speed, and CPU usage cannot be equated to actual playback load.
 
-记录中的主机一分钟 load 从早期约 3.10 上升到 paced 阶段约 10.29～14.42；
-调度竞争是待验证因素，不能仅据此免责或把不同顺序下的尾延迟排名归于架构。
-全局相位组本轮 paced 没有超时，也不能据两个短 case 认定其连续流资格通过。
-**本轮没有证明严格 <5 ms 或实际设备无卡顿。** 固定 256 帧缓冲仍是
-48 kHz 下 5.333 ms、44.1 kHz 下 5.805 ms，与计算耗时分开。
+Host one-minute load rose from early ~3.10 to ~10.29–14.42 during paced phase; scheduling contention remains a pending factor and cannot be used to excuse or attribute tail latency differences to architecture. The global phase group did not timeout in this round, and cannot be declared to have passed continuous stream qualification based on only two short cases. **This round does not prove strict <5 ms or device-free stuttering.** The fixed 256-frame buffer remains at 5.333 ms (48 kHz) and 5.805 ms (44.1 kHz), separate from computation time.
 
-### 完整性与下一步
+### Completeness and Next Steps
 
-核对 567 个来源／冻结源码／检查点／回放收据／原始计时文件哈希，全部一致。
-320 个完整 Rust 前端→ORT→DSP 角色的合成最大差异 **2.38e-7**、零容差失败；
-同观测 ORT／Torch 复数谱最大绝对差异 6.10e-5 单独保留。
-实现提交和启动文档的远程 CI 均通过。没有进行本轮盲听或物理设备验收。
+Hash verification of 567 sources, frozen source code, checkpoints, replay receipts, and original timing files all match. For 320 full Rust frontend → ORT → DSP roles, maximum synthetic difference is **2.38e-7**, zero tolerance failed; the maximum absolute difference between observed ORT/Torch complex spectra is separately retained at 6.10e-5. Remote CI for implementation submission and startup documentation passed. No blind listening or physical device validation was conducted.
 
-可复现分析及所有逐录音差异位于本地
-`data/runs/phase-coordinates-p31-20261019/evaluation-20261020/`：
-`summarize.py` / `assessment.json` 汇总全部端点和时延，`mechanism.py` 与
-`mechanism-*.json` 保留激活、预算和梯度诊断；计算使用冻结 P31 依赖。
+Reproducible analysis and per-recording differences are available locally at
+`data/runs/phase-coordinates-p31-20261019/evaluation-20261020/`:
+`summarize.py` / `assessment.json` aggregate all endpoints and latency; `mechanism.py` and `mechanism-*.json` retain activation, budget, and gradient diagnostics; computations use frozen P31 dependencies.
 
-下一步建议先做小范围可学习性与目标取舍审计：直接复数／波形约束为何允许幅度改善
-伴随相位退步，以及全局坐标的梯度方向、预算缩放与相位表示是否有效匹配。
-再预登记等预算对照，不从这批训练裁剪筛出“最好曲目”或直接进入扩容。
-性能另在可记录、较稳定的主机负载下交错复测全部候选，保留此次全部长尾证据。
-本次 P31 评估时尚未启动上述新实验，默认 DSP 和正式权重不变。
+**Next Steps:** Recommend a small-scale learnability and objective trade-off audit: why magnitude improvement occurs alongside phase degradation under direct complex/waveform constraints, and whether global coordinate gradients, budget scaling, and phase representation are effectively aligned. Pre-register budget comparisons without selecting "best" tracks from this training set or directly expanding the model. Performance should be retested under stable, recordable conditions on all candidates, preserving all long-tail evidence. This P31 evaluation has not yet initiated these new experiments; default DSP and formal weights remain unchanged.
 
-后续用户明确频谱优先后，[P32](spectrum-priority-study.md)已按这一优先级启动：
-固定模型结构，单独对照多分辨率频谱监督，波形作为辅助检查。P31 的历史结果和
-冻结协议保持原样，不用新的评估优先级追溯改变已完成实验。
+Upon user-defined spectral priority, [P32](spectrum-priority-study.md) has been launched accordingly: fixed model structure, isolated multi-resolution spectral supervision, waveform as auxiliary check. P31 historical results and frozen protocol remain unchanged and are not retroactively adjusted to reflect new priority.

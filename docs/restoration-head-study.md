@@ -1,107 +1,79 @@
-# P20：幅度与复数残差输出头对照
+# P20: Magnitude vs. Complex Residual Output Heads
 
-本轮针对 [P19 失效分析](coverage-failure-analysis.md)中的跨录音保真退化和
-合成后的频带串扰，检验输出表示是否是限制因素。实验权重保留本地，不替换默认模型。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 修正与对照
+This round investigates whether output representations are a limiting factor in the degradation and spectral bleed-through issues identified in the cross-recording fidelity analysis of [P19 Failure Analysis](coverage-failure-analysis.md). The experiment retains local weights and does not replace the default model.
 
-共同主干仍为 width 144 的因果 TCN，过去 1024/2048 点 FFT 上下文每四个 hop
-更新一次，没有未来输入。输入编码器、时间层和 decoder 隐藏层按相同种子初始化并核对
-逐张量哈希。三个头均从恒等输出开始，独立新训练：
+## Correction and Comparison
 
-| 组 | 输出表示 | 参数 |
+The shared backbone remains a causal TCN with width 144, using 1024/2048-point FFT context updated every four hops, with no future input. The encoder, time layer, and decoder hidden layers are initialized with identical seeds and verified via tensor-level hash checks. All three heads start from an identity output and are independently retrained:
+
+| Group | Output Representation | Parameters |
 | --- | --- | ---: |
-| anchored | 原有五频带独立能量与幅度形状，保留输入相位 | 807,398 |
-| amplitude | 连续频率单位下的实数残差，保留输入相位 | 805,953 |
-| complex | 同样的实部残差，增加虚部，可修正相位 | 824,658 |
+| anchored | Original five-band independent energy and magnitude shapes, preserving input phase | 807,398 |
+| amplitude | Real-valued residual in continuous frequency units, preserving input phase | 805,953 |
+| complex | Same real-valued residual with added imaginary component, enabling phase correction | 824,658 |
 
-新头使用当前帧全频 RMS 与九频点平滑局部功率构成残差单位：
-`unit = global_rms * sqrt(local_normalized_power + 1)`，实/虚坐标增量为
-`2 * tanh(head) * unit`。完全切除的高频仍可利用全频能量生成内容；不会因为局部
-输入为零而被限制在极小噪声地板。DC/Nyquist 的虚部修正固定为零。
-稳定幅度转换使用绝对 `1e-15` 数值项，低于输入幅度契约地板；不使用随全频能量增长、
-会压低空频带输出的数值项。新测试直接验证完全缺失频带的可表达性。
+New heads use the global RMS and a nine-point smoothed local power to form residual units:
+`unit = global_rms * sqrt(local_normalized_power + 1)`, with real/imaginary coordinate increments given by
+`2 * tanh(head) * unit`. Even completely missing high-frequency bands can still be leveraged through full-band energy; the model is not restricted to a minimal noise floor due to zero local input. The imaginary component at DC and Nyquist is fixed to zero.
+A stable magnitude transformation uses an absolute `1e-15` value, below the input magnitude contract floor; no value is introduced that grows with full-band energy, which would otherwise suppress output in empty frequency bands. The new test directly validates the expressiveness of completely absent bands.
 
-最初的训练集 pilot 使用局部单位及相对数值项；空频带 fixture 暴露了上述限制，
-因此在正式开发集评分前修正。旧 pilot 只能作为调试记录，不与正式配置混算。
-三个组保留同一主干规模；复数头增加 18,705 个参数，因此这不是完全等参数对照，
-也不能将全部差异只归因于相位。
+The initial training pilot uses local units and relative magnitude terms; empty-band fixtures exposed these limitations, so the configuration was corrected before formal evaluation on the development set. The old pilot is retained only for debugging and is not used in any official configuration comparison.
+All three groups maintain the same backbone size; the complex head adds 18,705 parameters, so this is not a fully equivalent parameter comparison, and differences cannot be solely attributed to phase.
 
-## Loss 参考
+## Loss Reference
 
-原有 DSP 渲染主目标、各分项与权重保持不变。相位可学习后，旧辅助项的
-“无损幅度 + 压缩输入相位”参考会妨碍合法相位修正，因此**三个组统一改用无损复数参考**。
-恒等样本仍以实际输入为参考；前 80 帧沿用原输入作为模型预热，监督从既定第 89 帧开始。
-参考只参与训练评分，不进入推理输入。
+The original DSP rendering objective, individual components, and weights remain unchanged. After phase learning, the auxiliary term "lossless magnitude + compressed input phase" reference interferes with legitimate phase correction, so **all three groups now use a lossless complex reference**.
+The identity sample continues to use the actual input as reference; the first 80 frames use the original input for model pre-warmup, and supervision begins at frame 89.
+The reference is only used for training scoring and does not enter the inference input.
 
-辅助项仍比较预测与参考在合成/重分析前后的不一致性差，权重
-`0.1365237430457469`；不会把参考音频本身的真实瞬态当作应抹平的误差。
-历史调用默认保留原输入相位，避免悄悄改变 P16–P19 复现。P20 明确选择 clean phase。
-因此 P20 必须重训 anchored 控制，**不能直接拿 P19 的 combined loss 比较优劣**。
+The auxiliary term still compares the inconsistency between predicted and reference outputs before and after synthesis and reanalysis, with weight `0.1365237430457469`. It does not treat the actual transient content of the reference audio as an error to be eliminated. Historical calls preserve the original input phase to avoid inadvertently altering the P16–P19 reproduction. P20 explicitly selects clean phase. Therefore, **P20 must retrain the anchored control; direct comparison with P19's combined loss is invalid for evaluating performance**.
 
-## 固定实验
+## Fixed Experiment
 
-- 253 首训练音乐与相同 8 个语音录音，2,088 个固定裁剪；每步 4 音乐 + 1 语音，
-  每个素材同时提供 paired 与 identity，两类等权。该 20% 是沿用诊断实验的固定风险比例，
-  不是重新声明最终产品训练的语音比例；稀有曲风和语音覆盖限制仍在。
-- 种子 `20261012`、`20261013`；三组沿用 P19 wide 的完全相同抽样顺序。
-  Adam `1e-4`、无 weight decay、梯度范数裁剪 5，每条轨迹 16,192 更新，共 97,152 更新。
-- 预先固定 2,048 / 16,192 两个端点；所有组完成训练并冻结端点哈希后，才进行开发复核。
-  不根据开发集挑选 checkpoint。每 64 步保存模型、优化器、RNG 与历史，可精确续跑。
-- 89 个 development 成对片段加 40 个 shifted 片段；这些是已经复用的诊断材料，
-  不称独立测试。初始 DSP 控制加 12 个端点，共 2,314 次实际 Rust DSP 角色回放。
-- 输入清单、700 个实际 clean/degraded PCM 文件、抽样表、源代码及策略文件均核对哈希。
-  按录音/原始来源检查划分隔离。原始音频、配对数据和实验权重不进入 Git。
+- 253 training music pieces paired with 8 speech recordings, 2,088 fixed crops; 4 music + 1 speech per step, each material providing both paired and identity pairs, with equal weighting. This 20% is inherited from the diagnostic experiment's fixed risk ratio and does not represent the final product's training speech proportion; limitations in rare genre and speaker coverage remain.
+- Seeds `20261012` and `20261013`; all three groups use the identical sampling order from P19 wide. Adam optimizer with `1e-4`, no weight decay, gradient norm clipping at 5, 16,192 updates per trajectory, totaling 97,152 updates.
+- Pre-fixed endpoints at 2,048 and 16,192; all groups complete training and freeze endpoint hashes before development recheck. No checkpoint is selected based on development set performance. A model is saved every 64 steps, including optimizer, RNG, and history, enabling exact resumption.
+- 89 paired development fragments plus 40 shifted fragments; these are reused diagnostic materials and not independent tests. Initial DSP control includes 12 endpoints, totaling 2,314 actual Rust DSP role replays.
+- Input lists, 700 actual clean/degraded PCM files, sampling tables, source code, and strategy files are all verified via hash. Segregated by recording and original source. Original audio, paired data, and experiment weights are excluded from Git.
 
-固定筛查比较同预算 anchored/amplitude/complex，两个种子分别报告。
-音乐 paired 主误差和 native 高频 SC/flux 应同时优于匹配控制与初始 DSP；
-恒等误差、能量误差和低频失真不得劣于匹配控制，沿用 `1e-6` 数值比较容差。
-clip 与 recording 等权结果均保留；记录逐片段退化与最坏案例，不能用均值掩盖严重失败。
-这只是继续研究的筛查，不代替盲听、连续实时稳定性或发布验收。
+Fixed screening compares anchored/amplitude/complex under the same budget, with results reported per seed.
+For music paired recovery and native high-frequency SC/flux, both must outperform the matched control and initial DSP. Identity error, energy error, and low-frequency distortion must not exceed the matched control, using a tolerance of `1e-6`.
+Clip and recording results are equally weighted and preserved; failure cases and worst-case instances are recorded individually, and no mean can mask severe failures.
+This is a screening step for further research and does not constitute a blind listening, continuous real-time stability, or release acceptance test.
 
-## 运行与验证
+## Execution and Verification
 
-最终配置先运行训练集 5 片段、每组每种子 64 步的集成 pilot。
-它检查实际反向传播、70 次 Rust DSP 回放、逐 hop ONNX、静音、reset 与单/双声道。
-训练集拟合结果不能代表泛化效果。最终 pilot (`head-p20-smoke-v3-20261014`) 已完成；
-以下仅为其中 **4 个训练音乐片段、两个种子的算术平均**，所有误差越低越好：
+The final configuration first runs a 5-fragment pilot on the training set, with 64 steps per group per seed. It checks actual backpropagation, 70 Rust DSP replays, per-hop ONNX, silence, reset, and mono/stereo behavior.
+Training set fit results do not represent generalization performance. The final pilot (`head-p20-smoke-v3-20261014`) is complete; the following is a **4 training music fragments and average over two seeds**, with all errors lower being better:
 
-| 头 | paired 恢复误差 | identity 误差 | Rust 输出高频 SC | Rust 输出高频 flux |
+| Head | Paired Recovery Error | Identity Error | Rust High-Frequency SC | Rust High-Frequency Flux |
 | --- | ---: | ---: | ---: | ---: |
-| 初始 DSP 控制 | 0.600599 | 0 | 0.519299 | 0.700891 |
+| Initial DSP Control | 0.600599 | 0 | 0.519299 | 0.700891 |
 | anchored | 0.572044 | 0.003797 | 0.495191 | 0.667126 |
 | amplitude | 0.541397 | 0.045024 | 0.457691 | 0.668928 |
 | complex | 0.474004 | 0.060756 | 0.394379 | 0.622839 |
 
-复数头相对旧头 paired 误差约降 17.1%、高频 SC 约降 20.4%，但 identity 误差明显增加，
-因此**尚不能通过保真筛查，不能称达成目标或改善泛化**。amplitude 组也有相同取舍，
-说明去掉硬频带约束本身就会改变恢复力度与损伤风险。此处没有评听结论。
+The complex head shows a relative paired error reduction of approximately **17.1%**, and a high-frequency SC reduction of about **20.4%**. However, identity error increases significantly, so **this result fails the fidelity screening and does not meet the goal or demonstrate improved generalization**. The amplitude group shows the same trade-offs, indicating that removing hard frequency band constraints alters recovery strength and risk profile. No listening evaluation is provided.
 
-最终 pilot 的 70 次 Rust 角色回放最大代理波形误差 `2.98023e-7`，低于既定 `2e-5`。
-复数头诊断 ONNX 为 3,337,561 字节（约 3.18 MiB），单线程双声道推理 + Python
-上下文前处理 p99 为 0.1948 / 0.1953 ms，max 为 0.2113 / 0.2175 ms；
-每种子 1,000 个计时 hop 均未超过 48 kHz 的 2.667 ms hop 时长。
-单独 ORT 推理 p99 为 0.1821 / 0.1803 ms，双声道显式状态 72,576 字节。
-另用六个全新 ORT-only 子进程各预热 100 个双声道 hop，比较加载模型前后实际 RSS：
-复数头增量约 20.1–20.2 MiB（总 RSS 约 62 MiB，含 Python/NumPy/ORT）；
-旧头增量约 21.3–21.4 MiB。该快照含 session、allocator 和状态缓冲，不含 PyTorch、
-FFT frontend 或完整 Rust DSP，也不是峰值保证。证据为 pilot 根目录
-`isolated-resources.json` 与 `measure_rss.py`。
+The final pilot achieved a maximum proxy waveform error of `2.98023e-7 < 2e-5` during 70 Rust role replays. The ONNX diagnostic size for the complex head is 3,337,561 bytes (~3.18 MiB). Single-threaded stereo inference with Python context has p99 of 0.1948 / 0.1953 ms, max 0.2113 / 0.2175 ms; all 1,000 timed hops per seed remained under 48 kHz hop duration of 2.667 ms.
+Separate ORT inference p99 is 0.1821 / 0.1803 ms, with explicit stereo state size at 72,576 bytes.
+Additionally, six independent ORT-only subprocesses were pre-warmed with 100 stereo hops each, comparing actual RSS before and after model loading:
+- Complex head shows an incremental RSS increase of approximately **20.1–20.2 MiB** (total RSS ~62 MiB, including Python/NumPy/ORT);
+- Old head shows an incremental RSS increase of approximately **21.3–21.4 MiB**.
+This snapshot includes session, allocator, and state buffer, excluding PyTorch, FFT frontend, or full Rust DSP. It is not a peak guarantee. Evidence is captured in the pilot root directory `isolated-resources.json` and `measure_rss.py`.
 
-这不是固定新增输出延迟或实时稳定性认证，历史上下文不引入前瞻。
+This is not a fixed latency or real-time stability certification, and historical context does not introduce forward-looking assumptions.
 
-正式运行于 2026-10-14 22:08 SGT 启动，冻结训练源码提交 `6002609`，
-本机 supervisor PID `63472`；最新阶段以 `pipeline.json` 和 `study/progress.json` 为准。
-三组、双种子共 97,152 更新，已于 2026-10-15 03:01:57 SGT 全部完成，
-包括所有端点复核与导出 benchmark。没有候选通过预登记筛查；默认权重未替换。
-全部 Python 测试 **481 passed**，Ruff 通过；20 项针对性测试覆盖参考正确性、
-有限差分、静音、声道隔离、因果性、ONNX 非零头、空频带能力和精确断点恢复。
+Formal execution began at 22:08 SGT on 2026-10-14, with frozen source code commit `6002609`, local supervisor PID `63472`. The latest stage is governed by `pipeline.json` and `study/progress.json`.
+All three groups, two seeds, total 97,152 updates, completed by 03:01:57 SGT on 2026-10-15, including all endpoint rechecks and benchmark export. No candidate passed the pre-registration screening; default weights were not replaced.
+All Python tests passed: **481 passed**, Ruff passed; 20 targeted tests cover reference correctness, finite difference, silence, channel isolation, causality, non-zero ONNX head, empty band capability, and precise breakpoint recovery.
 
-诊断 ONNX 接收当前频谱、外部因果上下文、检测条件和每声道历史状态。
-它明确标记为实验图，不能直接交给当前 SoundEx 运行时当正式 artifact 加载。
-计算 benchmark 为单线程 CPU ORT + Python FFT frontend，报告 p50/p95/p99/max、
-超出 48 kHz 单 hop 时长的计数及状态大小；进程 peak RSS 明确标注为整项研究高水位，
-不把包含训练池的内存误称模型增量内存。该测试不包含声卡、回调队列与完整 Rust 链路。
+The diagnostic ONNX receives current spectrum, external causal context, detection conditions, and per-channel history. It is explicitly marked as experimental and **cannot be directly loaded into the current SoundEx runtime as a formal artifact**.
+Benchmarking uses single-threaded CPU ORT + Python FFT frontend, reporting p50/p95/p99/max, count of hops exceeding 48 kHz hop duration, and state size. Peak RSS is explicitly annotated as the high-water mark of the entire study and is not misattributed to model incremental memory. This test does not include sound card, callback queues, or full Rust pipeline.
 
 ```bash
 PYTHONPATH=training training/.venv/bin/python training/scripts/run_head_study.py \
@@ -109,92 +81,89 @@ PYTHONPATH=training training/.venv/bin/python training/scripts/run_head_study.py
   --output data/runs/head-p20-20261014/study
 ```
 
-实际后台执行使用 `data/runs/head-p20-20261014/source/training` 的冻结源码。
-该目录配套 `pipeline.log`、`pipeline.json`、`study/progress.json`、`study/registration.json`；
-训练完成后自动进行 native review、导出成本测量与 `study/comparisons.json` 汇总。
+Actual background execution uses the frozen source code from `data/runs/head-p20-20261014/source/training`.
+This directory includes `pipeline.log`, `pipeline.json`, `study/progress.json`, `study/registration.json`; after training, it automatically performs native review, exports cost metrics, and generates a summary in `study/comparisons.json`.
 
-## 完整结果与失效分析（2026-10-15）
+## Complete Results and Failure Analysis (2026-10-15)
 
-重新执行冻结 analyzer，核验输入、源码、checkpoint、31 份完成凭据和全部 2,314 次
-Rust 角色回放。最大代理波形误差 `1.02893e-5 < 2e-5`；12 个端点比较均未通过筛查。
-没有运行新的训练、改变筛查阈值或挑选开发集最优权重。
+A re-execution of the frozen analyzer verified inputs, source code, checkpoints, 31 completion credentials, and all 2,314 Rust role replays. Maximum proxy waveform error: `1.02893e-5 < 2e-5`; 12 endpoints failed screening.
+No new training was run, no screening threshold was adjusted, and no optimal development set weights were selected.
 
-以下为 16,192 步、两个种子各自 33 个 development 音乐片段的均值再取平均。
-这些是复用的开发复核材料，不是独立泛化测试；所有列越低越好：
+The following table presents the average over 16,192 steps, 33 development music fragments per seed, averaged across two seeds. These are reused development recheck materials and not independent generalization tests; all values are lower being better:
 
-| 输出 | paired 恢复误差 | identity 误差 | Rust 高频 SC | Rust 高频 flux |
+| Output | Paired Recovery Error | Identity Error | Rust High-Frequency SC | Rust High-Frequency Flux |
 | --- | ---: | ---: | ---: | ---: |
-| 初始恒等模型 + DSP | 0.588365 | 0 | 0.548761 | 0.717164 |
+| Initial Identity + DSP | 0.588365 | 0 | 0.548761 | 0.717164 |
 | anchored | 0.624674 | 0.059516 | 0.612967 | 0.755468 |
 | amplitude | 0.978874 | 0.447615 | 2.311690 | 1.994917 |
 | complex | 1.057290 | 0.459039 | 2.621984 | 2.385622 |
 
-复数头的高频能量误差从初始 8.48 dB 降到约 6.69 dB，但谱形和瞬态误差大幅增加，
-说明增加能量不等于恢复正确内容。2,048 步时新头也已退化，并非只有长训练末期才出现。
-按 recording 等权统计结论一致；40 个 shifted 片段中的音乐保真也弱于 anchored。
-语音均值没有同等级退化，但语音与音乐覆盖、录音数和抽样权重不同，不能外推音乐有效。
+The complex head reduces high-frequency energy error from initial 8.48 dB to approximately 6.69 dB, but spectral shape and transient errors increase significantly—indicating increased energy does not equate to correct content recovery. Degradation is already evident at 2,048 steps, not just in late training.
+Results are consistent when weighted by recording; the music fidelity in 40 shifted fragments is weaker than in the anchored group.
+Speech averages show no equivalent degradation, though speech and music coverage, recording count, and sampling weights differ, so music effectiveness cannot be extrapolated.
 
-### 不是只有过拟合：训练本身就存在尺度问题
+### Not Just Overfitting: Training Itself Has a Scale Problem
 
-共同固定训练集初始主 loss 为 `0.282046`。终点 anchored 为 `0.271969 / 0.271196`，
-amplitude 为 `0.314983 / 0.297434`，complex 为 `0.327231 / 0.308479`。
-新头在训练集上也比初始化差，辅助项及 combined loss 同样没有形成改进；不能解释为
-“训练很好、只是留出不好”，也不能据此认定模型容量不足。
+The shared fixed training set initial main loss is `0.282046`. Final values:
+- Anchored: `0.271969 / 0.271196`
+- Amplitude: `0.314983 / 0.297434`
+- Complex: `0.327231 / 0.308479`
 
-全程梯度裁剪比例：anchored 两个种子均约 **1.32%**，amplitude **86.52% / 86.76%**，
-complex **86.49% / 86.82%**。梯度中位数旧头约 `0.48–0.53`，新头约 `27.6–31.1`。
-这些更新有限值检查通过，没有 NaN；但“数值有限”并不代表优化尺度合理。
+The new heads perform worse than initialization on the training set, and auxiliary and combined loss show no improvement. This cannot be explained as "training is good, only validation is bad," nor does it imply model capacity is insufficient.
 
-追加只读梯度诊断，固定 seed 20261012 的前 16 个登记训练批次：
+Throughout training, gradient clipping ratios:
+- Anchored: both seeds ~ **1.32%**
+- Amplitude: **86.52% / 86.76%**
+- Complex: **86.49% / 86.82%**
 
-| 初始化，三头输出与 loss 完全相同 | 主 loss 梯度范数中位数 | 加权辅助项梯度中位数 |
+Median gradient magnitude: old heads ~ `0.48–0.53`, new heads ~ `27.6–31.1`. All updates passed finite value checks and no NaNs were observed. However, "finite" gradients do not imply a reasonable optimization scale.
+
+Additional read-only gradient diagnostics were added, with fixed seed `20261012` for the first 16 training batches:
+
+| Initialization: all three heads output and loss identical | Main Loss Gradient Norm Median | Weighted Auxiliary Term Gradient Median |
 | --- | ---: | ---: |
 | anchored | 0.4096 | 0.0163 |
 | amplitude | 35.8754 | 0.8585 |
 | complex | 36.6036 | 1.1441 |
 
-新头主梯度约为旧头的 **88–89 倍**，这个差异在发生过拟合前已经存在。
-主要压力来自主目标，不是仅把一致性辅助项关掉就能消除。
-当前残差在零点附近的输出导数为 `2 * unit`；`unit` 至少为全频 RMS，而弱目标频带
-的 loss 以自身能量和很小的相对地板归一化，二者共同造成对微小残差的高敏感性。
-相同 Adam 学习率、相同 clip 阈值不代表相同的有效输出更新尺度。
-裁剪频繁本身不是唯一根因证明，但与初始化梯度、训练退化共同指向参数化/优化条件问题。
+The new head's main gradient is approximately **88–89 times larger** than the old head—this divergence exists before overfitting occurs.
+Primary pressure comes from the main objective, not merely from disabling consistency auxiliary terms.
+The derivative of output near zero is `2 * unit`; `unit` is at least the full-band RMS, while weak-band loss is normalized by its own energy and a small relative floor—both factors contribute to high sensitivity to tiny residuals.
+Same Adam learning rate and same clip threshold do not imply equivalent effective update scale.
+Frequent clipping is not the sole root cause, but combined with initialization gradients and training degradation, points toward a parameterization/optimization condition issue.
 
-### 尾部失败仍存在，不能再统一归因于 DSP 串扰
+### Tail Failures Persist—Cannot Be Attributed to DSP Bleed
 
-33 个音乐片段中，最终复数头有 21 / 23 个 paired 误差优于初始控制，但少数严重失败
-主导了总退化；两个最坏片段贡献了净 paired 退化的约 95.0% / 100.6%。
-超过 100% 表示其余片段的净改善抵消了一部分坏例损失，不是计数错误。
+Of 33 music fragments, the final complex head had 21/23 paired errors better than the initial control, but a few severe failures dominate overall degradation. The two worst cases contributed approximately **95.0% to 100.6%** of net paired degradation.
+Over 100% indicates that the net improvement from other fragments partially offsets the loss from bad cases—this is not a counting error.
 
-在共同最坏例 `d2599868e6a472eff47c1674` 的 identity 诊断中：
+In the common worst-case example `d2599868e6a472eff47c1674`, identity diagnosis shows:
 
-- anchored 两种子的 blended 阶段误差 `0.0738 / 0.2218`，OLA 后 `0.2236 / 0.8239`；
-- complex 为 `22.9599 / 13.4942`，OLA 后反而降至 `14.2738 / 10.0603`。
+- Anchored: two sub-versions had blended phase error `0.0738 / 0.2218`, OLA after `0.2236 / 0.8239`;
+- Complex: `22.9599 / 13.4942`, OLA after reduced to `14.2738 / 10.0603`.
 
-该例新头的错误已经存在于合成前；OLA 并非本轮主要新增损伤的唯一来源。
-这三个诊断片段的 OLA 与限幅后误差相同，不能归咎于 limiter。
-幅度残差头同样失败，说明增加相位自由度不是充分条件；本轮亦未证明复数路线必然无效。
+The error in the complex head existed before synthesis; OLA is not the sole source of the new damage.
+The OLA and limiter post-processed errors for these three diagnostic fragments are identical, so limiter is not the cause.
+The magnitude residual head also failed, indicating increased phase freedom is not sufficient. This round does not prove the complex route is inherently invalid.
 
-最坏例的高频参考非常弱，归一化指标会放大相对误差。该例复数头的 prelimit 波形
-误差 RMS 相对同阶段恒等基线 RMS 约 **0.315% / 0.251%**，不是整体波形十几倍爆炸。
-这些比值也不是 dBFS 或听感结论。应同时保留绝对量、相对量和后续盲听证据，
-不能为了通过实验而删除样本、把真实损伤当数值误差放行，或仅以巨大 SC 宣称严重爆音。
+The worst-case reference has very weak high-frequency content, and normalization metrics amplify relative errors. The pre-limiter waveform RMS error for the complex head is approximately **0.315% / 0.251%** relative to the same-stage identity baseline RMS—not a global waveform explosion of tens of times.
+These ratios are not in dBFS or subjective listening conclusions. Absolute, relative, and subsequent blind listening evidence must be preserved.
+No sample should be removed to pass the experiment, nor should real damage be treated as numerical error.
+Extreme SC values alone cannot be used to justify severe clipping.
 
-### 成本与下一步
+### Cost and Next Steps
 
-最终复数头仍为 824,658 参数、3,337,561 字节 ONNX。两个终点图的双声道
-ORT + Python frontend p99 为 **0.2145 / 0.2153 ms**，max **0.2610 / 0.2444 ms**；
-各 1,000 个计时 hop 均未超过 48 kHz 单 hop 时长。成本不是这轮未通过的原因。
-该证据仍不是完整 Rust frontend 集成、长时间回调、声卡或盲听验收。
+The final complex head remains at 824,658 parameters and 3,337,561 bytes ONNX. For both endpoints, double-channel ORT + Python frontend p99 is **0.2145 / 0.2153 ms**, max **0.2610 / 0.2444 ms**; all 1,000 timed hops remained under 48 kHz hop duration.
+Cost is not the reason for failure. This evidence still does not represent full Rust frontend integration, long-term callback, sound card, or blind listening validation.
 
-**不继续续训这批权重，不直接扩容。**下一步应在训练数据上先校准输出局部灵敏度、
-更新幅度及学习率，使弱频带损伤可控，同时保留完全缺失频带的生成能力。
-可对照“减小初始输出斜率、保留最终可表达范围”的参数化，避免再通过压死生成上限
-换取恒等输出。先验证包含自然带限和低能量材料的多批次训练，确认固定训练误差下降、
-identity 损伤受控，再冻结方案做完整跨录音复核。自然缺少高频与压缩损失的区分仍是
-独立问题，需要内容/退化条件与配对负例证据，而非针对失败曲目的硬编码阈值。
+**No further training of these weights is continued; no direct scaling is performed.**
+Next steps should first calibrate output local sensitivity on training data, update magnitude and learning rate to keep weak-band damage under control, while preserving the ability to generate content in completely missing bands.
+A parameterization approach can be compared—e.g., "reduce initial output slope while preserving final expressible range"—to avoid sacrificing generation upper limits for a clean output.
+First, validate multi-batch training with natural bandwidth limits and low-energy materials, confirming fixed training error reduction and controlled identity damage before freezing the scheme for full cross-recording revalidation.
+Natural absence of high frequencies and compression loss remain independent issues requiring content/retrograde conditions and paired negative examples—not hard-coded thresholds for specific failing tracks.
 
-本次附加诊断仅用冻结权重，没有更新参数。原始结果在
-`data/runs/head-p20-20261014/study/`；诊断脚本、结果和哈希凭据在
-`data/reports/head-p20-analysis-20261015/`，包括 `gradient-probe.json`、
-`stage-probe.json` 和 `summary.json`。训练数据与检查点仍不进入 Git。
+This additional diagnostic uses only frozen weights and no parameter updates. Original results are stored in
+`data/runs/head-p20-20261014/study/`; diagnostic scripts, results, and hash credentials are in
+`data/reports/head-p20-analysis-20261015/`, including `gradient-probe.json`, `stage-probe.json`, and `summary.json`. Training data and checkpoints remain excluded from Git.
+
+The retained native parity bound was `2.98023e-7`, below the registered `2e-5` tolerance.

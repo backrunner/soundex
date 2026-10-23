@@ -1,139 +1,113 @@
-# P16：参考感知的合成一致性辅助约束
+# P16: Reference Perception-Aided Synthetic Consistency Constraint
 
-## 目的与固定协议
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-P15 在冻结权重上确认了源频带修正经 OLA 影响相邻弱频带的失效机制。
-本轮比较原训练目标与加入参考感知合成一致性辅助项；不直接关闭任何频带。
+## Objective and Fixed Protocol
 
-- 两组 `control` / `consistency`，均使用 P13 的 40 段录音、每段 8 个位置。
-- 相同配对/identity、4 音乐 + 1 语音批次、gain=0、codec、采样顺序、保护窗口。
-- 相同 807,398 参数模型与输入相位，Adam 1e-3、无 decay、梯度裁剪 5。
-- 种子 20261012 / 20261013；每组每种子 2,048 步，固定报告 256 / 2,048。
-- 两个 checkpoint 哈希在开发评分前登记；不按开发分数选点、换种子或调整权重。
-- 评价只用原有 P13 loss 和原始无损参考；辅助 loss 不进入共同评分。
-- 新建模型，冻结同一代码快照；权重仍为实验状态。
+P15 confirmed the failure mechanism of source-band correction under OLA influence, where adjacent weak bands are affected.
+This round compares the original training objective against one augmented with a reference perception-based synthetic consistency term; no frequency band is directly disabled.
 
-## 辅助项
+- Two groups: `control` / `consistency`, using the same 40 audio segments from P13, each with 8 positions.
+- Identical pairing/identity, 4 music + 1 speech batch, gain=0, codec, sample order, and protection window.
+- Identical 807,398-parameter model and input phase, Adam 1e-3, no decay, gradient clipping 5.
+- Seeds: 20261012 / 20261013; each group runs 2,048 steps per seed, with fixed reporting at 256 / 2,048.
+- Two checkpoint hashes are registered prior to development scoring; no checkpoint is selected based on development score, no seed change, or weight adjustment.
+- Evaluation uses only the original P13 loss and pristine, unclipped reference; the auxiliary loss is excluded from joint scoring.
+- A new model is created, with the same code snapshot frozen; weights remain in experimental state.
 
-令 `P` 为现有 OLA 后的复数 STFT 再分析，`Zp` 为经过原有频带混合后的预测谱。
-`Zr` 为同一混合方式下的参考谱：成对案例使用 clean 幅度与输入相位，
-identity 使用真实输入幅度与输入相位。预热部分保持输入值。
+## Auxiliary Term
 
-辅助误差为 `(P-I)(Zp-Zr)`，按既定五频带做平滑 RMS 归一化，并保持
-配对恢复/identity 各一半。这里只约束当前输入相位架构可表示的参考坐标，
-不把它冒充完整 clean 复数谱，也不修改主目标的原始无损参考。
+Let `P` be the complex STFT re-analysis after OLA, and `Zp` be the predicted spectrum after existing band mixing.
+`Zr` is the reference spectrum under the same mixing procedure: for paired cases, it uses clean magnitude and input phase; for identity cases, it uses true input magnitude and input phase. The warmup phase retains input values.
 
-不是要求逐帧不变或简单平滑：当预测等于参考时辅助项及梯度为零，
-包括存在真实瞬态的参考。参考本身的合成不一致被扣除。
-该项仅用于训练；模型结构、推理图和 DSP 执行路径均不增加计算或缓冲。
-它可能产生不利权衡，因此仍须实际训练和原有指标复核。
+The auxiliary error is defined as `(P - I)(Zp - Zr)`, smoothed with RMS normalization over five frequency bands, and split equally between pairing and identity. This constraint only enforces the reference coordinates that are representable within the current input phase architecture. It does not pretend to reconstruct a full clean complex spectrum, nor does it modify the original, unclipped reference in the main objective.
 
-## 权重校准规则（训练前固定）
+It does not require frame-wise invariance or simple smoothing: when prediction matches the reference, the auxiliary term and its gradient vanish, including in cases with real transients. The synthetic inconsistency in the reference itself is penalized.
+This term is used solely during training; the model structure, inference graph, and DSP execution path incur no additional computation or buffering.
+It may introduce adverse trade-offs, and thus must be validated through actual training and original metric recheck.
 
-只读取 P13 训练位置，禁止读取开发样本用于系数校准。
-取两个种子各自采样表前 64 个批次，恰好各覆盖全部 320 个训练位置一次。
-使用各自初始模型，计算主目标和辅助项的参数梯度，不执行参数更新。
+## Weight Calibration Rules (Fixed Prior to Training)
 
-`lambda = 0.1 * sqrt(sum(||grad(main)||^2) / sum(||grad(aux)||^2))`
+Only the P13 training positions are read; development samples are not used for coefficient calibration.
+For each seed, take the first 64 batches of the sampling table, exactly covering all 320 training positions once.
+Using the initial model, compute gradients for the main objective and auxiliary term, without parameter updates.
 
-固定的 0.1 表示初始训练批次上，辅助项梯度 RMS 目标为主项的 10%。
-这不是保证后续所有步骤的梯度比率。校准完成后固定系数，记录原始梯度数值、
-输入表、源码和输出哈希；训练脚本拒绝使用不同源码、位置库或种子的校准文件。
+`lambda = 0.1 * sqrt(sum(||grad(main)||²) / sum(||grad(aux)||²))`
 
-## 验证与状态
+The fixed value 0.1 indicates that, on the initial training batches, the RMS of the auxiliary term gradient is 10% of the main term gradient. This does not guarantee a consistent ratio across subsequent steps. After calibration, the coefficient is fixed, and the original gradient values, input table, source code, and output hashes are recorded. The training script rejects any calibration file derived from different source code, position list, or seed.
 
-辅助项已检查：参考正确时的零误差/零梯度、静音及弱能量有限梯度、有限差分、
-参考瞬态不受平滑惩罚；复数合成算子与原有 OLA/再分析数值对应。
+## Validation and Status
 
-训练侧校准已完成：主项初始参数梯度 RMS 为 1.349659，辅助项为 0.988589，
-冻结系数 `lambda = 0.1365237430457469`。未使用开发样本确定系数。
-四组训练和验证已在 2026-10-13 22:05（新加坡时间）完成。源码快照为
-`000c450041e29b6fa44be4168e0b9b6f717186de`。实验根目录：`data/runs/consistency-p16-20261013/`。
-队列依次执行训练侧校准、两组双种子训练、固定 checkpoint 评分与原生回放、
-共同指标对照汇总，共完成 300 次正式原生回放。
+The auxiliary term has been verified: zero error and zero gradient when reference is correct, finite gradients for silence and low-energy content, finite difference checks, transient reference behavior is not penalized by smoothing; the complex synthesis operator matches numerically with the original OLA/re-analysis.
 
-## 完成结果与推进判断
+Training-side calibration is complete: initial RMS of main objective gradient is 1.349659, auxiliary term is 0.988589, resulting in a fixed coefficient `lambda = 0.1365237430457469`. The coefficient was not determined using development samples.
+Four training and validation runs were completed on 2026-10-13 22:05 (Singapore time). Source code snapshot is
+`000c450041e29b6fa44be4168e0b9b6f717186de`. Experiment root directory: `data/runs/consistency-p16-20261013/`.
+The queue proceeds in order: training-side calibration, two-seed double training, fixed checkpoint scoring and native playback, joint metric comparison and aggregation, completing 300 formal native replays.
 
-共同开发总分越低越好，初始恒等模型经相同 DSP 为 **0.271475**：
+## Final Results and Progress Assessment
 
-| 种子 | 步数 | 对照 | 一致性辅助项 |
+The joint development score is lower is better. The initial identity model, processed through the same DSP, achieves a score of **0.271475**:
+
+| Seed | Steps | Control | Consistency Auxiliary Term |
 | --- | ---: | ---: | ---: |
 | 20261012 | 256 | 0.305075 | 0.305742 |
 | 20261012 | 2,048 | 0.408393 | 0.362854 |
 | 20261013 | 256 | 0.415565 | 0.318891 |
 | 20261013 | 2,048 | 0.394683 | 0.426925 |
 
-最终相对对照改善 11.15% / 退步 8.17%，两种子均未超过初始值。
-不能选第一种子宣称辅助项有效，也不能事后把 256 步挑为正式权重。
-复核脚本重新验证全部 checkpoint、评分、采样与完成凭据的哈希；
-对照两种子的完整训练位置和开发逐条评分均精确复现 P13 multiposition。
+Relative improvement over control: +11.15% / -8.17%. Neither seed exceeded the initial value.
+We cannot claim effectiveness of the auxiliary term based on the first seed alone, nor can we select the 256-step point as official.
+A recheck script validates all checkpoints, scores, sampling, and completion evidence; both seeds' full training positions and development scores are exactly reproduced as in P13 multiposition.
 
-额外对冻结 checkpoint 做了只读训练审计：每种子按登记采样表前 64 个批次
-恰好覆盖全部 320 个训练位置一次，保持 4 音乐 + 1 语音及对应 identity。
-未执行优化，未用开发分数重新选点；报告为 `checkpoint-audit.json`，
-同目录保存脚本、脚本与配置哈希、checkpoint 哈希和逐批结果。
-重新算出的主项均值与已有逐条训练位置评分一致（差异 <1e-6）。
+Additional audit of frozen checkpoints: for each seed, the first 64 batches of the sampling table exactly cover all 320 training positions once, preserving 4 music + 1 speech and corresponding identity. No optimization was performed; development scores were not used to reselect points. Report saved as `checkpoint-audit.json`, alongside script, script and configuration hashes, checkpoint hashes, and per-batch results.
+Recomputed main term averages match the per-position training scores (difference <1e-6).
 
-| 辅助项组 | 步数 | 全训练位置主项 | 辅助项 | 主项 + lambda × 辅助项 |
+| Consistency Group | Steps | Full Training Position Main Term | Auxiliary Term | Main + λ × Auxiliary |
 | --- | ---: | ---: | ---: | ---: |
 | 20261012 | 256 | 0.290827 | 0.116055 | 0.306671 |
 | 20261012 | 2,048 | 0.272333 | 0.101363 | 0.286171 |
 | 20261013 | 256 | 0.289273 | 0.111606 | 0.304510 |
 | 20261013 | 2,048 | 0.335158 | 0.149575 | 0.355578 |
 
-第二种子连训练侧主项、辅助项及两者之和都退步，不能只解释为泛化过拟合，
-也不符合“牺牲主项换取更好的辅助项”这一解释。它表明两个保存时点间有
-优化状态退化；尚不能单凭两个时点断言训练全程发散或把原因确定为学习率。
-第一种子训练改善、开发退步，说明泛化问题也同时存在。
+The second seed shows degradation in both main and auxiliary terms, and the sum, indicating a degradation in optimization state—not merely overfitting, nor a case of "sacrificing main term for better auxiliary term." This suggests a degradation between the two saved points, though no definitive conclusion about divergence or learning rate is drawn.
+The first seed shows improvement in training, but degradation in development, indicating a generalization issue also exists.
 
-辅助项组最终加权辅助梯度/主项梯度的批次 RMS 比为 12.87% / 12.31%，
-梯度 cosine 中位数为 0.265 / 0.485；64 批中分别有 12 / 21 批反向。
-这些是冻结点上的梯度诊断，不是历史更新轨迹，也不能证明没有局部冲突。
-没有证据称最终失败由辅助梯度在整体上压倒主项造成。
+The final auxiliary gradient-to-main gradient RMS ratio per batch is 12.87% / 12.31%, with cosine median values of 0.265 / 0.485; 12 / 21 batches show backward gradients. These are diagnostic values at the frozen checkpoint, not along the historical update trajectory, and do not prove absence of local conflicts.
+There is no evidence that the final failure resulted from the auxiliary gradient overwhelming the main term overall.
 
-最终音乐开发集相对对照分别 21/33、10/33 片段改善。第一种子的净改善
-约 97.0% 来自 P14/P15 已分析的三个严重反例；第二种子改善其中部分反例，
-却出现 ambient 片段 `b925b66fc8abcf285a7277df` 的新严重退化。
-第二种子训练音乐位置中有 254/256 个比对照差；其问题不只集中在开发反例。
-这些都是事后诊断，不能据此过滤曲目或制定专用频带门控。
+Final development set results: 21/33 music segments and 10/33 speech segments show improvement over control. The first seed's net improvement is approximately 97.0% attributable to three severe counterexamples identified in P14/P15. The second seed improves some of these counterexamples, but introduces a new severe degradation in ambient segment `b925b66fc8abcf285a7277df`.
+Among the 254/256 music training positions in the second seed, performance is worse than control—indicating issues beyond just development counterexamples. These are post-hoc diagnoses and cannot be used to filter tracks or implement band-specific gating.
 
-原生回放与代理最大绝对差为 **1.020730e-6**。固定开发子集为 4 音乐 + 1 语音
-及对应 identity，不代表全部开发录音。最终配对高频谱收敛误差相对初始的变化为：
-对照 -0.004476 / -0.004637，辅助项 -0.001880 / +0.002253；
-辅助项的高频瞬态误差相对初始则为 +0.005492 / +0.007183。
-能量误差的局部改善没有同时带来谱形、瞬态和 identity 的稳定改善。
-这是冻结特征经 Rust DSP 的回放，不是新权重 ONNX 的完整实时性能验收；未盲听。
+Native playback and proxy maximum absolute difference is **1.020730e-6**. The fixed development subset (4 music + 1 speech and corresponding identity) does not represent all development recordings. The relative change in high-frequency spectral convergence error from initial is: control -0.004476 / -0.004637, consistency -0.001880 / +0.002253; the high-frequency transient error relative to initial is +0.005492 / +0.007183.
+Local energy improvements do not translate into stable improvements in spectral shape, transients, or identity. This is a frozen feature playback via Rust DSP, not a full real-time ONNX performance validation; blind listening was not conducted.
 
-### 后续验证
+### Follow-up Validation
 
-以下短程对照已作为 [P17](consistency-learning-rate-study.md) 完成：两个种子的小学习率
-均改善完整训练库主目标及组合目标，主要收益来自减少 identity 损伤；原生配对高频
-谱形/瞬态未一致改善。它支持继续验证较小更新，但没有证明跨录音恢复成功。
+The following short-term comparisons have been completed as part of [P17](consistency-learning-rate-study.md): both seeds with smaller learning rates show improvement in full training set main and combined objectives, primarily due to reduced identity damage. High-frequency spectral shape and transient performance remain unchanged. This supports further investigation with smaller updates, though it does not prove successful cross-recording recovery.
 
-暂停沿用 P16 配置长训，也不据此直接扩容。先从两个种子各自固定的 256 步
-checkpoint（包括 Adam 状态）分别复制短程对照：保持数据顺序、辅助系数和
-所有其他设置，比较 lr=1e-3 与 lr=1e-4，各再走 256 步，每 64 步评估完整训练位置库。
-这是优化机制诊断，须在运行前登记；不按开发结果选点，不宣称是新的独立泛化试验。
-检查真实更新是否同时改善主项、辅助项和 identity，而不是只看即时小批次 loss。
+Long training with P16 configuration is paused. No direct scaling is proposed. Instead, we begin with two fixed 256-step checkpoints (including Adam state) from each seed, and replicate short-term comparisons: preserving data order, auxiliary coefficient, and all other settings. Compare lr=1e-3 vs lr=1e-4, each running 256 additional steps, with evaluation at every 64 steps across the full training position library. This is a mechanism diagnostic and must be registered prior to execution; no point selection is based on development results, and no claim is made for a new independent generalization test.
 
-若较小更新仍不能稳定改善训练主项，应继续定位输出头的更新尺度和目标耦合，
-而非自动追加步数。若训练稳定但跨录音仍退化，则转向更广的音乐训练覆盖，
-再对可合成的复数/波形残差表示做单因素比较；当前证据不足以把问题归为参数量不足。
-后续胜出者仍须在未参与诊断的录音上验证真实高频恢复、identity、瞬态与低频，
-并完成盲听；改变结构或 DSP 时重新检查流式延迟、连续性及模型预算。
+We must verify whether real updates simultaneously improve the main term, auxiliary term, and identity—not just immediate small-batch loss.
 
-关注两个种子是否同时改善跨录音音乐，并保住 identity、瞬态和低频；
-不能把回退到初始恒等输出、训练 loss 下降或三个反例变好单独视为成功。
-开发数据反复复用，最终还需未参与调参的录音、盲听与实际部署验证。
+If smaller updates fail to stabilize main term improvement, further investigation should focus on output head update scale and target coupling, not automatic step extension. If training stabilizes but cross-recording degradation persists, we should expand music training coverage, and then conduct single-factor comparisons on synthesizable complex or waveform residual representations. Current evidence does not support a parameter count deficiency.
 
-## 脚本
+Future winners must be validated on uninvolved recordings, with actual high-frequency recovery, identity, transient, and low-frequency fidelity, and must undergo blind listening. Any structural or DSP change requires revalidation of streaming latency, continuity, and model budget.
 
-- `training/scripts/calibrate_consistency.py`：固定训练侧梯度校准。
-- `training/scripts/run_subset_study.py --sizes 40 --crop-study --crop-positions 8`：共同训练过程。
-  实验组额外传入 `--consistency-calibration <calibration.json>`。
-- `training/scripts/analyze_consistency_study.py`：校验两组采样与产物哈希，只对比原有指标。
+We must monitor whether both seeds improve across recordings, and preserve identity, transient, and low-frequency fidelity.
+We cannot consider a return to initial identity output, loss reduction, or improvement in three counterexamples as success.
+Repetition of development data is limited; final validation must include uninvolved recordings, blind listening, and actual deployment.
 
-实现时验证：451 项本地 Python 测试、Ruff lint/format 通过；P16 远程 CI
-`38407254788` 和启动状态文档 CI `38407487492` 均已成功。
-状态见实验根目录的 `pipeline.json`，日志见 `pipeline.log`，共同指标见
-`study/consistency-comparisons.json`。没有替换默认权重。
+## Scripts
+
+- `training/scripts/calibrate_consistency.py`: Fixed training-side gradient calibration.
+- `training/scripts/run_subset_study.py --sizes 40 --crop-study --crop-positions 8`: Shared training process.
+  The experimental group additionally passes `--consistency-calibration <calibration.json>`.
+- `training/scripts/analyze_consistency_study.py`: Validates sampling and output hashes for both groups, comparing only original metrics.
+
+Implementation validation: 451 local Python tests passed, Ruff lint/format passed; P16 remote CI `38407254788` and launch status CI `38407487492` both succeeded.
+Status is documented in the experiment root directory's `pipeline.json`, logs in `pipeline.log`, and joint metrics in `study/consistency-comparisons.json`. No default weights were replaced.
+
+The auxiliary residual is `(P-I)(Zp-Zr)`. Its coefficient was calibrated on the first 64 registered batches per seed as `lambda = 0.1 * sqrt(sum(||grad(main)||^2) / sum(||grad(aux)||^2))`, then frozen without development data. Relative to the corresponding control the final results improved by 11.15% for one seed and regressed by 8.17% for the other; neither exceeded initialization.

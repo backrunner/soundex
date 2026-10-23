@@ -1,98 +1,87 @@
-# P28：先用小模型验证失活机制
+# P28: Initial Validation of Deactivation Mechanisms with a Small Model
 
-2026-10-19，承接 [P27 定位与外部方法调研](head-collapse-audit.md)。
-这轮固定宽度 96，不恢复 640 宽度大模型训练，也不以扩大参数量作为改善方案。
-先检验解码器失活、预算监督梯度和相位输入三个机制，再决定是否实现新的 DSP 激励分支。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 固定对照
+2026-10-19, following [P27: Localization and External Method Survey](head-collapse-audit.md).
+This round fixes the width at 96, does not restore the 640-width large model training, and does not pursue parameter scaling as a solution.
+We first validate three mechanisms: decoder deactivation, budget supervision gradient, and phase input, before deciding whether to implement a new DSP incentive branch.
 
-| 组别 | 相对控制组的唯一干预 | 参数量 | 预检 ONNX |
+## Fixed Control Set
+
+| Group | Unique Intervention | Parameter Count | Pre-check ONNX |
 |---|---|---:|---:|
-| `control` | 小尺寸 complex residual head，原 GELU、共享预算梯度、幅度输入 | 431,015 | 1.688 MiB |
-| `decoder_norm` | decoder Linear 与 GELU 之间增加逐帧 LayerNorm | 431,207 | 1.689 MiB |
-| `budget_detach` | 只阻断预算辅助 loss 对共享 latent 的梯度 | 431,015 | 1.688 MiB |
-| `phase_input` | 编码器增加观测复数载波的零初始化投影 | 455,783 | 1.784 MiB |
+| `control` | Small-scale complex residual head, original GELU, shared budget gradient, magnitude input | 431,015 | 1.688 MiB |
+| `decoder_norm` | Add per-frame LayerNorm between decoder Linear and GELU | 431,207 | 1.689 MiB |
+| `budget_detach` | Block gradient flow from budget auxiliary loss to shared latent | 431,015 | 1.688 MiB |
+| `phase_input` | Add zero-initialized projection of observed complex carrier in encoder | 455,783 | 1.784 MiB |
 
-四组均使用完整残差预算 `budget_scope="residual"`、`residual_slope=1/64`，
-相同 shared 参数初始化、零输出初始化和相同随机数据日程。phase 投影额外增加
-24,768 个参数，因此其结果不能完全分离相位信息与新增参数化的影响；本轮没有规模排名。
-这些是单因素对照，不检验三种修改的交互作用，也不把全部修改叠在一起后归因。
+All groups use the full residual budget `budget_scope="residual"` with `residual_slope=1/64`, identical shared parameter initialization, zero output initialization, and the same random data schedule. The `phase_input` group adds 24,768 new parameters, so its performance cannot fully isolate phase information from the added parametrization effects. This round does not include a ranking by scale.
+These are single-factor controls; no interaction effects among the three modifications are tested, nor are all modifications combined and attributed in a single experiment.
 
-`budget_detach` 使用同一个预算头和数值相同的预算预测，只为辅助监督重新计算
-`budget_head(latent.detach())`。部署输出、主恢复 loss 到预算头／共享特征的梯度
-均保持原路径；不是关掉预算、绕过主损失或减小增强。
+The `budget_detach` group uses the same budget head and identical budget prediction values, but computes the auxiliary supervision via `budget_head(latent.detach())`. Deployment output and main recovery loss gradients to the budget head or shared features remain unchanged from the baseline—no budget is disabled, no path is bypassed, and no enhancement is reduced.
 
-`phase_input` 将当前输入相位的 sin/cos 与归一化 log 幅度载波结合，经过无偏置
-258→96 投影，加到输入编码器的 LayerNorm 之前。数字静音的特征底噪先扣除，
-不给零信号注入任意相位。仅访问输入与过去状态，参考相位只用于既有训练监督。
-原有 TCN 累积历史；这里没有新增前瞻、声道共享状态或额外帧缓冲。
-LayerNorm 只沿特征维度计算，无跨时间统计或训练／推理 running statistics 差异。
+The `phase_input` group combines the current input phase (sin/cos) with normalized log magnitude carrier, then projects it through a bias-free 258→96 projection and adds it before the LayerNorm in the encoder. The feature floor for digital silence is first subtracted, and no arbitrary phase is injected into zero signals. Only past and current state inputs are accessed; reference phase is used solely for existing training supervision. The original TCN accumulates historical context; no forward-looking, channel-sharing, or additional frame buffering is introduced.
+LayerNorm is computed only along the feature dimension, with no cross-time statistics or training/inference running statistics differences.
 
-## 训练与数据协议
+## Training and Data Protocol
 
-- 两个固定种子 `20261012 / 20261013`，每组 **2,048 次更新**，共八条轨迹、16,384 次更新。
-  这是小尺寸机制诊断预算，不是充分收敛或容量上限对照。不得与 P26 的 16,192 步结果
-  直接排名架构，也不以中途结果缩减某组预算。
-- 每个种子复用 P26 broad 日程的前 2,048 个 draw；每步 4 个不同音乐录音＋1 个语音，
-  加对应 clean identity，paired/identity 等权。保持 codec、采样率、声道视图及源时间规则。
-  数据仍来自已审核原生无损音乐与既定语音材料，不引入第三方权重或数据。
-- 整个输入窗口与 development/shifted 源区间隔离，跨 codec、采样率和声道视图核查；
-  保留录音、来源、work-group 划分审计。实际独立监督时长写入 `coverage.json`，
-  不能用曲库数替代覆盖，也不把单声道 L/R/M/S 视图当成成对立体声评价。
-  两个种子均涉及 253 个音乐、193 个语音录音及 9 种 codec 配方；按源时间去重后，
-  音乐监督为 3565.78 / 3565.40 秒，语音为 531.73 / 527.10 秒。
-- 统一 Adam `1e-4`、无 weight decay、梯度范数上限 5；既有部署重建主项＋
-  `0.1365237430457469 × clean-complex consistency`＋`0.1 × budget risk`。
-  本轮不改变 loss 数值定义、权重、频带归一化或 DSP，不引入 GAN。
-- 相同 80-hop 历史预热，监督从第 89 帧开始，预热不反传。训练缓存为 128 裁剪 LRU，
-  新随机裁剪不写磁盘；原生审计的少量缓存放在本轮目录，避免重建已清理的大缓存。
-- 各组完整跑完，再冻结最终 checkpoint 哈希；没有 best checkpoint 选择或早停。
-  数值非有限、来源漂移、运行错误必须中止并留下记录。
+- Two fixed seeds: `20261012` and `20261013`, each with **2,048 updates**, totaling eight trajectories and 16,384 updates.
+  This is a diagnostic budget for small-scale mechanism validation, not a sufficient convergence or capacity ceiling benchmark. It should not be ranked against P26's 16,192-step results, nor should any group's budget be reduced during the process.
+- Each seed reuses the first 2,048 draws from P26's broad schedule; each step includes 4 distinct music recordings + 1 speech, paired with corresponding clean identity, paired/identity weighting. The codec, sample rate, channel view, and source time rules are preserved.
+  Data remains from pre-verified native, lossless music and established speech materials—no third-party weights or data are introduced.
+- The entire input window and development/shifted source intervals are isolated; cross-codec, cross-sample rate, and cross-channel view checks are maintained.
+  Recording, source, and work-group divisions are preserved for audit. Actual independent supervision duration is logged in `coverage.json`; coverage cannot be substituted by number of tracks, nor can mono L/R/M/S views be treated as paired stereo evaluations.
+  Both seeds involve 253 music and 193 speech recordings, across 9 codec formulations; after deduplication by source time, music supervision totals 3565.78 / 3565.40 seconds, speech supervision totals 531.73 / 527.10 seconds.
+- Unified Adam optimizer with `1e-4`, no weight decay, gradient norm capped at 5; loss includes main reconstruction term plus `0.1365237430457469 × clean-complex consistency` and `0.1 × budget risk`.
+  No changes to loss definition, weights, band normalization, or DSP are introduced; GANs are not used.
+- Identical 80-hop history warmup, supervision begins at frame 89, and warmup gradients are not backpropagated. Training cache uses 128-crop LRU; new random crops are not written to disk; a small amount of pre-verified cache is retained in this run to avoid reconstructing large, previously cleaned caches.
+- All groups complete full training, and final checkpoints are frozen with hash; no best checkpoint selection or early stopping is performed.
+  Numerical divergence, source drift, or runtime errors must trigger immediate termination with record.
 
-## 验证与判断
+## Validation and Judgment
 
-固定训练监测集只报告优化过程。最终机制诊断使用首个种子日程第
-0、682、1364、2047 个 draw，共 16 个音乐＋4 个语音裁剪：
-记录 GELU 前后激活、预算、分频带原始／应用后残差、恒等 DSP 差异和参考 oracle。
-在第一批固定样本上分解五项损失的共享／decoder／budget 梯度，预算隔离组按真实
-训练梯度路由检查。归一化组的激活前统计取实际 GELU 输入，不能误取 LayerNorm 前值。
+The fixed training monitoring set only reports optimization progress. Final mechanism diagnosis uses the first seed's draws at 0, 682, 1364, and 2047, totaling 16 music and 4 speech clips:
+Recorded GELU pre- and post-activation, budget, per-band raw and post-processed residuals, identity DSP differences, and reference oracle.
+For the first batch of fixed samples, we decompose the shared, decoder, and budget gradient components of five loss terms; for the budget isolation group, actual training gradients are verified via routing.
+For normalization groups, activation pre-statistics use actual GELU inputs—never the LayerNorm input.
 
-八个最终端点统一复核：
+Eight final endpoints undergo unified recheck:
 
-1. 相同已复用的 development/shifted 裁剪，分别报告音乐、语音、原始预测与模型＋DSP。
-   development 不是新的独立测试，不依据其结果宣称无过拟合。
-2. 保留未处理压缩输入、恒等模型经过真实 DSP 的控制，以及原始无损参考。
-   检查 HF 谱收敛、能量、瞬态、低频保真、identity 扰动、绝对 PCM RMS/dBFS；
-   不靠弱频带 LSD 或更小的增强量判断恢复成功。
-3. 原生预测回放 1,602 个角色，联合 PCM 复核含基线共 1,780 个角色；再进行
-   **1,424 个完整 Rust 前端→ORT→DSP 角色回放**，保留前端差异与同观测合成差异。
-4. 八个导出均执行 320-hop ONNX 状态／静音／reset 一致性验证；完整链路性能安排
-   44.1/48 kHz、单／双声道、重复测量及 paced 长流，共 56 个进程、560,000 个测量 hop。
-   单独报告 <5 ms 计算上限、48 kHz/hop128 的 2.667 ms deadline、CPU/RSS 和调度迟到。
-   固定 256 帧缓冲继续计入完整输出延迟；合成性能刺激不是设备／听感认证。
+1. Recheck using the same previously reused development/shifted clips, reporting music, speech, raw predictions, and model + DSP outputs.
+   Development is not a new independent test; results cannot be used to claim absence of overfitting.
+2. Retain unprocessed compressed input, identity model passing through real DSP, and original lossless reference.
+   Check HF spectral convergence, energy, transients, low-frequency fidelity, identity perturbation, and absolute PCM RMS/dBFS.
+   Recovery success is not judged by weak-band LSD or minor enhancement metrics.
+3. Replay 1,602 roles from original prediction, jointly verified against baseline across 1,780 roles; then perform **1,424 full Rust frontend → ORT → DSP role replays**, preserving frontend differences and observed synthesis differences.
+4. All eight exports undergo 320-hop ONNX state, silence, and reset consistency validation; full pipeline performance is tested under 44.1/48 kHz, mono/stereo, repeated measurement, and paced long streams, totaling 56 processes and 560,000 measurement hops.
+   Report <5 ms computation ceiling, 48 kHz/hop128 deadline of 2.667 ms, CPU/RSS, and scheduling lateness.
+   Fixed 256-frame buffer is included in total output latency; synthesis performance stimulation is not a device or listening validation.
 
-恢复有效性与机制有效性分开判断。激活恢复、梯度非零或训练 loss 下降，只能说明
-机制干预生效。只有跨种子实际高频恢复、保留频段和原音保真均有支持时，才继续同规模
-完整训练或 DSP 结构实验。现有相对指标规则仅作筛查，仍保留全部绝对误差与反例；
-不放宽既定规则、不挑种子、不自动扩大规模、不自动替换正式权重。
+Separate judgment of recovery effectiveness and mechanism effectiveness.
+Activation recovery, non-zero gradients, or training loss reduction only indicate mechanism intervention effectiveness.
+Only when cross-seed high-frequency recovery, band preservation, and original audio fidelity are supported can we proceed to full-scale training or DSP structure experiments.
+Current relative metrics serve only as screening tools; all absolute errors and counterexamples are retained.
+No rule relaxation, no seed selection, no automatic scale expansion, and no automatic replacement of official weights are permitted.
 
-## 工程预检与运行
+## Engineering Pre-check and Execution
 
-预检目录：`data/runs/small-mechanisms-p28-preflight-20261019/`。
-四组各跑 4 步，仅用训练裁剪完成训练、机制诊断、冻结端点、共同评分、原生回放和导出，
-再完成 16 个完整前端→ORT→DSP 角色回放。预检权重丢弃，不用于选择候选或证明音质。
-它覆盖完整流水线，但不运行正式长时性能测量。
-四个导出均通过 320-hop 状态／reset／静音一致性检查；16 个完整 Rust 角色回放的
-同观测合成检查通过。完整本地测试 **569 项通过**，Ruff lint/format 通过。
-修正了旧 resume 测试替身对新增关键字参数的兼容，并加入隔离组的精确续跑验证。
+Pre-check directory: `data/runs/small-mechanisms-p28-preflight-20261019/`.
+Each group runs 4 steps, completing training, mechanism diagnosis, checkpoint freezing, joint scoring, native replay, and export, followed by 16 full Rust frontend → ORT → DSP role replays.
+Pre-check weights are discarded and not used for candidate selection or quality proof.
+It covers the full pipeline but does not run formal long-term performance measurement.
 
-新增结构验证包括：共享初始化与旧 checkpoint 兼容、预算辅助梯度隔离且主梯度不变、
-负公共偏移下的 decoder 梯度、相位输入的有效性／因果性、有限差分、静音／弱信号梯度、
-分块／reset／声道隔离、非零模型 ONNX 和真实 Rust 一致性，以及注册端点的计时选择。
+All four exports pass 320-hop state/reset/silence consistency checks; 16 full Rust role replays pass observed synthesis checks.
+Complete local test results: **569 items passed**, Ruff lint/format passed.
+Fixed bugs in old resume test stubs for new keyword parameter compatibility, and added precise resumption validation for isolation groups.
 
-正式训练由 `training/scripts/run_small_mechanism_study.py` 驱动，从已提交的冻结源码运行。
-运行路径、登记哈希和启动状态记录在本页后续状态及本地 `provenance.json` 中。
-训练完成后的机制诊断、原生复核和时延测试由同一个流水线顺序执行。
+New structural validations include: shared initialization and old checkpoint compatibility, budget auxiliary gradient isolation with unchanged main gradient, negative common offset decoder gradients, phase input validity/causality, finite difference, silence/weak signal gradients, block/reset/channel isolation, non-zero model ONNX and real Rust consistency, and endpoint timing selection.
+
+Formal training is driven by `training/scripts/run_small_mechanism_study.py`, running from a previously submitted frozen codebase.
+Run path, registration hash, and startup status are recorded in the subsequent status and locally in `provenance.json`.
+
+Post-training mechanism diagnosis, native recheck, and latency testing are executed in sequence via the same pipeline.
 
 ```bash
 rtk proxy env PYTHONPATH=training training/.venv/bin/python \
@@ -102,83 +91,76 @@ rtk proxy env PYTHONPATH=training training/.venv/bin/python \
   --native-binary target/release/soundex-context-replay --prepare-only
 ```
 
-执行完整流水线时，应先按登记保存 `source/training` 快照，再从该快照启动；
-不要从日后修改的 main 续跑已有登记。`--preflight` 固定为独立 4 步训练材料预检，
-必须使用另一个目录。原生图仍为实验接口，正式 artifact 和默认权重保持原状。
+When executing the full pipeline, first save a snapshot of `source/training`, then launch from that snapshot.
+Do not resume from a modified `main` branch after the registered state.
+`--preflight` is fixed as a separate 4-step pre-training material check and must use a distinct directory.
+Native playback remains an experimental interface; official artifacts and default weights remain unchanged.
 
-## 启动记录
+## Launch Record
 
-正式流水线已于 **2026-10-19 03:29 +08** 启动，目录
-`data/runs/small-mechanisms-p28-20261019/`。
-冻结训练源码来自提交 `435024a86a4c80e53a19c2f26d6494ee3d0c274c`，登记 SHA-256 为
-`d99d33421be0cb94ddcc861b22e95856f97feeb025dae467114b32c080caa8a0`。
-启动时 supervisor PID 4967、流水线 PID 4969、caffeinate PID 4970；PID 仅供本次运行定位。
-最新阶段看 `study/progress.json`，日志看 `pipeline.log`，退出状态看 `supervisor.json`。
-流水线已于 **2026-10-19 06:04 +08** 正常结束（exit 0）；八条轨迹均完成 2,048 步，
-机制诊断、统一复核、八个导出、完整 Rust 回放和长流计时均完成。
+The formal pipeline started on **2026-10-19 03:29 +08**, in directory
+`data/runs/small-mechanisms-p28-20261019/`.
+Frozen training source code comes from commit `435024a86a4c80e53a19c2f26d6494ee3d0c274c`, registered SHA-256 as
+`d99d33421be0cb94ddcc861b22e95856f97feeb025dae467114b32c080caa8a0`.
+At startup, supervisor PID 4967, pipeline PID 4969, caffeinate PID 4970; PIDs are for internal tracking only.
+Latest progress can be viewed in `study/progress.json`, logs in `pipeline.log`, exit status in `supervisor.json`.
+The pipeline completed normally at **2026-10-19 06:04 +08** (exit 0); all eight trajectories completed 2,048 steps, and all mechanism diagnosis, unified recheck, eight exports, full Rust replay, and long-stream timing tests were completed.
 
-## 完成结果
+## Final Results
 
-**三种干预均未通过预登记的双种子改善筛查，没有候选晋级。**
-以下为已复用 development 音乐裁剪的 clip mean；HF SC 越低越好，
-PCM 误差针对原始无损参考。不是新独立测试，也不是听感结论。
+**None of the three interventions passed the pre-registered dual-seed improvement screening; no candidates advanced.**
+Below are clip mean values from reused development music clips; lower HF SC is better,
+PCM error refers to the original lossless reference. This is not a new independent test, nor a listening-based conclusion.
 
-| 配置 | 原始预测 HF SC（种子 12 / 13） | DSP 输出 HF SC（种子 12 / 13） | 完整 Rust 输出 PCM 误差 RMS（两种子均约） |
+| Configuration | Raw Prediction HF SC (Seed 12 / 13) | DSP Output HF SC (Seed 12 / 13) | Full Rust Output PCM Error RMS (both seeds ~) |
 |---|---:|---:|---:|
-| 恒等控制 | 0.54787658 | 0.54876080 | 0.012518218 |
+| Identity Control | 0.54787658 | 0.54876080 | 0.012518218 |
 | control | 0.54782270 / 0.54796378 | 0.54877521 / 0.54888899 | 0.012518218 |
 | decoder_norm | 0.54787194 / 0.54797595 | 0.54883172 / 0.54886515 | 0.012518218 |
 | budget_detach | 0.54824934 / 0.54805025 | 0.54919308 / 0.54895948 | 0.012518218 |
 | phase_input | 0.54782296 / 0.54796493 | 0.54877604 / 0.54888656 | 0.012518218 |
 
-未处理压缩输入的音乐 PCM 误差为 **0.012404078**；经过恒等 DSP 后为
-0.012518218，八个模型也约为该值，没有消除原有 DSP 的误差。
-音乐共有 33 个裁剪、26 个录音；语音 56 个裁剪、54 个录音。
-语音未处理误差 0.00350853224，恒等 DSP 为 0.00350853253，
-八个模型约为 0.00350853221–0.00350853271，同样没有实质恢复证据。
-保留原始参考，不把限幅后的信号替换成恢复目标。
+Unprocessed compressed input music has PCM error of **0.012404078**; after passing through identity DSP, it becomes 0.012518218; all eight models remain around this value—no evidence of error reduction.
+Music has 33 clips, 26 recordings; speech has 56 clips, 54 recordings.
+Speech unprocessed error: 0.00350853224; identity DSP: 0.00350853253; the eight models range from 0.00350853221 to 0.00350853271—no substantial recovery evidence.
+Original reference is preserved; limited-amplitude signals are not replaced with recovery targets.
 
-完整 Rust 输出与恒等 DSP 的音乐差异，clip mean RMS 仅
-**2.77e-8–2.04e-7**。这轮主要结果仍然是接近恒等输出，而非有效高频修复。
-所有候选的 DSP 输出 HF SC 均略差于初始恒等控制；不能把原始预测中个别种子的
-微小改善或总 loss 的变化当作部署收益。
+Complete Rust output vs. identity DSP music differences show a clip mean RMS of only **2.77e-8 to 2.04e-7**.
+The main result remains close to identity output, not effective high-frequency restoration.
+All candidate DSP outputs have HF SC slightly worse than the initial identity control—no recovery benefit is evident.
+Individual seed improvements or total loss changes cannot be interpreted as deployment gains.
 
-### 对机制判断的修正
+### Correction to Mechanism Judgment
 
-20 个固定训练裁剪中，八个模型的 GELU 近零比例和负饱和比例均为 0。
-小模型控制组本身没有复现 P27 大模型端点的大量失活，但仍然输出近零残差。
-因此，**GELU 失活不是近恒等解的充分解释**；这不否定其对旧大模型的影响，
-也不能用本轮 2,048 步推断更长训练绝不会失活。
+Among 20 fixed training clips, all eight models show GELU near-zero and negative saturation ratios of 0.
+The small model control group does not reproduce the large model's extensive deactivation observed in P27, yet still produces near-zero residuals.
+Therefore, **GELU deactivation is not a sufficient explanation for near-identity output**; this does not negate its impact on prior large models, nor can the 2,048-step result be used to infer that longer training would never deactivate.
 
-归一化组的原始归一化残差 RMS 为 6.46e-5–1.08e-4，高于控制组约 2.05e-5，
-但经预算和 DSP 后仍很小。预算隔离组的辅助共享梯度确实为 0，未换来更好恢复；
-相位输入组指标则几乎重合于控制组。这些结果不支持直接叠加修改或扩大规模。
-第一批训练样本仍可见恢复与 identity/consistency 梯度冲突，但单批诊断不能证明
-它是全局唯一原因，也不能据此直接删除保真约束。
+The normalization group shows raw normalized residual RMS of 6.46e-5 to 1.08e-4, about 2.05e-5 higher than control, though post-budget and post-DSP values remain very small.
+The budget isolation group indeed shows an auxiliary shared gradient of 0, but no better recovery results are achieved.
+The phase input group shows metrics nearly identical to the control group.
+These results do not support direct stacking of modifications or scale expansion.
+Initial training samples still show conflicts between recovery and identity/consistency gradients, but a single-batch diagnosis cannot prove this is the sole cause—nor can it justify removing fidelity constraints.
 
-下一步应先用小尺寸、训练材料限定的可学习性诊断，区分原始残差目标、预算缩放与
-部署损失在何处使有效修复停滞，再决定新的 DSP 激励／谱形控制分支。
-原始预测和完整部署输出需分别判断，并保留低频、瞬态、静音与 identity 约束。
-这只是后续建议，本轮没有启动新训练，也没有实现新的 DSP 激励分支。
+Next, we should first use small-scale, training-material-limited learnability diagnostics to identify where—between original residual target, budget scaling, and deployment loss—the effective restoration stalls, before deciding on new DSP incentive or spectral shape control branches.
+Original predictions and full deployment outputs must be judged separately, and low-frequency, transient, silence, and identity constraints must be preserved.
+This is a recommendation for the next step; no new training was initiated, and no new DSP incentive branch was implemented.
 
-### 原生一致性与实时开销
+### Native Consistency and Real-time Overhead
 
-1,424 个完整 Rust 前端→ORT→DSP 角色的同观测合成检查全部通过，
-最大绝对误差 2.98e-7；同输入 ORT 复数谱最大误差为 3.87e-5，单独保留，
-不与合成误差混称。导出一致性通过不代表恢复有效。
+All 1,424 full Rust frontend → ORT → DSP role syntheses pass observed synthesis checks, with maximum absolute error of **2.98e-7**; maximum ORT complex spectrum error per input is **3.87e-5**, separately retained and not conflated with synthesis error.
+Export consistency passing does not imply effective recovery.
 
-本机 Apple M5 Max 的 56 次测量共 **560,000 hop**，计算超过 5 ms 为 0，
-最大 **3.6204 ms**。48 kHz 双声道的非 paced 24 次测量，p99 为
-0.1625–0.1764 ms；按真实周期 paced 的八次测量，p99 为 **0.9022–1.0165 ms**，
-CPU 为单核的 19.1%–24.4%，进程峰值 RSS 为 31.53–32.00 MiB。
-paced 共 80,000 hop，有 **5 次服务耗时超过 2.667 ms**、**32 次完成迟到**；
-两者不是同一种统计，不能相加或直接称为设备爆音。
-固定 256 帧缓冲在 48 kHz 仍为 **5.33 ms**，不包括在上述计算耗时内。
-合成刺激上的计算结果符合本次 <5 ms 要求，但没有完成真实设备、回调故障恢复或盲听认证。
+On an Apple M5 Max, 56 measurements total **560,000 hops**, with 0 computations exceeding 5 ms.
+Maximum observed latency is **3.6204 ms**. For 24 non-paced, 48 kHz, stereo measurements, p99 is 0.1625–0.1764 ms; for paced, 8 measurements, p99 is **0.9022–1.0165 ms**, CPU usage 19.1%–24.4% per core, peak RSS 31.53–32.00 MiB.
+Paced stream has 80,000 hops, with **5 instances exceeding 2.667 ms** and **32 instances of late completion**; these are distinct statistics and cannot be summed or directly labeled as device clipping.
+Fixed 256-frame buffer at 48 kHz remains **5.33 ms**, not included in the above computation.
+Synthesis workload meets the <5 ms requirement, but no real device, callback, or blind listening validation was performed.
 
-结果保存在本轮 `study/comparisons.json`、`mechanism/`、`joint-review/`、
-`native-audit/` 和 `native-cost/`。完成检查复核了 1,133 项文件哈希，包括
-34 份训练／复核／导出收据、冻结源码、八个端点及原生报告／登记，均匹配；
-记录为本地 `completion-audit-20261019.json`，本次没有重新哈希训练音频。
-代码提交的 [CI](https://github.com/backrunner/soundex/actions/runs/39159181414) 已通过。
-实验制品仍留在忽略目录，正式权重和默认接入行为保持原状。
+Results are saved in `study/comparisons.json`, `mechanism/`, `joint-review/`, `native-audit/`, and `native-cost/`.
+1,133 file hashes were verified, including 34 training, recheck, and export receipts, frozen source code, eight endpoints, and native reports—all matched.
+Recorded in local `completion-audit-20261019.json`; no rehashing of training audio was performed.
+CI [build](https://github.com/backrunner/soundex/actions/runs/39159181414) passed.
+Experimental artifacts remain in ignored directories; official weights and default access behavior remain unchanged.
+
+Both seeds `20261012 / 20261013` are retained. Zero update or identity behavior is a diagnostic control, not recovered audio.

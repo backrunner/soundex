@@ -1,126 +1,121 @@
-# P18：低学习率固定预算续训与跨录音复核
+# P18: Low-Learning-Rate Continual Training and Cross-Recording Recheck
 
-## 运行前协议
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-承接 P17：lr=1e-4 的短程续训在两个种子上改善训练目标，主要收益来自减少 identity
-损伤；原生配对高频指标没有一致改善。本轮检验更长固定预算能否带来真实恢复收益。
+## Pre-Execution Protocol
 
-- 从 P17 两种子的 lr=1e-4、512 步完整状态继续至总步数 2,048，每种子新增 1,536 步。
-- 学习率固定 1e-4；恢复 Adam 动量、计数、随机状态，沿用 P16 第 513–2,048 步采样。
-- 模型、loss、辅助系数 0.1365237430457469、clip=5、gain、codec 和 warmup 不变。
-- 继续 40 录音 × 8 位置，每批 4 音乐 + 1 语音及对应 identity；这是诊断比例。
-- 第 512 / 768 / 1,024 / 1,280 / 1,536 / 1,792 / 2,048 步检查全部 320 个训练位置。
-- 不按训练或开发分数提前选点。两个固定终点全部完成并登记哈希后，才开始开发评分。
-- 比较七个固定条件：初始恒等输出经 DSP、两个 P17 起点、两个 P16 原学习率终点、
-  两个 P18 终点。P18 是第 256 步降学习率后的持续训练，不是从零以低学习率训练。
-- 复核 40 个同录音保护窗口及全部 89 个跨录音开发片段；开发集为 33 音乐片段
-  （26 录音）与 56 语音片段（54 录音），均为此前用过的数据，不能称独立测试。
-- 七条件 × 89 片段 × paired/identity 共 1,246 次原生 Rust DSP 回放。
-  逐条保存原预测频谱与实际 DSP 输出指标，保持原始无损参考。
-- 共同原 loss 维持 80% 音乐 / 20% 语音；另外分别报告音乐、语音的片段均值与
-  录音均值，避免多片段录音占据过大权重。
+Building upon P17: lr=1e-4 short-range continual training on two seeds, which improved training objectives primarily by reducing identity degradation; native paired high-frequency metrics showed inconsistent improvements. This round evaluates whether a longer fixed-budget continuation can yield genuine recovery benefits.
 
-## 判读规则
+- Continuation from the lr=1e-4, 512-step state of both seeds to a total of 2,048 steps, adding 1,536 additional steps per seed.
+- Learning rate fixed at 1e-4; momentum, count, and random state restored, using P16 sampling from step 513 to 2,048.
+- Model, loss, auxiliary coefficient 0.1365237430457469, clip=5, gain, codec, and warmup remain unchanged.
+- Continuation on 40 recordings × 8 positions, with 4 music + 1 speech and corresponding identity per batch—this is the diagnostic ratio.
+- Evaluation at steps 512 / 768 / 1,024 / 1,280 / 1,536 / 1,792 / 2,048, checking all 320 training positions.
+- No early selection of checkpoints based on training or development scores. Both fixed endpoints must complete and be hashed before development scoring begins.
+- Comparison across seven fixed conditions: initial identity output via DSP, two P17 starting points, two P16 baseline learning-rate endpoints, and two P18 endpoints. P18 is the continuation after a 256-step reduction in learning rate, not a restart from zero with low learning rate.
+- Recheck of 40 identical-recording protected windows and all 89 cross-recording development segments; the development set consists of 33 music segments (26 recordings) and 56 speech segments (54 recordings), all previously used data and thus not independent test.
+- 7 conditions × 89 segments × paired/identity = 1,246 native Rust DSP re-plays.
+  For each, raw predicted spectra and actual DSP output metrics are saved individually, preserving original lossless references.
 
-训练误差下降不等于反压缩成功。只有两个种子在固定终点均满足以下数值筛查，才支持
-进一步做新录音测试和盲听；该筛查本身不是发布验收：
+- Common loss maintained at 80% music / 20% speech; separate reporting of per-segment and per-recording averages is provided to avoid overrepresentation by multi-segment recordings.
 
-- 音乐开发主项与配对恢复误差均低于各自 P17 起点和初始恒等 DSP，identity 不比起点差。
-- 原生配对音乐高频谱收敛与瞬态误差均低于起点及初始 DSP。
-- 原生配对音乐高频能量绝对误差、低频谱收敛不比起点差。
-- 上述条件同时检查片段均值与按录音均值；容差 1e-6 仅用于数值比较，不能冒充听觉阈值。
+## Interpretation Rules
 
-P16 原学习率终点作为辅助对照，不以“超过一个失败模型”作为成功标准。
-同时展示语音、同录音保护窗口、逐片段异常和原始/部署后指标，不能用平均数覆盖退化。
-若仍仅减少 identity 损伤，而跨录音高频恢复不一致，则不自动追加相同训练预算，
-转向音乐覆盖与输出表示的可表达性对照。权重保持实验状态。
+A reduction in training error does not equate to successful compression recovery. Only when both seeds meet the following numerical screening at all fixed endpoints is further testing on new recordings and blind listening justified; this screening itself is not a release criterion.
 
-## 执行与边界
+- For music development, both the main and paired recovery errors must be below their respective P17 starting points and initial identity DSP baseline; identity degradation must not exceed the starting point.
+- Native paired music high-frequency spectral convergence and transient errors must be below both the P17 starting point and initial DSP.
+- Native paired music high-frequency energy absolute error and low-frequency spectral convergence must not degrade relative to the starting point.
+- These conditions are evaluated both at the per-segment and per-recording level; a tolerance of 1e-6 applies only to numerical comparisons and cannot be interpreted as an auditory threshold.
 
-- `training/scripts/run_consistency_followup.py`：预登记、断点续训、终点冻结、全开发回放。
-- `training/scripts/analyze_consistency_followup.py`：校验所有输入、源码、checkpoint、
-  完成凭据及评分绑定，按登记规则汇总。
-- 实验目录：`data/runs/consistency-followup-p18-20261013/`。
-- `pipeline.json` / `study/progress.json` 记录状态，`pipeline.log` 记录进度。
+The P16 baseline learning-rate endpoint serves as an auxiliary reference and is not considered successful if it exceeds a single failed model. Both speech, same-recording protected windows, per-segment anomalies, and raw vs. deployed metrics are displayed—no averaging is permitted to mask degradation.
+If recovery is limited to reduced identity damage with inconsistent high-frequency cross-recording recovery, no additional training budget is automatically allocated. Instead, a contrast study of music coverage and output representability is initiated. Weighting remains under experimental status.
 
-原生回放仍是冻结预测特征通过 Rust DSP，不能冒充候选 ONNX 的逐 hop 性能验证。
-本轮不修改推理图或 DSP，不改变默认权重，不推送音频或本地实验产物。
-新增恢复测试用 dropout 与 Adam 验证中断后参数、动量和更新历史逐值一致；
-其他测试覆盖登记不可变、完成产物防漂移、录音权重及 identity-only 改善不能通过恢复筛查。
+## Execution and Boundaries
 
-## 完成状态
+- `training/scripts/run_consistency_followup.py`: pre-registration, checkpoint resumption, endpoint freezing, and full development re-play.
+- `training/scripts/analyze_consistency_followup.py`: validates all inputs, source code, checkpoints, completion proofs, and score bindings according to registration rules, then aggregates results.
+- Experiment directory: `data/runs/consistency-followup-p18-20261013/`.
+- `pipeline.json` and `study/progress.json` record status; `pipeline.log` logs progress.
 
-已于 2026-10-13 22:55（新加坡时间）启动后台队列，源码快照
-`4258462bf14d858762bf785225752d48f4e727ea`；启动时 pipeline PID 为 `58162`。
-队列已于 2026-10-13 23:09:39（新加坡时间）完成双种子训练、终点冻结、全部
-1,246 次原生回放和登记规则分析。2026-10-14 使用冻结源码重新执行分析，
-输入、源码、完成凭据、checkpoint 与评分绑定均通过校验；两个种子均未通过恢复筛查。
+Native re-play remains a frozen prediction passed through Rust DSP and cannot be used as a proxy for candidate ONNX hop-by-hop performance validation.
+This round does not modify the inference graph or DSP, does not alter default weights, and does not push audio or local experiment outputs.
+New recovery tests include dropout and Adam validation to verify consistency of interrupted parameters, momentum, and update history at each step; other tests cover immutability, completion product drift prevention, and the failure of identity-only improvements to pass recovery screening.
 
-实现时 460 项本地 Python 测试、Ruff lint/format 通过；代码 CI `38417618821`
-及启动文档 CI `38417737298` 均成功。本次仅复核产物和更新文档，没有重训或替换权重。
+## Completion Status
 
-## 训练改善没有转化为跨录音恢复
+Launched at 22:55 (Singapore time) on 2026-10-13, backend queue initiated with source code snapshot
+`4258462bf14d858762bf785225752d48f4e727ea`; pipeline PID at startup was `58162`.
+The queue completed both seed training, endpoint freezing, full 1,246 native re-plays, and registration rule analysis by 23:09:39 (Singapore time) on 2026-10-13.
+On 2026-10-14, a re-execution of analysis using frozen source code confirmed all inputs, source code, completion proofs, checkpoints, and score bindings passed validation.
+Both seeds failed the recovery screening.
 
-共同主误差越低越好，开发集表中继续使用既定 80% 音乐 / 20% 语音权重。
+During execution, 460 local Python tests and Ruff lint/format checks passed. CI `38417618821` (code) and CI `38417737298` (launch doc) both succeeded.
+This round only performed revalidation of outputs and updated documentation—no retraining or weight replacement occurred.
 
-| 指标 | 20261012：512 → 2,048 | 20261013：512 → 2,048 |
+## Training Improvements Do Not Translate to Cross-Recording Recovery
+
+Lower common main error is better. Development set results use the fixed 80% music / 20% speech weighting.
+
+| Metric | 20261012：512 → 2,048 | 20261013：512 → 2,048 |
 | --- | ---: | ---: |
-| 完整训练库主项 | 0.279703 → 0.273955 | 0.279112 → 0.272857 |
-| 完整训练库组合目标 | 0.294147 → 0.287927 | 0.293456 → 0.286820 |
-| 开发主项 | 0.296702 → 0.357384 | 0.309035 → 0.390484 |
-| 音乐开发配对恢复 | 0.606519 → 0.672024 | 0.621027 → 0.710225 |
-| 音乐开发 identity 损伤 | 0.046274 → 0.133471 | 0.062608 → 0.178525 |
+| Full training library main error | 0.279703 → 0.273955 | 0.279112 → 0.272857 |
+| Full training library composite target | 0.294147 → 0.287927 | 0.293456 → 0.286820 |
+| Development main error | 0.296702 → 0.357384 | 0.309035 → 0.390484 |
+| Music development paired recovery | 0.606519 → 0.672024 | 0.621027 → 0.710225 |
+| Music development identity degradation | 0.046274 → 0.133471 | 0.062608 → 0.178525 |
 
-所有登记训练检查点的主项均逐次降低，最终下降 2.05% / 2.24%；
-开发主项反而上升 20.45% / 26.36%。初始恒等 DSP 的开发主项为 0.271475，
-音乐配对为 0.588365，两个终点仍不及初始。
-P16 原学习率终点为 0.362854 / 0.426925；超过它们不能说明已达到恢复目标。
+All registered training checkpoints show a gradual decrease in main error, ending with reductions of 2.05% / 2.24%;
+development main error, however, increased by 20.45% / 26.36%. The initial identity DSP development main error was 0.271475, paired recovery 0.588365—both endpoints still fall short of the baseline.
+P16 baseline learning-rate endpoint: 0.362854 / 0.426925; surpassing these does not indicate achievement of recovery goals.
 
-按录音平均，音乐开发主项也由 0.320941 / 0.330513 升至 0.369912 / 0.393549；
-不能把退化解释为某首录音有多个片段造成的统计假象。
-同录音保护窗口的音乐配对误差略降，但 identity 损伤增加，整体主项一好一坏。
-语音开发主项降至 0.175929 / 0.174919（初始 0.180645），不能将语音收益外推至音乐。
+Per-recording average, music development main error increased from 0.320941 / 0.330513 to 0.369912 / 0.393549—degradation cannot be dismissed as a statistical artifact from a few segments.
+Same-recording protected window music paired error slightly decreased, but identity degradation increased, resulting in a net gain and loss respectively.
+Speech development main error decreased to 0.175929 / 0.174919 (initial 0.180645), and cannot be extrapolated to music gains.
 
-这次结果支持“小学习率改善了这段训练的优化行为”，同时暴露了持续的跨录音泛化
-和严重尾部错误；不支持“只要继续训练就会超过初始”。没有新的容量上限证据。
+This result supports the notion that "a small learning rate improved optimization behavior during this training phase," while exposing persistent cross-recording generalization and severe tail errors.
+It does not support the claim that "continuing training will eventually surpass the initial." No new capacity ceiling evidence is observed.
 
-## 全开发原生回放与尾部错误
+## Native Development Replays and Tail Errors
 
-原生/代理最大绝对差 **1.022220e-5**，低于既定 2e-5 校验阈值。
-该数值是数值一致性证据，不是听感、爆音或实际设备验收。
-全部 33 个开发音乐片段的原生配对输出，越低越好：
+Native/proxy maximum absolute difference: **1.022220e-5**, below the predefined 2e-5 validation threshold.
+This value is a numerical consistency indicator and does not imply audible artifacts, pops, or device-level acceptance.
 
-| 指标 | 初始恒等 DSP | 20261012 终点 | 20261013 终点 |
+For all 33 development music segments, native paired output performance must be minimized:
+
+| Metric | Initial Identity DSP | 20261012 Endpoint | 20261013 Endpoint |
 | --- | ---: | ---: | ---: |
-| 高频谱收敛误差 | 0.548761 | 0.696447 | 0.773183 |
-| 高频瞬态误差 | 0.717164 | 0.809499 | 0.861455 |
-| 高频能量绝对误差，dB | 8.480117 | 7.497984 | 7.266781 |
+| High-frequency spectral convergence error | 0.548761 | 0.696447 | 0.773183 |
+| High-frequency transient error | 0.717164 | 0.809499 | 0.861455 |
+| High-frequency energy absolute error (dB) | 8.480117 | 7.497984 | 7.266781 |
 
-高频能量误差降低，但谱形、瞬态更差；按录音平均同样如此。
-两个种子的原生高频谱形/瞬态筛查均失败，并非仅被 1e-6 的低频数值容差挡住。
-第二种子的低频误差相对起点只增加约 2.8e-6，也触发数值筛查，不能据此称其可闻。
-没有盲听或新的候选 ONNX 实时 benchmark。
+While high-frequency energy error decreased, spectral shape and transient performance worsened; the same trend holds when averaged per recording.
+Both seeds failed native high-frequency spectral shape and transient screening—this failure is not masked by a 1e-6 tolerance.
+The second seed's low-frequency error increased by only ~2.8e-6 relative to the starting point, which still triggered the numerical screening and cannot be interpreted as perceptible.
+No blind listening or new candidate ONNX real-time benchmark was conducted.
 
-相对初始，音乐配对误差有 20/33、21/33 片段改善，另有 13/33、12/33 退步；
-identity 有 27/33 片段在两个种子上退步。因此不是所有片段都变坏，
-而是少数严重失败抵消了多数片段的小幅恢复，并伴随更广的 identity 损伤。
-同一个 blues 片段 `9d95e7f035f878fa1a6ab421` 分别占音乐配对误差净增量的
-77.81% / 77.82%。这是净增量占比，不能解释为所有错误中该片段的占比。
-它也是 P14/P15 已识别的反例；本轮没有重新做频带干预，不能直接断言此次机制完全相同。
-保留所有反例及原评分，不删除曲目或事后放宽筛查。
+Relative to the baseline, 20/33 and 21/33 music segments improved in paired error, while 13/33 and 12/33 degraded.
+Identity degradation occurred in 27/33 segments across both seeds. Thus, not all segments deteriorated—only a few severe failures offset the small improvements in most segments, accompanied by broader identity degradation.
+A single blues segment, `9d95e7f035f878fa1a6ab421`, accounts for 77.81% / 77.82% of the net error increase in paired recovery.
+This is a net error increase proportion, not the percentage of total errors attributable to this segment.
+It is also a known counterexample from P14/P15; no re-intervention in frequency band was performed, and cannot be definitively linked to identical mechanisms.
+All counterexamples and original scores are preserved—no track is removed, and no post-hoc screening relaxation is applied.
 
-## 覆盖审计与下一步
+## Coverage Audit and Next Steps
 
-复核冻结 manifest 后，当前诊断训练音乐仅 32 录音：ambient 7、electronic 7、
-classical 6、rock 4、pop 3、unlabeled 2、country/folk/jazz 各 1；没有 blues、funk、hiphop。
-实际训练划分可用音乐为 253 录音，其中 blues 7、funk 1、hiphop 2；
-验证 26 录音和测试 21 录音继续隔离。当前只选 8 条语音录音，训练划分可用 193 条。
-计数以录音为单位，不能把合成后的数万配对行当成独立曲目数。
-审计保存在实验根目录 `coverage-audit.json`，包含配置哈希和固定 manifest 复核。
+After verifying the frozen manifest, current diagnostic training music includes only 32 recordings: ambient (7), electronic (7), classical (6), rock (4), pop (3), unlabeled (2), country/folk/jazz (1 each).
+Blues and funk are absent.
+Actual training music available: 253 recordings, including blues (7), funk (1), hip-hop (2).
+Validation on 26 recordings and test on 21 recordings remain isolated.
+Currently only 8 speech recordings are included in training; 193 available speech segments are used.
+Counts are per-recording, not per synthetic pair—totaling tens of thousands of paired rows does not equate to independent song count.
+Audit saved in root experiment directory as `coverage-audit.json`, including configuration hash and fixed manifest reconciliation.
 
-缺少 blues 与最大失败的风格相符，是可检验的覆盖假设，不证明这是唯一原因。
-按预定规则，本轮结束，不自动追加相同配置的训练。下一步优先登记音乐录音覆盖
-对照，使用现有训练划分里的更多录音，保持模型、loss、低学习率和诊断混入规则，
-分别控制更新预算及录音曝光；不将验证/测试反例加入训练，不按它们设置专用门控。
-若扩大覆盖仍不能稳定降低原生谱形/瞬态和 identity 损伤，再做输出表示的可表达性
-对照。该覆盖对照现已作为 [P19](music-coverage-study.md) 登记并启动，默认权重保持原状。
+The absence of blues and the presence of the most severe failure in style-matching is a testable coverage assumption and does not prove it is the sole cause.
+Per the predefined protocol, this round ends without automatic continuation of the same configuration.
+Next step: prioritize registration of music recording coverage comparison, using more recordings from the existing training split, while maintaining model, loss, low learning rate, and diagnostic mixing rules.
+Update budgets and exposure per recording are controlled; development and test counterexamples are not included in training, and no style-specific gating is introduced.
+If expanding coverage fails to stabilize reduction in native spectral shape/transient and identity degradation, a further output representability analysis will be conducted.
+This coverage comparison has now been registered and launched as [P19](music-coverage-study.md), with default weights retained.

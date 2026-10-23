@@ -1,112 +1,111 @@
-# 无损音乐训练候选：2026-10-10 首次验证
+# Lossless Music Training Candidate: First Validation – 2026-10-10
 
-结论：模型学到了高频恢复能力，但本次验证尚不足以作为正式恢复权重发布。
-建议先调整损失的量纲/权重及部署的带宽、相位和工作线程策略，再做小规模对照实验，
-不直接把当前配置继续训练数百轮。当前证据不能单独判定模型架构失效。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-后续的[损失审计与 8 轮受控续训](loss-audit-20261010.md)已完成：相位与波形小幅改善，高频指标回升，保留原权重。该文同时记录来源元数据修复与实时调度对照；本文保留首次诊断的原始结果。
+**Conclusion:** The model has learned high-frequency recovery capabilities, but this validation is insufficient to justify the release of recovered weights for production use.
+**Recommendation:** Prior to further training, adjust the scaling and weighting of the loss function, and refine deployment strategies for bandwidth, phase, and working thread allocation. Conduct small-scale controlled experiments before continuing training for hundreds of additional rounds. Current evidence does not independently indicate model architecture failure.
 
-## 权重与损失
+The subsequent [Loss Audit and 8-Round Controlled Retraining](loss-audit-20261010.md) has been completed: minor improvements in phase and waveform fidelity, with high-frequency errors rising again. The original weights are retained. This document also records metadata correction and real-time scheduling comparisons; the present report preserves the original results from the first diagnostic run.
 
-新训练在新加坡时间 01:00 完成 200 轮、25,600 次更新，随机初始化，没有旧权重或教师。
-固定验证指标选中的候选来自第 168 轮：总损失 11.6241，高频误差 10.8692。
-第 200 轮高频误差 10.9424，比最佳值略高。90–100 轮高频均值 11.4775，
-最后 10 轮 10.9740，继续训练 100 轮的改进约 4.4%，已接近平台。
+---
 
-| 同一批 896 个固定验证样本的指标 | 直接保留压缩输入 | 最佳模型 |
+## Weights and Loss
+
+Training completed at 01:00 Singapore time, consisting of 200 rounds and 25,600 updates, with random initialization—no prior weights or teacher model.
+The selected candidate checkpoint from round 168 is used for validation. Total loss: 11.6241, high-frequency error: 10.8692.
+At round 200, high-frequency error increases slightly to 10.9424, slightly above the minimum observed. The average high-frequency error across rounds 90–100 was 11.4775, and the last 10 rounds averaged 10.9740. The additional 100 completed epochs improved this average by approximately 4.4%, suggesting a plateau.
+
+| Metric (from 896 fixed validation samples) | Direct Compressed Input | Best Model |
 | --- | ---: | ---: |
-| 高频幅度误差（掩码加权 dB 绝对误差） | 36.3279 | 10.8692 |
-| 相位误差（能量加权 `1 - cos(delta)`） | 0.53944 | 0.81271 |
-| 稳态波形 L1（归一化 PCM） | 0.0068255 | 0.0068452 |
-| 总加权损失（验证时不含 GAN 项） | 36.4364 | 11.6241 |
+| High-frequency magnitude error (masked-weighted dB absolute error) | 36.3279 | 10.8692 |
+| Phase error (energy-weighted `1 - cos(delta)`) | 0.53944 | 0.81271 |
+| Steady-state waveform L1 (normalized PCM) | 0.0068255 | 0.0068452 |
+| Total weighted loss (validation, excluding GAN term) | 36.4364 | 11.6241 |
 
-验证行 ID 与 checkpoint 中的固定验证集合逐项一致。总损失以高频项为主，不能当作
-音质分数；训练的 G loss 含 GAN 项，也不能与该验证总损失直接等同。
-目前波形项在总损失中仅贡献约 0.000685，而高频项贡献约 10.87。
-强化波形/相位约束前应按量纲归一化并检查各项梯度，避免只增加一个仍然过小的权重。
+Each validation row ID matches exactly with the fixed validation set in the checkpoint. The total loss is dominated by high-frequency components and should not be interpreted as a perceptual quality score. The G loss during training includes the GAN term and is therefore not directly comparable to the validation total loss.
+Currently, the waveform term contributes only about 0.000685 to the total loss, while the high-frequency term contributes approximately 10.87. Before imposing stronger waveform or phase constraints, the loss components must be normalized by magnitude and gradient analysis must be performed to avoid merely increasing a still negligible weight.
 
-候选 checkpoint SHA-256：`a4fed7e7f4a463c01213d2a0705286c85a63b8e3b34c6681dcd9124cf7530650`。
-本地 ONNX 为 3,309,786 字节（3.16 MiB），SHA-256：
-`cd0546e54c4477195a2a6567192df515285b86c42b286baf4a9e40f90160d063`。
-13 项 PyTorch / ONNX Runtime / Rust 数值一致性检查通过，未放宽现有策略。
+Candidate checkpoint SHA-256: `a4fed7e7f4a463c01213d2a0705286c85a63b8e3b34c6681dcd9124cf7530650`.
+Local ONNX size: 3,309,786 bytes (3.16 MiB), SHA-256: `cd0546e54c4477195a2a6567192df515285b86c42b286baf4a9e40f90160d063`.
+13-point PyTorch / ONNX Runtime / Rust numerical consistency checks passed; existing policies remain unchanged.
 
-## 独立测试集的抽样诊断
+---
 
-完整测试集有 7,891 行。本次先冻结确定性抽样规则：按 corpus、曲风、编码、采样率
-各取一个单元，并补齐全部测试录音及声道角色。共 209 行，覆盖 21 首音乐、18 条语音、
-10 个编码配置和 44.1/48 kHz。使用生产 Rust gate、STFT、交叉频段、响度/相位处理、
-限幅及 flush，通过整段、128 帧块和不规则分块进行对照；没有替换为 Python 波形实现。
-原始测试清单未改写，所有测试行的配对文件哈希已审计。下面数值仅代表该固定诊断集合。
+## Independent Test Set Sampling Diagnostics
 
-| 指标 | 结果 |
+The full test set contains 7,891 rows. For this round, deterministic sampling rules were frozen: one unit selected per corpus, genre, encoding, and sample rate, with all test recordings and channel roles fully populated. A total of 209 rows were generated, covering 21 music tracks, 18 speech samples, 10 encoding configurations, and both 44.1 kHz and 48 kHz sample rates.
+Production-grade Rust gate, STFT, cross-band processing, loudness/phase handling, clipping, and flush operations were applied. Testing was performed on full segments, 128-frame blocks, and irregularly segmented portions. No Python waveform implementations were substituted.
+The original test list was not modified; all paired file hashes have been audited. The following values represent the fixed diagnostic set.
+
+| Metric | Result |
 | --- | --- |
-| 高频 LSD（压缩 → 增强） | 43.23 → 17.93 dB |
-| 高频 LSD 差值的按录音聚类 95% CI | −31.16 至 −18.38 dB |
-| 音乐／语音的高频 LSD 差值 | −25.83 / −21.90 dB |
-| SI-SDR（压缩 → 增强） | 24.21 → 23.58 dB，平均下降 0.63 dB |
-| 整段与两种分块方式最大绝对差 | 0 |
-| 非有限输出行 | 0 |
+| High-frequency LSD (compressed → enhanced) | 43.23 → 17.93 dB |
+| High-frequency LSD difference by track (95% CI) | −31.16 to −18.38 dB |
+| Music/speech high-frequency LSD difference | −25.83 / −21.90 dB |
+| SI-SDR (compressed → enhanced) | 24.21 → 23.58 dB, average drop of 0.63 dB |
+| Maximum absolute difference between full and two block types | 0 |
+| Non-finite output rows | 0 |
 
-高频谱改善不等于听感获益。测试集中的一首蓝调录音平均高频 LSD 反而增加 2.69 dB；
-该曲风仅有一个独立测试作品，不能外推整个蓝调类别。蓝调、流行、funk 等小类需要更多
-独立测试作品。相位/波形以及高码率输入的退化应列入下轮的保真对照。
+Improved high-frequency spectral content does not necessarily imply perceptual benefit. In one blues recording, the average high-frequency LSD increased by 2.69 dB. This genre has only one independent test piece and cannot be generalized to the entire blues category. Additional independent test pieces are required for genres such as blues, pop, and funk. Degradation in phase, waveform, and high-bitrate input should be included in the next round of fidelity comparisons.
 
-### 对低频和超幅指标的复核
+---
 
-原有低频保留 LSD 均值 4.47 dB，超过现有 0.25 dB 阈值；但该指标等权统计极弱频点，
-不能解释成低频实际响度改变了 4.47 dB。另对 115 个物理声道行（mono/left/right）
-去掉两端各 1,024 个样本，测量低于清单截止频率减 500 Hz 的复数 STFT 能量：
-平均低频绝对能量增益变化仅 0.0026 dB，最大 0.0588 dB；修改残差相对输入低频能量
-的 dB 比值均值 −50.91 dB。该复核说明低频实际变化很小，原指标需要结合能量及带宽
-估计评审；本次没有修改发布门槛，也没有据此宣称通过完整质量验收。
+### Recheck of Low-Frequency and Ultra-peak Metrics
 
-物理声道输入有 273 个已有超幅样本，输出保留 4 个，没有新增越界。其余诊断超幅主要
-来自能量归一化的虚拟 mid 角色，这些角色本身可能超过满刻度，不能按实际扬声器声道
-直接归因于模型爆音。离线保留的输入越界仍不满足当前零削波发布项，需审查 dry 路径。
+The original low-frequency LSD mean was 4.47 dB, exceeding the current 0.25 dB threshold. However, this metric is based on a weighted average of extremely sparse frequency points and does not imply a 4.47 dB change in actual low-frequency loudness. Additionally, for 115 physical channel rows (mono/left/right), the first and last 1,024 samples were removed, and the complex STFT energy below the cutoff frequency minus 500 Hz was measured:
+- Average absolute energy gain change: only 0.0026 dB (peak: 0.0588 dB)
+- Relative residual input low-frequency energy dB ratio change: average −50.91 dB
 
-原清单的 left/right 随机片段起点不同，不能拼成同步立体声。另从两首独立测试原始
-立体声作品（rock/electronic）完整编码为 MP3 128，再对齐并裁出 12 秒，验证两个采样率，
-共 4 个立体声场景：分块差值均为 0，无超幅，声像宽度误差略增约 0.0015–0.0065 dB。
-相位误差也略增，不能替代盲听。另测两个采样率、单双声道的静音/脉冲，共 8 个场景：
-输出帧数准确、无非有限值、静音峰值为 0。
+This recheck confirms minimal actual low-frequency changes. The original metric requires further evaluation in conjunction with energy and bandwidth estimates. No release threshold was adjusted, and no full quality acceptance is claimed based on this result.
 
-## 本机性能与持续输出
+There are 273 existing over-range samples in physical channel inputs; 4 are retained in output, with no new overflows. Most other overflow cases originate from energy-normalized virtual mid-channel roles, which may themselves exceed full-scale. These cannot be directly attributed to model clipping. Offline retained input overflows still do not meet the current zero-clipping release criterion and require review of the dry path.
 
-硬件为 Apple M5 Max，ORT 单线程，FFT 256 / hop 128。
-串行基准每个场景 10 秒，实时适配器用留出音乐的 MP3 128 音频，四个场景各 30 秒。
-这些是短时工程诊断，没有物理音频设备参与，也没有 x86 或 30 分钟压力结果。
+The left/right random snippet start points differ, so they cannot be stitched into a synchronized stereo signal. Additionally, two independent stereo test pieces (rock/electronic) were fully encoded to MP3 128, aligned, and 12-second segments cropped to verify both sample rates—yielding 4 stereo scenarios. Block-level differences were all 0, no overflows, and stereo image width errors increased slightly by 0.0015–0.0065 dB. Phase errors also increased slightly, but these cannot replace blind listening.
+Further tests on two sample rates and mono/stereo silence/pulse patterns (8 scenarios): output frame count accurate, no non-finite values, silence peak at 0.
 
-| 场景 | 串行 P99 总软件延迟 | 实时适配器保守附加延迟 | 增强结果未及时到达 |
+---
+
+## On-Device Performance and Continuous Output
+
+Hardware: Apple M5 Max, ORT single-thread, FFT 256 / hop 128.
+Serial baseline: 10 seconds per scene. Real-time adapter uses a 30-second MP3 128 audio stream from held-out music, with four scenes tested. These are short-term engineering diagnostics and do not involve physical audio devices, nor do they include x86 or 30-minute stress testing.
+
+| Scenario | Serial P99 Software Latency | Real-Time Adapter Conservative Overhead | Enhanced Output Not Arrived |
 | --- | ---: | ---: | ---: |
 | 44.1 kHz / 1 ch | 3.474 ms | 5.963 ms | 0.019% |
 | 44.1 kHz / 2 ch | 3.940 ms | 5.823 ms | 0.271% |
 | 48 kHz / 1 ch | 3.220 ms | 5.473 ms | 0.018% |
 | 48 kHz / 2 ch | 3.711 ms | 5.357 ms | 0.320% |
 
-串行 P99 包含 128 样本算法等待和处理时间；实时适配器包含 256 样本固定缓冲和观测到的
-最大回调耗时，不含声卡已有缓冲。两条路径是不同接入方式，不能将串行的约 3.9 ms
-作为异步适配器的端到端延迟。四组实时输出都保持准确帧数，回调超时、队列溢出、
-非有限输出均为 0；双声道未及时到达比例 0.27%–0.32% 高于当前 0.1% 的可用性目标。
-缺失被保护路径覆盖，并未表现为输出停顿，但不能宣称增强始终可用或绝无听感伪影。
+The serial P99 includes 128-sample algorithm processing and waiting time. The real-time adapter overhead includes 256-sample fixed buffer and observed maximum callback latency, excluding existing audio card buffering. These two paths represent different access methods and cannot be used to infer that the ~3.9 ms serial latency is representative of end-to-end latency in asynchronous adapters. All four real-time outputs maintain accurate frame count, with 0 callback timeouts, queue overflows, or non-finite outputs. The stereo enhancement lateness rate of 0.27%–0.32% exceeds the current 0.1% availability target. This missing coverage is not reflected in output dropouts, and no output pause is observed. However, the system cannot be claimed to be always available or free of audible artifacts.
 
-外部 `/usr/bin/time -l` 测得峰值进程 RSS：串行 39.09 MiB，实时适配器 36.11 MiB。
-串行双声道处理消耗约 0.34–0.37 个 CPU 核的计算预算；四场景实时测试的
-(user + system) / wall ≈ 0.49 个核，包含供帧/定时测试代码，不能作为纯模型 CPU 消耗。
+External `/usr/bin/time -l` measurement shows peak process RSS:
+- Serial: 39.09 MiB
+- Real-time adapter: 36.11 MiB
 
-## 下一步与证据边界
+Stereo processing consumes approximately 0.34–0.37 CPU core budget. The four-scenario real-time test (user + system) / wall time ≈ 0.49 cores, including overhead from frame provisioning and timing tests. This cannot be used as a pure model CPU consumption metric.
 
-1. 保留第 168 轮候选作基线；先在固定验证集上比较相位/波形保真约束、loss 归一化和
-   保守频段控制，再决定有限的低学习率续训或重训。当前小幅 loss 下降不是无限续训依据。
-2. 修正或补充针对弱能量频点的保留指标，分开实际声道、虚拟角色及输入已有超幅；
-   补齐同步立体声测试单元。不能用放宽一个阈值替代真实保真/听感验证。
-3. 处理实时工作线程的截止时间可用性问题，保留当前不丢帧的输出保护，再跑长时间和设备测试。
-4. 本次测试结果只用于诊断，不把这些测试样本加入训练。依据这些结果调参后的最终验收
-   应另保留未参与调参的作品，避免把测试集反复使用当作独立泛化证据。
+---
 
-尚未完成：全量 7,891 行部署评分、ViSQOLAudio（本机无可用程序）、人工盲听、
-30 分钟稳定性、x86 性能及最终 artifact 的完整权利核查。因此权重仍为本地实验候选。
-原始音频、配对文件、报告、试听 WAV 和 ONNX 均留在忽略的 `data/`，仅推送来源与结论文档。
+## Next Steps and Evidence Boundaries
 
-本地证据目录：`data/reports/native-validation-20261010/`，包含固定抽样清单、loss 曲线、
-同集合压缩基线、13 项 parity、209 行诊断、超幅/带宽复核、物理声道能量保留、立体声/
-边界测试、两个性能报告及资源测量记录。参见[训练记录](native-training-20261009.md)。
+1. **Retain the checkpoint from round 168 as baseline.** Prior to any further action, conduct controlled comparisons on the fixed validation set—specifically evaluating phase/waveform fidelity constraints, loss normalization, and conservative frequency band controls—before deciding on a limited low-learning-rate retraining or full retraining. A small loss reduction is not justification for indefinite continuation.
+2. **Refine or supplement metrics for weak-energy frequency points**, separating physical channels, virtual roles, and pre-existing overflow cases. Add synchronized stereo test cases. A single threshold relaxation cannot substitute for actual fidelity or perceptual validation.
+3. **Address real-time thread deadline availability issues**, preserving current non-drop-frame output guarantees, and then conduct extended and device-level testing.
+4. **This test result is strictly for diagnostic purposes and must not be used as training data.** Final acceptance based on these results should be evaluated using a separate, untouched set of samples not involved in the tuning process. Reusing test sets as evidence of generalization is invalid.
+
+**Pending tasks:**
+- Full 7,891-row deployment scoring
+- ViSQOLAudio evaluation (not available on this machine)
+- Human blind listening
+- 30-minute stability test
+- x86 performance benchmarking
+- Full artifact rights and ownership verification
+
+Therefore, the weights remain candidates for local experimentation only.
+Original audio, paired files, reports, audition WAVs, and ONNX files are preserved in the ignored `data/` directory. Only source metadata and report documents are shared.
+
+**Local evidence directory:** `data/reports/native-validation-20261010/`
+Contains: fixed sampling list, loss curves, compressed baseline comparison, 13-point parity checks, 209-row diagnostics, overflow/bandwidth rechecks, physical channel energy retention, stereo/boundary test cases, two performance reports, and resource measurement logs. See also [Training Record](native-training-20261009.md).

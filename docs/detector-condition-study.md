@@ -1,186 +1,214 @@
-# P38：小模型检测条件训练对照
+# P38: small-model detector-condition training controls
 
-**已完成：2026-10-23 00:14:38（新加坡时间）完成全部训练和自动复核。**
-固定检测条件使两个种子的音乐频谱均退步，两种输出路径都未通过研究筛选；
-本轮不晋级权重，也不继续扩展固定条件路线。完整结果见下文。
+**Completed 2026-10-23 at 00:14:38 Singapore time:** all training and automatic
+reviews finished. Fixed detector conditions regressed music spectra in both seeds;
+neither output path passed the registered research screen. No weights were promoted
+and this fixed-condition route will not be expanded unchanged.
 
-接续 [P37 融合审计](fusion-boundary-audit.md)。本轮只验证模型对显式 cutoff/active
-条件的依赖，不改变主要 loss，不扩大模型，不将 DSP 输出作为监督教师。
+Following [P37](fusion-boundary-audit.md), this study isolates dependence on explicit
+cutoff/active conditions. It does not change the main loss, enlarge the model or use
+DSP output as a supervision teacher.
 
-## 固定配置
+## Fixed configuration
 
-| 项目 | 设置 |
-|---|---|
-| 控制 | P36 compressed：直接无损谱及原始 OLA 多分辨率目标，identity 1.0 |
-| 实验 | 同一目标；模型内部固定归一化 cutoff=0.5、active=1，保留实时采样率条件 |
-| 模型 | 同一复数残差结构，宽度 96，431,015 参数 |
-| 初始化 | 每个种子两组参数完全相同，并核对 P36 初始化哈希；从头训练 |
-| 预算 | 种子 20261012/20261013，两组各 16,192 步，共 64,768 步 |
-| 数据/抽样 | 原 P36 完整抽样顺序，4 音乐 + 1 语音及各自 identity；没有新增来源 |
-| 优化 | CPU 单线程，Adam 1e-4，梯度范数上限 5；80 帧无梯度模型预热 |
-| 评分 | 全部端点冻结后统一评分，复用隔离录音留出集，不作独立泛化宣称 |
+| Item | Setting |
+| --- | --- |
+| Control | P36 compressed: direct lossless spectrum plus raw-OLA multiresolution objective, identity weight 1.0 |
+| Intervention | Same objective; normalized cutoff=0.5 and active=1 inside the model, retaining the real sample-rate condition |
+| Model | Same complex-residual structure, width 96, 431,015 parameters |
+| Initialization | Identical tensors between arms per seed; P36 initialization hashes checked; trained from scratch |
+| Budget | Seeds 20261012/20261013, 16,192 steps per arm/seed, 64,768 total |
+| Data/sampling | Full P36 schedules: four music plus one speech excerpt and corresponding identity roles; no new sources |
+| Optimization | Single-thread CPU, Adam 1e-4, gradient norm cap 5; 80-frame no-gradient model warmup |
+| Assessment | Freeze every endpoint before common scoring; reused recording-isolated held-out material, not independent generalization evidence |
 
-条件变换在 `RestorationHead.forward_details` 内完成，从第一帧预热即生效，并随
-ONNX 图导出。固定策略写入检查点配置与导出元数据。没有只在 Python 训练侧修改
-条件，也没有改变 Rust 检测器、门控或输入时间轴。旧模型默认 native，参数形状和
-初始化不变。此实验只去除显式检测条件的信息，不等于模型不再利用输入的带宽线索。
+Condition transformation occurs in `RestorationHead.forward_details`, starting at
+the first warmup frame and included in the exported ONNX graph. The policy is stored
+in checkpoint configuration and export metadata. It is not a Python-only training
+change. Rust detection, gating and the input timeline are unchanged. Old models
+default to native conditions, with unchanged parameter shapes and initialization.
+Removing explicit detector information does not remove bandwidth cues from the audio.
 
-训练目标与 P36 compressed 相同：每例 `log1p(direct) + log1p(MR)`，
-paired/identity 保持原系数，另加 0.1 倍原残差预算目标。监督是原始未限幅无损，
-不通过完整安全限幅或故障策略反传，不同时调整动态权重。
+The objective matches P36 compressed: per-example `log1p(direct) + log1p(MR)`, the
+original paired/identity coefficients, plus 0.1 times the residual-budget objective.
+The target is original unclipped lossless audio. No gradient passes through complete
+safety limiting or failure policies, and dynamics weights are not changed concurrently.
 
-## 自动验证与研究筛选
+## Review protocol
 
-四个最终端点全部冻结后，依次执行导出、原生 PCM/代理对应、共同 MR、CPU 时延，
-以及 current 和 phase-only 两条已固定的输出路径。后者仅取消幅度回混，仍保留
-相位融合、检测和门控。每条路径都比较同一路径下的控制与实验，不能跨路径挑最好值。
+After all four final endpoints freeze, run export, native PCM/proxy correspondence,
+common MR, CPU timing and the two predetermined output paths: current and phase-only.
+Phase-only removes magnitude remixing while retaining phase fusion, detection and
+gating. Compare candidate/control within the same path and seed; do not select the
+best score across paths.
 
-每条路径的研究筛选要求：两个种子均改善音乐原生 MR 均值与逐录音差值中位数，
-音乐/语音 identity 及各角色动态不退步；同时保留全部频段与绝对 PCM 反例。
-原始预测、原生输出、压缩输入和恒等 DSP 控制分别报告。
-即使满足这些研究筛选，也不自动发布或替换默认权重，仍需要独立录音、立体声、
-连续流和盲听证据。达到固定预算不等于证明收敛。
+Each path requires both seeds to improve native music MR means and median per-recording
+differences, without regressions in music/speech identity or either role's dynamics.
+Retain every band and absolute-PCM counterexample. Report raw prediction, native
+output, untreated compressed input and identity DSP separately. Even passing this
+research screen would not publish weights: independent recordings, stereo, continuous
+streams and blind listening remain necessary. A completed budget does not prove
+convergence.
 
-## 设备核查纠正
+## Device correction and startup
 
-2026-10-22 启动核查确认：**P36 冻结训练执行器原本就在 CPU 上运行**。
-`run_direct_spectrum_study.train` 创建 CPU 模型和批次，没有转移到 MPS；
-外层执行器设置单线程。此前将 Metal 编译服务故障当作本轮启动阻塞的判断不正确。
-本轮明确登记 CPU，沿用此前设备方式，不是为了绕开故障临时改变训练设备。
+The 2026-10-22 startup audit confirmed that **the frozen P36 executor already used
+CPU**. `run_direct_spectrum_study.train` creates CPU models/batches without moving
+them to MPS; the outer executor sets one thread. Treating the Metal compiler-service
+failure as a blocker for this experiment was incorrect. P38 explicitly registers
+the same CPU route, rather than changing devices to bypass a failure.
 
-启动时独立 MPS 运算报 `MTLCompilerService` 连接 error 141，当时 MPS 测试不能声称通过。
-它不影响本轮 CPU 训练或 Rust CPU ORT 验证。系统 FFmpeg 的动态库问题也通过已有的
-本地 FFmpeg 进程 PATH 解决，没有改动系统安装。
+The independent startup MPS probe failed with `MTLCompilerService` connection error
+141; it cannot be reported as passing. This did not affect CPU training or Rust CPU
+ORT validation. The system FFmpeg dynamic-library issue was handled using the existing
+local FFmpeg in the process PATH, without changing the system installation.
 
-## 运行入口
+Executor: `training/scripts/run_detector_condition_study.py`. Formal local directory:
+`data/runs/detector-condition-p38-20261022/`; separate preflight:
+`data/runs/detector-condition-p38-preflight-20261022/`. Source, configuration, manifests,
+initialization, schedules and native binary are hash-bound. Recovery state is saved
+every 64 steps. Failures retain evidence; no automatic budget changes, retries or
+intermediate-best selection occur. Status is in `supervisor.json`,
+`study/progress.json` and `pipeline.log`; checkpoints are under
+`study/<arm>-<seed>/latest.pth`.
 
-执行器：`training/scripts/run_detector_condition_study.py`。
-本地正式目录：`data/runs/detector-condition-p38-20261022/`；预检目录另列为
-`data/runs/detector-condition-p38-preflight-20261022/`。源码、配置、数据清单、
-初始化、抽样顺序、原生二进制均按哈希冻结。每 64 步保存恢复状态，失败留存证据，
-不自动改预算、重试或选择中途最优权重。
+The two four-step preflight endpoints completed training, ONNX export, 16 native PCM
+roles, 16 additional MR replays and 32 fusion-path replays. Maximum fusion-proxy
+error was `2.98e-7`, with unchanged tolerance. CPU tests: **653 passed, seven MPS
+items unverified**. Coverage includes nonzero-model condition invariance/sample-rate
+gradients, history equivalence, checkpoint policy, 320-hop export and per-path,
+two-seed screening. Short preflight loss was not used to predict full-run quality.
 
-状态入口：`supervisor.json`、`study/progress.json`、`pipeline.log`；
-各组检查点位于 `study/<arm>-<seed>/latest.pth`。
+All **191 execution-dependency hashes** match preflight/formal execution. Registration
+SHA-256: `5919c8c0c45891c00006ebce694f173c700f14bd5cebf4f6cc0fb990afa2a18d`.
+The supervisor records child exit success/failure without automatic restart or
+rewriting P36/P37 evidence. Initial process-bound caffeinate failed with
+`Failed to create PreventUserIdleSystemSleep assertion`; sleep prevention was not
+active then. Training continued and step 256 was verified; the machine needed to
+remain awake.
 
-## 启动记录（2026-10-22）
+## Completion and resume integrity
 
-正式后台监督进程已启动，四条轨迹按登记顺序执行。预检两个四步端点已完成训练、
-ONNX 导出、16 次原生 PCM 对应、16 次额外 MR 回放和 32 次融合路径回放。
-融合代理最大差异 `2.98e-7`，没有调整容差。CPU 测试 **653 passed、7 个 MPS 项未验证**；
-包含非零模型的条件不变性/采样率梯度、跨历史等价、检查点配置、320-hop 导出及
-分路径双种子筛选逻辑。没有从短预检 loss 推断正式效果。
+All four trajectories completed **16,192 steps**, totaling **64,768 updates**. The
+third finished October 22 at 21:50:59. At the user's request, the fourth paused at
+step 2,624 for a Mac restart. It resumed with identical weights, optimizer and sampling
+sequence; the first 2,624 history records and the three completed receipts were
+unchanged. Sleep prevention worked after restart. Final supervisor exit code: 0.
 
-预检与正式训练的 **191 个执行依赖哈希一致**；正式登记 SHA-256：
-`5919c8c0c45891c00006ebce694f173c700f14bd5cebf4f6cc0fb990afa2a18d`。
-后台监督器同时保存训练子进程状态；退出时记录成功或失败，不自动重启，
-不覆盖既有 P36/P37 证据。启动时尝试进程绑定的 caffeinate，但本机返回
-`Failed to create PreventUserIdleSystemSleep assertion`，防睡眠未生效；
-训练子进程正常更新并已核验第 256 步检查点，长时间训练需保持机器唤醒。
+All endpoint hashes, full update histories, registered inputs, 191 frozen dependencies,
+native scoring receipts and raw timing-report hashes were verified. Weights and
+training values are finite. Gradient clipping occurred 1 / 0 times in controls and
+2 / 1 times in fixed-condition arms. Every control model tensor equals its matching
+P36 `compressed` endpoint, reproducing the control behavior exactly.
 
-## 完成及恢复核验（2026-10-23）
+## Quality results
 
-四条轨迹均完成 **16,192 步**，合计 **64,768 次更新**。第三条于 10 月 22 日
-21:50:59 完成；随后按用户要求暂停第四条，保留第 2,624 步检查点。Mac 重启后从
-相同权重、优化器和抽样序列恢复；原 2,624 步历史摘要保持一致，前三条完成凭据
-没有改变。恢复后的防睡眠断言验证生效。最终监督进程退出码为 0。
+Common MR v1, aggregated by recording, against original unclipped lossless audio.
+Changes below compare the fixed-condition arm with the **same seed and output path's
+control**; negative means lower error. Cells list seeds 20261012 / 20261013.
+The 89 reused held-out clips cover 26 music and 54 speech recordings, not a new
+independent test.
 
-已核验四个端点哈希、完整更新历史、所有注册输入、191 个冻结执行依赖、原生评分
-凭据以及计时原始报告哈希。没有非有限权重/训练数值；控制两种子的梯度裁剪次数
-为 1 / 0，固定条件组为 2 / 1。两个控制组的全部模型张量均与 P36 `compressed`
-对应端点逐值相等，说明本轮控制行为得到了复现。
+| Stage/path | Music MR | Music dynamics | Speech MR | Speech dynamics |
+| --- | ---: | ---: | ---: | ---: |
+| Raw model OLA | **+0.276% / +0.629%** | +0.185% / −0.113% | −0.099% / −0.162% | +0.165% / +0.093% |
+| Current native DSP | **+0.195% / +0.558%** | +0.122% / −0.137% | −0.057% / −0.145% | +0.136% / +0.040% |
+| Phase-only native DSP | **+0.242% / +0.576%** | +0.166% / −0.087% | −0.052% / −0.172% | +0.171% / +0.055% |
 
-## 质量结果
+Current-path music MR changes from `0.3787409 / 0.3789824` to
+`0.3794783 / 0.3810963`. Recording outcomes are **13 wins/13 losses and six wins/20
+losses**; neither seed improves the median recording difference. Phase-only also
+fails the two-seed music-mean criterion. Against untreated compressed input, fixed
+current still reduces error by 1.466% / 1.045%, versus controls' 1.657% / 1.594%.
+Failing to beat the control does not mean every metric is worse than untreated audio.
 
-共同 MR v1，逐录音聚合，原始未限幅无损为参考。下表为固定条件组相对**相同种子、
-相同输出路径控制组**的变化，负值为误差降低；每格按种子 20261012 / 20261013 列出。
-仍是 89 个复用留出片段、26 首音乐及 54 条语音，不构成新的独立泛化证据。
+Above 16 kHz, current output amplitude error increases **0.656% / 1.525%** and log-shape
+error **0.602% / 4.169%**. Raw OLA amplitude error increases 0.596% / 1.659%.
+Seed two's high-band dynamics and PCM RMS improve approximately 0.525% / 0.578%,
+which does not cancel primary amplitude/shape regressions. Current 0–4 kHz PCM error
+increases only about 0.0002%; broad low-frequency destruction does not explain the
+main regression.
 
-| 输出阶段/路径 | 音乐频谱 MR | 音乐动态 | 语音频谱 MR | 语音动态 |
-|---|---:|---:|---:|---:|
-| 原始模型 OLA | **+0.276% / +0.629%** | +0.185% / −0.113% | −0.099% / −0.162% | +0.165% / +0.093% |
-| current 原生 DSP | **+0.195% / +0.558%** | +0.122% / −0.137% | −0.057% / −0.145% | +0.136% / +0.040% |
-| phase-only 原生 DSP | **+0.242% / +0.576%** | +0.166% / −0.087% | −0.052% / −0.172% | +0.171% / +0.055% |
+The largest recording accounts for approximately 33.1% / 45.1% of positive paired
+music error increments. The paired failure is not wholly one weak-bin/recording
+outlier. In contrast, about 99.0% of seed one's positive music-identity increment
+comes from the known `heiyaoyao-adaa234…` case; these mechanisms must be separated.
 
-current 路径的音乐 MR 从控制的 `0.3787409 / 0.3789824` 变为
-`0.3794783 / 0.3810963`。26 首音乐分别为 **13 胜/13 负、6 胜/20 负**，
-两个种子的逐录音差值中位数都没有改善；phase-only 也没有满足双种子音乐均值改善。
-相对未处理压缩输入，固定条件 current 仍降低 1.466% / 1.045%，但低于控制的
-1.657% / 1.594%。因此“没有超过控制”不等于“所有指标都比不处理更差”。
+## Identity preservation and absolute errors
 
-频带审计显示问题确实涉及恢复目标。current 输出 16 kHz 以上幅度误差增加
-**0.656% / 1.525%**，log 谱形误差增加 **0.602% / 4.169%**；原始 OLA 对应幅度
-误差增加 0.596% / 1.659%。第二种子的高频动态误差和 PCM RMS 虽分别降低约
-0.525% / 0.578%，仍不能覆盖幅度、谱形的退步，符合频谱优先的评估原则。
-0–4 kHz current PCM 误差仅约增加 0.0002%，不能将主退化解释为低频整体破坏。
+Current music identity MR changes **+8.285% / −3.175%**; speech identity changes
+**−42.392% / +53.658%**. Seeds disagree. Much music-identity error against the original
+reference includes existing safety limiting. Identity DSP on the same material
+separately measures additional model changes.
 
-第一种子原生音乐 paired 正误差增量的最大录音贡献约 33.1%，第二种子约 45.1%；
-并非都由一个异常弱频点或单个素材决定。第一种子音乐 identity 的正增量则约
-99.0% 集中于既有 `heiyaoyao-adaa234…` 反例，必须分别解释，不能混同。
+Recording-mean identity PCM RMS relative to identity DSP:
 
-## 无损输入保真与绝对误差
+| Material | Control | Fixed conditions |
+| --- | ---: | ---: |
+| Music | 2.28e-6 / 2.89e-6 | 1.75e-6 / 2.94e-6 |
+| Speech | 4.65e-8 / 5.92e-8 | 3.27e-8 / 7.83e-8 |
 
-current 路径音乐 identity MR 变化 **+8.285% / −3.175%**，语音 identity 为
-**−42.392% / +53.658%**；种子表现不一致。音乐 identity 的大量原始参考误差还包含
-既有安全限幅，另用相同素材的恒等 DSP 输出分离新增模型改动。
+Worst fixed-condition music-clip added RMS: `1.70e-5 / 2.84e-5`
+(−95.39 / −90.93 dBFS); speech: `5.08e-7 / 1.40e-6`
+(−125.88 / −117.06 dBFS). For seed one's known weak-high-band counterexample,
+added PCM rises from `2.66e-6` (−111.51 dBFS) to `5.34e-6` (−105.45 dBFS).
+These are calibrated PCM values, not FFT power. Relative spectral increases do not
+establish audible severity; small absolute errors do not replace restoration gains
+or blind listening. All counterexamples remain and thresholds were not revised.
 
-下表为 identity 原生输出相对恒等 DSP 的 PCM RMS，先按录音聚合后取均值：
+## Native correspondence and compute
 
-| 素材 | 控制组 | 固定条件组 |
-|---|---:|---:|
-| 音乐 | 2.28e-6 / 2.89e-6 | 1.75e-6 / 2.94e-6 |
-| 语音 | 4.65e-8 / 5.92e-8 | 3.27e-8 / 7.83e-8 |
+All endpoints completed **712 native PCM roles, 712 additional common-MR replays
+and 1,424 two-path replays**. Native synthesis/fusion proxy differences are at most
+**2.98e-7**, with zero tolerance failures under the original `2e-5` threshold.
+The regression already exists in raw predictions; a Python/Rust correspondence
+failure is not supported by these measurements.
 
-固定条件组最差单片段音乐新增 RMS 为 `1.70e-5 / 2.84e-5`
-（−95.39 / −90.93 dBFS）；语音为 `5.08e-7 / 1.40e-6`
-（−125.88 / −117.06 dBFS）。第一种子的上述既有弱高频反例，新增 PCM 从
-`2.66e-6`（−111.51 dBFS）变为 `5.34e-6`（−105.45 dBFS）。
-这些是校准的 PCM 数值，不是 FFT 功率；较大的相对频谱变化不能直接推成严重可闻
-失真，小绝对误差也不能替代恢复收益或盲听证据。所有反例保留，未事后修改筛选阈值。
+Current-path CPU ORT plus DSP covers **280,000 hops**, 44.1/48 kHz, mono/stereo and
+paced cases. All controls/candidates remain; failures were not replaced by reruns.
 
-## 原生对应和计算耗时
+| Metric | Result |
+| --- | ---: |
+| Maximum compute | **5.411 ms** |
+| Highest scenario p99 | **1.135 ms** |
+| Calls ≥5 ms | **2** |
+| Service time over hop period | **11** |
+| Paced completion delays | **27** |
+| Maximum paced lateness | **4.584 ms** |
+| Peak process RSS | **31.56 MiB** |
 
-四端点完成 **712 次原生 PCM 对应、712 次额外共同 MR 回放、1,424 次双路径回放**。
-原生合成及融合代理最大差异均不超过 **2.98e-7**，零容差失败；保留原 `2e-5` 阈值。
-因此没有证据将此次退步归于 Python/Rust 对应失败；退化已经出现在模型原始预测中。
+Both ≥5 ms calls occur in seed one's fixed-condition 48 kHz stereo paced case.
+A control also has four service overruns and six paced delays. Thus strict <5 ms
+compute and continuous hop deadlines are **not satisfied**. Fixed order, OS
+scheduling and background load may affect the tail; these results cannot attribute
+slower inference to constant conditions alone. Low p99 does not erase maxima or
+lateness. Process user+system totals 44.87 s and wall time 136.71 s, including startup
+and paced waits; this is not callback CPU utilization. Phase-only quality review is
+not a renewed performance qualification for that path.
 
-current 路径 CPU ORT 加 DSP 共 **280,000 hop**，44.1/48 kHz、单/双声道及 paced
-诊断。计时证据包含全部控制/候选，没有用重跑结果替换失败：
+Fixed buffering remains 256 frames: 5.33 ms at 48 kHz and 5.80 ms at 44.1 kHz,
+separate from compute. Real-device, full callback/queue and blind-listening validation
+are incomplete; glitch-free operation is not established.
 
-| 项目 | 结果 |
-|---|---:|
-| 最大总计算耗时 | **5.411 ms** |
-| 各场景最高 P99 | **1.135 ms** |
-| ≥5 ms 调用 | **2** |
-| 服务耗时超过 hop 周期 | **11** |
-| paced 完成迟到 | **27** |
-| 最大 paced 迟到 | **4.584 ms** |
-| 峰值进程 RSS | **31.56 MiB** |
+## Decision and follow-up
 
-两次 ≥5 ms 均在第一种子固定条件组的 48 kHz 立体声 paced 场景；控制也发生
-4 次服务超 hop、6 次 paced 迟到。因此本轮**没有满足严格 <5 ms 与逐 hop 持续
-输出要求**。固定顺序、系统调度和现场负载可能影响长尾，当前证据不能单独归因于
-条件常量导致模型变慢，也不能用 P99 较低抹掉最大耗时或迟到。
-计时进程累计 user+system 44.87 s、墙钟 136.71 s，包含初始化与 paced 等待；
-不是音频回调 CPU 占用。phase-only 的本轮质量复核不等于重新完成该路径性能验收。
+1. Retain explicit bandwidth conditions; stop unchanged expansion of the fixed-condition
+   route. P37 frozen-inference sensitivity did not predict retraining gains. This does
+   not prove detector conditioning is always harmless or isolate active alone from
+   the joint intervention.
+2. Separate DSP interface effects from learning. Raw predictions already regress,
+   while P37's magnitude-remixing issue remains real. Preserve direct lossless targets
+   and native conditions; do not hide training regressions by selecting another path.
+3. Do not blindly extend or enlarge these runs. Diagnose high-band magnitude/shape,
+   phase and reference-dynamics gradients on fixed training crops before designing
+   a new small-model comparison. Neither convergence nor an architecture ceiling is
+   established merely by finishing the registered budget.
+4. Diagnose timing separately with the same frozen binary/weights and balanced order,
+   stage attribution and actual worker deadlines/fallbacks. Whole-file mean time is
+   not acceptance evidence.
 
-固定 256 帧输出缓冲仍为 48 kHz 下 5.33 ms、44.1 kHz 下 5.80 ms，和计算耗时
-分开。没有完成真实声卡、完整回调/队列及盲听验证，不能宣称不会爆音或卡顿。
-
-## 判断与下一步
-
-1. **保留显式带宽条件，停止扩展固定条件路线。** 在本轮目标、架构和充分预登记
-   预算下，固定条件对音乐无益；P37 的冻结推理敏感性不能预测重新训练后的收益。
-   这不证明检测条件永远无害，也不把本轮固定两项的组合结果解释为单独 active 的因果。
-2. **DSP 职责问题与学习瓶颈分开处理。** 本轮退化在 raw 输出已经出现，不能继续
-   把全部问题归给后处理；P37 的幅度回混冲突仍成立。保持直接无损监督与原条件，
-   将取消幅度二次回混保留为独立诊断，不以更换输出路径掩盖训练退步。
-3. **不盲目延长这组训练或扩容。** 下一步优先检查 16 kHz 以上残差的幅度/谱形、
-   相位约束和参考动态之间的取舍，先在固定训练裁剪验证梯度方向与表达能力，
-   再决定新的小模型对照。完整预算不证明已收敛，这里也没有证明架构性能上限。
-4. **单独定位耗时长尾。** 同一冻结二进制/权重、交错运行顺序和受控负载下重复
-   分阶段计时，结合实际 worker deadline 与回退验证；不能仅以整段平均耗时放行。
-
-两条输出路径的预登记研究筛选均失败，没有替换默认模型，没有启动后续训练。
-本地补充汇总与完整性记录：`post-review/bands.json`、`post-review/verification.json`
-（相对正式运行目录）；原始音频、检查点和详细报告继续留在忽略目录。
+Both path screens failed. Default weights are unchanged; no subsequent training was
+launched. Local supplements: `post-review/bands.json` and
+`post-review/verification.json`, relative to the formal run. Audio, checkpoints and
+reports remain ignored. Subsequent [P39 gradient](objective-conflict-audit.md) and
+[timing](interleaved-timing-audit.md) diagnostics are recorded separately.

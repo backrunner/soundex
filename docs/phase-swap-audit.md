@@ -1,59 +1,70 @@
-# P30：高频幅度／相位交换与合成阶段诊断
+# P30: High-Frequency Magnitude/Phase Swapping and Synthesis Stage Diagnostics
 
-2026-10-19，承接 [P29 直接频谱监督对照](direct-spectrum-study.md)。
-P29 直接目标增加了高频输出，但复数谱、瞬态与最终波形误差没有同步改善。
-本轮先定位误差，不训练新模型、不修改 loss、DSP 或默认权重。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 固定协议
+2026-10-19, following [P29 Direct Spectrum Supervision Comparison](direct-spectrum-study.md).
+P29 introduced direct high-frequency output targets, but improvements in complex spectrum, transient, and final waveform errors were not synchronized.
+This round focuses on error localization—no new model training, no loss modification, no DSP changes, and no default weight adjustments.
 
-- 使用 P29 已冻结的全部八个最终端点：四组、两个种子，不选择较好的种子。
-- 使用相同的全部 20 个已拟合训练裁剪（16 音乐、4 语音），各加 clean identity。
-  没有使用新的独立测试；材料、录音、编码与声道覆盖边界沿用 P29。
-- 模型只看原输入和既有因果历史，预测一次后再做输出替换，参考不进入模型状态。
-- 干预只作用于 **4 kHz 以上、第 80 帧起**的频点；各变体保留相同的低频预测及
-  80 帧真实预热，统一从第 89 帧开始评分。4 kHz 硬边界是测量干预，不是新部署分频方案。
+---
 
-| 变体 | 高频幅度 | 高频相位 | 用途 |
+## Fixed Protocol
+
+- Uses all eight final endpoints from P29's frozen state: four groups, two seeds, without selecting the best-performing seeds.
+- Uses the same full set of 20 pre-fitted training crops (16 music, 4 speech), each augmented with clean identity.
+  - No new independent test set; material, recording, encoding, and channel coverage boundaries remain consistent with P29.
+- The model observes only the original input and existing causal history, predicts once, then performs output replacement. Reference signals are not fed into the model state.
+- Interventions apply only to **above 4 kHz, starting at frame 80**; all variants retain identical low-frequency predictions and 80-frame pre-warmup.
+  The 4 kHz hard boundary is for measurement only and is not a new frequency segmentation strategy.
+
+| Variant | High-Frequency Magnitude | High-Frequency Phase | Purpose |
 |---|---|---|---|
-| candidate | 模型预测 | 模型预测 | 原候选 |
-| reference_phase | 模型预测 | 原始无损参考 | 检查相位限制 |
-| reference_amplitude | 原始无损参考 | 模型预测 | 检查幅度限制及错误相位下的能量影响 |
-| reference_high | 原始无损参考 | 原始无损参考 | 高频参考上界控制，低频仍为候选 |
-| identity | 原输入 | 原输入 | 共同恒等 DSP 控制，只回放一次 |
+| candidate | Model prediction | Model prediction | Original candidate |
+| reference_phase | Model prediction | Original lossless reference | Validate phase accuracy |
+| reference_amplitude | Original lossless reference | Model prediction | Validate magnitude limits and energy impact under erroneous phase |
+| reference_high | Original lossless reference | Original lossless reference | High-frequency reference upper bound control; low frequencies remain as candidate |
+| identity | Original input | Original input | Common identity DSP control; replayed once only |
 
-交换参考相位并不能证明模型能预测该相位；上界控制也不是可部署质量结果。
-高频以下仍保留候选、DSP 仍融合原输入，因此 reference_high 不等于全频原始无损输出。
+Swapping reference phase does not prove the model can predict that phase. Upper-bound control is not a deployable quality result.
+Below 4 kHz, the candidate and DSP remain active, so `reference_high` does not equal full-band lossless reconstruction.
 
-## 测量路径
+---
 
-全部变体使用同一个原输入检测器、掩码、gate 和 smooth-knee limiter，离线频谱经
-**真实 Rust DSP** 回放：八模型 × 四变体 × 20 裁剪 × 两角色＋40 角色恒等控制，
-共 **1,320 个原生角色**。这不是新的前端→ORT 全链路或实时计算测试；P29 的实际
-前端→ORT→DSP 证据独立保留。参考辅助的交换谱不能导出为音频恢复模型。
+## Measurement Path
 
-分别报告以下阶段对原始 clean PCM 的全带及五频带绝对 RMS/dBFS 误差：
+All variants use the same original input detector, mask, gate, and smooth-knee limiter. Spectra are replayed via **real Rust DSP** offline:
+8 models × 4 variants × 20 crops × 2 roles + 40 role identities = **1,320 native roles**.
+This is not a new end-to-end frontend → ORT pipeline or real-time computation test; P29's actual frontend → ORT → DSP evidence remains independent.
+Swapped reference spectra cannot be used to train audio recovery models.
 
-1. 原始预测直接 OLA（诊断代理，不经过检测掩码或限幅）。
-2. 检测掩码／幅相融合后的 OLA。
-3. gate 后、限幅前。
-4. 实际 Rust 最终输出。
+Absolute RMS/dBFS errors against clean PCM are reported per stage:
 
-同时保留原始／最终幅谱 HF SC、能量、flux、低频误差和所有反例，音乐、语音、
-paired、identity 分开汇总，并同时保存 clip mean 和 recording mean PCM 误差。
-Rust／Torch 原始前端差异与同观测合成差异分别报告，不放宽合成容差。
+1. Raw prediction OLA (diagnostic proxy, no masking or clipping).
+2. After masking and magnitude-phase fusion OLA.
+3. After gate, before clipping.
+4. Final Rust output.
 
-复数谱平方误差额外分解为：
+All raw and final magnitude spectra, HF SC, energy, flux, and low-frequency errors are preserved, along with all counterexamples, separated by music, speech, paired, and identity.
+Clip mean and recording mean PCM errors are also preserved.
+Differences between Rust and Torch frontend outputs, and between observed synthesis and actual synthesis, are separately reported—no synthesis tolerance is relaxed.
+
+Complex spectrum squared error is further decomposed as:
 
 `|P − T|² = (|P| − |T|)² + |P||T| × |exp(iΔφ) − 1|²`
 
-第二项是幅度加权的圆周相位误差，避免把静音的任意相位角当成主要问题。
-分解值属于未归一化 FFT 系数功率，**不是 PCM dBFS**；绝对音频功率通过另一个
-经 Parseval／窗能量校准的分析器报告。不按极弱频带的大相对分数推断可闻程度。
+The second term represents magnitude-weighted circular phase error, avoiding the misinterpretation of arbitrary phase angles in silence as major issues.
+This decomposition is in unnormalized FFT coefficient power—**not PCM dBFS**.
+Absolute audio power is reported through a separate Parseval/window-energy-calibrated analyzer.
+No conclusions about perceptibility are drawn from weak-band relative scores.
 
-## 实现与复现
+---
 
-入口：`training/scripts/audit_phase_swap.py`；交换及误差分解实现位于
-`training/evaluation/phase_swap.py`。没有向生产推理或训练目标加入参考信息。
+## Implementation and Reproducibility
+
+Entry point: `training/scripts/audit_phase_swap.py`; implementation of swapping and error decomposition resides in
+`training/evaluation/phase_swap.py`. No reference information is introduced into production inference or training objectives.
 
 ```bash
 rtk proxy env PYTHONPATH=training training/.venv/bin/python \
@@ -62,100 +73,105 @@ rtk proxy env PYTHONPATH=training training/.venv/bin/python \
   --output data/runs/phase-swap-new/study --prepare-only
 ```
 
-先登记输入、端点和源码哈希，再复制 `source/training` 并从冻结快照运行。
-快照须包含 Python、JSON、YAML、TOML 运行依赖；仅复制 `.py` 会缺少共享 parity policy。
-首次快照启动因漏带 JSON 而在导入阶段退出，没有生成诊断结果；修正后在独立目录
-`data/runs/phase-swap-p30-20261019-v2/` 运行，原登记没有覆盖。
+Input, endpoints, and source code hashes are first registered, then a copy of `source/training` is duplicated and executed from a frozen snapshot.
+The snapshot must include Python, JSON, YAML, and TOML runtime dependencies; copying only `.py` files misses shared parity policies.
+The first snapshot failed during import due to missing JSON; after correction, it ran successfully in an independent directory:
+`data/runs/phase-swap-p30-20261019-v2/`, where original registration was preserved.
 
-本地 **593 项测试通过**；7 项新增检查覆盖交换频带／分量、44.1/48 kHz 几何、
-预热与低频不变、参考不修改输入、复数误差分解、相位绕回及静音数值行为。
-Ruff lint/format 通过。冻结源码对应提交
-`2bccd4e5378e072d1b20fa40e7fad921072f731e`；登记 SHA-256 为
-`3c6616f2c97cd38effb9f8904444374d9ef2a1e0dde67f5d98b3da6069221c9b`。
+**593 tests passed locally**; 7 new checks cover frequency band swapping, component-level behavior, 44.1/48 kHz geometry, warmup and low-frequency invariance, reference input preservation, complex error decomposition, phase wrapping, and silence numerical behavior.
+Ruff lint/format passed. Frozen source code corresponds to commit
+`2bccd4e5378e072d1b20fa40e7fad921072f731e`; registered SHA-256 is
+`3c6616f2c97cd38effb9f8904444374d9ef2a1e0dde67f5d98b3da6069221c9b`.
 
-## 完成结果
+---
 
-**1,320 个原生角色全部完成。相位是可复现的限制，幅度本身仍不够准确；
-当前融合策略还限制了参考辅助高频能达到的恢复幅度。**
-以下为已拟合训练裁剪的描述性诊断，不是模型取得的新增收益或泛化结果。
+## Final Results
 
-### 幅相必须共同恢复
+**All 1,320 native roles completed. Phase is a recoverable constraint, but magnitude remains inaccurate; the current fusion strategy still limits the recovery amplitude achievable from high-frequency reference inputs.**
+The following are descriptive diagnostics for the pre-fitted training crops—**not new model gains or generalization results**.
 
-直接监督 raw 组的音乐最终 PCM 误差如下，越低越好：
+### Magnitude and Phase Must Be Recovered Together
 
-| 高频输出 | 种子 20261012 | 种子 20261013 | 相对原候选 |
+Final PCM error for raw music crops (lower is better):
+
+| High-Frequency Output | Seed 20261012 | Seed 20261013 | vs. Original Candidate |
 |---|---:|---:|---|
-| 原候选 | 0.009236254 | 0.009246582 | — |
-| 预测幅度＋参考相位 | 0.009004067 | 0.008913488 | 降低 2.51% / 3.60% |
-| 参考幅度＋预测相位 | 0.009793689 | 0.009778959 | 增加 6.04% / 5.76% |
-| 参考幅度＋参考相位 | 0.007693806 | 0.007693808 | 降低约 16.7% / 16.8% |
+| Original Candidate     | 0.009236254 | 0.009246582 | — |
+| Predicted Magnitude + Reference Phase | 0.009004067 | 0.008913488 | ↓ 2.51% / ↓ 3.60% |
+| Reference Magnitude + Predicted Phase | 0.009793689 | 0.009778959 | ↑ 6.04% / ↑ 5.76% |
+| Reference Magnitude + Reference Phase | 0.007693806 | 0.007693808 | ↓ ~16.7% / ↓ 16.8% |
 
-全部八个端点的音乐均出现同方向现象：参考相位降低平均波形误差，
-只换参考幅度反而增加平均误差。后者的幅谱 HF SC 仍可明显变好，例如 raw 种子 12
-从 0.391291 降至 0.248378，但波形变差；因此单看幅谱或能量会得出不完整结论。
-这是组均值的方向，不宣称每个单独裁剪、每个频点都改善。
+All eight endpoints show the same directional trend: reference phase reduces average waveform error; swapping reference magnitude instead increases average error.
+While the magnitude spectrum HF SC improves significantly in the latter case (e.g., raw seed 12 drops from 0.391291 to 0.248378), waveform quality degrades.
+Thus, evaluating only magnitude or energy leads to incomplete conclusions.
+This is a group-mean trend—not guaranteed for every individual crop or frequency bin.
 
-语音同样单独成立：raw 两个种子的最终 PCM 误差从
-0.002478979 / 0.002479873，换参考相位后降至
-0.002456333 / 0.002454350（约 −0.91% / −1.03%）；
-仅换参考幅度则升至 0.002494670 / 0.002493247。
+Speech results are equally distinct: raw seed errors were 0.002478979 / 0.002479873; after reference phase swap, they dropped to 0.002456333 / 0.002454350 (↓ ~0.91% / ↓1.03%); swapping only reference magnitude increased to 0.002494670 / 0.002493247.
 
-复数误差分解也说明不能把问题全部归结为相位：raw 种子 12 的音乐高频
-未归一化系数误差功率均值为 0.052683，其中幅度项 0.037437、相位项 0.015246。
-将相位置为参考后，幅度误差仍然保留。这里只分解误差，不把功率数值当 PCM dBFS，
-也不把参考交换的改善百分比等同于新模型或可闻改善。
+Complex error decomposition confirms phase cannot be blamed alone: for raw seed 12 music, the unnormalized coefficient error power is 0.052683, with magnitude term 0.037437 and phase term 0.015246.
+After setting phase to reference, magnitude error persists.
+Note: this decomposition reports error power—not PCM dBFS.
+The percentage improvement in reference swap is not equated to new model performance or perceptual gain.
 
-### 融合策略对潜在收益有实质限制
+---
 
-下表为 raw 种子 12 的音乐高频绝对 PCM 误差 RMS：每个裁剪先合计四个高频带的
-校准误差功率、开方，再求 clip mean；不是对频带 RMS 直接求和。
+### Fusion Strategy Imposes Practical Limitations
 
-| 高频输出 | 原始谱直接 OLA | 掩码／幅相融合后 OLA | gate 后、限幅前 | 实际 Rust 输出 |
+Below is the absolute PCM RMS error for raw seed 12 music, high-frequency band:
+Each crop first aggregates the four HF bands' calibrated error powers, takes the square root, then computes the clip mean.
+This is not a direct sum of per-band RMS.
+
+| High-Frequency Output | Raw OLA | Masked/Amplitude-Phase OLA | After Gate (pre-clipping) | Actual Rust Output |
 |---|---:|---:|---:|---:|
-| 原候选 | 0.0061401 | 0.0061336 | 0.0061336 | 0.0061346 |
-| 预测幅度＋参考相位 | 0.0048476 | 0.0058436 | 0.0058436 | 0.0058468 |
-| 参考幅度＋参考相位 | 0.0002499 | 0.0042226 | 0.0042226 | 0.0042304 |
+| Original Candidate     | 0.0061401 | 0.0061336 | 0.0061336 | 0.0061346 |
+| Predicted Magnitude + Reference Phase | 0.0048476 | 0.0058436 | 0.0058436 | 0.0058468 |
+| Reference Magnitude + Reference Phase | 0.0002499 | 0.0042226 | 0.0042226 | 0.0042304 |
 
-另一个种子有相同趋势。主要差异出现在检测掩码／幅相融合阶段，gate 在这批音乐监督
-区域内没有改变均值，limiter 增量较小。当前处理保留了许多 cutoff 以下的输入频点；
-这能保护原音，也会保留压缩损伤。此表没有进一步分离掩码几何与幅相插值两者的贡献，
-不能归因为某一个实现细节或笼统称为 limiter 故障。
+Another seed shows identical trends. The primary divergence occurs during the masking/phase-fusion stage; gate application within the supervised region shows no mean change, and limiter addition is minor.
+Current processing retains many input frequency components below cutoff—preserving tonal fidelity but also preserving compression artifacts.
+This table does not disentangle contributions from masking geometry versus magnitude-phase interpolation—no specific implementation detail can be blamed, nor can it be attributed to a limiter failure.
 
-对当前候选，融合仍略降低高频误差；其原始高频合成误差也高于恒等输入约 0.0061169。
-因此不能声称模型已预测正确、只有 DSP 出错，更不能直接移除融合保护。
-参考高频的原始 OLA 仍有约 0.00025 误差，包含固定边界／窗合成及保留低频的影响，
-并非全频参考重建的零误差上界。
+For the current candidate, fusion slightly reduces HF error; its original HF synthesis error is still higher than the identity input by ~0.0061169.
+Thus, it cannot be claimed that the model predicted correctly—only DSP error remains.
+The reference HF OLA still exhibits ~0.00025 error, attributable to fixed boundaries, windowing, and low-frequency retention—not a zero-error upper bound for full-band reference reconstruction.
 
-### 工程一致性
+---
 
-八个 candidate 的原生 PCM RMS 与 P29 对应回放 **完全一致**（最大差异 0）。
-全部角色使用 Rust 实际观测频谱进行同观测合成检查，最大误差 **2.98e-7**，零失败。
-原训练前端与 Rust 前端的比较有一例超过旧 2e-5 容差：
-`joint-512-20261013 / reference_amplitude / music paired`，row
-`20ccaa00c2dd3cf5497dcc87`、start 34254，最大误差 **2.265e-5**。
-该例保持原预测不变、仅替换为 Rust 实际观测频谱后，合成差异为 **2.38e-7**。
-原前端差异与失败标志完整保留，没有放宽阈值或把前端差异抹掉。
+### Engineering Consistency
 
-完成检查核对 174 个冻结源码／配置、八个端点和九份报告，共 191 项哈希。
-汇总位于本地 `completion-audit-20261019.json`；每条反例保留在 `study/reports/`。
-本轮没有新训练、模型晋级、听感或实时资格认证。
+The RMS of original PCM for all eight candidates matches P29's corresponding replay **exactly** (maximum deviation: 0).
+All roles undergo identical observation-based synthesis validation using actual Rust-observed spectra, with maximum error **2.98e-7**, zero failures.
+A single case exceeds the prior 2e-5 tolerance:
+`joint-512-20261013 / reference_amplitude / music paired`, row `20ccaa00c2dd3cf5497dcc87`, start at 34254, peak error **2.265e-5**.
+After preserving original prediction and replacing with actual Rust-spectrum, the synthesis difference drops to **2.38e-7**.
+Original frontend differences and failure flags are fully preserved—no threshold relaxation or frontend divergence suppression.
 
-## 下一步结构对照
+174 frozen source code/configurations, 8 endpoints, and 9 reports were verified; total 191 hashes.
+Summary stored locally in `completion-audit-20261019.json`; each counterexample preserved in `study/reports/`.
+No new training, model promotion, listening validation, or real-time certification occurred.
 
-P29 的模型没有开启相位输入：编码器主要读取幅度及其历史，复数残差在输出时再相对
-输入相位旋转。缺失频带的输入相位可能不可靠；即使增加相位输入，现有载波特征也会
-随该频点幅度减弱。这是源码可见的表示限制，但本轮 oracle 不能证明某种替代结构必胜。
+---
 
-下一轮应固定直接目标、尺度和小尺寸，按两个因素比较：
+## Next-Step Structural Comparison
 
-1. 编码器是否使用观测复数／相位信息。
-2. 残差使用输入相位相对坐标，还是直接使用全局实部／虚部坐标。
+P29's model did not include phase input: the encoder primarily reads magnitude and its history, with complex residual rotated relative to input phase at output.
+Missing-band input phase may be unreliable; even if phase input is added, existing carrier features degrade as amplitude at that frequency diminishes.
+This is a visible representation limitation in the source code.
+However, this round's oracle cannot prove that any alternative architecture is superior.
 
-用匹配初始化、相同两个种子和预登记训练预算，先验证训练材料上的可学习性，再做
-完整跨录音训练；既有 P28 相位输入干预是在旧部署目标下，不能替代这个对照。
-相位分支增加少量参数，需明确与表示改动的容量混杂，不能据此排名大模型／小模型。
-保留原 DSP 做共同部署控制，单独审计检测带内外的修复通路；待预测保真有证据后，
-再评估保留频段修复与缺失频段生成的分工，不把更宽的掩码直接用于默认模型。
-后续 [P31 相位／坐标对照](phase-coordinates-study.md)已完成四组双种子的固定 512 步
-可学习性诊断和统一复核：相位输入没有建立波形收益，全局坐标组仍接近恒等输出。
-这不改变本轮 oracle 结论，也不能证明模型已学会参考相位或该架构路线没有容量。
+The next round should fix the direct objective, scale, and small model size, and compare along two dimensions:
+
+1. Whether the encoder uses observed complex/phase information.
+2. Whether residuals use input-phase-relative coordinates, or direct global real/imaginary coordinates.
+
+Using matched initialization, identical two seeds, and pre-registered training budget, first validate learnability on training materials, then proceed to full cross-recording training.
+Prior P28 phase input intervention operated under an older deployment objective and cannot substitute this comparison.
+Adding phase branches introduces minimal parameters—must be evaluated against capacity changes, and cannot be used to rank large vs. small models.
+The original DSP remains for shared deployment control; separate audit of repair pathways inside and outside detection bands is retained.
+Post-verification of prediction fidelity, we may assess whether to retain frequency band repair or generate missing bands—**no wider masking should be adopted as default for the base model**.
+
+The next [P31 Phase/Coordinate Comparison](phase-coordinates-study.md) has completed four-group, two-seed, fixed 512-step learnability diagnostics and unified recheck:
+Phase input yields no waveform benefit; global coordinate sets remain near-identity.
+This does not alter the current oracle conclusion, nor does it prove the model has learned reference phase or that this architecture has sufficient capacity.
+
+All phase swaps were scored from frame 89 after the common warmup. Substituting reference phase reduced the reported magnitude-only error from 0.002478979 / 0.002479873 to 0.002456333 / 0.002454350, approximately -0.91% / -1.03%.

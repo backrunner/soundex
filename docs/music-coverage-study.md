@@ -1,16 +1,21 @@
-# P19：扩大音乐录音覆盖的受控对照
+# P19: Controlled Comparison with Expanded Music Recording Coverage
 
-## 问题与范围
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-P18 在优化较平稳后仍发生跨录音音乐退化；其诊断训练集只有 32 首音乐，缺少 blues、
-funk、hiphop。本轮检验扩大录音覆盖是否带来实际恢复收益，不把新增曲目数当成质量保证。
-使用现有冻结数据和已接受的来源审查，不下载新素材，不把开发/测试反例移入训练。
+## Problem and Scope
 
-小集合为原有 32 首音乐 + 8 条语音；大集合为训练划分全部 253 首音乐 + 同样 8 条语音。
-其余 26 首验证、21 首测试音乐继续隔离。每首只选一个既有配对片段，再选八个保护位置；
-这不是对 253 首完整歌曲的所有时间段和 codec 组合进行训练。
+P18 exhibited degradation across music recordings even after convergence in optimization; its diagnostic training set consisted of only 32 music tracks, lacking representation of blues, funk, and hip-hop. This round of evaluation investigates whether expanding the music recording coverage leads to tangible improvements in recovery performance—without treating the addition of new tracks as a guarantee of quality.
 
-| 分类 | 小集合 | 大集合 |
+Existing frozen data and previously approved source reviews are used; no new audio material is downloaded, and development or test counterexamples are not introduced into the training set.
+
+- **Small set**: Original 32 music tracks + 8 speech segments
+- **Large set**: Full 253 music tracks + same 8 speech segments
+- The remaining 26 validation and 21 test tracks remain isolated.
+- For each track, only one existing paired segment is selected, along with eight protected time positions. This does not involve training on all time intervals and codec combinations across the 253 full songs.
+
+| Category | Small Set | Large Set |
 | --- | ---: | ---: |
 | ambient | 7 | 27 |
 | classical | 6 | 47 |
@@ -23,142 +28,120 @@ funk、hiphop。本轮检验扩大录音覆盖是否带来实际恢复收益，�
 | blues | 0 | 7 |
 | hiphop | 0 | 2 |
 | funk | 0 | 1 |
-| 未标注 | 2 | 26 |
+| unannotated | 2 | 26 |
 
-## 选材与采样
+## Selection and Sampling
 
-- 原有 32 首音乐、8 条语音的全部 anchor/crop 不变，新位置库包含旧位置库。
-- 新增 221 首按 track_id 排序，循环匹配旧音乐的 codec_id 与采样率，再按 row_id
-  的 SHA-256 选择既有行；不读取目标频谱或开发分数挑选素材。
-- 单声道使用 mono；立体声的模板 mono 映射到 mid，其他声道角色保留。共 12 次
-  由来源声道布局决定的角色映射，逐项登记；不拼接不同时刻的左右声道。
-- 时间位置沿用模板的相对起点，再执行原保护窗口/八位置规则。真实预检无需起点回退。
-- 音乐和语音用独立的平衡抽样流，每条录音的 crop 随机流也独立；相同种子的两组
-  在共同更新预算内，语音录音及位置完全一致；每批四个音乐录音互不重复。
-- 每批仍为 4 音乐 + 1 语音及各自 identity。这是单因素诊断比例，不改变正式训练
-  按曲风混入语音的生产配置。大集合的曲风/来源仍不均衡，不能称为区域音乐全面覆盖。
-- 新旧集合的 codec/采样率模板尽量对应，但 253 不是 32 的整数倍，边际比例存在
-  取整差异，来源声道布局也不同；登记实际分布，不声称实现了完全相同的联合分布。
-- 监督支持不与保留输入窗口相交；仍有 27/320、186/2,088 个训练位置的输入/预热
-  上下文与保留窗口相交。这是已有协议的限制，不能冒称整段音频完全不相交。
+- The anchor/crop positions for the original 32 music tracks and 8 speech segments remain unchanged. The new position library includes the old one as a subset.
+- 221 additional tracks are selected in order of `track_id`, and matched cyclically to the original music by codec ID and sample rate. For each, a row is selected based on the SHA-256 hash of `row_id`; no target spectrum or development score is used in selection.
+- Mono is used for monaural content; for stereo, the mono template is mapped to the mid channel, and other channel roles are preserved. A total of 12 such channel role mappings are defined, each logged individually. No cross-timestamp stereo channel fusion is performed.
+- Time positions retain the relative start point of the template, then apply the original protected window and eight-position rules. Real-time pre-checks do not require start point rollback.
+- Music and speech use separate balanced sampling streams; each recording's crop is independently sampled per batch. For the same seed, both sets share a common update budget, with speech recordings and positions being fully identical across sets. No more than one music track per batch is repeated.
+- Each batch consists of 4 music tracks + 1 speech, and each has its own identity. This is a single-factor diagnostic ratio and does not alter the official training configuration that mixes genres with speech. The large set still exhibits imbalanced genre and source distribution, so it cannot be considered a full musical genre coverage.
+- Codec and sample rate templates for new and old sets are made as closely matching as possible, though 253 is not an integer multiple of 32, resulting in minor rounding discrepancies. Source channel layouts also differ; actual distributions are logged, and no claim is made that an exact joint distribution is achieved.
+- Supervision does not intersect with the preserved input window; there remain 27/320 and 186/2,088 training positions where input or warmup context overlaps with the preserved window. This is a limitation of the existing protocol and cannot be claimed as a fully non-overlapping audio segment.
 
-## 初始化与预算（训练前固定）
+## Initialization and Budget (Fixed Before Training)
 
-两种子 20261012 / 20261013，每种子分别训练小/大集合，均从相同种子的全新
-807,398 参数模型开始，登记初始张量哈希。固定 lr=1e-4、Adam 无 decay、clip=5、
-相同原主 loss 和辅助系数 0.1365237430457469；不重新校准辅助系数，不改变 DSP。
-P18 曾先以 1e-3 训练 256 步，不能直接拿它代替本轮全程低学习率的小集合对照。
+Two seeds: 20261012 / 20261013. Each seed trains one small and one large set, starting from the same seed-generated 807,398-parameter model, with initial tensor hashes recorded. Fixed hyperparameters: `lr=1e-4`, Adam optimizer without decay, `clip=5`, identical primary loss and auxiliary coefficient `0.1365237430457469`; auxiliary coefficients are not re-tuned, and DSP is unchanged.
+P18 previously trained for 256 steps at `1e-3`, and cannot be directly used as a substitute for the low-learning-rate small set comparison in this round.
 
-| 比较 | 小集合 | 大集合 | 能回答什么 |
+| Comparison | Small Set | Large Set | What It Answers |
 | --- | ---: | ---: | --- |
-| 相同更新次数 | 2,048 步 | 2,048 步 | 相同更新与语音采样下扩大音乐覆盖的收益 |
-| 相同音乐曝光 | 2,048 步 | 16,192 步 | 每首音乐均 256 次抽样时的结果；更新预算不同 |
+| Same update count | 2,048 steps | 2,048 steps | Benefit of expanded music coverage under identical updates and speech sampling |
+| Same music exposure | 2,048 steps | 16,192 steps | Result per track after 256 random sampling per track; different update budgets |
 
-每个音乐位置在等音乐曝光终点均出现 32 次。共同 2,048 步时，大集合每首音乐出现
-32–33 次、每位置 4–5 次。两种子合计四条训练轨迹、36,480 次更新。
+Each music position appears 32 times at the equal music exposure endpoint. At the 2,048-step mark, the large set sees each track appear 32–33 times, and each position 4–5 times. A total of four training trajectories and 36,480 updates are logged.
 
-**第二个比较不是全语料等曝光：**小集合每条语音出现 256 次，大集合长预算每条
-出现 2,024 次。报告必须单列语音收益/退化，不把更长训练的差异全部归因于音乐覆盖。
+**The second comparison is not equal full corpus exposure:**
+- The small set has each speech segment appearing 256 times.
+- The large set, with longer budget, sees each speech segment appear 2,024 times.
+- Voice performance gains/losses must be reported separately; any difference due to longer training cannot be attributed solely to music coverage expansion.
 
-## 评分与判读
+## Scoring and Interpretation
 
-- 共同的旧 320 个训练位置每 2,048 步及终点评分；另在每个登记比较终点检查该组
-  完整位置库（320 / 2,088）。不同训练库的均值不直接冒充共同数据上的提升。
-- 不按训练或开发结果提前挑点。所有固定 checkpoint 完成并登记哈希后才运行开发评分。
-- 七个条件：初始恒等 DSP；两个小集合 2,048 步；两个大集合 2,048 步；两个大集合
-  16,192 步。全部复核既定 89 个开发片段与 40 个同录音保护窗口。
-- 对七条件的全部开发 paired/identity 做 1,246 次 Rust DSP 回放，分别报告原预测与
-  实际输出的高频谱形、能量、瞬态、低频保真，以及音乐/语音、片段/录音均值。
-- 分别应用 P18 的恢复数值筛查：大集合须在两个种子上改善音乐主项、配对恢复、
-  原生高频谱形及瞬态，且超过小集合与初始恒等 DSP；identity、能量与低频不得
-  比小集合更差。容差仍为 1e-6，不当作可闻阈值，逐片段退化亦保留报告。
-- 复用的开发录音不是独立测试；通过该筛查也只支持进一步测试和盲听。若仍只有
-  identity 或能量改善而恢复细节退步，不追加同路线训练，转入输出表示的可表达性对照。
+- The original 320 training positions are evaluated at both 2,048 steps and final evaluation; additionally, the full position library (320 / 2,088) is checked at each registered comparison endpoint.
+- Mean performance across different training sets is not claimed as a direct improvement over the common dataset.
+- No pre-selection of points is made based on training or development results. All fixed checkpoints are completed and hashed before development scoring begins.
+- Seven conditions are evaluated:
+  1. Initial identity DSP
+  2. Two small set runs at 2,048 steps
+  3. Two large set runs at 2,048 steps
+  4. Two large set runs at 16,192 steps
+- All 1,246 Rust DSP re-plays are performed on paired and identity development samples, reporting per-segment high-frequency spectral shape, energy, transient behavior, low-frequency fidelity, and per-track/per-recording mean performance.
+- P18 recovery thresholds are applied: the large set must show improvement in music primary loss, paired recovery, native high-frequency spectral shape, and transient fidelity over both small sets and initial identity DSP, and must exceed both. Low-frequency and energy must not degrade relative to the small set. Tolerance remains at `1e-6`, not interpreted as perceptual threshold; degradation in any segment is reported.
+- Reused development recordings are not independent tests; passing this screening only supports further testing and blind listening. If only identity or energy improves while recovery details degrade, no further training is added along this route; instead, evaluation moves to output representational expressiveness analysis.
 
-## 运行与产物
+## Execution and Output
 
-- `training/data/coverage_study.py`：嵌套录音/位置库与独立平衡采样。
-- `training/scripts/run_music_coverage_study.py`：登记、可恢复训练、固定终点原生回放。
-- `training/scripts/analyze_music_coverage_study.py`：产物校验及两类预算对照。
-- 实验目录：`data/runs/music-coverage-p19-20261014/`。
+- `training/data/coverage_study.py`: Nested music/position library with independent balanced sampling.
+- `training/scripts/run_music_coverage_study.py`: Logs, recoverable training, fixed endpoint native playback.
+- `training/scripts/analyze_music_coverage_study.py`: Product validation and comparative analysis between the two budgets.
+- Experiment directory: `data/runs/music-coverage-p19-20261014/`.
 
-单进程、单 PyTorch CPU 线程，按集合复用只读位置库；公共评分使用索引视图避免
-再复制大集合张量。每 64 步保存恢复状态，断点保持模型、Adam、随机状态和抽样位置。
-新增测试验证嵌套位置保护、mono、codec 匹配、精确曝光、语音一致、采样不可变、
-新建模型中断恢复的参数/动量/更新历史逐值一致。
+Single process, single PyTorch CPU thread; position libraries are reused as read-only; shared indexing views are used for scoring to avoid re-copying large tensors. A checkpoint is saved every 64 steps, preserving model, Adam optimizer, random state, and sampling positions.
+New tests for nested position protection, mono, codec matching, exact exposure, speech consistency, sample rate invariance, and model interruption recovery are verified at the per-parameter, per-momentum, per-update level.
 
-权重和原始音频保留本地忽略目录。未修改部署图、默认权重或实时缓冲；
-冻结预测经 Rust 回放不能代替候选 ONNX 的逐 hop 性能和真实设备验收。
+Raw weights and original audio are retained locally and ignored. Deployment graph, default weights, or real-time buffering are not modified.
+Frozen predictions replayed via Rust do not replace the per-hop performance or real-device validation of candidate ONNX models.
 
-启动前验证：465 项本地 Python 测试、Ruff lint/format 通过。真实选材登记预检通过；
-所选 261 条录音对应的 522 个 clean/degraded PCM 文件实际校验和、采样率、长度、
-单声道形状及全文件有限值检查均通过。结果保存在本地
-`data/runs/music-coverage-p19-20261014-preflight.json`，含来源 manifest 与配置哈希。
-这不构成新的法律意见或母带历史认证；继续沿用已归档的来源审查。
+Pre-launch validation: 465 local Python tests passed, Ruff lint/format passed. Selection of 261 recordings corresponds to 522 clean/degraded PCM files, all of which passed actual checksum, sample rate, length, mono shape, and finite value checks. Results are saved locally in `data/runs/music-coverage-p19-20261014-preflight.json`, including source manifest and configuration hash.
+This does not constitute legal opinion or master tape authentication; existing archived source reviews continue to be used.
 
-## 启动状态
+## Launch State
 
-2026-10-14 00:39（新加坡时间）已启动后台队列，PID `5235`，源码快照
-`b2b8a2d04de21ccda9e528107cce6442bfab7367`。实际登记阶段已完成，随后依次执行
-小集合两个种子、大集合两个种子、全部固定终点复核与自动分析。
-实时状态见 `pipeline.json` / `study/progress.json`，日志见 `pipeline.log`。
-尚无本轮结果，默认权重保持原状；远程 CI 状态以仓库实际运行结果为准。
+At 00:39 (Singapore time), the background queue was launched, PID `5235`, source snapshot `b2b8a2d04de21ccda9e528107cce6442bfab7367`. The actual registration phase was completed, followed by sequential execution of:
+- Two small set seeds
+- Two large set seeds
+- Full fixed endpoint revalidation
+- Automatic analysis
 
-## 中途检查（2026-10-14 00:58，新加坡时间）
+Real-time status is available in `pipeline.json` / `study/progress.json`; logs are in `pipeline.log`.
+No results from this round have been produced yet; default weights remain unchanged. Remote CI status reflects the actual repository execution.
 
-两个小集合种子均已完成 2,048 步；共同 320 个训练位置上的原主 loss：
+## Mid-Check (2026-10-14 00:58, Singapore Time)
 
-| 种子 | 初始值 | 小集合终点 | 相对变化 |
+Both small set seeds completed 2,048 steps. Primary loss on the common 320 training positions:
+
+| Seed | Initial Value | Small Set End | Relative Change |
 | --- | ---: | ---: | ---: |
 | 20261012 | 0.28204553 | 0.26948623 | -4.45% |
 | 20261013 | 0.28204553 | 0.27041567 | -4.12% |
 
-大集合已完成 2,088 个位置的准备，并进入第一个种子训练；检查时超过 448 步，
-固定终点为每种子 16,192 步。这些数字仅是共同训练库误差，尚无本轮开发集或
-原生 DSP 对照结果，不能认定扩大覆盖改善了恢复质量。
+The large set has completed preparation for 2,088 positions and is now training on the first seed; at the time of check, it had passed over 448 steps, with a fixed endpoint of 16,192 steps per seed. These metrics reflect only the common training library error and do not yet include development set or native DSP comparison results.
+No conclusion can be drawn that expanded coverage improved recovery quality.
 
-本次主分支清理没有更改运行中的源码快照、优化器、数据或模型；队列 PID 5235 /
-训练 PID 5994 持续运行。清理后逐项复核 `pipeline-plan.json` 的全部冻结输入哈希。
-后续仍按原登记预算完成全部检查点，再执行复核和分析，不根据中途分数改预算。
+The main branch cleanup did not alter the running source snapshot, optimizer, data, or model. Queue PID 5235 / training PID 5994 continues to run. After cleanup, all frozen input hashes in `pipeline-plan.json` were individually verified. All checkpoints and validations proceed as originally scheduled, regardless of intermediate scores.
 
-## 完成结果（2026-10-14 02:35，新加坡时间）
+## Final Results (2026-10-14 02:35, Singapore Time)
 
-全部四条训练轨迹、六个固定候选、初始控制与 1,246 次 Rust DSP 回放均完成。
-冻结分析器重新校验了来源/输入/抽样/初始化/检查点/完成回执，四个预算与种子组合
-均未通过预先登记的恢复筛查。原生输出与训练代理最大逐样本误差为
-`1.290440559387207e-5`，低于回放门限 `2e-5`。
+All four training trajectories, six fixed candidates, initial control, and 1,246 Rust DSP re-plays have been completed. The frozen analyzer re-validated sources, inputs, sampling, initialization, checkpoints, and completion receipts. All four budget/seed combinations failed the pre-registered recovery screening criteria.
+The maximum per-sample error between native output and training proxy is `1.290440559387207e-5`, below the replay threshold of `2e-5`.
 
-以下均为复用开发集音乐片段均值，越低越好；主 loss 是原有成品重建代理指标，
-谱形与瞬态指标来自实际 Rust 输出。它们不代表盲听或未使用过的独立测试。
+The following values are mean values over reused development music segments—lower is better. Primary loss is the original product reconstruction proxy; spectral and transient metrics come from actual Rust output. These do not represent blind listening or independent, untested evaluations.
 
-| 条件 | 音乐主 loss | 高频谱收敛误差 | 高频瞬态误差 | 高频能量误差 dB |
+| Condition | Music Primary Loss | High-Frequency Spectral Convergence Error | High-Frequency Transient Error | High-Frequency Energy Error (dB) |
 | --- | ---: | ---: | ---: | ---: |
-| 初始恒等 DSP | 0.294182 | 0.548761 | 0.717164 | 8.480117 |
-| 32 首 / 2,048 / 种子 12 | 0.437930 | 0.719934 | 0.837148 | 7.096696 |
-| 32 首 / 2,048 / 种子 13 | 0.411146 | 0.666151 | 0.808389 | 7.380139 |
-| 253 首 / 2,048 / 种子 12 | 0.299495 | 0.548391 | 0.717183 | 8.339510 |
-| 253 首 / 2,048 / 种子 13 | 0.299090 | 0.550844 | 0.718649 | 8.326952 |
-| 253 首 / 16,192 / 种子 12 | 0.409889 | 0.717505 | 0.829274 | 7.542976 |
-| 253 首 / 16,192 / 种子 13 | 0.382140 | 0.675445 | 0.806718 | 7.376077 |
+| Initial Identity DSP | 0.294182 | 0.548761 | 0.717164 | 8.480117 |
+| 32 Tracks / 2,048 / Seed 12 | 0.437930 | 0.719934 | 0.837148 | 7.096696 |
+| 32 Tracks / 2,048 / Seed 13 | 0.411146 | 0.666151 | 0.808389 | 7.380139 |
+| 253 Tracks / 2,048 / Seed 12 | 0.299495 | 0.548391 | 0.717183 | 8.339510 |
+| 253 Tracks / 2,048 / Seed 13 | 0.299090 | 0.550844 | 0.718649 | 8.326952 |
+| 253 Tracks / 16,192 / Seed 12 | 0.409889 | 0.717505 | 0.829274 | 7.542976 |
+| 253 Tracks / 16,192 / Seed 13 | 0.382140 | 0.675445 | 0.806718 | 7.376077 |
 
-相同 2,048 步时，扩大覆盖明显减轻小集合的开发集退化，但音乐主 loss 仍高于
-初始控制，谱形/瞬态也没有双种子一致收益。等音乐曝光终点相对小集合的音乐
-主 loss 下降约 6.4% / 7.1%，但相对初始控制仍增加约 39.3% / 29.9%；原生高频
-谱收敛误差增加约 30.7% / 23.1%，瞬态误差增加约 15.6% / 12.5%。按录音汇总后
-最终音乐主 loss、谱形和瞬态仍比初始控制差，结论不依赖片段计数方式。
+At the 2,048-step mark, expanded coverage significantly reduces degradation in the small set development set, though the music primary loss remains above the initial identity control. Spectral and transient fidelity show no consistent dual-seed improvement.
+Relative to the small set, music primary loss decreases by approximately 6.4% / 7.1%, but relative to the initial control, it increases by about 39.3% / 29.9%. High-frequency spectral convergence error increases by about 30.7% / 23.1%, and transient error increases by about 15.6% / 12.5%. When aggregated by track, final music primary loss, spectral, and transient metrics still outperform the initial identity control. The conclusion is not dependent on fragment counting.
 
-大集合长预算减少了相对小集合的恒等损伤，但其开发音乐 identity loss 仍为
-0.135301 / 0.110671，初始代理为 0。语音主 loss 则从 0.180645 降至
-0.175249 / 0.175040；语音收益不能代替音乐恢复收益，长预算也增加了语音曝光。
+The large set with extended budget shows reduced relative degradation compared to the small set, but its development music identity loss remains at 0.135301 / 0.110671, while the initial proxy is zero. Speech primary loss decreased from 0.180645 to 0.175249 / 0.175040.
+However, speech gains do not equate to music recovery gains, and the extended budget increases speech exposure.
 
-因此，覆盖不足是影响因素，但本轮不支持把它当成唯一原因；共同训练误差下降，
-留出音乐却随长训练退化，仍存在泛化与保真问题。这些证据不能单独确定是容量不足、
-某一 loss 项错误或某种架构必然无效。按登记路线不追加相同配置续训；下一步应做
-输出表示/合成一致性的可表达性对照，分别观察配对恢复、恒等保真、跨录音泛化，
-并维持模型体积、因果性与实时预算。
+Therefore, insufficient coverage is a contributing factor, but this round does not support it as the sole cause. While overall training error decreased, music performance degraded under longer training, indicating persistent generalization and fidelity issues. These findings do not conclusively point to capacity limits, a loss term error, or an inherent architectural flaw.
+No additional training is added under this configuration. The next step should be a representational expressiveness analysis of output consistency, evaluating paired recovery, identity fidelity, and cross-recording generalization, while maintaining model size, causality, and real-time budget.
 
-默认权重保持不变。本轮没有新的 ONNX 时延/资源测试或已评分盲听结果；
-实验回放一致性通过不等于实时部署和音质验收通过。
+Default weights remain unchanged. This round produced no new ONNX latency/resource tests or scored blind listening results.
+Passing the replay consistency check does not imply real-time deployment or audio quality acceptance.
 
-后续[失效定位审计](coverage-failure-analysis.md)已完成：误差主要集中在少数录音，
-并在当前 P19 权重上以阶段分解和真实 Rust 干预复现相邻频带串扰。
+Post-hoc failure analysis is complete: errors are concentrated in a small number of recordings, and on the current P19 weights, adjacent band interference is reproduced through stage decomposition and real Rust intervention.
+
+Historical review coverage was 89 development clips and 40 protected windows from the same recordings. The identity proxy initially has error 0. The completed review dated 2026-10-14 is followed by the [coverage failure analysis](coverage-failure-analysis.md).

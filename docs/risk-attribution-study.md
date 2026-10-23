@@ -1,165 +1,102 @@
-# P36：分离误差压缩与恒等降权的影响
+# P36: Impact of Error Compression and Identity Weighting Reduction
 
-接续 [P35 广覆盖结果](broad-risk-study.md)，继续使用 **431,015 参数**模型。
-本轮先完成冻结端点的实际部署分阶段审计，再补齐两个因素的组合对照；没有增加
-新的 loss 项，也没有改变部署 DSP。四条新增正式轨迹与全部自动复核已完成；单独误差压缩
-保留了两个种子的频谱收益，单独恒等降权的保真代价更大，但新组合均未通过完整研究筛选。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 退化定位
+Following [P35 Broad-Risk Study](broad-risk-study.md), this round completes a phased audit of the deployed endpoint with frozen weights, then fills in two additional comparative configurations. No new loss term is introduced, and the deployed DSP remains unchanged. Four new official trajectories have been completed, and all automatic rechecks are finalized. The error compression module retains spectral gains on two seeds, while the identity weighting reduction incurs a higher fidelity cost. However, neither combination passes the full study screening.
 
-对 P35 四个端点、全部 89 对既有留出片段执行实际 Rust 前端和 ORT 预测，复核
-712 个 paired/identity 角色。比较原始 OLA、频带融合、无限幅门控、实际限幅与
-原生最终输出；所有阶段仍对原始未限幅参考评分。合成最大误差 `2.98e-7`，无容差失败。
-无限幅阶段只是诊断反事实，不是部署配置；门控和限幅次序未改。
+## Degradation Localization
 
-音乐动态误差相对同期控制的变化，按录音均值：
+Actual Rust frontend and ORT predictions are performed on the four P35 endpoints and all 89 existing held-out pairs. A total of 712 paired/identity roles are rechecked. Comparisons are made between raw OLA, band-fused, unclipped gating, actual clipping, and the native final output. All stages are evaluated against the original unclipped reference. The maximum synthetic error is `2.98e-7`, with no tolerance failure.
 
-| 阶段 | 种子 20261012 | 种子 20261013 |
+The unclipped stage is used solely for diagnostic counterfactual analysis and is not part of the deployed configuration. The order of gating and clipping is unchanged.
+
+Changes in music dynamic error relative to the recording mean are as follows:
+
+| Stage | Seed 20261012 | Seed 20261013 |
 |---|---:|---:|
-| 实际 ORT 预测的原始 OLA | +0.641% | −0.008% |
-| 频带融合后 | +0.720% | +0.067% |
-| 无限幅门控后 | +0.720% | +0.067% |
-| 实际最终输出 | +0.696% | +0.064% |
+| Raw ORT Prediction (original OLA) | +0.641% | −0.008% |
+| After band fusion | +0.720% | +0.067% |
+| After unclipped gating | +0.720% | +0.067% |
+| Final output | +0.696% | +0.064% |
 
-第一种子的动态退化在模型原始预测里已经存在；第二种子原始预测略有改善，融合后
-才转为小幅退化。语音的原始动态也分别退步约 0.816% / 0.108%。因此后续需要分别
-关注模型训练和融合，不能将全部问题归到 DSP。
+Dynamic degradation in the first seed already exists in the original model prediction. The second seed shows slight improvement in the original prediction, which turns into minor degradation only after fusion. Voice dynamics also degrade by approximately 0.816% / 0.108%. Therefore, future work must address both model training and fusion—errors cannot be attributed solely to DSP.
 
-音乐 identity 的额外生成在原始预测阶段就存在，融合减小了绝对动态误差，最终
-限幅又引入另一部分相对原始参考的误差。这里不能用取消安全限幅来宣称恢复改善，
-也不能由很大的相对 identity 比例推断听感；绝对 PCM 量级与最差片段见 P35 报告。
+Additional identity generation in music is already present in the raw prediction stage. Band fusion reduces the absolute dynamic error, but the final clipping introduces a new relative error compared to the original reference. It is inappropriate to claim improvement by removing safety clipping, nor can a large identity ratio be used to infer perceptual quality. The absolute PCM magnitude and worst-case fragment performance are detailed in the P35 report.
 
-另外，每种子固定选取完整训练顺序中 16 个等间隔批次，仅在冻结权重上测量梯度，
-没有更新参数或选取验证最优模型。将当前优化梯度精确拆为非动态重建、参考动态、
-恒等保护和预算四项，逐批检验各项之和与原目标梯度一致。候选的非动态重建与
-恒等保护方向，在两个种子分别有 **14/16、15/16** 批为负余弦，中位数
-**−0.495 / −0.648**。非动态重建与动态项分别有 6/16、5/16 批方向冲突。
-这支持存在目标取舍的诊断，但有限训练裁剪上的梯度不能单独证明因果、过拟合或
-增加某一权重必然有效。
+For each seed, 16 evenly spaced batches from the full training sequence are selected. Gradient measurement is performed only on frozen weights, with no parameter updates or selection of the optimal validation model. The current optimization gradient is decomposed into four components: non-dynamic reconstruction, reference dynamic, identity protection, and budget. Each batch is individually verified to ensure the sum of these components matches the original target gradient. For the non-dynamic reconstruction and identity protection directions, 14/16 and 15/16 batches show negative cosine values, with median values of **−0.495 / −0.648**. The non-dynamic and dynamic components show directional conflicts in 6/16 and 5/16 batches, respectively. This supports a diagnostic of target trade-offs, though the limited training cropping gradients do not independently prove causality, overfitting, or the effectiveness of increasing any particular weight.
 
-本地证据：`data/runs/risk-stages-p35-20261022/`、
-`data/runs/risk-gradients-p35-20261022/`。这仍是复用留出/训练材料的事后诊断，
-不是独立泛化测试，所有既有反例继续保留。
+Local evidence: `data/runs/risk-stages-p35-20261022/`, `data/runs/risk-gradients-p35-20261022/`. This remains a post-hoc diagnosis using reused held-out/training materials and is not an independent generalization test. All existing counterexamples are retained.
 
-## 固定的两因素对照
+## Fixed Two-Factor Comparison
 
-P35 同时改变了误差压缩和恒等权重，因此仅凭现有两个组合无法区分贡献。
-P36 补齐另外两个组合，既能检验恢复收益来自哪里，也能检验恢复恒等保护权重
-能否减轻退化。
+Since P35 modified both error compression and identity weighting, the existing two combinations cannot isolate individual contributions. P36 completes two additional configurations to evaluate where the recovery benefits originate and whether reduced identity weighting can alleviate degradation.
 
-| 误差方式 | 恒等权重 1.0 | 恒等权重 0.3 |
+| Error Method | Identity Weight 1.0 | Identity Weight 0.3 |
 |---|---|---|
-| 原始 direct + MR | P35 `control`，已冻结 | P36 `identity_mid`，新训练 |
-| 每例分别 log1p(direct) + log1p(MR) | P36 `compressed`，新训练 | P35 `compressed_identity_mid`，已冻结 |
+| Raw direct + MR | P35 `control`, frozen | P36 `identity_mid`, new training |
+| Per-example log1p(direct) + log1p(MR) | P36 `compressed`, new training | P35 `compressed_identity_mid`, frozen |
 
-所有组合的 paired 系数均固定 0.5，预算项保持 0.1 倍且不改变其 paired/identity
-比例。每个新增组合使用两个既定种子，各自从随机初始化完整训练 **16,192 步**，
-新增四个端点。模型、优化器、抽样顺序、语音比例、历史预热和监督区域与 P35 一致；
-不沿用 P35 检查点继续微调。
+All combinations maintain a fixed paired coefficient of 0.5, with the budget term kept at 0.1× and unchanged in paired/identity ratio. Each new configuration uses the two designated seeds, trained from random initialization for **16,192 steps**, with four new endpoints. Model, optimizer, sampling order, speech proportion, historical warmup, and supervised region are identical to P35. No P35 checkpoints are reused for fine-tuning.
 
-复用历史对照前核验其全部证据与端点哈希，并绑定参考 assessment、初始化哈希和
-数据清单；模型、数据构造、loss 及优化器执行依赖必须与 P35 相同。新初始化也必须
-等于同种子 P35 的初始化。报告各恒等权重下压缩的影响、各误差方式下降权的影响，
-以及以共同 MR 分数计算的交互项，不拿不同优化总 loss 或百分比之差当作交互效应。
+Historical controls are pre-validated for full evidence and endpoint hashes, and are tied to reference assessments, initialization hashes, and data manifests. Model, data construction, loss, and optimizer execution must be identical to P35. The new initialization must exactly match the P35 initialization for the same seed. Reports on the impact of compression and identity weighting reduction, as well as interaction terms computed from common MR scores, are provided. No comparison of total loss or percentage differences is used to infer interaction effects.
 
-## 验证与验收
+## Validation and Acceptance
 
-四个新端点全部训练完成并冻结后，执行原生 PCM、一致性、共同 MR 与实时基准，
-再与固定的 P35 单元统一分析。始终同时报告原始预测与实际 DSP 输出，音乐与语音、
-paired 与 identity、逐录音收益和反例。使用的录音仍是复用留出集，不新增独立测试宣称。
+After completing training and freezing the four new endpoints, native PCM, consistency, common MR, and real-time baselines are executed, followed by unified analysis with the fixed P35 units. The original prediction and actual DSP output are always reported together, with separate analysis for music and speech, paired and identity, per-recording gains, and counterexamples. The used recordings remain from the reused held-out set and no new independent test claims are made.
 
-新组合的研究筛选要求沿用 P35：两个种子原生音乐 MR 的均值和逐录音误差差值中位数
-均改善，音乐/语音 identity MR 与各角色动态均值均不退化。未通过的组合也必须完整
-报告并作为诊断，不按途中指标选组、缩短预算或自动替换默认权重。动态项继续跟随
-参考的真实变化，不能用平滑瞬态换取分数。
+The study screening criteria for the new combinations follow P35: for both seeds, the average native music MR and the median difference in per-recording error must improve. Music and speech identity MRs, as well as dynamic values for each role, must not degrade. Combinations that fail must be fully reported and used for diagnosis—no group selection based on intermediate metrics, no budget reduction, and no automatic default weight override. Dynamic terms continue to follow the true reference changes, and smoothing transient behavior to improve scores is not permitted.
 
-代码入口：`training/scripts/run_risk_attribution_study.py` 与
-`training/scripts/analyze_risk_attribution_study.py`。复用广覆盖执行器的显式协议、
-目标和评估回调；检查点恢复、全部端点冻结、Rust/ORT/DSP 验证以及逐 hop 基准保持不变。
-原始音频、检查点、详细报告留在忽略目录，仅提交代码和来源/实验说明。
+Code entry points: `training/scripts/run_risk_attribution_study.py` and `training/scripts/analyze_risk_attribution_study.py`. The explicit protocol, objectives, and evaluation callbacks from the broad coverage executor are reused. Checkpoint recovery, full endpoint freezing, Rust/ORT/DSP validation, and hop-by-hop baselines remain unchanged. Original audio, checkpoints, and detailed reports are retained in the ignored directory; only code and source/experiment documentation are submitted.
 
-## 执行状态
+## Execution Status
 
-预检 `data/runs/risk-attribution-p36-preflight-20261022-v2/` 已完成：两个新组合各四步，
-覆盖音乐/语音、44.1/48 kHz、paired/identity，16 个实际原生一致性角色与
-16 个额外原生 MR 角色。全量 Python **651 项测试通过**，Ruff lint/format 通过。
-测试包括因素改变后的精确梯度、预算项保持不变、交互效应单位、逐录音匹配、两种子
-结果合并，以及拒绝变更输入基线。预检与正式训练的 188 个执行依赖哈希完全一致。
+Pre-check `data/runs/risk-attribution-p36-preflight-20261022-v2/` is complete: two new combinations, each with four steps, cover music/speech, 44.1/48 kHz, paired/identity, 16 native consistency roles, and 16 additional native MR roles. All 651 Python tests pass, and Ruff lint/format passes. Tests include exact gradient after factor change, preserved budget term, interaction effect units, per-recording alignment, merging of both sub-results, and rejection of input baseline changes. The 188 execution dependencies' hash is identical to the preflight and formal training.
 
-正式目录：`data/runs/risk-attribution-p36-20261022/`；登记 SHA-256：
-`0900a05c633afbb0529715e66b88e105c90ebfbff999487d0150d07bcf593fad`。
-独立监督进程已正常结束，训练期间每 64 步保存恢复状态；状态入口为
-`supervisor.json`、`study/progress.json`、`pipeline.log`。失败时保留证据，不自动缩减
-预算或选择中途最佳模型。预检短训练不计入正式初始化或充分训练结论。
+Formal directory: `data/runs/risk-attribution-p36-20261022/`; registered SHA-256:
+`0900a05c633afbb0529715e66b88e105c90ebfbff999487d0150d07bcf593fad`.
+An independent supervision process has completed normally, with state saved every 64 steps during training. Entry points are `supervisor.json`, `study/progress.json`, and `pipeline.log`. Evidence is preserved on failure; no automatic budget reduction or selection of intermediate best models occurs. Pre-check short training is not counted toward formal initialization or sufficient training conclusions.
 
-## 完整结果（2026-10-22）
+## Complete Results (2026-10-22)
 
-新加坡时间 **2026-10-22 10:51:22** 完成全部训练及自动复核，耗时约 **8 小时 7 分钟**。
-四个新增端点各完成 16,192 步。已核验连续更新历史、端点/评估证据哈希、全部登记输入
-与冻结源码；监督进程正常退出，无 pipeline 错误。P35 的四个参考端点保持不变。
+All training and automatic rechecks were completed at **10:51:22 Singapore Time, 2026-10-22**, taking approximately **8 hours 7 minutes**. Each of the four new endpoints completed 16,192 steps. All update history, endpoint/assessment evidence hashes, and full input registration have been verified. The supervision process exited normally with no pipeline errors. The four P35 reference endpoints remain unchanged.
 
-以下为共同 MR v1、实际 Rust/ORT/DSP 输出的逐录音均值，相对同种子的 P35 原始控制；
-负值表示误差降低。括号内按两个种子依次列出，不能跨不同优化总 loss 比较。
+Below are per-recording mean values for common MR v1 and actual Rust/ORT/DSP outputs, relative to the same seed P35 control; negative values indicate error reduction. Values in parentheses list results for the two seeds in order, and comparisons across different total loss percentages are not permitted.
 
-| 方案 | 音乐频谱 | 语音频谱 | 音乐动态 | 音乐 identity 频谱 |
+| Configuration | Music Spectrum | Speech Spectrum | Music Dynamics | Music Identity Spectrum |
 |---|---:|---:|---:|---:|
-| 仅误差压缩，identity 1.0（P36） | **−1.417% / −1.274%** | −1.773% / −2.028% | +0.214% / +0.242% | +5.331% / +1.629% |
-| 仅 identity 降至 0.3（P36） | −1.031% / −1.142% | −3.020% / −2.437% | +0.823% / +0.295% | +85.285% / +29.419% |
-| 压缩且 identity 0.3（P35） | −2.126% / −1.118% | −4.342% / −3.072% | +0.696% / +0.064% | +36.550% / +2.338% |
+| Only error compression, identity 1.0 (P36) | **−1.417% / −1.274%** | −1.773% / −2.028% | +0.214% / +0.242% | +5.331% / +1.629% |
+| Only identity reduced to 0.3 (P36) | −1.031% / −1.142% | −3.020% / −2.437% | +0.823% / +0.295% | +85.285% / +29.419% |
+| Compression + identity 0.3 (P35) | −2.126% / −1.118% | −4.342% / −3.072% | +0.696% / +0.064% | +36.550% / +2.338% |
 
-仅压缩的原生音乐 MR 为 **0.378741 / 0.378982**，相对未处理压缩输入降低
-**1.657% / 1.594%**；原始模型 OLA 相对同期控制降低 **1.669% / 1.613%**。
-26 首复核音乐中分别 20 首改善/6 首退步、17 首改善/9 首退步，逐录音差值中位数均改善。
-仅降权的原始 OLA 音乐 MR 相对控制降低 1.308% / 1.444%，原生输出相对输入降低
-1.272% / 1.462%。因此两因素单独都能产生恢复指标收益，不能将全部收益归给其中一项。
+The native music MR for only compression is **0.378741 / 0.378982**, representing a relative reduction of **1.657% / 1.594%** compared to uncompressed input. The original model OLA shows a relative reduction of **1.669% / 1.613%**. Among 26 rechecked music pieces, 20 improved and 6 degraded in the first seed, while 17 improved and 9 degraded in the second seed, with median per-recording differences improving in both. For the identity reduction-only case, the original OLA music MR decreased by 1.308% / 1.444% relative to control, and the native output decreased by 1.272% / 1.462% relative to input. Thus, both factors independently produce recovery gains—neither can be credited with all the benefit.
 
-仅压缩的语音动态仍上升 **0.092% / 0.066%**，但语音 identity MR 降低
-**96.648% / 90.398%**。仅降权的语音动态上升 0.632% / 0.286%，语音 identity MR
-上升 1883.597% / 719.121%；后者的基数很小，须结合下节 PCM 绝对量级理解。
+The speech dynamic for only compression still increases by **0.092% / 0.066%**, but speech identity MR drops by **96.648% / 90.398%**. For only identity reduction, speech dynamic increases by 0.632% / 0.286%, and speech identity MR increases by **1883.597% / 719.121%**; the latter has a very small baseline and must be interpreted in conjunction with the next section's PCM absolute magnitude.
 
-在压缩目标内，identity 从 1.0 降至 0.3 对音乐 MR 的作用在两个种子不一致：
-第一个种子进一步改善，第二个种子反而轻微退步。两因素在音乐原生 MR 上的交互项
-为 **+0.001239 / +0.004985**（共同分数单位，不是百分比）；语音为
-**+0.001452 / +0.004492**。组合收益不是两个单独收益的简单相加。
+Within the compression target, reducing identity from 1.0 to 0.3 shows inconsistent effects on music MR across the two seeds: the first seed sees further improvement, while the second seed shows slight degradation. The interaction term for music native MR is **+0.001239 / +0.004985** (in common score units, not percentages); for speech, it is **+0.001452 / +0.004492**. The combined gain is not simply the sum of the individual gains.
 
-仅压缩的梯度裁剪次数为 **1 / 0**，最大范数 **10.491 / 4.708**；仅降权为
-**63 / 46**，最大范数 **401.072 / 745.066**。对照 P35 原始控制的 59 / 45 次，
-降低极端梯度主要与误差压缩对应，恒等降权并未解决这一问题。完整预算仍不证明收敛。
+For compression-only: gradient clipping count is **1 / 0**, maximum norm **10.491 / 4.708**; for identity-only: **63 / 46**, maximum norm **401.072 / 745.066**. Compared to P35 control's 59 / 45, extreme gradient reduction is primarily associated with error compression, while identity reduction does not resolve this issue. Full budget does not prove convergence.
 
-## 绝对 PCM、原生一致性与时延
+## Absolute PCM, Native Consistency, and Latency
 
-identity 原生输出相对同素材恒等 DSP 的 PCM RMS，先按录音聚合再取均值：
+The native output relative to the same material identity DSP in PCM RMS, averaged per recording:
 
-| 方案 | 音乐 | 语音 |
+| Configuration | Music | Speech |
 |---|---:|---:|
-| 仅压缩 | 2.28e-6 / 2.89e-6 | 4.65e-8 / 5.92e-8 |
-| 仅降权 | 4.14e-5 / 1.85e-5 | 1.40e-6 / 6.53e-7 |
+| Only compression | 2.28e-6 / 2.89e-6 | 4.65e-8 / 5.92e-8 |
+| Only identity reduction | 4.14e-5 / 1.85e-5 | 1.40e-6 / 6.53e-7 |
 
-仅压缩的音乐最差单片段分别为 `2.29e-5 / 2.32e-5`（−92.81 / −92.70 dBFS），
-仅降权为 `3.42e-4 / 9.46e-5`（−69.31 / −80.48 dBFS）。语音最差单片段，
-仅压缩为 `4.61e-7 / 7.28e-7`（−126.73 / −122.76 dBFS），仅降权为
-`1.74e-5 / 6.74e-6`（−95.19 / −103.43 dBFS）。这些是实际 PCM 差值，
-不是未归一化 FFT 功率；不据此推断听感，也不因绝对量级小而事后调整通过门槛。
+For compression-only, the worst-case single fragment music is `2.29e-5 / 2.32e-5` (−92.81 / −92.70 dBFS), and for identity-only, it is `3.42e-4 / 9.46e-5` (−69.31 / −80.48 dBFS). For speech, the worst-case single fragment for compression-only is `4.61e-7 / 7.28e-7` (−126.73 / −122.76 dBFS), and for identity-only, it is `1.74e-5 / 6.74e-6` (−95.19 / −103.43 dBFS). These are actual PCM differences, not unnormalized FFT power. No perceptual inference is drawn from these absolute values, nor are thresholds adjusted post hoc based on magnitude.
 
-音乐 paired 相对原始无损的 PCM RMS，仅压缩为 `0.0134995 / 0.0135008`，
-同期控制约为 `0.0134978`；这一轻微增加不单独否定频谱收益。音乐 identity 相对
-原始无损的误差还包含恒等 DSP 自身限幅/合成的影响，不能与新增模型改动混为一项。
+For paired music, relative to the original lossless PCM RMS, compression-only yields `0.0134995 / 0.0135008`, compared to the control of approximately `0.0134978`. This slight increase does not negate the spectral gains. Music identity error relative to the original lossless also includes the impact of identity DSP's own clipping/synthesis, and cannot be conflated with new model modifications.
 
-新增四端点共完成 **712 个原生 PCM 角色 + 712 个额外原生 MR 角色**，合成最大误差
-**4.17e-7**，零容差失败。共测 **280,000 hop**：最大处理耗时 **1.278 ms**，
-各场景最高 P99 **0.517 ms**，零次 ≥5 ms，零次服务耗时超过 hop 周期，峰值 RSS
-**31.69 MiB**。paced 仍有 **1 次完成迟到，0.467 ms**；不能宣称零调度迟到或设备认证。
-这次时延更低不证明模型结构变快，测试运行条件不同。固定 256 帧缓冲仍为
-5.333 ms @48 kHz / 5.805 ms @44.1 kHz，另计。
+A total of **712 native PCM roles + 712 additional native MR roles** are newly evaluated, resulting in a maximum synthetic error of **4.17e-7**, with zero tolerance failure. A total of **280,000 hops** are tested: maximum processing time is **1.278 ms**, highest P99 is **0.517 ms**, zero instances ≥5 ms, and zero instances exceeding hop period. Peak RSS is **31.69 MiB**. The `paced` system still has **1 instance of late completion, 0.467 ms**. This does not justify claiming zero scheduling delay or device authentication. Lower latency does not imply faster model structure—testing conditions differ. A fixed 256-frame buffer remains at 5.333 ms @48 kHz / 5.805 ms @44.1 kHz, plus additional overhead.
 
-## 后续方向
+## Next Steps
 
-两个新组合都因动态或音乐 identity 退化未通过预登记筛选。仅误差压缩在两个种子保留
-音乐收益，同时比仅降权和 P35 组合更好地控制 identity 改动，适合作为下一步研究起点；
-它并非所有指标都优于 P35 组合，也尚不是合格发布权重。后续优先定位剩余高频动态误差
-与少数 identity 反例，保留同素材、原始预测/部署输出对照。复用留出集的两种子结果
-不替代独立泛化、盲听和真实设备稳定性验证。本轮未晋级默认权重。
+Both new configurations fail pre-registration screening due to dynamic or music identity degradation. Only error compression retains music gains and better controls identity changes compared to the identity-only and P35 combinations, making it a suitable starting point for further study. However, it does not outperform P35 across all metrics and is not yet a qualified release weight. Future work will prioritize identifying remaining high-frequency dynamic errors and a few identity counterexamples, with continued use of the same material and direct comparison between original prediction and deployed output. The two sub-results from the held-out set do not replace independent generalization, blind listening, or real-device stability validation. This round does not result in promotion of a default weight.
 
-后续已完成 [P36 时间变化与恒等反例诊断](risk-temporal-diagnosis.md)：确认收益包含
-输入缺失高频的改善，动态退化同时存在于原始预测和融合阶段；恒等均值退化主要
-由极弱参考频带反例拉高。详见分频带、逐录音、绝对 PCM 与监督路径分析。
+Subsequent work completed: [P36 Temporal Dynamics and Identity Counterexample Diagnosis](risk-temporal-diagnosis.md). Confirmed that gains include improvements in missing high-frequency input, and dynamic degradation exists in both raw prediction and fusion stages. Identity mean degradation is primarily driven by a few extremely weak reference band counterexamples. See detailed analysis by frequency band, per-recording, absolute PCM, and supervision path.
+
+The unchanged small architecture has 431015 parameters.

@@ -227,3 +227,57 @@ Rebuilding a five-pair diagnostic batch with an empty disk cache reproduced the
 entire prior inspection JSON exactly and left the read-only cache empty.
 Local validation: **548 Python tests passed**, Ruff lint/format and changed-document
 links passed. No new listening, physical-device or model-quality qualification is claimed.
+
+## 2026-10-23: cache cleanup and English documentation
+
+Removed **20,680 regenerable cache/build files**: 4,002,113,941 logical bytes
+(**3.73 GiB**) and 4,045,869,056 allocated bytes (**3.77 GiB**). The inventory covers
+Rust `target/debug/incremental`, Python tool caches and 2,194 derived `.npz` feature
+cache files in historical study directories. No original audio, prepared pairs,
+licenses/manifests, checkpoints, frozen sources/binaries, ONNX exports or failed
+validation reports were deleted. Older shared model/loss code remains because it
+still supplies current imports and reproducible controls.
+
+Before deletion, the inventory recorded paths, sizes, allocated blocks, inodes and
+mtimes; registration documents were checked for individual NPZ references, and open
+files/active Cargo work were checked. All **158 retained registration/endpoint
+records** kept identical hashes. After cleanup, **211 P38 input/checkpoint/frozen-source
+hashes** passed. Rebuilding the same **32 registered training draws** from retained
+material reproduced every original gradient norm/cosine and decomposition error
+exactly in the extended P39 audit. These checks establish retention and regeneration,
+not new model-quality or device qualification.
+
+Local receipts: `data/maintenance/cleanup-20261023/inventory.json`, `receipt.json`
+and `post-check.json`. Logical/allocated totals describe deleted files, not a promise
+that a shared volume's free-space counter changes by exactly that amount.
+
+Maintained documentation is English, including root instructions, `.agents`, legal
+notes and historical study reports. Exact upstream Japanese attribution/work titles
+are preserved as provenance. The former Chinese README is an English compatibility
+link. Early `.agents` sketches were consolidated against current implementation and
+acceptance requirements; obsolete latency, dependency and ignore-file examples are
+not current instructions. Historical source text remains in Git history and the
+local maintenance snapshot; frozen experiment source is never rewritten for translation.
+
+The [failure registry](failed-experiments.md) indexes unsuccessful/unqualified routes
+and conditions for revisiting them. `training/scripts/check_documentation.py` checks
+English prose, local links/anchors and P-series indexing in CI. The new P39 diagnostics
+retain all timing failures and do not promote weights.
+
+Final documentation checks cover **116 Markdown files**. The historical translation
+review retained original numeric table cells, code literals, links and source
+provenance, with separately recorded equivalent Chinese number-unit conversions.
+These checks do not turn historical metrics into current acceptance or legal review.
+Focused objective/gradient tests passed (**44 tests**), and the three new diagnostic/
+documentation scripts pass Ruff lint and formatting. The new scripts were also
+exercised on actual frozen-model audits and the completed interleaved timing run.
+
+Temporary translation-only model downloads, the isolated translation environment,
+caches and rejected drafts created during this task were removed after their
+processes exited and an open-file check passed: 18,442 files, 3,310,436,716 logical
+bytes (3.08 GiB). This is **not** additional pre-existing project clutter reclaimed
+and is separate from the 3.73 GiB inventory above. Original documentation snapshots,
+reviewed translations, verification scripts and receipts remain under
+`data/maintenance/english-docs-20261023/`; `temporary-cleanup.json` records deletion,
+and `final-review.json` binds the applied historical reports. No translation model
+is used to initialize SoundEx or included in its weights.

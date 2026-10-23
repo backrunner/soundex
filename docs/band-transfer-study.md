@@ -1,56 +1,66 @@
-# P15：冻结权重的频带干预
+# P15: Band-Specific Intervention with Frozen Weights
 
-## 结论
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-P14 严重反例的误差放大，可以进一步定位到相邻频带之间的修正串扰。
-两个 blues 反例主要由 12–16 kHz 的修正产生 16 kHz 以上的输出变化；
-另一个 unlabeled 反例主要由 4–8 kHz 的修正影响 8–12 kHz。
-这不是“只要关掉 16 kHz 以上生成就解决”的问题。
+## Conclusion
 
-## 协议与核验
+The error amplification observed in severe counterexamples from P14 can be further localized to crosstalk between adjacent frequency bands.
+Two blues-type counterexamples are primarily driven by corrections in the 12–16 kHz band causing output changes above 16 kHz;
+a third, unlabeled counterexample is mainly influenced by corrections in the 4–8 kHz band affecting the 8–12 kHz range.
+This is *not* a problem that can be resolved simply by disabling generation above 16 kHz.
 
-冻结 P13 多位置组两个 step 2048 权重，全部 320 个训练位置和 89 个开发片段，
-共 818 对案例；每对做 5 个频带的 only / without 干预。
-`only` 只保留一个频带的模型修正，`without` 只移除该频带修正，其余条件固定。
-最终误差仍通过原有 DSP 和 P13 objective 计算，不改变参考音频或评价权重。
+## Protocol and Verification
 
-同时把混合后的复数频谱残差按源频带分解，经过相同 OLA 和再分析，形成
-源频带 → 输出频带的残差 RMS 矩阵。该矩阵位于限幅和 gate 之前；各分量的
-功率不能直接相加归因，因为可能有相位抵消。最终输出的 only / without 是另一组直接干预证据。
+We froze the step-2048 weights from the P13 multi-location group, retaining all 320 training positions and 89 development snippets,
+resulting in 818 paired cases. For each pair, we performed 5 frequency band interventions:
+- `only`: retain only one specific frequency band's correction
+- `without`: remove the correction of one specific frequency band
+All other conditions were held constant.
 
-分量相加误差：波形最大 `1.862645149230957e-8`，复数谱最大 `1.6858739115832577e-7`。
-P14 事后最差三个音乐片段各选择主要源频带，对 only / without 再做真实 Rust 回放：
-24 次全部完成，代理/原生波形最大误差 `3.5762786865234375e-7`。
-这仍是机制诊断，不是独立质量测试或新模型验收。
+The final error was computed using the original DSP pipeline and the P13 objective function, without altering the reference audio or evaluation weights.
 
-源码冻结于 `1af287b3c25b9a0957c2d9e08daa468d9035e56c`，报告回执哈希重新校验通过。
-运行根目录为 `data/runs/band-transfer-p15-20261013/`，产物全部忽略、不推送音频。
+We also decomposed the complex spectral residuals after mixing, by source frequency band, and then re-analyzed them using the same OLA (Overlap-Add) and processing chain to generate a residual RMS matrix mapping from source frequency band to output frequency band. This matrix was computed prior to clipping and gating; the power of individual components cannot be directly summed due to potential phase cancellation. The resulting `only` and `without` outcomes constitute a separate, direct line of evidence.
 
-## 直接干预结果
+Component-summed error:
+- Waveform maximum: `1.862645149230957e-8`
+- Complex spectrum maximum: `1.6858739115832577e-7`
 
-严重 blues 反例 `9d95e7f035f878fa1a6ab421`：
+For the three worst-performing music snippets from P14, we selected the dominant source bands and performed real-time Rust playback for both `only` and `without` conditions:
+- 24 runs completed successfully
+- Maximum error between proxy and native waveforms: `3.5762786865234375e-7`
+This remains a mechanism-level diagnosis, not an independent quality assessment or a model validation for deployment.
 
-| 种子 | identity：全部修正 | 只保留 12–16 kHz 修正 | 移除 12–16 kHz 修正 |
+Source code was frozen at commit `1af287b3c25b9a0957c2d9e08daa468d9035e56c`, and the report hash was verified to match.
+Runtime directory: `data/runs/band-transfer-p15-20261013/`
+All generated outputs were ignored and not pushed to audio storage.
+
+## Direct Intervention Results
+
+Severe blues counterexample `9d95e7f035f878fa1a6ab421`:
+
+| Seed | Identity: All Corrections | Only 12–16 kHz Correction | Remove 12–16 kHz Correction |
 | --- | ---: | ---: | ---: |
 | 20261012 | 2.273816 | 2.272545 | 0.043032 |
 | 20261013 | 2.087431 | 2.088101 | 0.025600 |
 
-该案例输入 12–16 kHz 修正在目标 16 kHz 以上产生的残差 RMS，分别约为
-直接 16 kHz 以上修正所产生 RMS 的 52 / 79 倍；这是分量 RMS 比，不是可相加的误差比例。
+The residual RMS in the 16 kHz+ output region induced by the 12–16 kHz correction is approximately
+52% and 79% of the RMS produced directly by a 16 kHz+ correction—this is a component-wise RMS ratio, not a directly additive error proportion.
 
-但是直接关闭这个源频带也会丢失恢复收益：
+However, disabling the 12–16 kHz correction also results in a loss of recovery benefit:
 
-| 音乐训练位置 / 种子 | 原成对恢复 loss | 关闭 12–16 kHz 修正 |
+| Music Training Position / Seed | Original Pairwise Recovery Loss | Recovery Loss with 12–16 kHz Correction Disabled |
 | --- | ---: | ---: |
 | 20261012 | 0.572272 | 0.578455 |
 | 20261013 | 0.572836 | 0.578190 |
 
-开发音乐的均值虽可因此降低，仍未超过初始模型，而且该规则是在看过开发反例后发现的。
-不能把它作为上线开关或直接当作改良后的模型。本轮没有修改 DSP 或权重。
+While the average performance on development music improves slightly, it still remains above the baseline model. This rule was discovered only after observing the development counterexamples.
+It cannot be used as a production toggle or treated as a direct improvement to the model. No modifications to DSP or weights were made in this round.
 
-## 后续
+## Next Steps
 
-启动 [P16 参考感知的合成一致性对照](spectral-consistency-study.md)：
-在训练阶段约束预测与参考之间的合成不一致，保留参考真实的时间变化，
-并继续用原有成对恢复、identity、瞬态、低频和真实 DSP 指标判断收益。
-它是待验证的辅助约束，不是已证明有效的修复。
+Initiate [P16: Reference Perceptual Synthesis Consistency Benchmark](spectral-consistency-study.md):
+During training, enforce consistency between predicted and reference outputs in synthesis, preserving the true temporal dynamics of the reference.
+Continue evaluating gains using existing metrics: pairwise recovery, identity, transient, low-frequency, and real DSP performance.
+This is a pending auxiliary constraint and has not yet been proven to yield effective fixes.

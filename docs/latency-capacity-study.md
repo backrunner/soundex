@@ -1,102 +1,73 @@
-# P22：延迟优先的容量扩展
+# P22: Latency-First Capacity Expansion
 
-2026-10-15 用户取消实验模型的体积上限，并确认 **5 ms 指模型 + DSP 计算耗时**，
-不含固定输出缓冲。现有 256 帧缓冲仍为 5.33 / 5.80 ms；模型增大不增加前瞻。
-正式 artifact 的 2M / 8 MiB 契约暂未迁移；本轮使用显式无大小上限的诊断导出，
-保留数值一致性检查，不能直接作为生产模型加载。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-后续用户要求完整训练后判断容量效果，已建立独立的 [P23 完整预算对照](full-capacity-study.md)。
-P22 的早期检查结果保留，不再作为阻止 P23 长训练的条件；P22 本身未被改写重跑。
+2026-10-15 User lifted the volume ceiling on the experimental model and confirmed **5 ms as the model + DSP computation latency**, excluding fixed output buffering. The existing 256-frame buffer remains at 5.33 / 5.80 ms; model scaling does not extend lookahead. The 2M / 8 MiB production contract for formal artifacts has not yet been migrated. This round uses explicit, size-unbounded diagnostic exports, preserving numerical consistency checks and cannot be directly loaded into production models.
 
-## 成本实测
+Subsequently, user requests a full post-training evaluation of capacity performance. An independent [P23 Full Budget Comparison](full-capacity-study.md) has been established. Early P22 evaluation results are retained and no longer serve as a barrier to long-training in P23; P22 itself was not re-run or rewritten.
 
-Apple M5 Max，CPU ORT 单线程，双声道，每 hop 128 帧；100 次预热后计时
-10,000 hop，包含 Python 因果 FFT 上下文处理。测量期间 P21 CPU 训练仍在运行。
-全部五种规模通过 320 hop 的 PyTorch/ONNX 连续状态、单/双声道、静音、reset、
-44.1/48 kHz 数值一致性检查。输出头使用固定种子的非零随机权重；不是训练后的音质结果。
+## Cost Measurement
 
-| width | 参数 | ONNX | 平均 | p99 | 最大 | ORT RSS 增量 | 初筛 |
+Apple M5 Max, CPU ORT single-thread, stereo, 128-frame hop; 100 warmup iterations measured, then 10,000 hops, including Python causal FFT context processing. During measurement, P11 CPU training remained active. All five scales passed 320-hop PyTorch/ONNX continuous state, mono/stereo, silence, reset, 44.1/48 kHz numerical consistency checks. Output heads used fixed-seed non-zero random weights; these are not training-quality audio results.
+
+| width | parameters | ONNX | average | p99 | maximum | ORT RSS increment | initial screening |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| 224 | 1,748,578 | 6.70 MiB | 0.261 ms | 0.327 ms | 0.654 ms | 28.39 MiB | 通过 |
-| 384 | 4,594,818 | 17.55 MiB | 0.502 ms | 0.576 ms | 0.726 ms | 47.45 MiB | 通过 |
-| 640 | 11,917,698 | 45.47 MiB | 1.075 ms | 1.196 ms | 1.443 ms | 65.30 MiB | 通过 |
-| 896 | 22,648,450 | 86.39 MiB | 2.397 ms | 3.782 ms | 30.650 ms | 114.39 MiB | 暂不进入训练 |
-| 1280 | 45,134,338 | 172.15 MiB | 3.605 ms | 3.979 ms | 5.744 ms | 211.13 MiB | 暂不进入训练 |
+| 224 | 1,748,578 | 6.70 MiB | 0.261 ms | 0.327 ms | 0.654 ms | 28.39 MiB | passed |
+| 384 | 4,594,818 | 17.55 MiB | 0.502 ms | 0.576 ms | 0.726 ms | 47.45 MiB | passed |
+| 640 | 11,917,698 | 45.47 MiB | 1.075 ms | 1.196 ms | 1.443 ms | 65.30 MiB | passed |
+| 896 | 22,648,450 | 86.39 MiB | 2.397 ms | 3.782 ms | 30.650 ms | 114.39 MiB | on hold |
+| 1280 | 45,134,338 | 172.15 MiB | 3.605 ms | 3.979 ms | 5.744 ms | 211.13 MiB | on hold |
 
-RSS 是独立 ORT 进程加载前与 100 hop 预热后的快照差，含 allocator 与缓冲，
-不含 PyTorch、FFT frontend 或完整 Rust，也不是内存峰值。
-当前计时未包含完整 DSP、回调、设备、唤醒与队列等待，不能宣称模型 + DSP 已通过 5 ms 验收。
-计时输入为固定合成信号；真实音乐、静音、瞬态的部署成本仍须在训练后复测。
+RSS is the difference between ORT process memory snapshot before and after 100-hop warmup, including allocator and buffers, excluding PyTorch, FFT frontend, or full Rust—nor is it peak memory. The timing measured does not include full DSP, callbacks, device, wake-up, or queue wait, so it cannot be claimed that model + DSP has passed 5 ms validation. Input signals are fixed synthetic signals; real music, silence, and transients require post-training revalidation for actual deployment cost.
 
-48 kHz 每 2.667 ms 到达一个新 hop，平均 <5 ms 仍可能持续积压。
-初筛预先要求：双声道平均与 p99 均 <2 ms（给其余 DSP/调度留出约 25% hop），
-观测最大 <5 ms；将实际服务时长按固定 2.667 ms 到达间隔重放时，虚拟超时比例
-<=0.1%，末尾积压为零。该重放只计算容量压力，不是真实设备 deadline 记录。
+At 48 kHz, a new hop arrives every 2.667 ms, so average <5 ms may still accumulate. Initial screening requires: stereo average and p99 both <2 ms (leaving ~25% hop buffer for remaining DSP/scheduling), with observed maximum <5 ms. When replaying actual service duration at a fixed 2.667 ms hop interval, the virtual timeout ratio must be ≤0.1%, and tail accumulation must be zero. This replay only measures capacity pressure, not actual device deadline records.
 
-224/384/640 的虚拟超时均为零；896 超时 5,745/10,000，最大积压 796.86 ms；
-1280 超时 10,000/10,000，结束积压 9.38 秒。896 的波动与并行负载有关，不能据此
-断言其硬件极限；但本次没有足够余量，不因其 p99 <5 ms 就接受。
+All 224/384/640 configurations have zero virtual timeouts; 896 has 5,745/10,000 timeouts, peak backlog 796.86 ms; 1280 has 10,000/10,000 timeouts, ending with 9.38 seconds of backlog. The 896 fluctuations are tied to parallel load, so cannot be used to infer hardware limits. However, this round lacks sufficient headroom—its p99 <5 ms does not justify acceptance.
 
-本地完整报告：`data/reports/latency-capacity-20261015/summary.json`。
+Full local report: `data/reports/latency-capacity-20261015/summary.json`.
 
-## 校准结果（2026-10-15 16:03 SGT）
+## Calibration Results (2026-10-15 16:03 SGT)
 
-P22 已正常完成全部 8 组、4,096 次更新。训练和导出各 8 份完成回执均已重新验证。
-所有配置未通过预先记录的训练优化检查，包括 anchored 控制；没有启动更长训练、
-没有选出合格权重。512 步是早期校准，不能证明某种容量的最终上限。
+P22 completed all 8 configurations, 4,096 updates, with all 8 training receipts and all 8 export receipts verified. All configurations failed pre-registered training optimization checks, including anchored control; no extended training was initiated, and no qualified weights were selected. 512 steps represent early calibration and do not establish a final capacity ceiling.
 
-完整 2,088 裁剪训练池、两个种子均值（音乐/语音按既定 0.8/0.2 加权，越低越好）：
+Complete 2,088-crop training pool, two seeds averaged (music/voice weighted 0.8/0.2, lower is better):
 
-| 配置 | paired 恢复误差 | identity 原音损伤 | main 综合误差 |
+| Configuration | paired recovery error | identity original damage | main combined error |
 | --- | ---: | ---: | ---: |
-| 恒等初始化 | 0.585364 | 0 | 0.292682 |
-| anchored 控制 | 0.584665 | 0.003496 | 0.294080 |
-| scaled224（175 万） | 0.582753 | 0.004961 | 0.293857 |
-| scaled384（459 万） | 0.582639 | 0.008002 | 0.295320 |
-| scaled640（1,192 万） | 0.583808 | 0.018202 | 0.301005 |
+| Identity initialization | 0.585364 | 0 | 0.292682 |
+| Anchored control | 0.584665 | 0.003496 | 0.294080 |
+| scaled224 (175 × 10,000 parameters) | 0.582753 | 0.004961 | 0.293857 |
+| scaled384 (459 × 10,000 parameters) | 0.582639 | 0.008002 | 0.295320 |
+| scaled640 (1,192 × 10,000 parameters) | 0.583808 | 0.018202 | 0.301005 |
 
-三种 scaled 容量的恢复误差比初始化下降 0.446% / 0.465% / 0.266%，但原音损伤
-抵消了收益，main 反而增加 0.402% / 0.902% / 2.844%。两个种子方向一致。
-共同 320 裁剪的 main/combined 也均未优于初始化。不能把训练池结果解释为已完成
-留出音质、Rust DSP 或听感验证，也没有证据将其归咎于验证集过拟合。
+The recovery error for the three scaled widths decreased by 0.446% / 0.465% / 0.266% compared to initialization, but original audio damage offset the gains, resulting in a net increase in main error by 0.402% / 0.902% / 2.844%. Both seeds show consistent trends. The main/combined error on the shared 320-crop set did not outperform initialization. These results cannot be interpreted as evidence of completed held-out audio quality, Rust DSP, or perceptual validation. There is no evidence of overfitting to the validation set.
 
-P21 同预算 512 步对照中，未缩放复数头的裁剪比例为 86.3–89.1%，相同 144 width
-改成 slope=1/64 后为 1.17–2.15%；只降学习率仍为 93.2–93.9%。这支持输出坐标
-灵敏度校准改善了梯度尺度，但不能说明训练目标和最终保真问题已经解决。
-P22 的 384/640 width 裁剪比例分别为 5.08–6.45% / 9.375%，仍低于 25% 检查线。
+In the P11 equivalent budget at 512 steps, the gradient-clipping rate without complex head scaling was 86.3–89.1%. When changing 144 width to slope=1/64, it dropped to 1.17–2.15%; reducing only learning rate yielded 93.2–93.9%. This supports improved gradient scale sensitivity in output coordinates, but does not indicate that training objectives or final fidelity have been resolved. The 384/640 width gradient-clipping rates were 5.08–6.45% / 9.375%, still below the 25% threshold.
 
-训练后每模型每种子重新测量 10,000 hop，双声道 p99：224 为 0.307–0.308 ms，
-384 为 0.565–0.566 ms，640 为 1.108–1.109 ms；640 最大值 1.331 ms。
-全部固定到达间隔的虚拟超时计数为零。这仍不包含完整 DSP/设备验收。
+Post-training, each model per seed was re-measured for 10,000 hops, stereo p99: 224 at 0.307–0.308 ms, 384 at 0.565–0.566 ms, 640 at 1.108–1.109 ms; maximum 640 at 1.331 ms. All virtual timeouts under fixed hop intervals were zero. This still does not include full DSP/device validation.
 
-当前证据说明：在本轮校准预算和参数设置下，单纯加宽没有改善综合误差。
-后续应先诊断 paired 与 identity 梯度/更新的相互影响，以及随 width 变化的实际输出
-步长；同时检查短期筛查是否足以评价学习进展，不能因为 anchored 也在 512 步失败
-就断言所有长训练无效。尚未据此改 loss 或选择新学习率。
+Current evidence shows: under the current calibration budget and parameter settings, widening alone does not improve overall error. Future work should first diagnose the interaction between paired and identity gradients/updates, and the actual output step size as a function of width. Additionally, it must be determined whether short screening is sufficient to evaluate learning progress. Failure of anchored control at 512 steps does not justify dismissing all long training. No loss modification or new learning rate selection has been made based on this.
 
-## 同预算训练
+## Same-Budget Training
 
-新实验独立于冻结的 [P21](capacity-calibration-study.md)，不改变 P21 的任何参数或选择规则。
-P22 已在 P21 流水线退出后启动并完成，避免同时加载完整训练池与两条长训练相互争抢资源。
-前序失败则停止并报告，不把失败当作训练完成。
+This experiment is independent of the frozen [P21](capacity-calibration-study.md), with no changes to P21's parameters or selection rules. P22 was launched and completed after the P21 pipeline exited, avoiding resource contention between full training pools and long training runs. If a prior run fails, it stops and reports failure—not as a successful completion.
 
-- anchored144 控制 + scaled224/384/640，两个种子 `20261012 / 20261013`；
-  每配置每种子 512 步，共 4,096 更新；全部从头初始化。
-- 相同 2,088 裁剪训练池、共同 320 裁剪、P21 校准抽样顺序、主/辅 loss 与权重，
-  每步 4 音乐 + 1 语音，paired/identity 等权。
-- scaled 头继续 `2*tanh(z/64)`，Adam 1e-4、无 weight decay、梯度裁剪 5；
-  先修正已知灵敏度问题，再观察扩容效应。不同宽度不声称共享相同初始化张量。
-- 选择规模只依据训练前 CPU 成本，不读取开发集质量。所有通过成本的规模均纳入，
-  不选择最好种子或事后缩减对照。
-- 共同/完整训练池报告 main、paired、identity 与 combined，分别保留音乐/语音、
-  梯度裁剪比例。各规模训练后重新导出、验证并测量 10,000 hop。
-- 记录各项训练优化检查，不根据一个规模通过就自动启动长训练，不自动发布权重。
-  后续必须冻结候选，再做实际 Rust DSP、复用开发集及新录音泛化、听感、完整链路实时验证。
+- **anchored144 control + scaled224/384/640**, two seeds `20261012 / 20261013`;
+  Each configuration per seed for 512 steps, total 4,096 updates; all initialized from scratch.
+- Shared 2,088-crop training pool, common 320-crop, P21 calibration sampling order, main/aux loss and weights;
+  4 music + 1 voice per step, paired/identity equally weighted.
+- Scaled heads continue with `2*tanh(z/64)`, Adam 1e-4, no weight decay, gradient clipping 5;
+  First correct known sensitivity issues, then observe expansion effects. Different widths do not share identical initialization tensors.
+- Scale selection based solely on pre-training CPU cost, not development set quality. All cost-passing scales are included; no best seed or post-hoc reduction is selected.
+- Shared/complete training pool reports main, paired, identity, and combined, preserving music/voice, and gradient clipping ratios. Each scale is re-exported, validated, and measured for 10,000 hops post-training.
+- All training optimization checks are recorded; no long training is automatically triggered based on a single scale passing, and no weights are automatically released. Future work must freeze candidates before actual Rust DSP, reusing development set, new recordings, generalization, perceptual, and full chain real-time validation.
 
-运行脚本为 `training/scripts/run_latency_capacity_study.py`；源码与输入哈希冻结，支持
-64 步检查点恢复，启动和结束均验证输入。训练目录：
-`data/runs/latency-capacity-p22-20261015/study/`，通过 `progress.json` 区分 queued、
-数据准备、训练及校准完成。排队不代表已经产生大模型权重。
+Run script: `training/scripts/run_latency_capacity_study.py`
+Source code and input hashes are frozen, supporting 64-step checkpoint recovery. Start and end are both validated against input. Training directory:
+`data/runs/latency-capacity-p22-20261015/study/`
+Progress is tracked via `progress.json`, distinguishing queued, data preparation, training, and calibration completion. Queueing does not imply large model weights have been generated.
 
 ```sh
 PYTHONPATH=training training/.venv/bin/python training/scripts/screen_latency_capacity.py \
@@ -108,10 +79,8 @@ PYTHONPATH=training training/.venv/bin/python training/scripts/run_latency_capac
   --wait-for data/runs/capacity-p21-20261015/pipeline.json
 ```
 
-正式运行使用该轮冻结源码 `d1697c7`，已于 2026-10-15 15:27 SGT 启动后台队列；
-历史监督 PID `93749`、子进程 `93751`；16:03 SGT 完成后已退出，当前为 `calibration_complete`。
-日志 `data/runs/latency-capacity-p22-20261015/pipeline.log`，运行状态以该目录
-`pipeline.json` 和 `study/progress.json` 为准。已登记目录不能随源码修改直接重跑。
+Formal run uses the frozen source code `d1697c7`, launched at 15:27 SGT on 2026-10-15; historical supervision PID `93749`, child process `93751`; completed at 16:03 SGT and exited. Current status is `calibration_complete`. Logs: `data/runs/latency-capacity-p22-20261015/pipeline.log`. Runtime status is determined by `pipeline.json` and `study/progress.json`. The directory is registered and cannot be directly rerun upon source code modification.
 
-本轮全量 Python 测试 496 项通过；之后补充训练汇总的双种子/identity 检查，
-相关 15 项测试通过。Ruff 检查及格式检查通过。未进行新大模型的盲听或设备连续流认证。
+Full Python test suite passed 496 items; subsequent addition of training summary double-seed/identity checks, 15 additional tests passed. Ruff and formatting checks passed. No blind listening or continuous stream device validation was conducted.
+
+The largest scale label is 1,192 × 10,000 parameters (approximately 11.92M); the registered exact model count is in the configuration table. The eight-arm/seed calibration is an early optimization diagnostic, not a capacity ceiling.

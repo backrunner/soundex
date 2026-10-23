@@ -1,141 +1,145 @@
-# 平滑限幅：固定权重的 DSP 对照
+# Smooth Clipping: DSP Comparison with Fixed Weights
 
-2026-10-12，实现提交 `aeae49e`。[基线审计](baseline-generalization-20261012.md)发现限幅本身产生额外高频。
-本轮保持所有权重冻结，只修改可选 DSP 模式，验证原因和收益；默认仍为 legacy，
-没有晋升权重或宣称整体音质合格。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 实现及边界
+2026-10-12, commit `aeae49e`. The baseline audit [baseline-generalization-20261012.md] identified that clipping itself introduces additional high-frequency content.
+This round maintains all weight freezing, modifying only optional DSP modes to validate the cause and benefit; the default remains `legacy`.
+No weights were promoted, and overall audio quality is not declared acceptable.
 
-旧曲线在 `knee=0.9*ceiling` 处由斜率 1 突变到 0.1，并在实时回调端再次压缩已经
-过 worker 限幅的输出。新 `LimiterMode::SmoothKnee` 保留相同 knee 和 ceiling，
-只改肩部为：
+## Implementation and Boundaries
+
+The original curve abruptly changed slope from 1 to 0.1 at `knee = 0.9 * ceiling`, and then applied a further compression on the output already limited by the worker.
+The new `LimiterMode::SmoothKnee` preserves the same `knee` and `ceiling`, modifying only the shoulder region as follows:
 
 ```
 |x| <= 0.9c: y = x
 |x| > 0.9c:  y = sign(x)*c*(0.9 + 0.1*tanh((|x|/c - 0.9)/0.1))
 ```
 
-肩部在起点的斜率为 1、二阶导数为 0，渐近于上限；默认 c 仍为 0.95。
-它是无状态的逐样本非线性，没有新增延迟、前瞻、缓冲、分配或线程。
-高于 knee 的合法信号仍会改变，不能称其全幅透明，也不保证重建采样点之间的 true peak。
-没有扩大安全上限来换分数。
+The shoulder region starts with a slope of 1 and zero second derivative, asymptotically approaching the upper limit. The default `c` remains 0.95.
+This is a stateless, per-sample nonlinear function, introducing no new latency, lookahead, buffering, allocation, or threading.
+Signals within legal bounds above the knee are still modified—thus, it is not fully transparent—and true peak reconstruction between sample points is not guaranteed.
+No safety margin was expanded to gain score.
 
-新模式的实时 mixer 对 dry 保护一次，直接接收 worker 已限幅的 wet，使用原有
-128 样本共享淡变；不再次压缩混合结果。保留最终 clamp，防止故障恢复时固定的
-correction 与突然变化的 dry 相加越界。模式在构造时确定，不在回调中热切换。
-双声道仍分别做非线性，不能保证高峰值处任意左右电平比不变；声道隔离、反相和
-共享恢复时间轴已有测试。这不是带 lookahead 的 stereo-linked 动态限幅器。
+The real-time mixer applies a single dry protection, directly receiving the wet output from the worker after it has been clipped, using the original 128-sample shared fade.
+It does not re-compress the mixed result. The final clamp is retained to prevent overflow during recovery when a fixed correction is added to a suddenly changing dry signal.
+The mode is determined at construction time and does not support hot-swapping in callbacks.
+Stereo channels are processed independently; peak-levels at high peaks are not guaranteed to remain consistent across left/right balance.
+Channel isolation, phase inversion, and shared recovery timing have been tested.
+This is not a stereo-linked dynamic limiter with lookahead.
 
-入口为 `SoundExConfig.limiter_mode`，流式评分器通过 `SOUNDEX_EVAL_LIMITER_MODE`，
-benchmark 通过 `SOUNDEX_LIMITER_MODE` 显式选择；报告绑定该模式。
-Python `limit/render` 提供同名模式供部署代理验证。已完成的 P3 始终使用 legacy；
-本次没有中途修改它，也没有把 smooth-knee 的结果冒称重新训练过的权重。
-未来切换训练目标须另行登记，不能直接复用旧 loss 总分。
+Entry point: `SoundExConfig.limiter_mode`. The streaming scorer uses `SOUNDEX_EVAL_LIMITER_MODE`, and benchmarks use `SOUNDEX_LIMITER_MODE` explicitly.
+Reports are bound to this mode. The Python `limit/render` provides a matching mode for deployment proxy validation.
+P3 has always used legacy; this round did not modify it during execution, and the smooth-knee results were not claimed as retrained weights.
+Future switching of training objectives requires separate registration and cannot reuse the old loss total.
 
-## 固定样本与选择
+## Fixed Samples and Selection
 
-`training/scripts/run_limiter_study.py` 要求 P3 完成，先登记模型、二进制、输入哈希和
-样本窗口，再执行所有路径。7 个模型/增益组合 × 2 种限幅 × 2 组样本，共 28 份报告。
+`training/scripts/run_limiter_study.py` requires P3 completion, first registering the model, binary, input hash, and sample window before executing all paths.
+7 model/gain combinations × 2 clipping modes × 2 sample sets = 28 reports.
 
-- 恒等模型、旧 shape-small 的 MatchEdge / Model gain。
-- P3 control 与 excess_identity，每组两个既定种子的验证 best；并不按留出分数换候选。
-- 开发 89 条 / 80 个录音，其中音乐 33 条 / 26 个录音；32768 样本中心裁剪。
-- 历史留出 39 个录音各一份保留编码完整文件，其中音乐 21 首。完整文件为 2–4 秒素材段。
-- 共同稳态区间从第 72 hop 到末尾前 256 样本；报告按 track_id 聚类 bootstrap。
-- 与上轮基线审计的 78 条留出选择不同，不能跨表相减。
+- Identity model, old `shape-small` MatchEdge / Model gain.
+- P3 control and `excess_identity`, each with two fixed seeds for validation; selection is not based on out-of-sample scores.
+- Development set: 89 tracks / 80 recordings, 33 music tracks / 26 recordings; 32768-sample center crop.
+- Historical out-of-sample 39 recordings, each preserved with full encoding and intact files; 21 music tracks.
+  Each file contains a 2–4 second segment.
+- Stable steady-state interval from hop 72 to 256 samples before end; reports are clustered by `track_id` for bootstrap.
+- Different from the prior round's baseline audit (78 out-of-sample selections), no cross-table subtraction is allowed.
 
-重新构建评分器的 legacy 模式，在四个 P3 候选的开发逐行谱形/瞬态/能量/SI-SDR 指标上，
-与冻结的原 P3 评分差值均为 0；避免把构建漂移当作新模式收益。
+A new scorer for the legacy mode is reconstructed, and across four P3 candidates, evaluated on all development paths for spectral shape, transient, energy, and SI-SDR metrics.
+The difference from the frozen P3 scorer is zero across all metrics—preventing any drift in the baseline from being misinterpreted as a benefit of the new mode.
 
-## 音频结果
+## Audio Results
 
-历史留出音乐的固定权重对照，箭头右侧为 smooth-knee：
+Fixed-weight comparison on historical out-of-sample music. Arrow to the right is smooth-knee:
 
-| 路径 | 高频谱形 ↓ | 高频瞬态 ↓ | 高频能量误差 dB ↓ | SI-SDR 相对输入 dB ↑ |
+| Path | High-Frequency Spectral Shape ↓ | High-Frequency Transient ↓ | High-Frequency Energy Error (dB) ↓ | SI-SDR Relative to Input (dB) ↑ |
 | --- | ---: | ---: | ---: | ---: |
-| 恒等 DSP | 0.70159 → 0.70030 | 0.88145 → 0.87035 | 4.15524 → 4.39902 | −0.29939 → −0.13762 |
-| 旧 MatchEdge | 0.66171 → 0.65646 | 0.99114 → 0.97985 | 2.87073 → 2.92152 | −0.37155 → −0.21395 |
-| 旧 Model gain | 0.65433 → 0.65087 | 0.90772 → 0.89622 | 3.94947 → 4.11817 | −0.34477 → −0.18615 |
-| P3 control / 种子 1 | 0.67888 → 0.67436 | 0.90480 → 0.89514 | 3.15370 → 3.25407 | −0.30885 → −0.14791 |
-| P3 control / 种子 2 | 0.67511 → 0.67109 | 0.89943 → 0.89008 | 3.20499 → 3.31591 | −0.30719 → −0.14623 |
-| P3 excess_identity / 种子 1 | 0.66342 → 0.65932 | 0.88667 → 0.87661 | 3.46710 → 3.60667 | −0.30501 → −0.14379 |
-| P3 excess_identity / 种子 2 | 0.65872 → 0.65524 | 0.87940 → 0.87012 | 3.66740 → 3.85356 | −0.30302 → −0.14163 |
+| Identity DSP | 0.70159 → 0.70030 | 0.88145 → 0.87035 | 4.15524 → 4.39902 | −0.29939 → −0.13762 |
+| Old MatchEdge | 0.66171 → 0.65646 | 0.99114 → 0.97985 | 2.87073 → 2.92152 | −0.37155 → −0.21395 |
+| Old Model Gain | 0.65433 → 0.65087 | 0.90772 → 0.89622 | 3.94947 → 4.11817 | −0.34477 → −0.18615 |
+| P3 Control / Seed 1 | 0.67888 → 0.67436 | 0.90480 → 0.89514 | 3.15370 → 3.25407 | −0.30885 → −0.14791 |
+| P3 Control / Seed 2 | 0.67511 → 0.67109 | 0.89943 → 0.89008 | 3.20499 → 3.31591 | −0.30719 → −0.14623 |
+| P3 excess_identity / Seed 1 | 0.66342 → 0.65932 | 0.88667 → 0.87661 | 3.46710 → 3.60667 | −0.30501 → −0.14379 |
+| P3 excess_identity / Seed 2 | 0.65872 → 0.65524 | 0.87940 → 0.87012 | 3.66740 → 3.85356 | −0.30302 → −0.14163 |
 
-输入谱形 0.69998、瞬态 0.86321、能量误差 4.48301 dB。
-所有路径的上述谱形/瞬态/SI-SDR 均值改善，能量误差则增加。恒等模型也出现同样取舍：
-原限幅生成的谐波可能掩盖高频能量缺失，因此不能单凭能量指标判定旧曲线更正确。
-这也不证明每个片段改善，或所有新增谐波都有害，仍需试听与更多独立来源。
+Input spectral shape: 0.69998, transient: 0.86321, energy error: 4.48301 dB.
+All paths show improvement in spectral shape, transient, and SI-SDR mean values, though energy error increases.
+The identity model also shows the same trade-off: harmonics introduced by the original limiter may mask missing high-frequency energy, so a single energy metric cannot determine that the old curve is correct.
+This does not prove that every segment improved, nor that all newly generated harmonics are harmful—further listening and independent validation are still required.
 
-开发音乐同样方向：恒等路径谱形 0.77050→0.71507、瞬态 1.04263→0.87396，
-SI-SDR 差 −0.14647→−0.07260 dB。P3 excess_identity 两个种子的谱形
-1.09259→1.08476 / 1.03185→1.02246，仍差于输入 0.69958。
-不能把 DSP 的改善包装成模型已经解决额外生成问题。
+Development music follows the same trend: identity path spectral shape 0.77050 → 0.71507, transient 1.04263 → 0.87396,
+SI-SDR change: −0.14647 → −0.07260 dB.
+P3 excess_identity on both seeds: spectral shape 1.09259 → 1.08476 / 1.03185 → 1.02246, still below input 0.69958.
+We cannot package DSP improvements as evidence that the model has resolved the issue of extra harmonic generation.
 
-留出语音在新模式下，输入谱形 0.21943，P3 两种子约 0.22103/0.22104，
-SI-SDR 差约 −0.00356 dB；旧 MatchEdge 谱形 0.33089、SI-SDR 差 −0.02211 dB。
-分别报告音乐和语音，不用语音近恒等表现稀释音乐问题。
+For out-of-sample speech, under the new mode: input spectral shape 0.21943, P3 seeds at ~0.22103/0.22104,
+SI-SDR difference ~−0.00356 dB; old MatchEdge at 0.33089, SI-SDR difference −0.02211 dB.
+Results are reported separately for music and speech; speech performance near identity does not dilute the music issue.
 
-## 正确性验证
+## Correctness Verification
 
-- Rust workspace 测试、Clippy、无 ORT feature 构建，以及 303 项 Python 测试通过。
-- 已知正弦的合法峰值平方误差小于旧曲线的 10%；检查斜率、奇对称、单调性、
-  零/极小 ceiling 和有限极值的上限，而不只检查输出不爆。
-- 两采样率的 Python/Rust 重放涵盖过载、静音、开关门控；smooth-knee 有限差分梯度通过。
-- Mono/stereo 原生采样率、短块/不规则块/finalize/reset、静音、反相及单次限幅一致性通过。
-- 回调、worker 的新模式零 Rust 堆分配；NaN/Inf、迟到包、丢包、恢复与队列饱和测试通过。
-- 每种模式各 1800 秒**加速样本时间**的故障恢复测试输出 86,400,000 帧，
-  640 个故意损坏包被拒绝，零队列溢出；已知慢正弦最大步进 0.01625。
-  实际约 1 秒完成一个用例，不是 30 分钟声卡或听感验证。
+- Rust workspace tests, Clippy, and builds without ORT feature passed.
+- For known sine waves, peak-square error is less than 10% of the original curve; verified for slope, odd symmetry, monotonicity, zero/peak ceiling, and finite upper bounds—beyond just output clipping.
+- Python/Rust replay at two sample rates covers overload, silence, gate control; smooth-knee finite-difference gradients pass.
+- Mono/stereo native sample rates, short blocks, irregular blocks, finalize/reset, silence, phase inversion, and single-clip consistency passed.
+- Callback and worker mode: zero Rust heap allocation; NaN/Inf, late packets, dropped packets, recovery, and queue saturation tests passed.
+- Each mode ran 1800 seconds of accelerated sample time, producing 86,400,000 frames; 640 intentionally corrupted packets were rejected, zero queue overflow; known slow sine maximum step 0.01625.
+  Actual runtime per test case ~1 second, not 30 minutes of card or perceptual validation.
 
-## 性能与交付
+## Performance and Delivery
 
-Apple M5 Max / macOS / AC、低功耗关闭。模型固定为 P3 excess_identity 种子 1，
-639,906 参数、2,599,024 bytes（2.479 MiB），SHA-256
-`f325b54ad21d4b6f6f733c69057938c62ba9c8b81a239689865cc1af39a7efad`。
-两模式按 legacy→smooth-knee 顺序串行测量，没有并发训练、质量评分或编译。
-这是单次顺序诊断，不能据此判断微小差值的统计显著性。
+Apple M5 Max / macOS / AC, low-power disabled. Model fixed to P3 excess_identity seed 1,
+639,906 parameters, 2,599,024 bytes (2.479 MiB), SHA-256 `f325b54ad21d4b6f6f733c69057938c62ba9c8b81a239689865cc1af39a7efad`.
+Both modes measured sequentially in order: legacy → smooth-knee.
+No concurrent training, quality scoring, or compilation.
+This is a single sequential diagnostic and cannot be used to infer statistical significance of minor differences.
 
-同步 worker 各采样率/声道测 5 秒，预热 96 hop，强制实际推理：
+Synchronous worker measurements at various sample rates and channel counts, 5 seconds per test, pre-warmed 96 hops, with enforced actual inference:
 
-| 模式 | 单声道 p99 范围 | 双声道 p99 范围 | 最大处理时间 | peak RSS |
+| Mode | Mono p99 Range | Stereo p99 Range | Max Processing Time | peak RSS |
 | --- | ---: | ---: | ---: | ---: |
 | legacy | 0.108–0.110 ms | 0.175 ms | 1.272 ms | 35.50 MiB |
 | smooth-knee | 0.099–0.102 ms | 0.205–0.214 ms | 1.143 ms | 35.48 MiB |
 
-同步测量未出现 hop deadline miss。退出码 2 是因为明确标为 diagnostic、每组不足
-1800 秒；正式发布门槛仍为失败，不能将短测改标为通过。
-同步吞吐满载进程 CPU 接近一个核心，不能当作正常实时播放占用。
+No hop deadline misses were observed. Exit code 2 is due to explicit marking as diagnostic and less than 1800 seconds per group; formal release threshold remains failure, and short tests cannot be marked as passed.
+Synchronous throughput under full load uses nearly one core—cannot be considered normal real-time playback usage.
 
-回调使用同一真实无损录音合成的 MP3 CBR128，4 个原生采样率/声道 PCM 均验证
-SHA，与上轮准备的连续 61 秒文件一致；双声道来自同步原文件，mono 为声道均值，
-没有独立角色拼接、循环或合成填充。每种模式每组 30 秒墙钟，128 帧回调。
+Callback uses a single, real, lossless audio file synthesized as MP3 CBR128, verified by SHA for all four native sample rates and channel configurations.
+Mono is the average of both channels; stereo matches the original file; no independent channel stitching, looping, or synthetic padding.
+Each mode runs 30 seconds wall-clock, 128 frames per callback.
 
-| 新模式用例 | callback p99 | callback max | worker miss | 最长 miss | 固定延迟+实测 callback max |
+| New Mode Use Case | callback p99 | callback max | worker miss | Longest Miss | Fixed Delay + Measured Callback Max |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | 44.1 kHz mono | 10.209 µs | 105.208 µs | 0 | 0 | 5.910 ms |
 | 44.1 kHz stereo | 13.916 µs | 349.459 µs | 0 | 0 | 6.154 ms |
 | 48 kHz mono | 10.333 µs | 89.333 µs | 0 | 0 | 5.423 ms |
 | 48 kHz stereo | 14.125 µs | 159.417 µs | 4 / 0.0356% | 10.667 ms | 5.493 ms |
 
-48 kHz stereo 还记录了一次 producer schedule late；没有删除这个用例或重跑到全绿。
-四组均满足 callback p99<100 µs、max<500 µs、miss<=0.1%、burst<=20 ms、
-新增软件延迟<8 ms；这里不包括外部集成缓冲和设备已有延迟。
-所有组输出帧数准确、零 NaN/Inf、零 callback deadline overrun，峰值最高 0.94361，
-没有越过 0.95。miss 时继续输出同时间轴 dry，是增强暂不可用，不代表音频丢帧。
-原 legacy 四组零 worker miss，callback p99 7.792–14.291 µs，最大附加延迟 5.892 ms。
+The 48 kHz stereo case also recorded one producer schedule delay; this case was not removed or rerun to achieve full green.
+All four cases meet: callback p99 < 100 µs, max < 500 µs, miss ≤ 0.1%, burst ≤ 20 ms, new software delay < 8 ms.
+These do not include external integration buffers or device-level latency.
+All groups output frame count accurate, zero NaN/Inf, zero callback deadline overruns, peak at 0.94361, never exceeding 0.95.
+During miss, the same time-aligned dry signal is output—enhanced unavailability, not audio drop.
+Legacy mode had zero worker misses, callback p99 7.792–14.291 µs, maximum additional delay 5.892 ms.
 
-`/usr/bin/time -l` 的整个回调 benchmark 进程（含源读取、调度与推理）平均 CPU
-为 legacy 19.6%、smooth-knee 19.1% 的一个逻辑核心，peak RSS 分别 36.86 / 44.625 MiB。
-这是该次进程观测，不能把 RSS 差直接解释为限幅器分配，也不能把短测 CPU 差当成优化收益。
-两次均低于既定 50 MiB RSS 预算；新代码的回调与 worker 零 Rust 分配另有回归测试。
-模型参数、ONNX 大小和固定 256 帧 adapter delay 未增加。
+The entire callback benchmark process (`/usr/bin/time -l`) averaged 19.6% and 19.1% CPU usage on a single logical core, peak RSS at 36.86 MiB and 44.625 MiB respectively.
+This is a single observation and cannot be used to infer that the limiter allocation caused the RSS difference.
+The short test CPU difference cannot be interpreted as performance gain.
+Both cases remain below the 50 MiB RSS budget.
+The new code shows zero Rust allocation in both callback and worker, with separate regression tests.
+Model parameters, ONNX size, and fixed 256-frame adapter delay remain unchanged.
 
-这些是回调模拟和数值证据。单一音乐摘录、短时 Apple Silicon 测量不能代替各用例
-30 分钟的物理声卡、x86_64 和盲听验证。本轮不支持“所有场景已稳定合格”的结论。
+These are numerical and callback evidence. A single music snippet or short Apple Silicon test cannot replace 30-minute physical DAC, x86_64, or blind listening validation.
+This round does not support the conclusion that "all scenarios are stable and acceptable."
 
-所有报告与 PCM 留在忽略目录 `data/reports/limiter-study-20261012/`：
-`registration.json`、`benchmark-registration.json`、`benchmark-exits.json` 和逐模式 JSON/log。
-无模型晋升，`independent_test=false`、`listening_performed=false`、`audio_device_tested=false`。
+All reports and PCM files are stored in the ignore directory: `data/reports/limiter-study-20261012/`:
+`registration.json`, `benchmark-registration.json`, `benchmark-exits.json`, and per-mode JSON/log files.
+No model promotion, `independent_test=false`, `listening_performed=false`, `audio_device_tested=false`.
 
-下一轮应固定新部署代理、区分合法参考峰值和真正过量生成，重新控制恢复与保真目标；
-不能让模型靠补偿旧限幅失真拿分，也不继续单纯加大 excess 权重。
+Next round should fix the new deployment proxy, distinguish between valid reference peaks and actual over-generation, and re-define recovery and fidelity objectives.
+Models must not rely on compensating for old limiter distortion to gain points, nor should excess weights be increased without justification.
+
+The [baseline attribution audit](baseline-generalization-20261012.md) identified limiter-generated high frequencies. The old knee is `knee=0.9*ceiling`. Recomputed original P3 scores differ by 0; silence checks also preserve 0. Local checks passed 303 Python tests. The paced input consists of 4 rate/channel PCM combinations from the same aligned 61-second recording, verified by SHA.

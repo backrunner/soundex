@@ -1,83 +1,75 @@
-# P8：线性重建目标与独立分组检查
+# P8: Linear Reconstruction Objective and Independent Group Verification
 
-承接 [P7 loss 审计](energy-objective-audit.md)。本轮固定 P7 加法能量双分支模型，
-仅比较训练目标；不把模型扩容、loss 修改和新增推理特征混在一个实验里。
-以下规则在正式训练前固定，默认权重不变。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 重建目标
+Building upon [P7 Loss Audit](energy-objective-audit.md). In this round, the P7 additive energy two-branch model is fixed, and we compare only the training objectives—no model scaling, loss modification, or new inference features are introduced in the same experiment. The following rules are fixed prior to formal training and remain unchanged throughout, with default weights preserved.
 
-对每个样本、每个频带，先排除前 80 hop。设 `f` 为参考全谱 RMS 的 1e-4，
-绝对下限 1e-7 DFT 幅度，与 P6/P7 相同；`D² = mean(target²) + f²`。
-均值覆盖该频带的频点和有效时间帧。定义平滑范数：
+## Reconstruction Objective
 
-`N(error) = sqrt(mean(error²) / D² + 1e-6) - 1e-3`。
+For each sample and each frequency band, we exclude the first 80 hops. Let `f` be the reference full-spectrum RMS at 1e-4, with an absolute lower bound of 1e-7 DFT magnitude, consistent with P6 and P7. Define `D² = mean(target²) + f²`, where the mean is taken over the frequency points and effective time frames in the band. The smooth norm is defined as:
 
-- 幅度重建项：`N(prediction - target)`，共同约束能量和带内细节。
-- 参考动态项：`N(diff(prediction) - diff(target))`，保留差分符号，分母仍为参考幅度能量。
-- 总分：幅度重建 + 0.25×参考动态。0–4 kHz 权重 0.25，其余四带各 1，除以 4.25。
+`N(error) = sqrt(mean(error²) / D² + 1e-6) - 1e-3`.
 
-这是以直接重建目标替代旧分项总和，**不把旧对数总分再加回去**。
-旧能量、归一化形状、动态、log1p 幅度仍记录，旧总分另存 `factor_total`，便于解释变化。
-参考正确时新目标为零；平滑项避免零残差时 sqrt 梯度不定；地板避免极小参考无限放大。
-所有参考统计只用于训练与评分，不进入推理。
+- **Amplitude reconstruction term**: `N(prediction - target)`, jointly constraining both energy and intra-band detail.
+- **Reference dynamic term**: `N(diff(prediction) - diff(target))`, preserving the sign of differences, with the denominator still using the reference magnitude energy.
+- **Total score**: amplitude reconstruction + 0.25 × reference dynamic. Weighting: 0.25 for 0–4 kHz, 1.0 for each of the other four bands, normalized by 4.25.
 
-已核验审计中的固定反例：正确谱形但仅 1% 幅度，新 loss **0.23271**；正确 RMS
-但平坦谱形为 **0.30610**，不再奖励这次细节损伤。幅度 0.1 倍与 10 倍分别为
-**0.21153 / 2.11741**，不再近似等价。此结果是数学排序验证，不是音乐质量结论。
+This replaces the previous sum of individual components with a unified linear reconstruction objective. **The old log-sum score is not re-added**. Historical metrics—original energy, normalized shape, dynamic, and log1p amplitude—are still recorded for analysis, and the old total score is stored separately as `factor_total` for interpretability. When the reference is correct, the new loss approaches zero; the smoothness term prevents undefined gradients at zero residual; the floor avoids infinite amplification when reference magnitude is extremely small.
 
-## 对照与数据
+All reference statistics are used solely for training and scoring and are not passed into inference.
 
-| 组别 | 模型 | 训练目标 | 共同选模目标 |
+Validated against audit-level counterexamples: correct spectral shape with only 1% amplitude yields a loss of **0.23271**; correct RMS with flat spectral shape yields **0.30610**, and such detail degradation is no longer rewarded. Amplitude scaling of 0.1x and 10x results in **0.21153 / 2.11741**, respectively—no longer approximately equivalent. These results are mathematically verified, not musical quality judgments.
+
+## Comparison and Data
+
+| Group | Model | Training Objective | Shared Selection Target |
 | --- | --- | --- | --- |
-| energy_control | P7 rms_residual | 原 P6/P7 分项 loss | P8 线性重建总分 |
-| linear_reconstruction | 完全相同模型 | P8 线性重建总分 | P8 线性重建总分 |
+| energy_control | P7 rms_residual | Original P6/P7 component loss | P8 Linear Reconstruction Total Score |
+| linear_reconstruction | Identical model | P8 Linear Reconstruction Total Score | P8 Linear Reconstruction Total Score |
 
-两种子 `20261012/20261013`，四次从头训练，每次 2048 更新、batch 4。
-同种子所有初始化张量完全相同，均为 807,398 参数，未加载 P7 权重。
-AdamW lr=1e-4，余弦衰减至 0.1 倍、weight decay=1e-4、clip=5。
-保持 past-only 1024/2048 点输入、80 hop 预热、现有音频和作品隔离。
+Both sub-experiments use seeds `20261012` and `20261013`, trained four times from scratch, each with 2048 updates and batch size 4. All initial tensors are identical under the same seed, resulting in identical initialization across runs. Total parameters: 807,398. No P7 weights are loaded. Optimizer: AdamW with lr=1e-4, cosine decay to 0.1×, weight decay=1e-4, gradient clipping=5.
+Input remains past-only with 1024/2048 point history, 80-hop warmup, and audio/track isolation preserved.
 
-每种子用 `seed+60000` 新抽样 8192 个，1024 个为恒等控制；音乐/语音采样及恒等替换
-方式保持不变。每 512 步验证，共同选模仍使用音乐/语音 253:1 和 paired/identity 87.5:12.5。
-第 0 步允许被选中，但不等于恢复成功。全部最佳若位于末步，也不据此宣称已收敛。
-新旧总 loss 数值不能跨目标直接比较；正式对照用相同新目标重算两组。
+For each seed, 8192 samples are drawn from `seed+60000`, with 1024 samples serving as identity control. Music and speech sampling, and identity substitution, remain unchanged. Validation occurs every 512 steps, with shared selection using music/speech ratio 253:1 and paired/identity ratio 87.5:12.5. Selection at step 0 is allowed, but does not imply successful recovery. If the best performance occurs at the final step, it does not imply convergence.
 
-## 分组检查不能被总体均值覆盖
+New and old loss values cannot be directly compared across objectives. Formal comparison uses the same new objective to recompute both groups.
 
-共同总分只负责选出研究检查点。选模冻结后，另外执行全部分组检查；不会根据检查结果
-反复改选模型，也不会用其他组的改善抵消某一组的退步。
+## Group Checks Cannot Be Overridden by Overall Averages
 
-弱频带定义：参考 clip-band RMS 不大于上述既有 `f`，只统计 4 kHz 以上频带。
-对照与候选必须具有相同参考分组；没有弱频带的片段不以零值稀释弱组均值。
-先对每个录音的片段取均值，再进行 2000 次配对 bootstrap。
+The shared total score is solely responsible for selecting study checkpoints. After selection, additional per-group checks are performed independently. These checks are not iteratively reselected based on results, nor do they offset poor performance in one group with gains in another.
 
-- 开发音乐高频 SC、能量误差：相对同预算对照和原压缩输入均要求改善。
-- paired 和 identity 的音乐弱频带重建误差：各自单列，不允许退步。
-- 音乐及语音的恒等重建误差：各自单列，不允许退步。
-- 音乐及语音的保留低带 SC、高频 flux，以及 paired 语音重建误差：分别检查。
+**Weak band definition**: a band where reference clip-band RMS is ≤ the previously defined `f`, and only bands above 4 kHz are considered.
+For comparison and candidates, the reference grouping must be identical. Fragments without weak bands do not dilute the average of weak groups to zero.
+Per-recording segment averages are computed first, then 2000 paired bootstrap resamples are performed.
 
-“支持改善”要求差值 95% 区间上界 <= -1e-6；“支持未退步”要求上界 <= +1e-6。
-1e-6 是数值容差，不是可闻容差。少于两个录音标记 unsupported，区间不足以支持结论时
-标记 inconclusive；所有检查均 supported 才标记 `all_groups_supported=true`。
-因此原样输出、样本不足或总体均值改善，都不能自动通过。
+- **Development music high-frequency SC and energy error**: must show improvement over both baseline and compressed input under the same budget.
+- **Paired and identity music weak-band reconstruction error**: reported separately, with no degradation allowed.
+- **Music and speech identity reconstruction error**: reported separately, with no degradation allowed.
+- **Music and speech preservation of low-band SC, high-frequency flux, and paired speech reconstruction error**: checked individually.
 
-这是一项保守的研究诊断，并非统计等效证明或生产晋级。复用开发录音不能证明独立泛化，
-低功率频带的相对误差也不能代替听感。未通过时完整报告各项，不删除失败素材或改变阈值。
+"Support for improvement" requires the upper bound of the 95% confidence interval to be ≤ -1e-6. "Support for no degradation" requires the upper bound to be ≤ +1e-6.
+1e-6 is a numerical tolerance, not a perceptual one. If fewer than two recordings are available, the result is marked as *unsupported*. If the confidence interval is insufficient to support a conclusion, it is marked *inconclusive*. Only when all checks are supported is `all_groups_supported=true` set.
+Thus, unchanged output, insufficient samples, or overall average improvement do not automatically pass.
 
-## 流程与验收边界
+This is a conservative diagnostic, not a statistical equivalence proof or a production promotion. Reuse of development recordings does not imply independent generalization. Relative error in low-power bands does not substitute for perceptual quality. When any check fails, full details are reported—no failure samples are suppressed or thresholds altered.
 
-loss 测试覆盖参考最优、弱/静音有限梯度、有限差分、batch 独立性、warmup 排除、
-真实参考动态、MPS/CPU 对应及前述排序反例。分组回归验证平均收益不能掩盖弱组损伤，
-且配对、参考分组和缺失样本必须正确处理。模型没有结构改变，仍验证单/双声道 ONNX 状态对应。
+## Workflow and Acceptance Boundaries
 
-正式训练完成后自动运行录音配对比较、全部分组检查、第一种子候选 ONNX 导出、逐 hop
-CPU 成本与独立 RSS；benchmark 不与本轮训练并行。随后执行 890 次真实 Rust DSP 回放，
-包含对应种子的 P3、恒等 DSP、两组模型配 P3 相位、候选配输入相位。
-保留动态 HF、固定 HF、同窗五频带原始/重分析输出指标，代理误差要求 <=2e-5。
+Loss testing covers: reference optimal, weak/noisy gradient, finite difference, batch independence, warmup exclusion, real reference dynamics, MPS/CPU correspondence, and the previously cited counterexamples. Group regression validation must not mask damage to weak groups, and paired, reference grouping, and missing sample handling must be correctly processed. The model has no structural changes, and single/dual-channel ONNX state consistency is verified.
 
-上述分组检查只覆盖原始幅度；最终仍要求实际 DSP 输出收益、恒等成品回放、独立评测、
-盲听及完整实时稳定性，不能因原始幅度检查通过而自动替换默认模型。
-模型继续受 <=2M 参数、<8 MiB 限制，前端+推理耗时与完整输出延迟分开报告。
+After formal training, automated execution of:
+- Pairwise audio comparison
+- Full group validation checks
+- First seed candidate ONNX export
+- Per-hop CPU cost and independent RSS
+is performed. Benchmarking runs are executed *after* training and are not concurrent. Then, 890 real-time Rust DSP re-plays are conducted, including corresponding seed P3, identity DSP, and phase-matched pairs: model paired with P3 phase, and candidate paired with input phase.
+
+Retained metrics include dynamic HF, fixed HF, and five-band fixed window raw/analyzed outputs. Proxy error requirements are ≤ 2e-5.
+
+These group checks only evaluate raw magnitude. Final validation still requires actual DSP output gain, identity output playback, independent evaluation, blind listening, and full real-time stability—no automatic model replacement is permitted based solely on magnitude-based pass.
+The model remains constrained by ≤2M parameters and <8 MiB memory. Frontend + inference latency and full output latency are reported separately.
 
 ```sh
 PYTHONPATH=training training/.venv/bin/python training/scripts/run_linear_study.py \
@@ -94,27 +86,25 @@ PYTHONPATH=training training/.venv/bin/python training/scripts/replay_factorized
   --replay-binary target/debug/soundex-prediction-replay
 ```
 
-从提交后的冻结源码执行；配置、抽样、检查点和流水线阶段保留本地。
-源音频和实验权重不推送。
+Executed from the frozen source code. Configuration, sampling, checkpoints, and pipeline stages are preserved locally. Source audio and experimental weights are not pushed.
 
-## 完成结果（2026-10-12）
+## Final Results (2026-10-12)
 
-四组均完成 2048 步，完成回执中的检查点与评估哈希匹配。共同开发选模分数如下，越低越好：
+All four groups completed 2048 steps. Checkpoints and evaluation hashes match those in the request. Shared development selection scores are as follows, with lower being better:
 
-| 检查点 | 种子 20261012 | 种子 20261013 |
+| Checkpoint | Seed 20261012 | Seed 20261013 |
 | --- | ---: | ---: |
-| 第 0 步 | 0.494611 | 0.494611 |
-| energy_control，第 2048 步 | 1.920612 | 1.789279 |
-| linear_reconstruction，第 2048 步 | 1.188453 | 0.888879 |
+| Step 0 | 0.494611 | 0.494611 |
+| energy_control, Step 2048 | 1.920612 | 1.789279 |
+| linear_reconstruction, Step 2048 | 1.188453 | 0.888879 |
 
-新目标比旧目标的末步误差更低，但仍未超过初始状态。四组共同选模都选择第 0 步，
-不是分组检查导致拒绝后回退：平均选模分数本身已经失败。每种子 13 项分组检查中，
-9 项未退步得到支持，4 项恢复改善为 inconclusive；不能把近恒等模型的未退步当作恢复。
+The new objective achieves lower error than the previous objective at its final step, but still does not surpass the initial state. All group selections converged to Step 0—this is not due to group checks rejecting and then reverting; the average selection score itself failed. For each seed, 13 group-level checks were evaluated: 9 were supported for no degradation, and 4 were inconclusive (improvement not statistically significant). The lack of degradation in near-identity models does not constitute recovery.
 
-890 次 Rust DSP 回放已完成，最大代理/原生误差 4.54e-6，但使用选中的第 0 步幅度模型，
-不能证明训练产生了质量提升。候选结构 807,398 参数，ONNX 3,271,096 bytes（3.12 MiB）；
-前端+ORT 的最高配置 P99 0.400 ms、观测最大值 1.120 ms，独立进程峰值 RSS 增量 20.97 MiB。
-这些是诊断路径成本，未覆盖 detector、DSP、音频适配器与设备，不是完整输出延迟或听感合格证据。
+890 Rust DSP re-plays have been completed. Maximum proxy/original error is 4.54e-6. However, using the selected Step 0 magnitude model, no quality gain is demonstrated. Candidate model has 807,398 parameters, ONNX size: 3,271,096 bytes (3.12 MiB).
+Frontend + ORT peak performance (P99) is 0.400 ms, observed maximum 1.120 ms. Independent process peak RSS increase: 20.97 MiB.
 
-没有替换默认权重。后续 [优化过程审计](linear-optimization-audit.md) 检查第一步过冲、
-小样本拟合及能量坐标的输入尺度条件化；不通过放宽分组阈值获得改善。
+These represent diagnostic overhead and do not cover detector, DSP, audio adapter, or device-level performance. They do not constitute evidence of complete output latency or perceptual quality.
+
+No default weights were replaced. Future [Optimization Process Audit](linear-optimization-audit.md) will examine first-step overshoot, small-sample fitting, and energy coordinate input scale conditioning. No improvement was achieved by relaxing group thresholds.
+
+Exact registered seeds: `20261012/20261013`. The high-band weights are 1 each, with low-band weight 0.25 and normalization by 4.25; this is a reference-reconstruction objective, not a mandate to suppress all enhancement.

@@ -2,11 +2,12 @@
 
 These profiles and commands document earlier registered comparisons. Use the
 matching frozen source, config and artifacts to reproduce them; do not resume
-an old trajectory with edited main-branch code. Results and current P19 status
+an old trajectory with edited main-branch code. Results and current P38/P39 status
 are indexed in [research history](../docs/research.md).
 
 Model/loss modules used by these workflows are also shared by later studies.
-A completed experiment does not make its implementation unused code.
+A completed experiment does not make its implementation unused code. Consult the
+[failed-experiment registry](../docs/failed-experiments.md) before repeating a route.
 
 ## Continuation profiles (v3–v6)
 
@@ -27,7 +28,7 @@ six-epoch budgets. A legacy-parent architecture migration explicitly requires
 `--initialize-zero-interactions` with `--initialize-generator-from`; changed objectives
 or structure cannot directly resume old optimizer state. The data and sample ratios
 must be resolved from the existing native run, rather than using example paths/ratios.
-See [the objective definitions](../docs/inpainting-objective.md#objective-v4复数重建与频谱一致性)
+See [the objective definitions](../docs/inpainting-objective.md)
 and [measured follow-up results](../docs/optimization-20261011.md).
 
 `calibrated_continuation.yaml` and `circular_continuation.yaml` compare objective v5

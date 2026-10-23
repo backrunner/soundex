@@ -1,0 +1,111 @@
+# Failed and unqualified experiments
+
+This is the mandatory lookup before a new experiment. It records rejected routes,
+unqualified candidates and inconclusive diagnostics, not a claim that every related
+architecture is intrinsically ineffective. The linked reports retain exact budgets,
+seeds, metrics, counterexamples and local evidence paths. Raw local reports and
+frozen checkpoints remain available; they are not public training-data artifacts.
+
+The current default weights are unchanged. The latest completed training is P38;
+both detector-condition output paths failed their registered screen. P39 is a
+balanced-order timing diagnostic, not another training run.
+
+## How to use this record
+
+1. Find the closest previous route and read its report before changing training.
+2. Name the unresolved hypothesis and the changed control, representation, data
+   exposure or deployment mechanism. Do not repeat an unchanged rejected setup.
+3. Freeze endpoints, budget and assessment rules before scoring. Preserve every
+   seed and every measured run, including failures and invalid preflights.
+4. Add the outcome here and in a detailed report: endpoint hashes/evidence paths,
+   comparator, failed criterion, counterexamples, absolute and relative errors,
+   runtime failures, limitations and the condition that would justify revisiting.
+5. A corrected measurement may supersede an invalid measurement, but must not erase
+   it. A diagnosis is not a quality-qualified model. Reused development recordings
+   remain rechecks; fitted crops cannot establish cross-recording generalization.
+
+Status meanings: **not qualified** means an overall restoration/runtime screen was
+not met; **diagnostic** means the experiment cannot establish deployable quality;
+**invalid measurement** means the measurement needs correction before interpretation.
+A positive submetric is retained even when the candidate is not qualified.
+
+## Registered P-series
+
+| ID and evidence | Outcome / unsuccessful validation | What permits a new experiment |
+| --- | --- | --- |
+| [P2: matched causal backbones](causal-training-20261012.md), [seed review](causal-p2-review-20261012.md) | Not qualified. Six fresh 4,096-step runs improve on a matched fresh control but do not establish an overall win over the historical checkpoint; weak high bands receive excess generation. Unequal historical budgets are not architecture evidence. | Match budgets and directly constrain reference-relative weak-band generation while measuring recovery. |
+| [P3: weak-band continuation](weak-band-study-20261012.md) | Not qualified. Both seeds reduce excess generation but retain restoration/fidelity tradeoffs. | Show spectral restoration, not merely reduced enhancement, with identity controls. |
+| [P4: bidirectional energy](balanced-restoration-study-20261012.md) | Not qualified. Six runs improve energy recovery but regress other fidelity measures. | Separate energy, shape and phase effects under one common evaluation. |
+| [P5: amplitude context](envelope-study-20261012.md) | Diagnostic. Six short/tiled/past-context runs do not give a consistent amplitude-quality win; the amplitude probe is not an audio deployment artifact. | Demonstrate effective context use and final-output fidelity, not a single transient metric. |
+| [P6: envelope/shape factorization](factorized-envelope-study-20261012.md) | Not qualified. Six matched runs reduce some raw spectral errors while sacrificing energy recovery; final output does not improve consistently. | Preserve energy and shape together and validate actual DSP output. |
+| [P7: additive energy](energy-coordinate-study-20261012.md), [objective audit](energy-objective-audit.md) | Not qualified. Four runs and 890 native replays improve mean energy recovery but worsen shape/transients, especially naturally weak bands. | Correct weak-band optimization behavior without tuning to the known recordings. |
+| [P8: linear reconstruction](linear-reconstruction-study.md), [optimization audit](linear-optimization-audit.md) | Not qualified. All selected checkpoints are step zero; first-step energy overshoot prevents either objective beating the initial common score. | Verify update scale and reference-correct behavior before another full run. |
+| [P9: shape coordinates](shape-coordinate-study.md) | Not qualified. Six runs and 2,136 native replays: small raw-loss gains still damage identity material. | Establish direct restoration and identity preservation in native synthesis. |
+| [P10: rendered-output supervision](rendered-restoration-study.md) | Not qualified. Pilot plus six 2,048-step runs reduce damage but all arms select step zero; preservation pressure and generalization remain unresolved. | Separate expressivity, fitting and cross-recording generalization. |
+| [P11: fixed-set fitting](fixed-fit-diagnostic.md) | Diagnostic. Eight runs and 90 replays show direct-fit headroom and network fitting ability, not identity/generalization success. | Use broader independent recording coverage; do not present fitted-crop gains as deployment quality. |
+| [P12: subset scaling](subset-scaling-study.md) | Not qualified. Six runs and 330 replays: broader data reduces regression, but longer fixed-crop fitting worsens development fidelity. | Change actual source-time coverage, with matched update and exposure controls. |
+| [P13: crop coverage](crop-coverage-study.md) | Not qualified. Four runs and 300 replays: eight-position sampling helps versus fixed crops but still trails initialization. | Address preservation and cross-recording failures, not only crop count. |
+| [P14: loss/synthesis audit](loss-scale-audit.md) | Diagnostic. Weak-band errors persist in Rust DSP and some grow during overlap-add; proxy-only scoring is insufficient. | Verify synthesis-stage attribution and calibrated absolute errors. |
+| [P15: band interventions](band-transfer-study.md) | Diagnostic. Cross-band spill is measurable; disabling a band also removes restoration gains. | Demonstrate a reconstruction mechanism that preserves useful gain and limits spill. |
+| [P16: spectral consistency](spectral-consistency-study.md) | Not qualified. Four runs and 300 replays disagree across seeds; one seed regresses in both objective terms across the training bank. | Identify an optimization or representation cause; do not promote the better seed alone. |
+| [P17: lower learning rate](consistency-learning-rate-study.md) | Not qualified. Four continuations and 60 replays improve training mostly through identity preservation; paired high-band detail does not improve consistently. | Show spectral recovery across recordings, not lower aggregate loss alone. |
+| [P18: extended continuation](consistency-followup-study.md) | Not qualified. Both 2,048-step continuations and 1,246 replays improve training but regress development music; the 32-recording subset misses blues. | Correct coverage with a matched design; unchanged continuation is not justified. |
+| [P19: broader music](music-coverage-study.md), [failure analysis](coverage-failure-analysis.md) | Not qualified. 32 versus 253 recordings, four runs and 1,246 replays: broader data reduces some regression, but neither budget passes across both seeds. Cross-band spill and recording tails remain. | Address the measured synthesis/tail mechanism and preserve all recording-level counterexamples. |
+| [P20: restoration heads](restoration-head-study.md) | Not qualified. Six matched fresh trajectories and 2,314 replays: alternative heads regress; optimization scale and weak-band tails remain. | Validate gradient scale and weak-band response before treating representation as a cure. |
+| [P21: capacity calibration](capacity-calibration-study.md) | Calibration rejected; longer comparison did not start. A short calibration is not a capacity ceiling. | Pre-register an adequate matched capacity budget and fidelity controls. |
+| [P22: latency-first capacity](latency-capacity-study.md) | Not qualified. Up to 11.92M parameters, two seeds, 512 updates: compute passes, identity damage outweighs small restoration gains. | Full matched budgets may test capacity; these short runs cannot reject large architectures generally. |
+| [P23: full capacity](full-capacity-study.md), [outlier audit](capacity-outlier-audit.md) | Not qualified. 129,536 updates and 4,450 native replays: lower train loss does not pass quality gates. One weak-high-band case dominates relative music risk; absolute-error rankings differ. | Correct the measured generation mechanism while reporting both relative and calibrated absolute errors. |
+| [P24: generation budget](generation-budget-study.md) | Not qualified. Four configurations, two seeds, 16,192 steps each, 9,078 native roles: weak-band risk improves but waveform/identity errors and deadlines still fail. Original frontend parity failure is retained alongside corrected same-observation parity. | Explain proxy/frontend differences; verify full-residual behavior and native output. |
+| [P25: native/coverage audit](context-deployment-audit.md) | Diagnostic. The finite bank gives only 482 seconds of unique music supervision; zero old budget still leaves a residual. | Use actual broad source-time exposure and a budget that covers the entire generated residual. |
+| [P26: broad coverage × budget](broad-budget-study.md) | Not qualified. Eight 16,192-step runs remain near identity DSP. All 560,000 compute calls are below 5 ms but per-hop deadlines still fail. | Diagnose decoder/gradient mechanisms; do not scale the same 640-wide route again without new evidence. |
+| [P27: decoder collapse](head-collapse-audit.md) | Diagnostic. Negative GELU saturation is localized on fixed crops; oracle spectra retain headroom. The 640-wide scaling route is retired, not all large models. | Validate a small mechanism change before expanding capacity. |
+| [P28: small mechanism controls](small-mechanism-study.md) | Not qualified. Four configurations × two seeds × 2,048 updates: no screen pass; no GELU collapse on these crops, yet outputs remain near identity DSP. Five service overruns and 32 paced misses persist below 5 ms. | Directly test the target-supervision path instead of assuming activation or capacity is sufficient. |
+| [P29: direct spectrum](direct-spectrum-study.md) | Diagnostic / not qualified. Eight endpoints and 320 native roles improve high-band energy and residual size, but complex, transient and final PCM fidelity do not improve together. | Diagnose amplitude/phase coupling with the original clean reference; fitted crops are not independent evidence. |
+| [P30: amplitude/phase swaps](phase-swap-audit.md) | Oracle diagnostic only. 1,320 native roles: reference phase helps PCM; reference amplitude with predicted phase can hurt it. Fusion also restricts reference-assisted recovery. | Implement a deployable mechanism; do not count target-assisted swaps as model improvement. |
+| [P31: phase coordinates](phase-coordinates-study.md) | Not qualified. Eight endpoints, 320 roles and 560,000 hops: amplitude gains do not establish phase/PCM restoration; Cartesian residuals remain near zero without saturation. Nine >5 ms calls and 79 paced misses. | Explain optimization/target conflicts on small fixed controls before changing capacity. |
+| [P32: spectrum-first MR](spectrum-priority-study.md) | Diagnostic / not qualified. Six 1,024-step runs: added MR improves fitted music spectra by 2.02–2.35%, with dynamics/PCM tradeoffs; primary MR weakens speech. 91 of 420,000 calls exceed 5 ms. | Test matched broad exposure and both corpora; fitted gains alone do not generalize. |
+| [P33: broad spectrum](broad-spectrum-study.md), [diagnosis](broad-spectrum-diagnosis.md) | Not qualified. Four fresh 16,192-step trajectories: no added-MR music advantage; speech means improve with worse dynamics. Two calls exceed 5 ms. | Attribute objective scaling and fusion before another MR-weight sweep. |
+| [P34: small risk balance](risk-balance-study.md) | Diagnostic / not qualified. Compressed risk and identity reweighting motivate broader controls; small-crop improvements do not establish generalization or complete quality. | Separate compression from identity weighting and evaluate broader matched exposure. |
+| [P35: broad risk](broad-risk-study.md), [temporal diagnosis](risk-temporal-diagnosis.md) | Not qualified. Spectral gains coexist with dynamics/identity regressions; changing compression and identity weight together confounds attribution. | Complete the compression × identity-weight factorial before assigning the cause. |
+| [P36: factorial attribution](risk-attribution-study.md), [DSP boundary review](dsp-model-boundary-review.md) | Not qualified. Both new arms finish two 16,192-step seeds. Compression alone retains spectral gains, but dynamics/identity gates still fail. | Isolate fusion and conditioning with frozen models rather than assume DSP must be removed wholesale. |
+| [P37: fusion boundaries](fusion-boundary-audit.md) | Not qualified. Eight interventions, two seeds, 2,848 reused-validation replays: removing magnitude fusion slightly helps means, but identity/local-band regressions remain. Supplemental 120,000-hop timing passes do not erase other runs' failures. | Test a specific training/deployment interaction; keep phase blend and gate attribution separate. |
+| [P38: detector conditions](detector-condition-study.md) | Not qualified. Four 16,192-step CPU trajectories: fixed cutoff/active worsens music MR by 0.195% / 0.558% versus same-path controls; raw predictions already regress. Neither current nor phase-only path passes. Across 280,000 hops: max 5.411 ms, two ≥5 ms, 11 service overruns, 27 paced delays. | Retain native conditioning. Investigate objective/representation conflicts and timing order/load independently; no unchanged fixed-condition rerun. |
+| [P39: objective gradients](objective-conflict-audit.md) | Diagnostic only. Both frozen small models show opposed parameter gradients concentrated in the shared encoder, despite mostly aligned high-band output-coordinate gradients. Above 16 kHz, the dB-only chain also reverses in the encoder; removing phase alone does not address it. No update or quality gain is claimed. | Attribute band/example contributions and encoder conditioning before changing losses or architecture; do not delete phase supervision on this evidence. |
+| [P39: balanced timing](interleaved-timing-audit.md) | Runtime target failed: 160,000 balanced-order hops, three ≥5 ms calls, eight service overruns and 119 paced delays; max compute 9.280 ms. It does not change P38 quality qualification or certify real-device callbacks. | A timing change needs the same balanced endpoint/stimulus control and all failures retained. |
+
+## Earlier routes and operational failures
+
+| Evidence | Unresolved or unsuccessful result | Required control before revisiting |
+| --- | --- | --- |
+| [Original run](native-training-20261009.md), [loss audit](loss-audit-20261010.md), [follow-up](optimization-followup-20261010.md), [native review](native-validation-20261010.md) | Completing the original 200 epochs does not settle spectral restoration or deployment qualification. | Compare paired original references, untreated input and identity DSP under common scoring. |
+| [V4 architecture](optimization-20261011.md), [V5 goal review](goal-refinement-20261011.md), [V6 deployment continuation](deployment-refinement-20261011.md) | Complex reconstruction, calibration and proxy matching yield mixed quality; no general restoration claim. | Separate amplitude/phase and actual Rust output; retain recording-level regressions. |
+| [Architecture research](architecture-research-20261011.md), [matched study](architecture-study-20261011.md), [causal context](causal-context-20261011.md) | Lower validation loss and past-context experiments do not establish a balanced quality win. | Match representation, capacity, budget and effective context; test streaming costs. |
+| [V7 MR reconstruction](multires-reconstruction-20261011.md) | Two four-epoch runs with real warmup have mixed improvements; neither replaces the baseline. | Isolate objective changes and measure spectral recovery plus preservation. |
+| [DSP gain calibration](gain-calibration-20261011.md) | Ten-coefficient regression fits better but actual high-band recovery regresses. | Evaluate final reconstruction, not coefficient-fit error. |
+| [Phase reconstruction](phase-reconstruction-20261011.md) | Waveform and some high-band gains still fall short of balanced music restoration; opt-in only. | Validate all spectral/identity/stereo tradeoffs and listening. |
+| [Baseline audit](baseline-generalization-20261012.md), [limiter study](limiter-study-20261012.md) | Identity DSP exposes limiter/gain distortion. Baseline overfitting is not established, and a safer limiter is not proof of restored source audio. | Compare original unclipped reference and identity-through-DSP explicitly. |
+| [Architecture reset](architecture-reset-20261011.md), [prototype stage](causal-prototypes-20261011.md), [inpainting objective](inpainting-objective.md) | Research proposals, oracle diagnostics and tiny-set fitting do not qualify weights. | Deployable causal model, complete matched training and native rechecks are required. |
+| [P24 retained parity failure](generation-budget-study.md) | Original native frontend mismatch is an invalid proxy-parity conclusion, not evidence that the corrected same-observation check failed. | Preserve the original artifact; separately identify observations, source hashes and corrected measurement. |
+| [P37 snapshot resource](fusion-boundary-audit.md) | Supplemental import exposed omitted `parity_policy.json` in the original frozen snapshot. Resource evidence was added without rewriting registration; corrected preflight matched the original scores. | Register non-Python runtime resources and verify standalone snapshot imports before execution. |
+| [P36/P38 execution notes](detector-condition-study.md) | Historical Metal failure did not block these CPU runs. Pause/reboot is an execution event, not model failure. | Verify optimizer/history continuity and input/source hashes; do not relabel CPU runs as Metal training. |
+
+| [P26 registration](broad-budget-study.md) | The initial registration omitted `native_count` required by final analysis; the first trajectory stopped at step 256. The original directory and `superseded.json` remain. | Validate downstream analyzer fields before training; the v2 registration fixes the contract, not model quality. |
+| [P29 launcher and preflight](direct-spectrum-study.md) | A supervisor used the wrong virtual-environment interpreter and exited before importing PyTorch; no training occurred. A separate preflight unnecessarily depended on the old P10 cache. Both failed attempts remain recorded. | Bind the intended interpreter and current cache explicitly; retain `supervisor-attempt-1.json` and distinguish corrected preflight from training evidence. |
+| [P33 coverage registration](broad-spectrum-study.md) | A training-only coverage calculator rejected validation rows before training. | Use role-aware coverage accounting; preserve the first attempt and identify v2 separately. |
+| [P38 sleep assertion](detector-condition-study.md) | Initial `caffeinate` assertion failed without blocking CPU training. After reboot the assertion worked and checkpoint continuity was verified. | Check process and assertion state separately; an assertion failure is neither a model-quality result nor proof training stopped. |
+| [P37 codec environment](fusion-boundary-audit.md) | System FFmpeg lacked x265; a process-local fallback supplied the required encoder. | Record the exact executable and codecs; do not claim the system installation was repaired. |
+
+## Evidence retention and future entries
+
+Each linked report is the authoritative detailed record for its experiment, including
+per-seed and per-recording failures. This index consolidates routes rather than
+inventing missing measurements. Local `data/runs/` registrations, assessments,
+raw native reports and checkpoint receipts remain the auditable evidence. Cleanup
+must preserve them. If an old report lacks an independent-test or listening result,
+that evidence is missing; it must not be inferred from the index.
+
+For a new failed validation, add a dated section to the experiment report and a row
+or update here with: status; exact comparison and budget; failed rule and metric;
+all counterexamples; relative and absolute magnitude where relevant; runtime and
+parity status; local evidence/endpoint hashes; what remains untested; and a concrete
+reason a future repeat could answer a different question.

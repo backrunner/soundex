@@ -1,128 +1,104 @@
-# P23：完整训练预算下的容量对照
+# P23: Capacity Comparison Under Full Training Budget
 
-用户于 2026-10-15 明确要求先完成充分训练，再判断大模型效果。
-[P22](latency-capacity-study.md) 的 512 步结果保留为早期诊断；本轮不以该检查失败
-阻止长训练，也不把短期原音损伤上升解释为大模型的最终上限。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 完成结果（2026-10-16 09:13 SGT）
+The user explicitly requested on 2026-10-15 to complete sufficient training before evaluating large model performance.
+The results from [P22](latency-capacity-study.md) at 512 steps are retained for early diagnosis; this round of training is **not** halted due to failure of the 512-step check, nor is an increase in initial audio degradation interpreted as the ultimate performance ceiling of the large model.
 
-全部八条轨迹已完成各 16,192 步，共 129,536 次更新；24 个端点冻结后完成
-4,450 次 Rust 角色回放、开发/shifted 复核和导出成本测量。已使用冻结分析器重新
-核查输入、源码、抽样、检查点与 57 份完成回执。最大 Rust/代理误差
-`1.08034e-5 < 2e-5`；所有比较均未通过完整质量检查，未替换正式权重。
-这次停止是预登记完整实验结束，不是 512 步早停或执行失败。
+## Final Results (2026-10-16 09:13 SGT)
 
-完整训练池、两个种子均值：恒等初始化 main 为 0.292682；anchored / scaled224 /
-scaled384 / scaled640 分别为 0.284743 / 0.287859 / 0.288519 / 0.290059。
-长训练确实改善了训练误差，但这没有直接转化为开发音乐的整体收益。
+All eight trajectories have completed 16,192 steps, totaling 129,536 updates. After 24 endpoint freezes, 4,450 Rust role replays, development/recheck validations, and export cost measurements were completed. The input, source code, sampling, checkpoints, and 57 finalized review reports were re-verified using a frozen analyzer. The maximum Rust/proxy error is `1.08034e-5 < 2e-5`; all comparisons failed full quality checks, and no formal weights were replaced.
 
-以下为 **16,192 步、两个种子的均值、33 个音乐开发片段按 clip 聚合**。
-这些是反复使用的开发复核，不是独立测试。各误差越低越好，proxy 和实际 DSP 指标
-分别列出，不将不同类型数值混为同一目标：
+This stop is the **official end of a pre-registered experiment**, not an early stop at 512 steps or a failed execution.
 
-| 配置 | proxy paired | proxy identity | DSP 高频 SC | DSP 高频 flux | DSP 高频能量误差 |
+### Full Training Pool & Seed Averages:
+- Identity initialization (main): **0.292682**
+- Anchored / Scaled224 / Scaled384 / Scaled640: **0.284743 / 0.287859 / 0.288519 / 0.290059**
+
+Longer training indeed reduced training error, but this did not translate into overall gains in development music quality.
+
+Below are the **16,192-step, two-seed averages, aggregated across 33 music development clips**. These are reused development rechecks, not independent tests. Lower error is better. The table presents proxy and actual DSP metrics separately—different metric types are not conflated into a single objective:
+
+| Configuration | proxy paired | proxy identity | DSP High-Frequency SC | DSP High-Frequency Flux | DSP High-Frequency Energy Error |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| 恒等模型 + DSP | 0.588365 | 0 | 0.548761 | 0.717164 | 8.4801 dB |
-| anchored 控制 | 0.624674 | 0.059516 | 0.612967 | 0.755468 | 8.1772 dB |
+| Identity Model + DSP | 0.588365 | 0 | 0.548761 | 0.717164 | 8.4801 dB |
+| Anchored Control | 0.624674 | 0.059516 | 0.612967 | 0.755468 | 8.1772 dB |
 | scaled224 | 0.823622 | 0.209859 | 1.615558 | 1.491498 | 7.2266 dB |
 | scaled384 | 0.986274 | 0.334769 | 2.057559 | 1.783899 | 7.4695 dB |
 | scaled640 | 0.951500 | 0.306329 | 1.901090 | 1.684844 | 7.7538 dB |
 
-按 recording 聚合方向同样没有通过。能量误差变小不等于谱形与瞬态恢复更好。
-语音端 scaled 的 proxy total 约 0.18060–0.18063，对比初始 0.180645，收益非常小；
-shifted 音乐 total 约 0.30184–0.30286，对比初始 0.301122，也未呈现整体收益。
+Aggregation by recording also failed to show improvement. Lower energy error does not imply better spectral shape or transient recovery.
+For speech, the total proxy score for scaled models ranges from **0.18060 to 0.18063**, compared to initial **0.180645**—a negligible gain.
+For shifted music, the total score ranges from **0.30184 to 0.30286**, compared to initial **0.301122**—also showing no overall benefit.
 
-但不能据上表声称每段音乐都变差：每种 scaled 容量、每个种子均有 **29–30 / 33**
-片段的 paired proxy 指标比初始化更好。异常主要集中在
-`d2599868e6a472eff47c1674`、起点 40244 的同一片段；最大两个反例贡献了
-101–106% 的净恶化，其余改善抵消了一部分退化。不可删除这个已知反例、事后改
-阈值放行，也不能用平均相对误差直接推断全局波形爆音或可闻程度。
+However, it is incorrect to claim that every music segment degraded: for each scaled capacity and each seed, **29–30 out of 33** clips show improved paired proxy metrics compared to initialization. The main anomalies are concentrated in the same clip `d2599868e6a472eff47c1674`, starting at position 40244. Two counterexamples contributed up to **101–106% net degradation**, though the rest of the improvements partially offset this degradation.
 
-该反例的 12–16 kHz / 16 kHz 以上参考功率，在现有频带指标坐标中约为
--111 / -119 dB。以 scaled640、种子 20261012 为例，identity 的实际 DSP 输出
-高频 SC 为 28.86，原始模型为 34.25；paired 分别为 31.83 / 34.95。
-相对指标在极弱参考上会放大误差，但也确实记录了本应保留的原音高频被额外生成。
-DSP 并未消除该问题，数值一致性也没有显示出代理/部署错配。
-这些功率读数不是经过校准的波形 dBFS 或听感结论，后续需要绝对误差与听测共同判断。
+This known counterexample **must not be deleted**, nor can post-hoc threshold adjustments be applied to allow passage. It is also invalid to infer global waveform burst or perceptual degradation from average relative error alone.
 
-训练后最终端点的单线程 CPU ORT + 因果 FFT 前处理（双声道、每种子 10,000 hop）：
+In this counterexample, the 12–16 kHz and above reference power levels are approximately **-111 dB and -119 dB**, respectively, within the current frequency band metric space. Taking the Scaled640 configuration and seed `20261012` as an example:
+- Identity actual DSP output high-frequency SC: **28.86** (vs. original **34.25**)
+- Paired values: **31.83 / 34.95**
 
-| 配置 | p99 范围 | 观测最大 |
+Relative metrics amplify errors under weak references, but they also document the generation of high-frequency content that should have been preserved. The DSP did not eliminate this issue, and consistency between proxy and deployed outputs remains unverified.
+
+These power readings are **not calibrated waveform dBFS values** nor subjective listening conclusions. Further validation via absolute error and human listening is required.
+
+### Final End-to-End Latency (Single-threaded CPU ORT + Causal FFT Preprocessing)
+- Two-channel, 10,000 hop per seed:
+
+| Configuration | p99 Range | Observed Maximum |
 | --- | ---: | ---: |
 | scaled224 | 0.300–0.429 ms | 2.440 ms |
 | scaled384 | 0.567–0.586 ms | 1.142 ms |
 | scaled640 | 1.104–1.175 ms | 2.466 ms |
 
-最终 scaled 端点的虚拟逐 hop 超时计数为零，仍不等于完整实时 DSP worker 或设备
-通过 5 ms 预算。未完成盲听、物理设备连续流或新录音独立测试。
+The virtual per-hop timeout count for scaled endpoints remained zero—this does **not** imply that the full real-time DSP worker or hardware has met the 5 ms budget. No blind listening, continuous physical device streaming, or independent new recording evaluation has been conducted.
 
-当前结论：增加训练预算有用，但在本轮完整预算和固定优化设置下，单纯加宽仍未
-解决弱能量高频上的失效。后续优先审计弱频带的绝对/相对误差、输出残差尺度和
-原音保真约束，再决定方法调整；不能仅凭训练 loss 继续加规模，也不能据此断言
-所有更长训练都无效。原始证据位于本轮 `study/comparisons.json` 与 `study/review/`。
+### Conclusion:
+Increasing training budget is beneficial, but under the current full budget and fixed optimization settings, **wider scale alone has not resolved failure in weak energy bands**. Future work should prioritize auditing absolute and relative errors in low-frequency bands, output residual scales, and original audio fidelity before deciding on method adjustments.
+It is inappropriate to continue scaling based solely on training loss, nor can we conclude that all longer training is ineffective. Original evidence is preserved in `study/comparisons.json` and `study/review/`.
 
-后续 [绝对误差与处理阶段审计](capacity-outlier-audit.md)进一步确认：主异常存在真实
-但绝对幅度较小的高频误生成，极弱参考会显著放大相对分数。最大模型在这个片段
-上的 identity 波形扰动反而小于 anchored。保留本轮原评分，但不把其巨大相对数值
-直接等同可闻失真；尚未修改验收规则或提升权重状态。
+## Fixed Scheme
 
-## 固定方案
-
-| 配置 | 参数量 | 每个种子训练步数 |
+| Configuration | Parameter Count | Steps per Seed |
 | --- | ---: | ---: |
-| anchored144 控制 | 807,398 | 16,192 |
+| Anchored144 Control | 807,398 | 16,192 |
 | scaled224 | 1,748,578 | 16,192 |
 | scaled384 | 4,594,818 | 16,192 |
 | scaled640 | 11,917,698 | 16,192 |
 
-两个种子 `20261012 / 20261013`，总共 **129,536 次更新**；每个配置的预算为
-P22 的 31.625 倍，并与 P20 的完整单配置预算相同。执行顺序先 scaled640，
-再 scaled384、scaled224、anchored；完成第一个种子全部配置后再执行第二个种子。
-这样先开始大模型，同时保持全部控制实验。
+Two seeds: `20261012` and `20261013`, totaling **129,536 updates**. Each configuration's budget is **31.625×** that of P22 and equals the full budget of P20. Execution order: **Scaled640 → Scaled384 → Scaled224 → Anchored**. After completing all configurations for the first seed, the second seed is executed.
 
-全部从相同规则的恒等初始化重新训练。前 512 步沿用 P22 的相同抽样前缀，不从校准
-结果选择较好检查点，也不覆盖 P21/P22 的登记、检查点与结论。不同宽度无法逐元素
-共享初始化张量，同种子/同宽度的主干初始化仍检查哈希。
+All training begins from the same identity initialization. The first 512 steps reuse the identical sampling prefix from P22. No checkpoint selection is made based on performance, and no P21/P22 registration, checkpoints, or conclusions are overridden. Due to the lack of element-wise tensor sharing across different widths, per-seed and per-width backbone initializations are still verified via hash.
 
-沿用 P20 已冻结的完整 16,192 步抽样序列及 2,088 裁剪训练池、共同 320 裁剪。
-253 个音乐录音、8 个语音录音，每步 4 音乐 + 1 语音，paired/identity 等权。
-模型结构、DSP 代理、主 loss、clean-complex 辅助项及权重不变；scaled 头继续使用
-`2*tanh(z/64)`，Adam 学习率固定 1e-4、无 weight decay、梯度范数裁剪 5。
-本轮先隔离训练预算的影响，不同时重新调 loss、学习率或按开发集搜索超参数。
+The full 16,192-step sampling sequence and 2,088-crop training pool from P20's frozen state are reused, along with a common 320-crop set.
+253 music recordings and 8 speech recordings, with 4 music and 1 speech per step, paired/identity-weighted.
+Model architecture, DSP proxy, main loss, clean-complex auxiliary term, and weights remain unchanged. The scaled head continues to use `2*tanh(z/64)`, with fixed Adam learning rate at `1e-4`, no weight decay, and gradient norm clipping at 5.
 
-不按 512 步、训练 loss 或裁剪比例提前停止；NaN/Inf、输入/源码漂移或运行故障
-仍会停止并记录错误。每 64 步保存包含 Adam/RNG 的恢复检查点。达到预算不等于
-已经收敛；最终需结合学习曲线判断是否还有继续训练的依据。
+This round isolates the effect of training budget—no re-tuning of loss, learning rate, or hyperparameter search based on development set performance.
 
-## 完整训练后的评估
+No early stopping is triggered by 512 steps, training loss, or clipping ratio. NaN/Inf, input/source drift, or runtime failures will halt execution and record errors. A checkpoint is saved every 64 steps, including Adam and RNG state. Reaching the budget does **not** imply convergence; final decisions on whether further training is warranted must be based on learning curve analysis.
 
-固定 2,048 / 8,192 / 16,192 三个端点，主要结论以 **16,192 步**为准。
-中间端点用于学习轨迹对照，不挑选最优端点。不在训练过程中查看留出质量以决定
-留下哪些规模。每 2,048 步观察共同训练池，固定端点额外观察完整训练池。
+## Post-Training Evaluation
 
-全部八条训练轨迹完成后，验证回执与完整更新数，再一次性冻结 **24 个端点哈希**，
-然后自动执行：
+Fixed at 2,048 / 8,192 / 16,192 endpoints, with primary conclusions based on **16,192 steps**. Intermediate endpoints are used for trajectory comparison only, and no endpoint is selected as optimal. No quality monitoring during training is used to decide which scale to retain. Every 2,048 steps, the shared training pool is observed; at the end, the full training pool is observed for each endpoint.
 
-- 89 个 development 配对片段与 40 个 shifted 片段的代理评估；这些录音此前已复用，
-  明确称开发复核，不作为新的独立测试。
-- 初始控制加 24 个端点，development 全部经过实际 Rust DSP 回放，共 **4,450 个角色**。
-  同时看模型原始输出与 DSP 后的高频谱形、能量、瞬态、低频保真和原音损伤，
-  分音乐/语音、clip/recording 聚合，并保留最差案例。
-- 每个端点做非零 ONNX 连续状态一致性检查，双声道 CPU 推理加因果 FFT 前处理
-  计时 10,000 hop，以及独立 ORT RSS 快照。
-- 对照各规模与 anchored，并比较 224→384、384→640 的同预算差异。
+After all eight trajectories complete, validation reports and total update counts are verified, and **24 endpoint hashes are then frozen**. Following this, the system automatically executes:
 
-数值复核、盲听、真正独立新录音评估和连续物理设备验收仍是不同阶段。
-现有诊断导出的计时不包含完整实时 DSP worker；不能由它单独宣称模型 + DSP
-已满足用户的 <5 ms 计算预算。所有新权重保留为实验，不自动替换正式模型。
+- **89 development paired clips** and **40 shifted clips** for proxy evaluation. These recordings were previously reused and are explicitly labeled as development rechecks—**not** new independent tests.
+- Initial control plus 24 endpoints: all development clips undergo actual Rust DSP replay, totaling **4,450 roles**.
+  For each, the model's raw output and post-DSP high-frequency spectral shape, energy, transient, low-frequency fidelity, and original audio damage are analyzed, separately by music and speech, aggregated by clip and recording, and the worst-case examples are preserved.
+- Each endpoint undergoes non-zero ONNX continuous state consistency checks: two-channel CPU inference with causal FFT preprocessing (10,000 hop), and independent ORT RSS snapshots.
+- Comparative analysis across all scales and against the anchored baseline, with attention to differences between 224→384 and 384→640 under same budget.
 
-## 运行
+Full numerical validation, blind listening, independent new recording evaluation, and continuous physical device validation remain distinct phases.
+The current diagnostic export does **not** include full real-time DSP worker timing. It cannot be used to claim that the model + DSP meets the user’s <5 ms computation budget. All new weights remain experimental and are **not automatically promoted** to production.
 
-运行脚本：`training/scripts/run_full_capacity_study.py`。
-本地目录：`data/runs/full-capacity-p23-20261015/`，源码和音频/抽样输入均冻结哈希。
-训练与自动复核状态在 `study/progress.json`，监督状态在 `pipeline.json`，
-日志在 `pipeline.log`。原始训练素材与检查点均不推送。
+## Execution
 
+Command:
 ```sh
 PYTHONPATH=training training/.venv/bin/python training/scripts/run_full_capacity_study.py \
   --parent data/runs/latency-capacity-p22-20261015/study \
@@ -130,13 +106,17 @@ PYTHONPATH=training training/.venv/bin/python training/scripts/run_full_capacity
   --output data/runs/full-capacity-p23-20261015/study
 ```
 
-正式运行使用该轮冻结的 `source/training`。已登记目录不能随源码更改直接重跑；
-恢复必须保持原有协议和源码。运行时长由实际 CPU 训练速度决定，不把预算完成
-时间或最终收益作为保证。
+Local directory: `data/runs/full-capacity-p23-20261015/`
+Source code and audio/sampling inputs are frozen with hash.
+Training and auto-recheck status are tracked in `study/progress.json`, supervision status in `pipeline.json`, and logs in `pipeline.log`.
+Original training materials and checkpoints are not pushed.
 
-## 启动记录
+## Launch Log
 
-2026-10-15 23:01 SGT 已启动本机后台训练，冻结源码 `4fa004c`。
-历史监督 PID `98142`（现已正常退出），正式运行使用该目录的冻结源码；实际子进程和阶段以
-`pipeline.json` / `study/progress.json` 为准。先运行 scaled640、种子 20261012。
-本轮全量 Python 测试 505 项通过，Ruff 检查与格式检查通过。
+- Started at **23:01 SGT, 2026-10-15** on local machine, with source code hash `4fa004c` frozen.
+- Historical supervision PID `98142` (now terminated normally) was replaced by the new run using the same directory's frozen source.
+- Actual subprocess and stage progression are governed by `pipeline.json` and `study/progress.json`.
+- First run: **Scaled640**, seed `20261012`.
+- Full Python test suite passed 505 cases; Ruff and formatting checks passed.
+
+The registered seeds are `20261012 / 20261013`. Execution uses `training/scripts/run_full_capacity_study.py` from the frozen `source/training` tree. The subsequent [absolute-error/stage audit](capacity-outlier-audit.md) retains the original scores while separating small absolute high-band generation from amplified relative errors above 16 kHz; no thresholds or release status change.

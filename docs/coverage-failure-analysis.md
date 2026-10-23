@@ -1,137 +1,98 @@
-# P19 失效定位：跨录音保真失效与频带串扰
+# P19 Failure Localization: Cross-Recording Fidelity Failure and Band Interference
 
-## 结论
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-P19 的问题不只是曲库小，也不是所有录音都持续恶化。共同训练误差下降，
-多数开发音乐片段的配对误差也小幅下降，但少数未见录音出现严重的原音损伤，
-超过这些小收益。分阶段和实际 Rust 干预进一步确认：模型修正进入原本很弱的
-频段时，重叠相加再分析会产生相邻频带串扰，在严重案例中显著放大误差。
+## Conclusion
 
-这是本轮实际定位的失效链，不是某个新架构已能修复它的证明：
+The issues with P19 are not merely due to a small music library, nor are all recordings exhibiting degradation over time. While overall training error decreases and most development music pairs show only minor improvements in paired error, a small number of previously unseen recordings exhibit severe original signal damage—outweighing these marginal gains. Stepwise and actual Rust intervention further confirm: when the model attempts to correct weak frequency bands, the overlap-add (OLA) reanalysis reveals interference between adjacent bands, significantly amplifying errors in severe cases.
 
-1. 自然窄带的无损输入也会激活增强路径；截止频率并不能区分自然带宽与压缩损失。
-2. 当前共享预测器在训练录音上学会较小的恒等修正，但在部分未见录音上给出错误修正。
-3. 按频带生成的幅度修正、保留的输入相位和重叠窗口共同决定输出；逐帧频谱误差
-   较小，不保证合成后仍小。严重案例的主要损伤来自相邻频带，而非该频带直接生成。
-4. 弱参考频带的相对归一化使这类损伤在 loss 中更显著；真实 Rust 输出也出现了
-   频谱偏差，所以不能仅通过改分母或放宽门限消除问题。
+This is the actual failure chain observed in this round—not a proof that any new architecture can resolve it:
 
-本轮初始控制是零修正的恒等映射，不能把它的优势解释成“初始模型过拟合得更好”。
-这也没有重新检验早期已训练基线的过拟合问题，两者应分开。
+1. **Natural narrowband, lossless inputs can still activate enhancement paths**; the cutoff frequency does not distinguish between natural bandwidths and compressed degradation.
+2. The current shared predictor learns small identity corrections on training recordings, but produces incorrect corrections on certain previously unseen recordings.
+3. Output is determined by per-band amplitude correction, preserved input phase, and overlapping windowing; small per-frame spectral errors do not guarantee small overall output. In severe cases, the primary damage originates from adjacent bands, not directly from the corrected band itself.
+4. Relative normalization of weak reference bands amplifies these damages in the loss function; real Rust outputs also show spectral bias, so problems cannot be resolved simply by adjusting the denominator or relaxing thresholds.
 
-## 范围与复核
+The initial control for this round was a zero-correction identity mapping. Its performance cannot be interpreted as "overfitting better." This also does not re-verify the overfitting issue in early training baselines—these should be considered separately.
 
-冻结 P19 的全部原始结果；不更新模型，不调 loss，不重新选择 checkpoint。
-新增分阶段诊断覆盖训练集每条录音的第一个登记窗口（253 音乐 + 8 语音），
-以及全部 89 个复用开发片段。训练侧检查两个最终模型，开发侧检查两个种子的
-2,048 / 16,192 步，共 878 对案例、1,756 个 paired/identity 角色。
-训练侧阶段诊断只有每录音一个固定窗口，不冒充完整 2,088 位置库；训练误差统计
-则读取原实验已经完成的整个位置库评分。
+## Scope and Recheck
 
-所有开发案例重新计算的目标值须与冻结评分相差不超过 `2e-6`，实际通过。
-频带残差分量重组的最大波形误差 `2.98e-8`，复数谱误差 `2.87e-7`。
-对每种子最终 identity 最差的三个音乐片段进行五频带 only/without 诊断；
-按目标误差频带的主要来源，另做 24 次真实 Rust 回放。
-代理/原生最大逐样本误差 `2.98e-7`，低于原 `2e-5` 门限。
-这些是事后机制诊断，不是新独立测试、听感评分或候选发布资格。
+All original results for P19 are frozen; no model updates, no loss modifications, no checkpoint reselection.
+A new staged diagnosis is added, covering the first registered window per recording in the training set (253 music + 8 speech), and all 89 reused development fragments.
+On the training side, two final models are inspected; on the development side, two seeds are evaluated at 2,048 → 16,192 steps, totaling 878 cases and 1,756 paired/identity roles.
 
-## 训练收益与开发尾部损伤
+The training-side staged diagnosis includes only one fixed window per recording, not claiming full coverage of the 2,088-position library. Training error statistics are drawn from the original experiment's completed position library scoring.
 
-| 项目 | 种子 20261012 | 种子 20261013 |
+For all development cases, the target values must differ from the frozen scores by no more than `2e-6`. This threshold is met.
+Maximum waveform error after reorganized band residuals: `2.98e-8`, maximum complex spectral error: `2.87e-7`.
+For the three worst music fragments per seed, a five-band only/without diagnosis is performed.
+Additionally, 24 real Rust re-replays are conducted, based on the primary error band sources.
+Proxy/native maximum per-sample error: `2.98e-7`, below the original `2e-5` threshold.
+
+These are post-hoc diagnostic checks—not new independent tests, no listening evaluations, and not a basis for candidate release approval.
+
+## Training Gains and Development Tail Damage
+
+| Metric | Seed 20261012 | Seed 20261013 |
 | --- | ---: | ---: |
-| 全训练音乐配对误差，2,048 → 16,192 步 | 0.622491 → 0.608755 | 0.622672 → 0.608035 |
-| 全训练音乐 identity 误差，2,048 → 16,192 步 | 0.005085 → 0.003182 | 0.004660 → 0.003731 |
-| 开发音乐配对误差，初始 → 最终 | 0.588365 → 0.684476 | 0.588365 → 0.653610 |
-| 开发音乐 identity 最终误差 | 0.135301 | 0.110671 |
-| 开发音乐配对改善 / 退化片段数 | 22 / 11 | 21 / 12 |
-| 开发音乐配对误差变化中位数 | -0.001172 | -0.002101 |
-| 最差两个片段占音乐主误差净增加 | 92.17% | 82.64% |
+| Full training music paired error, 2,048 → 16,192 steps | 0.622491 → 0.608755 | 0.622672 → 0.608035 |
+| Full training music identity error, 2,048 → 16,192 steps | 0.005085 → 0.003182 | 0.004660 → 0.003731 |
+| Development music paired error, initial → final | 0.588365 → 0.684476 | 0.588365 → 0.653610 |
+| Development music identity final error | 0.135301 | 0.110671 |
+| Development music paired improvement/degradation fragment count | 22 / 11 | 21 / 12 |
+| Development music paired error change median | -0.001172 | -0.002101 |
+| Worst two fragments contribute to net increase in main music error | 92.17% | 82.64% |
 
-最后一行分母是总体**净增加**，包含其他片段的正负抵消，不是全部误差的占比。
-两处严重片段来自不同录音：`9d95e7f035f878fa1a6ab421`（blues）与
-`d2599868e6a472eff47c1674`（未标注）。不能删去这两条后宣布通过：它们是合法输入
-上的失效，而且去掉最差录音的全部片段后，其余音乐平均主误差仍增加约
-0.055735 / 0.048173。这一删除诊断不用于更改评分集。
+The denominator in the last row refers to the **net increase** across all fragments, including both positive and negative changes, not the percentage of total error.
+Two severe cases originate from different recordings: `9d95e7f035f878fa1a6ab421` (blues) and `d2599868e6a472eff47c1674` (unlabeled). These cannot be removed to declare success—they represent valid input failures. Removing these two fragments does not eliminate the problem: after removal, the average main error of the remaining music still increases by approximately 0.055735 / 0.048173. This deletion analysis is not used to modify the evaluation set.
 
-原 32 条训练音乐的保护窗口配对误差则从 0.602244 降到 0.589545 / 0.589813；
-这些窗口仍有既有输入上下文重叠限制。证据支持跨录音的泛化缺口，不能声称完全
-独立的时间泛化已经验证。语音改善也不能替代音乐恢复。
+The paired error for the protected 32 training music windows decreased from 0.602244 to 0.589545 / 0.589813. These windows still have overlapping input context constraints. Evidence supports a generalization gap across recordings—complete temporal generalization cannot be claimed verified. Speech improvements do not substitute for music recovery.
 
-## 放大发生的位置
+## Location of Amplification
 
-相同 frame 89 至末尾有效区域，以下为 identity 频谱项（含参考变化误差，不含波形项）。
-identity 在每个阶段都使用该阶段的初始输出为参考。
+In the same frame range from 89 to end of valid region, the following shows identity spectral components (including reference change error, excluding waveform term).
+For identity, each stage uses the output of the initial stage as reference.
 
-| 范围 / 种子 | 混合后频谱 | OLA 后再分析 | 限幅后 |
+| Range / Seed | Spectral after mixing | After OLA reanalysis | After clipping |
 | --- | ---: | ---: | ---: |
-| 训练音乐固定窗口 / 12 | 0.002355 | 0.003025 | 0.003008 |
-| 训练音乐固定窗口 / 13 | 0.002737 | 0.003259 | 0.003229 |
-| 开发音乐全部片段 / 12 | 0.035712 | 0.137102 | 0.135115 |
-| 开发音乐全部片段 / 13 | 0.047008 | 0.112079 | 0.110523 |
-| blues 严重片段 / 12 | 0.115361 | 2.109583 | 2.109583 |
-| blues 严重片段 / 13 | 0.102157 | 1.418578 | 1.418578 |
+| Training music fixed window / 12 | 0.002355 | 0.003025 | 0.003008 |
+| Training music fixed window / 13 | 0.002737 | 0.003259 | 0.003229 |
+| All development music fragments / 12 | 0.035712 | 0.137102 | 0.135115 |
+| All development music fragments / 13 | 0.047008 | 0.112079 | 0.110523 |
+| Blues severe fragment / 12 | 0.115361 | 2.109583 | 2.109583 |
+| Blues severe fragment / 13 | 0.102157 | 1.418578 | 1.418578 |
 
-该 blues 片段的主要传递为 **12–16 kHz → 16 kHz 以上**。仅移除 12–16 kHz 修正，
-完整 identity loss 从 2.109781 / 1.418697 降到 0.055444 / 0.052442；真实 Rust
-高频谱形误差从 4.118242 / 2.746885 降到 0.101922 / 0.095809。
-仅保留该源频带则基本重现原损伤。限幅前峰值约 0.691，小于 0.855 起点，gate=1，
-因此这个反例不是 limiter 或门控切换导致。
+The primary transfer in the blues fragment is **12–16 kHz → above 16 kHz**. Removing only the 12–16 kHz correction reduces full identity loss from 2.109781 / 1.418697 to 0.055444 / 0.052442; the real Rust high-frequency spectral error drops from 4.118242 / 2.746885 to 0.101922 / 0.095809.
+When only the source band is retained, the original damage is largely reproduced. Pre-clipping peak ≈ 0.691, below the 0.855 starting point, with gate=1—thus, this counterexample is not caused by limiter or gating switch.
 
-另一严重片段主要传递为 **4–8 kHz → 8–12 kHz**；移除源频带后 identity loss
-从 1.780225 / 1.370762 降到 0.238690 / 0.299738，限幅前峰值约 0.022，亦无
-限幅介入。它还有其他频带的直接损伤，因此移除单个源频带并不完全修复。
+Another severe fragment primarily transfers as **4–8 kHz → 8–12 kHz**. Removing the source band reduces identity loss from 1.780225 / 1.370762 to 0.238690 / 0.299738; pre-clipping peak ≈ 0.022, with no clipping involved. This fragment also exhibits direct damage from other bands, so removing a single source band does not fully resolve the issue.
 
-没有据此设置曲目阈值或关闭某频段。这类开发反例上的规则不能代表训练收益，
-[P15 的训练干预](band-transfer-study.md)也已显示硬关闭频带会损失配对恢复。
+No threshold on tracks or frequency band closures was established. Such development counterexamples should not be used to justify training gains. [P15 training intervention](band-transfer-study.md) has already shown that hard-band closures degrade paired recovery performance.
 
-## loss、采样与结构分别说明了什么
+## What the Loss, Sampling, and Structure Reveal
 
-- **loss 实现：**P19 实际调用 `FixedFitObjective`，逐批平均 paired/identity 各 50%，
-  同时计算实际合成后的谱形、参考时间变化和波形误差；不是只监督未合成幅度。
-  `RenderedObjective` 里历史 1/8 identity 的归一化不在这条训练路径上。
-  辅助项为参考感知 `(P-I)(Zpred-Zref)`，不是要求把真实瞬态抹平。
-  本轮复算一致，历史有限差分/恒等/静音与原生对齐检查通过；这些不证明现有目标
-  权重就是最优，也不保证它与主观音质完全一致。
-- **误差尺度：**blues 反例 16 kHz 以上的参考幅度 RMS 约 `1.01e-4`，预测误差 RMS
-  约 `1.66e-3 / 1.11e-3`，全谱参考 RMS 约 1.819。相对弱频带很大，
-  相对全谱约 0.091% / 0.061%；这是 DFT 幅度比例，不是整体响度、可闻度或爆音证据。
-  原生频谱偏差真实存在，但判断主观严重程度仍需盲听和波形测量。
-- **训练数值：**两个种子只有 155 / 169 次更新触发 norm>5 的裁剪，分别约 0.96% /
-  1.04%，中位梯度范数约 0.552 / 0.498；有孤立峰值，但未出现非有限值。
-  不能以“普遍梯度爆炸”解释结果，也不能仅凭这些统计排除所有优化问题。
-- **数据覆盖：**253 首仍是每首一条 codec/声道配置、八个固定短窗口，不等于对全部
-  歌曲及所有退化条件学习。训练现在已有 blues；严重案例的 Vorbis q3、MP3 VBR q6
-  和 AAC 192 都是已见 codec，不是仅由留出的 AAC 160 导致。恒等输入的增强激活比例
-  在训练固定窗口约 65.2%、开发约 72.4%；这是带宽检测行为，不能当作压缩识别率。
-  16 kHz 以上参考弱到归一化下限的案例分别为训练 18/253、开发 3/33，训练并非完全
-  缺少弱高频。曲风数量没有保证频谱边缘/瞬态/声道联合条件覆盖。
-- **结构限制：**当前头按五个硬频带独立控制能量和幅度形状，再复用输入相位。
-  它没有从表示结构上保证跨帧修正可一致合成；训练损失中的约束需要泛化到新输入。
-  P19 的辅助项没有保证这一点。该结构是值得对照的嫌疑点，尚未证明是唯一根因。
-  [P11 直接拟合](fixed-fit-diagnostic.md)已有固定相位幅度改善空间，所以“必须改相位
-  才能恢复”也不是现有证据支持的结论，更不能直接推出参数量太小。
+- **Loss Implementation:** P19 actually uses `FixedFitObjective`, averaging 50% paired and 50% identity errors per batch, and also computes actual rendered spectral, time-variant reference, and waveform errors. It is not limited to supervising unrendered magnitude. The `RenderedObjective` includes historical 1/8 identity normalization, which is not part of this training path. Auxiliary term is reference perception `(P-I)(Zpred-Zref)`, not requiring the true transient to be eliminated. Recomputation confirms consistency; historical finite-difference, identity, and silence alignment checks pass. However, this does not prove the current weights are optimal, nor that they align with subjective audio quality.
+- **Error Scale:** In the blues counterexample, RMS reference magnitude above 16 kHz is approximately `1.01e-4`, predicted error RMS is about `1.66e-3 / 1.11e-3`, full-spectrum reference RMS ≈ 1.819. Relative to weak band, this is large—about 0.091% / 0.061% of full spectrum; this is a DFT magnitude ratio, not overall loudness, audibility, or burst evidence. Actual spectral bias exists, but subjective severity assessment still requires blind listening and waveform measurement.
+- **Training Statistics:** Across both seeds, only 155 / 169 updates triggered norm > 5 clipping, approximately 0.96% / 1.04%. Median gradient norm ≈ 0.552 / 0.498; isolated peaks exist, but no non-finite values occurred. The result cannot be explained by "generalized gradient explosion," nor can these statistics alone rule out all optimization issues.
+- **Data Coverage:** The 253 tracks still represent one codec/channel configuration per song, with eight fixed short windows—this does not equate to learning across all songs or all degradation conditions. Training now includes blues; severe cases involving Vorbis q3, MP3 VBR q6, and AAC 192 are all observed codecs—not solely due to the left-out AAC 192. The activation rate of enhancement in identity input is 65.2% in training and 72.4% in development—this reflects bandwidth detection behavior, not compression recognition accuracy. Cases with reference below 16 kHz are rare: 18/253 in training, 3/33 in development. Training does not lack weak high-frequency content. Genre diversity does not guarantee coverage of spectral edges, transients, or multi-channel joint conditions.
+- **Structural Limitation:** The current head independently controls energy and magnitude shape per five hard frequency bands, then reuses input phase. It does not guarantee consistent cross-frame correction synthesis at the representation level. Constraints in the training loss must generalize to new inputs. The P19 auxiliary term does not ensure this. This structure is a suspect point worth further investigation, though not yet proven to be the sole root cause. [P11 direct fitting](fixed-fit-diagnostic.md) already shows room for improvement in fixed-phase magnitude, so the claim that "phase correction is required for recovery" is not supported by current evidence, nor can it be directly inferred from small parameter count.
 
-## 下一步应验证的假设
+## Hypotheses to Validate Next
 
-不再追加相同配置的长续训，也不靠放宽误差门限晋级。优先做两条分开的对照：
+No further long-running training with identical configuration will be attempted. Error threshold relaxation should not be used as a path to promotion. Priority should be given to two separate controls:
 
-1. **输出表示：**固定数据、backbone、起点和预算，对照当前独立频带幅度头与
-   能跨频带协调、允许相位修正的复数残差头。先检查训练拟合和合成传递，再冻结
-   候选复核泛化。复数头不自动保证一致性，须实测；单纯再做一次分析/合成投影也
-   不能假定有效，因为当前部署本来就会合成，而当前 loss 已经监督合成后的结果。
-2. **保真泛化：**单独对照训练侧更多 codec/声道/时间位置轮换及频谱边缘条件覆盖，
-   记录每录音风险分布，检验是否降低尾部损伤。保持既有 clean identity 对照，
-   不把“再加入 identity”当作尚未尝试的方法，不使用开发曲目决定训练阈值。
+1. **Output Representation:** With fixed data, backbone, starting point, and budget, compare the current independent per-band magnitude head against a complex residual head that enables cross-band coordination and phase correction. First verify training fit and synthesis transfer, then freeze and recheck generalization. Complex heads do not automatically ensure consistency—must be empirically verified. A single re-analysis/synthesis projection is insufficient, as the current deployment already performs synthesis, and the current loss already supervises the rendered output.
+2. **Fidelity Generalization:** Isolate a comparison with more codec/channel/time-position rotation and expanded spectral edge conditions in training. Record per-recording risk distribution and assess whether tail damage is reduced. Maintain existing clean identity baselines; do not treat "adding back identity" as an untried method, nor use development tracks to set training thresholds.
 
-每条路线都必须同时改善配对恢复和原音保真；若只是缩小修正回到恒等，仍不是成功。
-模型继续遵守 <=2M 参数、ONNX <8 MiB、因果性和既定实时预算；任何新导出模型都
-须重新测推理成本，不能沿用本次诊断的通过结果。本轮没有修改模型或部署路径。
+Each path must simultaneously improve paired recovery and original signal fidelity. Simply reducing correction back to identity is not success.
+The model continues to adhere to ≤2M parameters, ONNX <8 MiB, causality, and existing real-time budget. Any new exported model must undergo re-measurement of inference cost—results from this diagnostic round cannot be reused. No model or deployment path was modified in this round.
 
-## 复现与产物
+## Reproducibility and Output
 
-原 P19 根目录：`data/runs/music-coverage-p19-20261014/study`。
-新增报告：`data/reports/coverage-failure-20261014/`，包含登记、六份阶段报告、
-原生干预、汇总与输入/源码/检查点校验和；音频与权重不推送。
+Original P19 root directory: `data/runs/music-coverage-p19-20261014/study`.
+New report: `data/reports/coverage-failure-20261014/`, containing registration, six stage reports, native interventions, summary, and input/code/source/checkpoint hash verification; audio and weights are not pushed.
 
 ```sh
 PYTHONPATH=training training/.venv/bin/python training/scripts/audit_coverage_failure.py \
@@ -145,6 +106,7 @@ PYTHONPATH=training training/.venv/bin/python training/scripts/analyze_coverage_
   --audit data/reports/coverage-failure-20261014
 ```
 
-首条命令要求新输出目录；复现时修改三条命令的输出/审计路径。审计开始前登记来源，
-执行后检查源码未改变；汇总时再次核对原始输入、源码和阶段报告哈希。
-验证：29 项 loss 分解、频带干预、合成一致性、覆盖抽样和断点恢复测试通过。
+The first command requires a new output directory; during reproduction, modify the output/audit paths accordingly. Before audit, record the source; after execution, verify source code has not changed. During summary, recheck original inputs, source code, and stage report hashes.
+Verification: 29 loss decompositions, band interventions, synthesis consistency, coverage sampling, and break recovery tests passed.
+
+The retained codec counterexamples include the stated 160 kbps condition; codec labels and paired-file evidence remain in the frozen per-case reports.

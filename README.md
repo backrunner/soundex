@@ -1,6 +1,6 @@
 # SoundEx
 
-[中文](README.zh-CN.md) · [CI](https://github.com/backrunner/soundex/actions/workflows/ci.yml) · [Apache-2.0](LICENSE)
+[CI](https://github.com/backrunner/soundex/actions/workflows/ci.yml) · [Apache-2.0](LICENSE)
 
 SoundEx is an experimental Rust library and CLI for restoring compressed audio.
 Its goal is high-frequency spectral inpainting followed by DSP fusion and artifact
@@ -12,83 +12,21 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
+[P39](docs/objective-conflict-audit.md) found opposed parameter gradients concentrated
+in the shared encoder despite mostly aligned high-band output-coordinate gradients. This
+is a frozen-model diagnosis, not a new quality gain. The [balanced timing audit](docs/interleaved-timing-audit.md)
+retained three ≥5 ms calls among 160,000 hops (max 9.280 ms), so real-time qualification
+remains open. Consult the [failed-experiment registry](docs/failed-experiments.md)
+before repeating a route. All maintained project documentation is in English.
+
 [P38](docs/detector-condition-study.md) completed all four 16,192-step CPU trajectories
 and native reviews. Fixed detector conditions worsened music MR by 0.19–0.56% versus
 matched controls; removing magnitude fusion did not reverse this. Neither path passed
 the research screen. Across 280,000 timing hops, max compute was 5.411 ms, with two
 ≥5 ms calls, 11 service overruns and 27 paced delays. No promotion or new training.
 
-[P37](docs/fusion-boundary-audit.md) completed 2,848 frozen-model native ablations.
-Removing magnitude fusion while retaining phase fusion reduced music MR error by
-0.12–0.14% against the same weights/current DSP, with small dynamics gains and identity
-regressions. This isolates a fusion cost but does not solve model restoration.
-Across 120,000 hops, max compute was 0.992 ms with no hop overruns or paced delays.
-No weights were promoted; P38 follows with a matched detector-condition training study.
-
-[P36](docs/risk-attribution-study.md) completed all four new matched-budget trajectories.
-Risk compression alone reduced native music MR error by 1.27–1.42% across two seeds;
-identity downweighting alone improved music by 1.03–1.14% with larger fidelity costs.
-Both still failed dynamics/identity gates on reused validation, so no model was promoted.
-Across 280,000 hops, max compute was 1.278 ms, with zero ≥5 ms calls and one paced delay.
-
-[P35](docs/broad-risk-study.md) completed all four 16,192-step trajectories and native
-reviews. The candidate reduced native music MR error by 1.12–2.13% and speech error
-by 3.07–4.34% against matched controls across two seeds on reused validation.
-Dynamics and some identity metrics regressed, so the registered screen failed and
-no model was promoted. Across 280,000 hops, max compute was 1.948 ms with zero ≥5 ms
-calls and one paced completion delay; fixed buffering remains separate.
-
-[P34](docs/risk-balance-study.md) completed three debugging rounds on one 431k-parameter
-architecture, five matched 1,024-step endpoints. Smooth risk compression removed gradient
-clipping; an intermediate identity weight improved native music MR error by 0.305% on
-unfitted training-domain crops, with remaining dynamics/identity regressions. An added
-overshoot guard did not improve the overall tradeoff. These are single-seed, finite-pool
-diagnostics, not independent generalization or qualified restoration weights.
-
-[P33](docs/broad-spectrum-study.md) completed all four 16,192-step broad-coverage
-trajectories and native reviews. Added MR supervision did not improve music over
-matched control on recording-isolated reused validation; speech spectral means
-improved 0.86–1.26%, with worse dynamics. Music restoration remains weak.
-Two of 280,000 compute calls exceeded 5 ms (max 8.445 ms). No model was promoted.
-
-[P32](docs/spectrum-priority-study.md) completed six 1,024-step spectrum-first
-diagnostics. Adding multi-resolution supervision reduced native music spectrum
-error by 2.02–2.35% against the matched control on fitted training crops; transient
-and PCM fidelity remain unresolved, and generalization is untested. Across 420,000
-timing hops, 91 exceeded 5 ms (max 45.00 ms); realtime tails remain unqualified.
-Preflight and 620 tests passed. No model was promoted.
-
-[P31](docs/phase-coordinates-study.md) completed all eight 512-step endpoints,
-320 full native roles and 560,000 timing hops. Phase inputs improved some amplitude
-metrics but worsened PCM error; global Cartesian groups remained near identity.
-No restoration gain was established. Nine compute calls exceeded 5 ms (max 14.10 ms);
-79 paced completions were late. No model was promoted.
-
-[P30](docs/phase-swap-audit.md) completed 1,320 native DSP diagnostic roles.
-Reference-assisted HF swaps identify phase fidelity and spectral fusion as
-remaining constraints. These oracle results are not deployable model gains.
-
-[P29](docs/direct-spectrum-study.md) completed the small-model, fixed-training-crop
-diagnostic. Direct spectrum supervision improved HF energy reconstruction and
-produced larger residuals, but complex-spectrum, transient and final PCM fidelity
-did not improve together. No model was promoted; generalization remains untested.
-
-The [P28 small-model mechanism study](docs/small-mechanism-study.md) is complete:
-431K–456K parameters, four controlled configurations, two seeds and 2,048 updates
-each. It tests decoder normalization, budget-gradient isolation and observed-phase
-inputs before any further scaling. None passed the two-seed improvement screen;
-outputs remain near identity DSP even without decoder saturation in the diagnostic crops.
-All 560,000 timing hops stayed below 5 ms, with five service overruns and 32 paced
-completion misses. No production weights are changed.
-
-The [P27 audit](docs/head-collapse-audit.md) retired the 11.92M-parameter route
-from further scaling after finding widespread residual-decoder inactivity.
-The compact DSP-excitation route remains a later experiment, not a trained model.
-
-[P26](docs/broad-budget-study.md) completed eight full trajectories, native reviews
-and 560,000 timing hops without establishing overall recovery. Compute stayed
-below 5 ms in that run, but hop deadlines still missed. No weights were promoted.
-Earlier studies and continuation commands are indexed in [research history](docs/research.md).
+Earlier protocols, full results and counterexamples are indexed in
+[research history](docs/research.md) and the [failure registry](docs/failed-experiments.md).
 
 The reviewed library contains 300 native-lossless music works plus VCTK speech;
 raw audio, prepared pairs and experimental checkpoints stay local. See the

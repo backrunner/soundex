@@ -1,161 +1,139 @@
-# 相位融合与连续波形重建对照
+# Phase Fusion and Continuous Waveform Reconstruction Comparison
 
-本轮获得了值得保留的 DSP 改善：在不改变模型预测幅度、边缘增益和输出延迟的条件下，
-按输入残留功率融合相位，改善了波形保真和部分高频恢复指标。仍未达到全面恢复目标，
-默认策略与正式权重不替换。没有新增神经训练或声称训练 loss 下降。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 方法与固定条件
+This round yielded a noteworthy DSP improvement: by fusing phases based on residual input power—without altering the model's predicted magnitude, edge gain, or output latency—the waveform fidelity and certain high-frequency recovery metrics were enhanced. A full restoration of the original signal remains unachieved. The default strategy and official weights were not replaced. No new neural training or claimed loss reduction was introduced.
 
-同一个 shape-small 模型，905,734 参数、ONNX 3,722,845 bytes（3.550 MiB），
-使用 C1、FFT256/hop128、Neural/MatchEdge、1000 Hz crossover；增益校准关闭。
-模型 SHA-256：`bdef9d1269ea4b8b1e8e5e04bd6d25032b817f5401e13c51e2c064d721503782`。
-实现源码：`19aa0eecadda43713e998a0aeabb406b9257befe`。
+## Methodology and Fixed Conditions
 
-固定三组相位策略，幅度和 MatchEdge 递推完全相同：
+The same `shape-small` model, 905,734 parameters, ONNX 3,722,845 bytes (3.550 MiB),
+uses C1, FFT256/hop128, Neural/MatchEdge, 1000 Hz crossover; gain calibration disabled.
+Model SHA-256: `bdef9d1269ea4b8b1e8e5e04bd6d25032b817f5401e13c51e2c064d721503782`.
+Implementation source code: `19aa0eecadda43713e998a0aeabb406b9257befe`.
 
-- `model`：原有单位相量交叉融合，默认不变。
-- `observed`：全频使用输入相位，作为相位来源消融。仍使用模型预测幅度，不是 dry bypass。
-- `surviving-power`：主要候选，模型相位权重为
-  `w_phase = w_crossover * (1 - min(A_input / A_generated_after_gain, 1)^2)`。
-  候选幅度不大于输入时权重为零；输入缺失时使用模型相位。零/零返回零。
+Three phase strategies are fixed, with identical magnitude and MatchEdge recursion:
 
-残留功率比例是启发式，并非已经校准的相位置信度。它不访问无损参考，不拟合参数，
-不抹平跨帧变化，不引入前视或新缓存；逐声道重用构造时分配的权重数组。
-仅支持 Neural，Spectral/Hybrid 搭配新策略会显式拒绝。
-它改变的是单位相量融合，和前轮失败的复数频谱直接插值不同。
+- `model`: Original unit vector phase fusion, unchanged by default.
+- `observed`: Full-frequency use of input phase as phase source, ablation. Still uses model-predicted magnitude, not dry bypass.
+- `surviving-power`: Primary candidate. Model phase weight is set to
+  `w_phase = w_crossover * (1 - min(A_input / A_generated_after_gain, 1)^2)`.
+  When generated magnitude is ≤ input magnitude, the weight is 0; when input is missing, model phase is used. Zero input yields output 0.
 
-单元测试验证三个策略送往 IFFT 的幅度、增益相同，保留频段相位不变，且实际走过增强。
-最终重建能量仍会变化，因为相位影响实数谱投影和相邻窗的叠加结果。`PhaseSmoother` 的旧注释已修正：
-它只做帧内融合，本身不提供时间相位一致性保证。
+The residual power ratio is heuristic and not calibrated phase reliability. It does not access unclipped references, does not fit parameters, does not smooth inter-frame variations, does not introduce lookahead or new caching. Weights are reused per channel from the time they were constructed. Only supports Neural; Spectral/Hybrid pairing is explicitly rejected.
 
-开发评分前冻结公式、模型与选择规则：只有主要候选的音乐核心指标没有统计支持的退步，
-且至少一项高频指标有统计支持的改善，才进入录音留出复核。该条件不是等效性或发布证明。
-`observed` 不在看过结果后替代主要候选。没有根据留出结果再次调参。
+Unit tests verify that all three strategies produce identical magnitude and gain when passed to IFFT, preserve phase in the retained bands, and actually undergo enhancement. Final reconstructed energy may still vary, as phase affects real-valued spectral projection and the overlap with adjacent windows. The old comment for `PhaseSmoother` has been corrected: it only performs intra-frame fusion and does not provide temporal phase consistency guarantees.
 
-## 开发集与原始相位诊断
+Development scoring criteria were frozen prior to evaluation, model, and selection rules: only if the primary candidate shows no statistically supported degradation in music-centric metrics and at least one high-frequency metric shows statistically supported improvement, will it proceed to held-out recheck. This condition is not equivalent to or proof of release. The `observed` strategy was not substituted for the primary candidate after seeing results. No hyperparameter tuning was performed based on held-out results.
 
-同一批反复使用的 89 行 / 80 个录音：音乐 33 行 / 26 首、语音 56 行 / 54 条。
-这是开发诊断，不是独立测试。配对文件哈希及与训练录音隔离已复核。
-全部评分使用真实 Rust 输出，包括检测器、增益、融合、OLA、门控和限幅。
-默认路径与上一轮共有的 4,272 个指标值完全一致；这是指标复算一致，不是保存 PCM 的字节比对。
+## Development Set and Original Phase Diagnostics
 
-另用相同音频做 NumPy 周期 Hann FFT + CPU ORT 原始相位探针，跳过前32帧，
-按无损高频功率加权 `1-cos(phase_pred-phase_clean)`（零最好，二最差）：
+Same 89 rows / 80 recordings: 33 rows / 26 music tracks, 56 rows / 54 speech segments.
+This is a development diagnostic, not an independent test. Pairwise file hashes and isolation from training recordings have been verified.
+All scoring uses real Rust output, including detectors, gain, fusion, OLA, gating, and clipping.
+The default path shares the exact same 4,272 metric values as the prior round—metric consistency, not PCM byte-level comparison.
 
-| 语料 | 输入相位 | 模型原始相位 |
+An additional NumPy-based periodic Hann FFT + CPU ORT probe was run on the same audio, skipping the first 32 frames, using unclipped high-frequency power-weighted `1-cos(phase_pred-phase_clean)` (0 is best, 2 is worst):
+
+| Corpus | Input Phase | Model Original Phase |
 |---|---:|---:|
-| 音乐 | 0.534109 | 0.975867 |
-| 语音 | 0.614377 | 0.977454 |
+| Music | 0.534109 | 0.975867 |
+| Speech | 0.614377 | 0.977454 |
 
-这说明本模型的原始相位存在明显不足，输入中仍有可利用的信息。该探针没有 Rust 的
-检测/融合/增益/限幅，不是部署代理一致性或独立测试证据；不能从这里推断全频复制输入
-相位一定更好。实际完整处理的 `observed` 音乐高频谱收敛反而从0.896469恶化到0.938182，
-差值95% CI为 +0.012144 至 +0.075401。相位与幅度、窗口叠加必须联合评价。
+This indicates that the original model phase is significantly suboptimal, and useful information remains in the input. This probe does not include Rust's detection, fusion, gain, or clipping—thus it is not evidence of deployment consistency or independent test performance. It cannot be inferred that copying the input phase across the full frequency band would necessarily yield better results. In fact, the full-frequency `observed` strategy showed a deterioration in high-frequency spectral convergence—from 0.896469 to 0.938182, a difference of +0.012144 to +0.075401 (95% CI). Phase and magnitude, along with window overlap, must be evaluated jointly.
 
-主要候选的实际输出（误差越低越好；SI-SDR越高越好）：
+Actual output of the primary candidate (lower error is better; higher SI-SDR is better):
 
-| 开发指标 | 音乐 model | 音乐 surviving-power | 语音 model | 语音 surviving-power |
+| Development Metric | Music (model) | Music (surviving-power) | Speech (model) | Speech (surviving-power) |
 |---|---:|---:|---:|---:|
-| 高频谱收敛 | 0.896469 | 0.890703 | 0.654183 | 0.644661 |
-| 高频能量绝对误差 dB | 3.916874 | 3.664596 | 4.641319 | 4.329585 |
-| 高频 flux 误差 | 1.391960 | 1.397953 | 0.808059 | 0.796096 |
+| High-frequency spectral convergence | 0.896469 | 0.890703 | 0.654183 | 0.644661 |
+| High-frequency energy absolute error (dB) | 3.916874 | 3.664596 | 4.641319 | 4.329585 |
+| High-frequency flux error | 1.391960 | 1.397953 | 0.808059 | 0.796096 |
 | SI-SDR dB | 26.597193 | 26.790031 | 29.270062 | 29.328735 |
-| 保留频段 LSD dB | 4.031109 | 3.787984 | 4.008570 | 3.673020 |
+| Retained band LSD (dB) | 4.031109 | 3.787984 | 4.008570 | 3.673020 |
 
-按录音聚类的95% bootstrap CI：音乐能量差−0.252278 dB（−0.517444至−0.028016），
-SI-SDR差+0.192838 dB（+0.043346至+0.397447）；谱收敛和flux变化区间跨零。
-因此进入预定复核，但不宣称音乐瞬态改善或无退步已被证明。
-去除前0.25秒和尾256samples后，音乐能量差−0.208368 dB的区间为−0.440836至+0.027766，
-改善还不够稳健。语音几项核心改善的区间均未跨零。
+95% bootstrap CI by track clustering: music energy difference −0.252278 dB (−0.517444 to −0.028016),
+SI-SDR difference +0.192838 dB (+0.043346 to +0.397447); both spectral convergence and flux changes cross 0.
+Thus, it meets the pre-defined recheck threshold, though music transient improvements or absence of degradation are not proven.
+After removing the first 0.25 seconds and the last 256 samples, the music energy difference drops to −0.208368 dB (−0.440836 to +0.027766), still insufficiently robust. Speech improvements in key metrics show no interval crossing 0.
 
-## 录音留出复核
+## Held-Out Recheck
 
-复用之前的78行 / 39录音选择（音乐42行 / 21首，语音36行 / 18条），
-每个录音覆盖两个采样率和配方内/留出codec。按 track、split_group、原文件checksum
-与训练和开发验证隔离。它曾被多轮诊断使用，因此是留出复核，不是全新独立测试。
-22:11:56（新加坡）冻结主要候选及开发报告哈希后开始本轮复核。
+Reused the prior 78 rows / 39 recordings (42 music rows / 21 tracks, 36 speech rows / 18 segments),
+each covering two sample rates and codec variants within and outside the held-out set.
+Grouped by track, split group, and original file checksum, isolated from training and development validation.
+Previously used in multiple diagnostic rounds—thus constitutes a held-out recheck, not a fresh independent test.
+At 22:11:56 (Singapore time), the primary candidate and development report hashes were frozen before this round began.
 
-| 留出音乐指标 | 原始 epoch168 | shape-small 原策略 | surviving-power |
+| Held-Out Music Metrics | Original epoch168 | shape-small original strategy | surviving-power |
 |---|---:|---:|---:|
-| 高频谱收敛 | 0.745696 | 0.728370 | 0.722453 |
-| 高频能量误差 dB | 2.503481 | 2.821492 | 2.607615 |
-| 高频 flux 误差 | 1.119915 | 1.089917 | 1.076957 |
+| High-frequency spectral convergence | 0.745696 | 0.728370 | 0.722453 |
+| High-frequency energy error (dB) | 2.503481 | 2.821492 | 2.607615 |
+| High-frequency flux error | 1.119915 | 1.089917 | 1.076957 |
 | SI-SDR dB | 25.751111 | 25.772151 | 25.927686 |
-| 保留频段 LSD dB | 3.455125 | 3.420168 | 3.029181 |
+| Retained band LSD (dB) | 3.455125 | 3.420168 | 3.029181 |
 
-相对同模型原策略，音乐能量均值下降0.213878 dB，但CI为−0.488168至+0.060180；
-谱收敛、flux的区间同样跨零。SI-SDR增加0.155535 dB（+0.036727至+0.362978），
-保留频段LSD下降0.390987 dB（−0.504739至−0.282840）。
+Relative to the original model strategy, music energy average decreased by 0.213878 dB, with a CI of −0.488168 to +0.060180; both spectral convergence and flux show intervals crossing 0. SI-SDR increased by 0.155535 dB (+0.036727 to +0.362978), while retained band LSD decreased by 0.390987 dB (−0.504739 to −0.282840).
 
-相对原始epoch168，音乐谱收敛下降0.023244（−0.044643至−0.001839），
-flux下降0.042957（−0.079012至−0.013399），SI-SDR增加0.176575 dB；
-但能量误差均值仍高0.104133 dB（−0.216905至+0.420045），不能称全面超越。
-这项对比同时包含shape-small的神经改动；只有与shape-small原策略的对比隔离相位因素。
+Relative to the original epoch168, music spectral convergence decreased by 0.023244 (−0.044643 to −0.001839), flux decreased by 0.042957 (−0.079012 to −0.013399), and SI-SDR increased by 0.176575 dB; however, energy error remained higher by 0.104133 dB (−0.216905 to +0.420045), so a full superiority cannot be claimed. This comparison includes neural modifications to `shape-small`; only the comparison against the `shape-small` original strategy isolates the phase factor.
 
-留出语音相对同模型原策略：谱收敛0.544782→0.503865、能量误差3.199011→2.862136 dB、
-flux 0.692443→0.643190、SI-SDR 30.015958→30.053379 dB，改善区间均未跨零。
-音乐与语音分开报告，不按诊断行数比例推算实际使用收益。
+Relative to the same model baseline, speech performance: spectral convergence 0.544782 → 0.503865, energy error 3.199011 → 2.862136 dB, flux 0.692443 → 0.643190, SI-SDR 30.015958 → 30.053379 dB. All improvement intervals remain non-crossing 0.
+Music and speech are reported separately; actual usage benefit is not inferred from diagnostic row proportions.
 
-对压缩直通仍有明显差距：留出音乐能量误差减少1.337463 dB，但flux误差增加
-0.202636（CI +0.065450至+0.427575），SI-SDR下降1.018799 dB（−1.919280至−0.348657）。
-因此有比旧模型好的部分，仍不能宣称已经接近无损或完成总体目标。
-57个物理mono/left/right行的低频绝对功率变化均值仅0.003397 dB，低频残差相对输入
-均值−62.539 dB；LSD的变化不等于低频响度发生同量级变化。
+For direct compression pass-through, there remains a notable gap: held-out music energy error reduced by only 1.337463 dB, but flux error increased by 0.202636 (CI +0.065450 to +0.427575), and SI-SDR decreased by 1.018799 dB (−1.919280 to −0.348657). Thus, while some improvements over the old model exist, it still falls short of near-lossless or overall goal achievement.
+Across 57 physical mono/left/right rows, low-frequency absolute power variation averaged only 0.003397 dB; low-frequency residual relative to input averaged −62.539 dB; LSD changes do not imply equivalent low-frequency loudness changes.
 
-## 连续性与覆盖限制
+## Continuity and Coverage Limitations
 
-三个策略的89个开发行、主要候选的78个留出行，128帧及不规则31/512/997/7分块
-与离线输出的最大误差均为0，输出全部有限。四个同步立体声场景（二首rock/electronic、
-44.1/48kHz、完整MP3编码对齐后截取12秒）也全部分块误差为0。
-主要候选峰值最高0.861610，声像宽度误差均值0.002579 dB，声道相位误差0.006122 rad；
-样本太少，不能据微小差别宣布声像改善。
+Across 89 development rows and 78 held-out rows of the primary candidate, and with 128-frame and irregular 31/512/997/7 block divisions, the maximum error across all strategies is zero. All outputs are bounded. In four synchronized stereo scenarios (two rock/electronic tracks, 44.1/48 kHz, fully aligned MP3-encoded, 12-second clips), all block-level errors are zero.
+The primary candidate peaks at 0.861610, with average stereo image width error of 0.002579 dB and channel phase error of 0.006122 rad.
+With insufficient sample volume, minor differences cannot be declared as image improvement.
 
-另有10个静音、脉冲、单侧输入场景，帧数正确、非有限值为0、静音和未输入声道严格为0。
-构造/重置和活动worker hop的零Rust堆分配检查通过。回调继续只做队列与固定时间轴处理。
-这些不替代物理设备的爆音/卡顿检查。
+Additionally, 10 silent, pulse, and mono-side input scenarios were tested: frame count correct, non-finite values zero, silence and uninput channels strictly zero.
+Zero Rust heap allocation during construction/reset and active worker hop checks passed. Callbacks continue to perform only queue and fixed-time-axis processing.
+These do not substitute physical device checks for pops or dropouts.
 
-已生成20个匿名24-bit WAV（4片段×5条件），先整段RMS匹配再共同衰减防削波；
-不是LUFS匹配。评分表为空，`listening_performed: false`。
-开发音乐没有pop/country/hiphop/funk；留出音乐没有country/hiphop/jazz和中国作品。
-结果不能推广到全部曲风、地区或所有joint-stereo编码器。
+20 anonymous 24-bit WAV files (4 segments × 5 conditions) were generated. RMS matched first, then common attenuation applied to prevent clipping; not LUFS-matched.
+Scoring table is empty, `listening_performed: false`.
+Development music lacks pop/country/hip-hop/funk; held-out music lacks country/hip-hop/jazz and Chinese works.
+Results cannot be generalized to all genres, regions, or all joint-stereo encoders.
 
-## 实时资源
+## Real-Time Resource Performance
 
-完成所有质量与相位诊断后，在Apple M5 Max上使用同一release二进制、CPU ORT单线程，
-以相同真实PCM交错测量。同步为三轮×四种采样率/声道组合×每案例10秒，含完整分析、推理与DSP。
-压测将min_bandwidth_ratio设为1.0，实际质量评分仍为默认0.85。
+After completing all quality and phase diagnostics, the same release binary was run on Apple M5 Max using CPU ORT single-threaded, with identical real PCM interleaved measurement. Synchronized across three rounds × four sample rates/channel combinations × 10 seconds per case, including full analysis, inference, and DSP.
+The `min_bandwidth_ratio` was set to 1.0; actual quality score remained at default 0.85.
 
-| 策略 | 完整hop p99范围 ms | 同步进程峰值RSS MiB |
+| Strategy | Full hop p99 range (ms) | Synchronous process peak RSS (MiB) |
 |---|---:|---:|
 | model | 0.551–1.942 | 38.03 |
 | surviving-power | 0.672–1.660 | 38.34 |
 
-每个策略另做四配置×60秒节拍运行，均开启worker预热与macOS实时调度请求：
+Each strategy also underwent four configuration × 60-second beat runs, with worker pre-warmup and macOS real-time scheduling requests enabled:
 
-| 策略 | 整链附加软件延迟 ms | CPU单核% | 进程峰值RSS MiB | callback p99 μs | worker miss / queue overflow |
+| Strategy | Full chain software latency (ms) | CPU single core (%) | Process peak RSS (MiB) | callback p99 μs | worker miss / queue overflow |
 |---|---:|---:|---:|---:|---:|
 | model | 5.346–5.824 | 46.95 | 42.44 | 4.833 | 0 / 0 |
 | surviving-power | 5.346–5.831 | 47.19 | 38.89 | 5.167 | 0 / 0 |
 
-八个案例的8ms目标、10ms红线、回调预算和增强可用率均通过；最长连续漏处理为0。
-主要候选callback最大耗时26.0 μs。256samples固定适配器延迟不变，相位策略新增缓冲为0。
-CPU为整组进程(user+system)/wall，RSS包含测试框架及报告缓存；没有据波动宣称新策略更快或更省内存。
-已复核原始回调数组、miss位图、PCM/ONNX/二进制哈希和实际策略字段，保留背景负载快照。
-整链软件延迟不包含声卡、驱动或宿主原有缓冲；增加接入缓冲时须另计。
-本轮不是物理声卡、30分钟设备持续运行或x86_64验收。
+All eight cases met the 8ms target, 10ms redline, callback budget, and enhancement availability. Longest continuous processing gap was 0.
+Maximum callback latency for the primary candidate was 26.0 μs. Fixed 256-sample adapter latency remained unchanged; phase strategy added no new buffering.
+CPU is user+system/wall time; RSS includes test framework and report caching. No claims are made about faster or more memory-efficient performance due to fluctuation.
+Original callback arrays, miss bitmaps, PCM/ONNX/binary hashes, and actual strategy fields have been verified. Background load snapshots are retained.
+Chain software latency does not include sound card, drivers, or host buffer overhead; any added buffer must be accounted for separately.
+This round does not represent physical sound card, 30-minute continuous device operation, or x86_64 validation.
 
-## 工程与后续
+## Engineering and Next Steps
 
-本轮不改数据、神经权重、训练目标或Apache-2.0路线，原始素材与实验材料仍留在本地。
-源码CI [38145958140](https://github.com/backrunner/soundex/actions/runs/38145958140)的Rust及export-contract均通过；
-本地276项Python测试通过，Rust workspace、Clippy、无默认后端编译及格式检查通过。
-没有把既有ONNX再包装成新训练权重，也没有新增PyTorch/Rust代理一致性的声称。
+This round did not modify data, neural weights, training objectives, or the Apache-2.0 path. Original materials remain on local disk.
+Rust and export-contract code in source commit [38145958140](https://github.com/backrunner/soundex/actions/runs/38145958140) passed;
+276 Python tests passed locally; Rust workspace, Clippy, no default backend compilation, and formatting checks passed.
+No existing ONNX was repackaged into new training weights, and no claim of PyTorch/Rust proxy consistency was made.
 
-下一步应围绕保留输入相位信息的残差表示与幅度联合训练，并通过真实重建音频选择模型；
-本轮原始相位探针不支持单纯增加phase loss权重或直接废弃相位分支。
-新的训练须以这组冻结DSP候选为对照，补充未反复使用的录音与评分听感。
-这部分尚未实施。当前候选只通过显式`PhasePolicy::SurvivingPower`或评估工具启用。
+Next steps should focus on residual representations preserving input phase information and joint training with magnitude. Model selection should be based on real waveform reconstruction performance.
+The current phase probe does not support simply increasing phase loss weight or directly discarding the phase branch.
+New training must use this frozen DSP candidate as a baseline, supplemented with additional, previously unused recordings and subjective listening evaluation.
+This work has not yet been implemented. The current candidate is only enabled via explicit `PhasePolicy::SurvivingPower` or via evaluation tools.
 
-本地完整材料：`data/reports/phase-reconstruction-20261011/`。
-复现开发对照的源码入口：`training/evaluation/compare_phase.py`，使用相同selection、
-两个manifest、固定ONNX及新构建的release `soundex-stream-eval`。
+Local full materials: `data/reports/phase-reconstruction-20261011/`.
+Source code entry point for reproducing development comparison: `training/evaluation/compare_phase.py`, using identical selection, two manifests, fixed ONNX, and the newly built release `soundex-stream-eval`.

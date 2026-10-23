@@ -1,173 +1,124 @@
-# P29：直接无损频谱监督与 DSP 依赖诊断
+# P29: Direct Lossless Spectral Supervision and DSP Dependency Diagnosis
 
-后续 [P30 幅度／相位交换诊断](phase-swap-audit.md)已完成，定位相位限制及融合阶段的恢复上限。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-2026-10-19，承接 [P28](small-mechanism-study.md)。目标是判断模型为何仍趋近恒等输出，
-先检查小模型对固定训练材料的可学习性，不扩大模型、不选择正式权重。
+The subsequent [P30 Phase-Swap Diagnosis](phase-swap-audit.md) has been completed, identifying phase limitations and recovery ceilings in the fusion stage.
 
-## 已确认的监督路径
+**2026-10-19**, building upon [P28](small-mechanism-study.md). The goal is to determine why the model still approaches identity output. First, we assess the learnability of a small model on fixed training materials, without expanding model size or selecting formal weights.
 
-当前 P28 的 `FixedFitObjective` 主项把模型输出经过检测掩码、幅相融合、OLA、
-gate 和 limiter，再重分析频谱，与原始无损参考比较。paired 的目标不是 DSP 输出；
-但主项没有直接约束 DSP 前的模型频谱。identity 角色以恒等 DSP 为保真参考。
-`consistency_loss` 约束参考校正后的合成／重分析一致性，并不是直接幅谱或复数重建。
-因此，当前目标存在依赖部署链传递恢复梯度的问题，但还不能认定 DSP 是唯一原因。
+---
 
-历史 `RenderedObjective` 有 raw 指标，不代表 P28 当前优化器对它进行了反传；
-本轮依据实际调用链 `run_head_study → FixedFitObjective` 检查，避免把报告字段当训练项。
+## Confirmed Supervision Path
 
-## 直接参考目标
+The primary component of the current P28 `FixedFitObjective` applies the following pipeline: model output is passed through a detection mask, amplitude-phase fusion, OLA, gating, and limiter, then re-analyzed in the frequency domain and compared against an original lossless reference. The paired target does not refer to the DSP output; however, the main objective does not directly constrain the model's spectrum prior to DSP processing. The identity role uses identity DSP as a fidelity reference.
 
-新增 `training/models/direct_spectrum_objective.py`。模型输入与部署结构不变，
-只在训练时使用原始无损的幅度、复数谱、频带能量包络和相邻帧变化：
+The `consistency_loss` enforces consistency between the corrected synthesis and re-analyzed spectrum, but does not directly constrain amplitude or complex spectrum reconstruction. As such, the current objective suffers from a dependency on gradient transmission through the deployment chain. However, this alone does not establish that the DSP is the sole cause.
+
+Historical `RenderedObjective` included raw metrics, which do not imply that the current optimizer performed backpropagation on them. In this round, we analyze the actual call chain `run_head_study → FixedFitObjective` to ensure that reported fields are not being used as training objectives.
+
+---
+
+## Direct Reference Target
+
+A new file, `training/models/direct_spectrum_objective.py`, has been introduced. The model input and deployment structure remain unchanged, with only the training process now using raw, lossless amplitude, complex spectrum, band energy envelope, and inter-frame dynamics:
 
 `raw = amplitude + 0.1 × complex + 0.1 × envelope + 0.25 × dynamics`
 
-使用 0–4、4–8、8–12、12–16、16 kHz–Nyquist 五个频带，低频权重 0.25，
-其余各 1，总权重归一化。每带误差按该参考带功率加全谱参考功率的 `1e-4`
-及绝对功率底 `1e-14` 归一化，使用 `1e-3` 平滑范数。尺度、权重在运行前固定，
-不从已知曲目反例拟合阈值。绝对 PCM 误差仍由独立原生复核报告。
+The five bands are 0–4, 4–8, 8–12, 12–16 kHz and 16 kHz–Nyquist. The low-band weight is 0.25 and each other band has weight 1, normalized by the total. Per-band error is normalized by reference-band power plus `1e-4` times full-reference power and an absolute floor of `1e-14`, using a `1e-3` smooth norm. All scales and weights are fixed before execution, not fitted to known counterexamples. Calibrated absolute PCM error remains a separate native assessment.
 
-直接监督不乘 detector mask/active，也不经过 DSP。identity 直接参考原输入；
-paired 直接参考无损谱。有效相位误差通过幅度加权的复数距离约束，不要求静音相位角
-有意义。时间项比较预测与参考的真实帧间变化，不惩罚参考本身的瞬态。
-参考尺度全程停止梯度，不进入模型或部署推理。
+Direct supervision is not multiplied by detector mask/active and does not pass through DSP. Identity targets the original input; paired roles target the original lossless spectrum. Magnitude-weighted complex distance constrains meaningful phase without assigning meaning to silent-bin phase angles. Dynamics compares prediction/reference frame changes, rather than penalizing the reference's own transients. Reference scales are detached throughout and never enter the model or deployment inference.
 
-这是一套显式的直接重建目标；与旧部署目标相比还改变了误差度量及归一化，
-不是仅切断 DSP Jacobian 的纯梯度路径实验。结果只能支持对应组合，不能过度归因。
+This is an explicit, direct reconstruction objective. Compared to the previous deployment objective, it introduces new error metrics and normalization. It is not merely an experiment that cuts the DSP Jacobian path. Results are only valid for the specific combinations tested and cannot be overinterpreted.
 
-## 四组匹配对照
+---
 
-四组均为同一个宽度 96、431,015 参数的 complex head，相同 `residual_slope=1/64`、
-残差范围预算及初始参数；不加入 P28 的归一化或相位输入干预。
+## Four Matching Control Groups
 
-| 组别 | 优化目标 | 残差预算 |
+All four groups use the same width-96, 431,015-parameter complex head, identical `residual_slope=1/64`, residual budget, and initial parameters. No P28 normalization or phase input interventions are introduced.
+
+| Group | Optimization Objective | Residual Budget |
 |---|---|---|
-| `deployed` | 旧部署主项＋原权重复数一致性＋0.1 预算监督 | 学习 |
-| `raw` | 直接无损频谱＋0.1 预算监督 | 学习 |
-| `joint` | 直接无损频谱＋完整旧部署目标＋0.1 预算监督 | 学习 |
-| `raw_unit_budget` | 直接无损频谱 | 固定为初始 1，不训练预算头 |
+| `deployed` | Old deployment objective + original-weight complex consistency + 0.1 budget supervision | Learning |
+| `raw` | Direct lossless spectrum + 0.1 budget supervision | Learning |
+| `joint` | Direct lossless spectrum + full old deployment objective + 0.1 budget supervision | Learning |
+| `raw_unit_budget` | Direct lossless spectrum | Fixed at initial 1; budget head not trained |
 
-`raw` 对 `joint` 检查添加部署目标的影响；`raw` 对 `raw_unit_budget` 检查
-学习预算及其辅助监督的影响。后者不是单独改变预算数值或辅助梯度的实验。
-固定预算保留相同推理图与参数，仅在训练时冻结预算头。
-所有组保留低频和 identity 约束，不能靠噪声填充或破坏无损输入获取低分。
+The `raw` group is compared against `joint` to evaluate the impact of adding the deployment objective. `raw` is also compared against `raw_unit_budget` to assess the effect of learning and auxiliary supervision on the budget head. The latter is not a simple change in budget value or auxiliary gradient. The budget is fixed, with identical inference graph and parameters; only the budget head is frozen during training. All groups retain low-frequency and identity constraints, and cannot rely on noise injection or corruption of the lossless input to achieve low scores.
 
-两个种子 `20261012 / 20261013`，每条 **512 步**，Adam `1e-4`、无权重衰减、
-梯度范数上限 5。相同 80 帧无梯度历史预热，监督从第 89 帧开始。
-这是早期拟合诊断，不能替代完整训练或据此否定容量、相位建模和架构上限。
-四组全部完成后冻结八个端点，统一评分；不挑最好中间点、不临时缩减某组预算。
+Two seeds: `20261012` and `20261013`, each with **512 steps**, Adam optimizer at `1e-4`, no weight decay, gradient norm capped at 5. An 80-frame no-gradient warmup is used, and supervision begins at frame 89. This is an early fitting diagnosis and does not replace full training or justify claims of capacity, phase modeling, or architectural limits. After completion, all eight endpoints are frozen and scored uniformly. No intermediate point is selected, and no group's budget is temporarily reduced.
 
-## 诊断材料和证据边界
+---
 
-固定使用 P28 第一个种子日程第 0、682、1364、2047 个 draw，正好四批，
-每批 4 音乐＋1 语音，再加入对应 clean identity。循环四批训练，两个种子只改变
-初始化，不改变这组诊断材料。整个输入窗口与已有 development/shifted 源时间隔离。
+## Diagnostic Materials and Evidence Boundaries
 
-材料为 **16 个音乐录音＋4 个语音录音**；去除历史预热并按源区间去重后，
-实际音乐监督约 **7.32 秒**、语音 **1.85 秒**。覆盖八种 codec 配方及 mono/L/R/M/S
-视图，不是完整曲库，也不是对齐双声道质量评价。其用途就是检查是否能够拟合已见材料，
-不存在独立测试或“没有过拟合”的结论。
+Fixed inputs are drawn from the first seed schedule at draw indices 0, 682, 1364, and 2047—exactly four batches, each containing 4 music clips and 1 speech clip, plus corresponding clean identity references. The training cycles through these four batches, with only the initialization changed between seeds. No alteration to the diagnostic materials occurs. The entire input window is isolated from existing development/shifted source time.
 
-统一记录直接频谱的分频带／分项误差、旧部署指标、四批参数梯度范数和方向、
-模型与恒等 DSP 差异；分别检查 paired 和 identity。最终仍用同一个旧目标复核，
-不能跨四种优化总分排名。模型原始幅谱与真实 Rust 输出的 HF SC、能量和瞬态也保留。
+Materials consist of **16 music recordings and 4 speech recordings**. After removing historical warmup and deduplication by source interval, actual music supervision totals approximately **7.32 seconds**, and speech supervision totals **1.85 seconds**. Coverage includes eight codec recipes and mono/L/R/M/S views. This is not a complete music library, nor a full stereo quality alignment test. Its purpose is to determine whether the model can fit known materials—no independent test or "no overfitting" conclusion is implied.
 
-额外进行从输入谱到无损复数谱的固定比例插值 `0/.01/.1/.5/1`，只用于检查目标方向。
-它使用参考信息，不可部署。预检四批的直接目标均随插值下降，完整参考为零；
-DSP 后恢复目标也下降，但没有归零，说明原有 DSP 留有恢复空间且仍有自身误差。
-这不是模型已经学到上述改善的证据。
+Unified records of per-band and per-component spectral errors, old deployment metrics, per-batch gradient norm and direction, and differences between model and identity DSP outputs are tracked. Both paired and identity comparisons are evaluated. Final results are verified against the original objective, and no cross-group ranking is performed. The original amplitude spectrum and true Rust output HF SC, energy, and transients are preserved.
 
-## 运行与验证
+Additional fixed-ratio interpolation from input spectrum to lossless complex spectrum is performed at `0/.01/.1/.5/1` for directional validation only. This uses reference information and is not deployable. Pre-checks show that all four batches' direct objectives decrease monotonically with interpolation, reaching zero at full reference. The DSP-post recovery objective also decreases, but does not reach zero, indicating residual recovery space and inherent DSP error. This does **not** constitute evidence that the model has learned the improvements.
 
-入口为 `training/scripts/run_direct_spectrum_study.py`，支持 `--prepare-only` 和
-独立 `--preflight`（每组 4 步、单种子）；预检不用于选择候选或报告音质进展。
-先登记所有输入／源码哈希，再保存 `source/training` 快照，从冻结源码启动。
-断点保存模型、优化器、目标签名及训练历史；签名漂移或非有限值必须报错。
+---
 
-回放工具的历史目录名 `development` 在本轮只装上述训练裁剪，登记中的
-`review_scope` 明确标记训练拟合材料。完成后共八个导出，每个验证 320-hop
-状态／reset／静音一致性，再做 320 个完整 Rust 前端→ORT→DSP 角色回放。
-本轮不重复 P28 的长时性能实验，不据此给新候选任何实时或音质认证。
-结构、状态和固定缓冲没有变化；若恢复信号有效，后续仍需完整训练、跨录音复核、
-真实流时延／持续性及听感验证。
+## Execution and Validation
 
-正式对照于 **2026-10-19 14:38 +08** 从提交
-`796d838560648c2ffef585aa7b96a866e68c936e` 的冻结源码启动，目录
-`data/runs/direct-spectrum-p29-20261019/`，登记 SHA-256：
-`68d98a0bc92326b02de5032d6c8ced613905ee9aaf8d7e4f254406ea1c3b5a76`。
-启动时 supervisor PID 84735、训练 PID 84736；当前状态看 `supervisor.json` 和
-`study/progress.json`。首次启动错误解析虚拟环境解释器，在 import torch 前退出，
-未执行训练；记录保留于 `supervisor-attempt-1.json`，随后用正确解释器重启。
+Entry point: `training/scripts/run_direct_spectrum_study.py`, supporting `--prepare-only` and independent `--preflight` (4 steps per group, single seed). Pre-flight checks are not used for candidate selection or audio quality reporting. All input and source code hashes are logged, and a `source/training` snapshot is saved before training begins. The run starts from a frozen source code. Breakpoints save model, optimizer, objective signature, and training history. Any signature drift or non-finite value must trigger an error.
 
-本地 **586 项测试通过**，Ruff lint/format 通过。新增直接目标的参考零误差、
-静音／弱信号梯度、有限差分、参考瞬态、相位误差、DSP 掩码独立性及四组精确续跑测试。
-第一版预检在完整前端审计阶段暴露了旧工具对 P10 缓存目录的多余依赖；修正为优先使用
-本轮显式缓存后，独立的 `direct-spectrum-p29-preflight-20261019-v2` 全流程通过。
-四个导出、160 个完整原生角色的同观测合成检查均通过，最大绝对误差 2.38e-7；
-同输入 ORT 复数谱最大误差 6.10e-5 单独记录。所有预检权重均不用于质量选择。
-正式流水线于 **2026-10-19 14:52 +08** 正常结束（exit 0）：八条轨迹各 512 步，
-最终端点统一复核、八个导出及 320 个完整 Rust 角色回放均已完成。
-原始音频和实验制品均留在忽略目录。
+The historical replay directory name `development` is used only for the training clips in this round. The registered `review_scope` explicitly marks the training fitting materials. After completion, eight exports are produced, each validated for 320-hop state/reset/silence consistency, followed by 320 full Rust frontend → ORT → DSP role replays. This round does not repeat the long-term performance experiments from P28, nor does it provide any real-time or audio quality certification for new candidates.
 
-## 完成结果：能学出高频，但恢复精度仍不足
+Structural, state, and fixed buffer configurations remain unchanged. If a recovered signal is valid, further full training, cross-recording recheck, real-time latency, continuity, and perceptual validation are still required.
 
-所有结果仅适用于上述反复训练的 16 个音乐、4 个语音裁剪。
-四组的优化目标不同，以下用共同指标复核，不比较各自优化总 loss；
-本轮没有预设质量晋级或独立测试，不能据此宣称泛化、收敛或充分训练效果。
+The official comparison was launched on **2026-10-19 14:38 +08** from commit
+`796d838560648c2ffef585aa7b96a866e68c936e`, frozen source code, directory
+`data/runs/direct-spectrum-p29-20261019/`, with SHA-256 hash:
+`68d98a0bc92326b02de5032d6c8ced613905ee9aaf8d7e4f254406ea1c3b5a76`.
+Process supervisor PID 84735, training PID 84736. Current status can be viewed in `supervisor.json` and `study/progress.json`. The first launch failed due to incorrect virtual environment interpreter parsing; it exited before training began, with the attempt logged in `supervisor-attempt-1.json`. A correct interpreter was then used to restart.
 
-下表为音乐 clip mean，斜线前后分别为种子 20261012 / 20261013，误差越低越好。
-原始模型预测与 DSP 输出的 HF SC 使用同一组回放报告，PCM 则使用完整 Rust 前端→ORT→DSP。
+**586 tests passed locally**, Ruff lint/format passed. New direct target reference zero error, silence/weak-signal gradient, finite difference, reference transient, phase error, DSP mask independence, and exact continuity across all four groups were verified. The first version of pre-flight revealed an old tool's excessive dependency on P10 cache directory; after correction to prioritize the current explicit cache, the independent `direct-spectrum-p29-preflight-20261019-v2` passed fully. All four exports, 160 full native role syntheses, passed identical observation checks with maximum absolute error of **2.38e-7**; maximum ORT complex spectrum error of **5.34e-5**, independently reported. All pre-flight weights were not used for quality selection.
 
-| 配置 | 原始预测 HF SC | 原始预测高频能量误差 dB | DSP 输出 HF SC | 完整 Rust PCM 误差 RMS |
+The official pipeline completed normally at **2026-10-19 14:52 +08** (exit 0): all eight trajectories completed 512 steps, final endpoints were uniformly rechecked, and all eight exports and 320 full Rust role replays were completed. Original audio and experimental outputs remain in the ignored directory.
+
+---
+
+## Final Results: High-Frequency Recovery Achieved, But Recovery Precision Still Insufficient
+
+All results apply only to the repeated training on the 16 music and 4 speech clips described above. The four groups have different optimization objectives; the following metrics are evaluated using common indicators, without comparing individual total loss. No pre-defined quality promotion or independent test was conducted, so no claims of generalization, convergence, or full training effectiveness can be made.
+
+The table below shows music clip mean values, with the slash-separated values representing seed `20261012` and `20261013`, respectively. Lower error is better. The HF SC values for raw prediction and DSP output use the same replay report; PCM values use full Rust frontend → ORT → DSP.
+
+| Configuration | Raw Prediction HF SC | Raw Prediction High-Frequency Energy Error (dB) | DSP Output HF SC | Full Rust PCM Error RMS |
 |---|---:|---:|---:|---:|
-| 初始恒等控制 | 0.430315 | 8.1553 | 0.430129 | 0.009223736 |
+| Initial Identity Control | 0.430315 | 8.1553 | 0.430129 | 0.009223736 |
 | deployed | 0.380854 / 0.373307 | 3.9457 / 3.5397 | 0.386107 / 0.374710 | 0.009223956 / 0.009223969 |
 | raw | 0.376954 / 0.362712 | 1.7485 / 1.5170 | 0.391291 / 0.381931 | 0.009236265 / 0.009246550 |
 | joint | 0.365301 / 0.369889 | 3.1713 / 3.4722 | 0.373114 / 0.378548 | 0.009224300 / 0.009224012 |
 | raw_unit_budget | 0.414607 / 0.357858 | 1.6043 / 1.3862 | 0.417105 / 0.377242 | 0.009239957 / 0.009242278 |
 
-未处理压缩输入的音乐 PCM 误差为 **0.009219998**；恒等 DSP 已略增至
-0.009223736。raw 组最终波形误差比恒等 DSP 增加约 **0.14% / 0.25%**，
-虽幅谱和能量有改善，不能称为整体恢复成功。这些百分比不代表可闻程度。
-raw 组与恒等 DSP 的音乐输出差异 RMS 为 **0.0003685 / 0.0005607**，
-约为 deployed 组的 **14 / 19 倍**，已不再是 P28 那种接近浮点噪声的输出变化。
+The unprocessed music PCM error is **0.009219998**; the identity DSP value is slightly higher at **0.009223736**. The raw group shows a **~0.14% / 0.25% increase** in waveform error compared to identity DSP, despite improvements in magnitude and energy. These percentages do not represent audible degradation. The RMS difference between raw and identity music output is **0.0003685 / 0.0005607**, approximately **14 / 19 times higher** than the deployed group—no longer resembling the near-floating-point-noise output of P28.
 
-四批 paired 的直接目标共同评分（固定 4:1 音乐／语音混合）从初始 0.249942
-降到 raw 的 0.229088 / 0.225849，约降 **8.3% / 9.6%**。
-但同一个直接目标内的复数误差从 0.224356 **升至 0.234412 / 0.236973**，
-说明降低总分并未同时解决幅度与相位的联合保真。仅凭复数误差不能把全部退化归因于相位。
-音乐 DSP 输出的高频 flux 误差也从恒等 0.602888 升至 raw 的
-0.616682 / 0.606590；deployed 为 0.593535 / 0.593778。
-这支持继续定位相位和瞬态重建，而非只奖励更多高频能量。
+The paired direct target scores (fixed 4:1 music-to-speech mix) dropped from initial **0.249942** to **0.229088 / 0.225849** for raw, a reduction of **~8.3% / 9.6%**. However, the per-component complex error within the same direct target increased from **0.224356 to 0.234412 / 0.236973**, indicating that the overall score reduction does not equate to joint magnitude and phase fidelity. Complex error alone cannot attribute all degradation to phase. The HF flux error in music DSP output increased from identity's **0.602888** to **0.616682 / 0.606590** in raw, and to **0.593535 / 0.593778** in deployed. This supports continued focus on phase and transient reconstruction, not just higher HF energy.
 
-语音单独报告：未处理 PCM 误差 0.00247517461，恒等 DSP 为 0.00247517467，
-raw 完整 Rust 输出为 **0.00247898025 / 0.00247987867**，仍略有退化；
-其原始预测 HF SC 则从 0.218055 降为 **0.203486 / 0.195704**，
-DSP 输出为 0.208642 / 0.203823。语音幅谱改善同样不等于波形恢复。
+**Speech-only report**: Unprocessed PCM error is **0.00247517461**, identity DSP is **0.00247517467**, and raw full Rust output is **0.00247898025 / 0.00247987867**, showing slight degradation. Original prediction HF SC drops from **0.218055 to 0.203486 / 0.195704**, and DSP output from **0.208642 to 0.203823**. Improved amplitude spectrum does not equate to waveform recovery.
 
-### 对 DSP 依赖假设的判断
+---
 
-- 直接目标确实促使小模型学出更明显的高频补充，并降低能量误差；此前缺少直接
-  监督是值得修正的问题。加入完整旧部署目标后，输出变化重新明显缩小。
-- 旧 deployed 目标在固定训练样本上也能改善 HF SC，所以它没有完全阻断恢复梯度。
-  P28 广泛随机裁剪与本轮反复拟合小样本的结果不能用于跨预算或泛化排名。
-- raw 在 DSP 前后都存在保真问题；不能说模型已经预测正确，只是被 DSP 毁掉。
-  固定预算并没有稳定解决音乐谱形／瞬态误差，两个种子仍有差异。
-- joint 在部分部署指标上较好，但没有同时赢过控制的两个种子；不挑一个种子晋级。
-  直接目标与旧目标还改变了误差度量和尺度，不能单独证明 DSP Jacobian 是全部原因。
+### Judgment on the DSP Dependency Hypothesis
 
-下一步建议仍用这些训练材料做非部署的幅度／相位交换诊断：预测幅度配参考相位、
-参考幅度配预测相位，与原预测同路径对照，区分相位、幅度及 OLA／融合的贡献，
-再决定小尺寸的幅相表示或生成载波改造。参考信息只能用于诊断，不能进入推理。
-本次没有自动延长训练、启动新实验或替换默认权重。
+- The direct target indeed prompts the small model to learn more prominent high-frequency supplementation and reduces energy error—previously lacking direct supervision was a valid issue. Adding the full old deployment objective causes output changes to shrink significantly.
+- The old deployed objective improves HF SC on fixed training samples, indicating it does not fully block gradient flow. The random cropping used in P28 and the small-sample fitting in this round cannot be used for cross-budget or generalization ranking.
+- The `raw` group shows fidelity issues both before and after DSP—this does not imply correct prediction; the signal is corrupted by the DSP. A fixed budget does not stabilize music spectrum or transient errors, and differences remain between the two seeds.
+- The `joint` group performs well on some deployment metrics but does not outperform the control on either seed. No seed is selected for promotion. The direct and old objectives alter error metrics and scales, so they cannot be used to prove that the DSP Jacobian is the sole cause.
 
-### 工程复核
+**Next Steps**: Continue using these training materials for non-deployment amplitude/phase swap diagnosis: predict magnitude with reference phase, reference magnitude with predicted phase, and compare against original predictions along the same path to isolate contributions from phase, magnitude, OLA, and fusion. Reference information is strictly for diagnosis and must not enter inference. No automatic training extension, new experiment launch, or default weight override was initiated.
 
-320 个完整原生角色的同观测合成检查全部通过，最大绝对误差 **2.38e-7**；
-同输入 ORT 复数谱最大误差 **5.34e-5**，独立报告。不存在靠放宽合成容差放行的情况。
-完成检查核对冻结源码、34 份完成收据中的制品、八个端点及原生审计登记／报告，
-共 **462 项哈希**均匹配；本次未重哈希原始音频。
-描述性汇总在本地 `completion-audit-20261019.json`，完整分项及反例保留原报告。
-代码的 [CI](https://github.com/backrunner/soundex/actions/runs/39211136683) 已通过。
-本轮没有重新进行长流时延、真实设备连续性或盲听验证，不提供新实时或音质认证。
+---
+
+### Engineering Recheck
+
+All 320 full native role syntheses passed with maximum absolute error of **2.38e-7**; maximum ORT complex spectrum error of **5.34e-5**, independently reported. No synthetic tolerance was relaxed to pass cases. Final checks confirmed frozen source code, 34 completed receipts, eight endpoints, and native audit logs/reports—all **462 hash values** matched. No rehashing of original audio occurred. Descriptive summary is stored locally in `completion-audit-20261019.json`, with full per-component and counterexample reports preserved. CI [build](https://github.com/backrunner/soundex/actions/runs/39211136683) passed.
+No additional long-duration latency, real device continuity, or blind listening validation was performed. No new real-time or audio quality certification is provided.
+
+The exact seed pair is `20261012 / 20261013`. The separately reported same-input ORT complex-spectrum maximum error is 6.10e-5; it must not be confused with a PCM synthesis-parity tolerance.

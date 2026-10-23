@@ -1,133 +1,151 @@
-# P13：固定片段与同录音多位置采样
+# P13: Fixed Segments and Multi-Position Sampling from Same Recording
 
-本轮检验 P12 暴露的固定片段泛化问题。只改变训练位置覆盖，不扩大模型或同时改 loss。
-这是诊断实验，不是全曲库训练或权重发布。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 预先固定的协议
+This round of evaluation addresses the generalization issues exposed in P12 regarding fixed segment performance. The experiment modifies only the training position coverage, without expanding model size or altering the loss function.
+This is a diagnostic study, not a full library training or a weight release.
 
-- 同一批 P12 的 40 段训练录音：32 音乐、8 语音；每步 4 音乐 + 1 语音，
-  各自附带同位置的 clean identity。诊断风险为音乐 80% / 语音 20%，
-  不改变全库正式采样的 253:1。
-- 两组：`fixed` 每段只用原 anchor；`multiposition` 每段包含原 anchor 在内的
-  8 个固定位置，均衡轮换。有限位置库不是每步无限随机切片。
-- 相同 807,398 参数模型、输入相位、P11 loss、Adam 1e-3、无 weight decay、
-  梯度裁剪 5、gain=0、codec、录音顺序及批大小。种子 20261012 / 20261013。
-- 每组每种子 2,048 步；固定报告 256 / 2,048 步，无开发集选点。
-  最终每段录音曝光 256 次；多位置组每个位置 32 次，256 步时每位置 4 次。
-- 新建模型；两组冻结同一源码快照。训练完成并登记两个 checkpoint 哈希后再评分。
+## Predefined Protocol
 
-## 位置隔离与评分
+- 40 training audio segments from the same P12 batch: 32 music, 8 speech; each step consists of 4 music + 1 speech, with a corresponding clean identity at the same position.
+  Diagnostic risk is 80% music / 20% speech; the 253:1 sampling ratio for the full library remains unchanged.
+- Two groups:
+  - `fixed`: each segment uses only the original anchor position;
+  - `multiposition`: each segment includes the original anchor and 7 additional fixed positions, with balanced rotation.
+  The limited position library does not allow infinite random slicing at each step.
+- Identical 807,398-parameter model, input phase, P11 loss, Adam optimizer (1e-3), no weight decay, gradient clipping at 5, gain=0, codec, audio order, and batch size.
+  Seeds: 20261012 / 20261013.
+- Each group runs 2,048 steps per seed; the fixed group reports every 256 steps, with no development set selection points.
+  Each segment is exposed 256 times in total; in the multiposition group, each position is seen 32 times, and at 256 steps, each position is seen 4 times.
+- New models are created; both groups are trained from the same source code snapshot. After training completion and checkpoint hashing, scoring is performed.
 
-为每段录音保留一个 32,768 样本窗口。选最远且不与 anchor 保守监督区域相交的端点。
-保守监督区域按 `[crop_start + 80*128, crop_start + 32768)` 计算，
-覆盖实际 frame 89 起的谱形、波形和时间差分参考支持。
-全部训练位置的保守监督区域均不得接触保留窗口的任何样本。
-其余合法起点按等距分位选出 7 个位置，不根据 loss 或试听挑选。
-实库审计：320 个位置监督重叠为 0；27 个位置存在输入/预热上下文重叠。
+## Position Isolation and Scoring
 
-短录音的输入/预热上下文可能仍与保留窗口重叠；逐位置记录在 config 审计中。
-这不是整段录音独立留出。其中两个短录音的保留端点与 P12 不同，因此不能直接将
-P12 的 shifted 总分拿来和 P13 对比；P13 两组使用相同的保留端点。
+For each segment, a 32,768-sample window is reserved. The endpoint is selected as the farthest one that does not intersect with the anchor’s supervised region.
+The supervised region is defined as `[crop_start + 80*128, crop_start + 32768)`, covering actual frame 89 onward in spectral, waveform, and time-differenced reference support.
+No sample from any training position’s supervised region may overlap with the reserved window.
+The remaining valid start positions are selected at equal intervals, yielding 7 positions, without selection based on loss or listening preference.
 
-同时评分全部 40 个原 anchor、40 个保留位置和复用的 89 个开发片段，
-按音乐/语音分别求均值后以 80/20 汇总，成对恢复/identity 各占一半。
-开发集仍是反复使用的开发复核，不能称独立测试或无过拟合证明。
-每个评分组按预先固定的 4 音乐 + 1 语音及其 identity 做真实 Rust DSP 回放。
-两组共 300 次回放（每组 30 baseline + 4 checkpoint × 30）。
-另记录多位置训练库整体 proxy 分数，但不与固定组不同样本的均值直接比较。
+Library audit: 320 positions have zero supervision overlap; 27 positions show input or warmup context overlap.
 
-## 状态与复现
+For short recordings, input and warmup contexts may still overlap with the reserved window; these are recorded individually in the config audit.
+This is not equivalent to independent segment holdout. For two short recordings, the reserved endpoints differ from P12, so the shifted total score from P12 cannot be directly compared to P13.
+P13 uses identical reserved endpoints for both groups.
 
-四组正式训练、300 次真实 Rust DSP 回放及自动对照汇总均已完成；不替换默认权重。
-队列于 2026-10-13 09:33:50 UTC（新加坡 17:33:50）完成。源码快照为
-`279d7548222f75b7b3b4281116ad34c789650d70`。运行根目录：
-`data/runs/crop-p13-20261013/`，原音频、缓存、检查点和报告全部忽略、不提交。
+All 40 original anchors, 40 reserved positions, and 89 reused development segments are scored.
+Music and speech scores are averaged separately, then combined at 80/20 ratio.
+Each scoring group is evaluated with half of the paired recovery and half of the identity components.
+The development set remains reused for validation — not an independent test, and no overfitting proof is provided.
 
-两组均调用 `training/scripts/run_subset_study.py --sizes 40 --crop-study`，
-分别传入 `--crop-positions 1` / `--crop-positions 8`，共用相同 parent config、
-Rust detector/replay 和 ONNX 回放契约。训练结束运行：
+Each scoring group performs real-time Rust DSP playback using the exact 4-music + 1-speech anchor and its identity.
+Total of 300 real-time replays (30 baseline + 4 checkpoints × 30) are conducted.
+Additionally, a proxy score is recorded for the multiposition training library as a whole, though it is not directly compared to the fixed group's mean across different samples.
+
+## State and Reproducibility
+
+Four training runs, 300 real-time Rust DSP replays, and automated pairwise comparisons have been completed. Default weights are not replaced.
+The run completed at 09:33:50 UTC (Singapore time: 17:33:50) on 2026-10-13.
+Source code snapshot: `279d7548222f75b7b3b4281116ad34c789650d70`.
+Run root directory: `data/runs/crop-p13-20261013/`. All original audio, cache, checkpoints, and reports are excluded from submission.
+
+Both groups used:
+`training/scripts/run_subset_study.py --sizes 40 --crop-study`
+with arguments `--crop-positions 1` and `--crop-positions 8`, sharing the same parent config, Rust detector/replay, and ONNX replay contract.
+After training, the following command was executed:
 
 ```sh
 PYTHONPATH=training training/.venv/bin/python training/scripts/analyze_crop_study.py \
   --study data/runs/crop-p13-20261013/study
 ```
 
-checkpoint 固定前禁止用开发集更改本轮配置。判断时同时观察成对恢复、
-identity 损伤、真实 DSP 高频谱收敛/瞬态/能量/低频，以及两种子的方向一致性。
-模型结构及实时执行路径没有改变；本轮不产生新的实时合格或盲听通过结论。
+No development set was used to modify configuration prior to checkpoint fixation.
+During evaluation, paired recovery, identity degradation, and high-frequency spectral convergence, transients, energy, and low-frequency behavior were observed, along with consistency across seeds.
+Model architecture and real-time execution path remain unchanged.
+No new real-time pass or blind listening verdicts are generated in this round.
 
-验证：两组各 8 步的真实数据冒烟检查已完整跑通训练、Rust 回放及带哈希校验的对照汇总。
-427 项本地 Python 测试、Ruff lint/format 均通过；
-[冻结版本 CI](https://github.com/backrunner/soundex/actions/runs/38375024429)通过。
-固定组种子 20261012 的 step 256 参数与 P12 对应检查点逐项完全一致（最大差 0），
-证明控制训练没有因采样工具扩展而漂移。完成状态见 `pipeline.json`，日志见 `pipeline.log`。
-本次重新执行冻结版本汇总脚本，全部 checkpoint、评分、采样表和完成回执哈希校验通过。
+Verification: 8 real-data smoke tests per group were fully executed — training, Rust replay, and hash-verified comparison summaries.
+427 local Python tests and Ruff lint/format checks passed.
+[CI for frozen version](https://github.com/backrunner/soundex/actions/runs/38375024429) passed.
+For the fixed group, seed 20261012 at step 256 matches the P12 checkpoint exactly (maximum difference: 0), confirming no drift due to extended sampling tools.
+Final status is recorded in `pipeline.json`, logs in `pipeline.log`.
+Re-execution of the frozen version summary script confirms all checkpoints, scores, sampling tables, and completion receipts pass hash validation.
 
-## 正式结果
+## Official Results
 
-以下为固定共同目标分数，越低越好；不能解释为音质恢复百分比。
-两组每个位置的曝光次数不同，这是覆盖变化的预定组成部分。
+The following scores are for fixed, common objectives — lower is better.
+Note: These scores do not represent audio quality recovery percentages.
+The exposure count per position differs between groups, as this is a deliberate component of coverage variation.
 
-| 种子 | 步数 | 原 anchor：固定 / 多位置 | 同录音保留位置：固定 / 多位置 | 跨录音开发集：固定 / 多位置 |
+| Seed | Step | Original Anchor: Fixed / Multi-position | Reserved Position: Fixed / Multi-position | Cross-Recording Dev Set: Fixed / Multi-position |
 | --- | ---: | ---: | ---: | ---: |
-| 初始模型 | 0 | 0.279887 | 0.286961 | 0.271475 |
+| Initial Model | 0 | 0.279887 | 0.286961 | 0.271475 |
 | 20261012 | 256 | 0.279933 / 0.282780 | 0.292147 / 0.293856 | 0.338419 / 0.305075 |
 | 20261013 | 256 | 0.277783 / 0.405433 | 0.291418 / 0.334142 | 0.341236 / 0.415565 |
 | 20261012 | 2048 | 0.261841 / 0.269019 | 0.330395 / 0.286107 | 0.511675 / 0.408393 |
 | 20261013 | 2048 | 0.261074 / 0.270330 | 0.317800 / 0.286693 | 0.446079 / 0.394683 |
 
-最终多位置组相对固定组，开发总分分别降低 20.18% / 11.52%，但相对初始模型
-仍高 50.43% / 45.38%。同录音保留位置仅比初始低 0.30% / 0.09%，
-属于接近初始，不能夸大为稳健突破。256 步两个种子的开发变化方向相反，
-不能宣称多位置采样在所有预算下都更好，也不能根据结果追选一个种子或检查点。
+The multiposition group shows a relative reduction of 20.18% / 11.52% in development set scores compared to the fixed group, but still remains 50.43% / 45.38% above the initial model.
+The reserved position score drops only by 0.30% / 0.09% — essentially unchanged from baseline — and cannot be interpreted as a robust breakthrough.
+At 256 steps, the two seeds show opposite trends in development set performance, so it cannot be claimed that multi-position sampling performs better under all budgets.
+No single seed or checkpoint should be selected based on these results.
 
-### 音乐与语音
+### Music and Speech
 
-跨录音开发集为 33 个音乐片段 / 26 段录音、56 个语音片段 / 54 段录音。
-表中是各自语料内部均值，最终共同总分仍按音乐 80% / 语音 20% 汇总。
+The cross-recording development set consists of 33 music segments / 26 recordings, 56 speech segments / 54 recordings.
+The table shows per-linguistic mean scores. Final combined score is still weighted 80% music / 20% speech.
 
-| 语料 | 初始模型 | 多位置 2048 / 种子 20261012 | 多位置 2048 / 种子 20261013 |
+| Corpus | Initial Model | Multi-position (2048, seed 20261012) | Multi-position (2048, seed 20261013) |
 | --- | ---: | ---: | ---: |
-| 音乐 | 0.294182 | 0.466435 | 0.449274 |
-| 语音 | 0.180645 | 0.176225 | 0.176322 |
+| Music | 0.294182 | 0.466435 | 0.449274 |
+| Speech | 0.180645 | 0.176225 | 0.176322 |
 
-语音有约 2.4% 的共同分数下降，音乐仍明显退步。音乐成对恢复误差由初始
-0.588365 升至 0.734712 / 0.719533，identity 增量损伤为 0.198158 / 0.179015；
-因此并非只由 identity 权重导致总分变坏。
+Speech shows a ~2.4% drop in common score, while music performance deteriorates significantly.
+Paired recovery error increases from initial 0.588365 to 0.734712 / 0.719533; identity degradation increases to 0.198158 / 0.179015.
+Thus, the degradation is not solely attributable to identity weights.
 
-事后逐片段诊断：两种子分别有 24/33、25/33 个音乐片段共同分数比初始更差。
-相同三个片段贡献约 78.1% / 76.6% 的音乐净误差增量，分别来自两个 blues 录音和
-一个 unlabeled 录音。这是定位线索，不能直接断言某个曲风失效、删除这些片段、
-重设阈值或排除它们后重新宣布成功；也不能把片段计数冒称独立录音数量。
+Post-hoc per-fragment analysis:
+- Seed 20261012: 24/33 music segments have worse scores than initial;
+- Seed 20261013: 25/33 music segments have worse scores than initial.
+Three specific segments contribute approximately 78.1% / 76.6% of the net error increase — two blues recordings and one unlabeled segment.
+These are diagnostic signals, not grounds to conclude a genre failure, delete these segments, reset thresholds, or declare success without further validation.
+The count of such fragments should not be equated with the number of independent recordings.
 
-### 真实 DSP 复核
+### Real DSP Validation
 
-全部 300 次正式回放完成，代理与 Rust 波形最大绝对误差为
-`1.430511474609375e-6`，低于既定 `2e-5` 容差。
-这只证明代理对应关系，不能替代音质或实时性能判断。
+All 300 real-time replays completed. Maximum absolute error between proxy and Rust waveform is
+`1.430511474609375e-6`, below the predefined tolerance of `2e-5`.
+This confirms proxy-to-proxy alignment, but does not validate audio quality or real-time performance.
 
-固定开发子集的多位置最终模型，相对初始恒等模型经 DSP 的输出：
+For the multiposition final model, using only the original 4 music + 1 speech and its identity, the output compared to the baseline identity model:
 
-| 原生指标变化（越低越好） | 种子 20261012 | 种子 20261013 |
+| Native Metric Change (lower is better) | Seed 20261012 | Seed 20261013 |
 | --- | ---: | ---: |
-| 成对高频谱收敛误差 | -0.004476 | -0.004637 |
-| 成对高频瞬态误差 | +0.003048 | +0.001569 |
-| identity 高频谱收敛误差 | +0.054860 | +0.022179 |
-| identity 高频瞬态误差 | +0.058260 | +0.024531 |
+| Paired high-frequency spectral convergence error | -0.004476 | -0.004637 |
+| Paired high-frequency transient error | +0.003048 | +0.001569 |
+| Identity high-frequency spectral convergence error | +0.054860 | +0.022179 |
+| Identity high-frequency transient error | +0.058260 | +0.024531 |
 
-原生子集仅为预定的 4 音乐 + 1 语音及其 identity，不代表全部 89 个开发片段。
-高频能量与谱形的局部改善仍伴随瞬态及 identity 损伤；保持实验状态。
+Note: This native subset consists only of the original 4 music + 1 speech and its identity — not the full 89 development segments.
+Local improvements in high-frequency energy and spectral shape are accompanied by transient and identity degradation.
+The experimental state remains unchanged.
 
-## 判断与下一步
+## Judgment and Next Steps
 
-增加同录音位置覆盖能减轻最终固定片段拟合的退步，但没有解决跨录音音乐泛化。
-不能继续把问题全部归因为固定片段，也不能据此断言模型容量不足。
-本轮没有新盲听结论或推理性能认证，默认模型与实时路径不变。
+Expanding training position coverage within the same recording helps mitigate degradation in fixed segment fitting, but does not resolve the issue of cross-recording music generalization.
+The problem cannot be entirely attributed to fixed segments, nor can it be concluded that model capacity is insufficient.
+No new blind listening conclusions or inference performance certifications are generated.
+Model structure and real-time execution path remain unchanged.
 
-下一步优先审计音乐失败片段的频谱尺度、弱高频归一化、误补与训练覆盖关系，
-并在训练侧寻找同类现象；区分优化尺度/稳定性与表示能力后再注册单因素实验。
-保留全体开发样本、原始无损参考和相同评价尺度，不直接延长当前模型训练或依据
-少数开发反例制定曲目专属规则。
+Next steps:
+Prioritize auditing the spectral scale of failed music segments, weak high-frequency normalization, and misfilling behavior in relation to training coverage.
+On the training side, investigate whether similar patterns exist.
+Distinguish between improvements in scale/stability and representation capability before registering any single-factor experiments.
+Retain all development samples, original lossless references, and identical evaluation metrics.
+Do not extend current model training, nor establish genre-specific rules based on a small number of development counterexamples.
 
-完整数值：`study/crop-comparisons.json`；各组 `scaling-comparisons.json`、
-`evaluation-256.json` / `evaluation-2048.json` 保存逐片段及原生指标。
+Full numerical results: `study/crop-comparisons.json`
+Per-group files: `scaling-comparisons.json`, `evaluation-256.json`, `evaluation-2048.json` contain per-fragment and native metric details.
+
+Both real-data preflights use 8 updates. The fixed arm at step 256 reproduces the corresponding P12 checkpoint with maximum tensor difference 0. The final endpoint is step 2048; its lower training error does not establish cross-recording restoration.

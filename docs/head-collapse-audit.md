@@ -1,114 +1,152 @@
-# P27：残差解码器失活诊断与路线收敛
+# P27: Residual Decoder Deactivation Diagnosis and Convergence Path
 
-后续进展：[P28 小模型机制对照](small-mechanism-study.md)已实现三项单因素干预，
-并完成固定预算训练，未建立恢复收益；后续为 [P29 直接频谱监督](direct-spectrum-study.md)。
-下面保留 P27 时点的定位与规划；新的 DSP 激励分支仍未实现。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-2026-10-19：停止继续扩训 P26 的 640 宽度、11,924,103 参数模型。
-八条完整训练轨迹及原生部署复核没有建立整体恢复收益；大模型端点转为历史对照，
-不进入默认权重或下一轮扩容。这是对当前表示、结构和目标组合的工程取舍，
-不是“大模型对音频恢复无效”的结论。
+**Follow-up progress:** [P28 Small Model Mechanism Comparison](small-mechanism-study.md) has implemented three single-factor interventions and completed fixed-budget training, without establishing recovery gains. The next step is [P29 Direct Spectral Supervision](direct-spectrum-study.md). Below retains the positioning and planning from the P27 timepoint; the new DSP incentive branch remains unimplemented.
 
-## 已验证的机制
+**2026-10-19:** Training of the 640-width, 11,924,103-parameter model from P26 has been halted.
+No overall recovery gain was established across eight complete training trajectories or native deployment rechecks. The endpoint of the large model has been shifted to historical baselines and is no longer loaded into default weights or considered for expansion in the next round. This represents an engineering trade-off in the current representation, structure, and objective design—not a conclusion that "the large model is ineffective for audio restoration."
 
-诊断工具为 `training/scripts/audit_head_collapse.py`。在评分前登记固定选择规则：
-取 P26 第一个种子的 broad 训练日程第 0、5397、10794、16191 个 draw，
-每批 4 个音乐、1 个语音片段，各加对应 clean identity 输入。
-20 个 paired 裁剪的整个输入窗口与 development/shifted 区间隔离，
-检查八个最终端点；无训练、无新候选选择、无留出评分。
-以下均为这组训练机制诊断，不能外推音乐总体质量或无过拟合。
+---
 
-1. **残差解码器的 GELU 隐层高度失活。** 四个 broad 端点、四批 paired 输入中，
-   隐层 `abs(activation) < 1e-8` 的比例为 **72.47%–99.62%**，
-   激活前均值约 **−7.03 至 −16.34**；67.15%–99.30% 的激活前值小于 −6。
-   这些是诊断阈值，不用于部署、训练放行或曲目筛选。
-   输出 `tanh` 的 `abs(scaled_logit)>3` 比例全为零，不能归因于输出 tanh 饱和。
-   隐层已在当前分布上大量进入 GELU 的负饱和区，扩容没有变成有效的残差预测。
-2. **不是预算完全归零，也不是检测器全部 bypass。** broad 端点预算 RMS 为
-   0.0312–0.1899；paired 激活帧占比 80.0%–88.1%。
-   与 identity DSP 的 PCM 差异 RMS 仅约 `8.2e-9`–`4.0e-7`。
-   五频带记录显示，部分原始残差位于低频，经过原有频带融合后被丢弃；
-   缺失高频的有效残差本来就很小。不能用全频原始残差量冒充补高频。
-3. **同一个 DSP 与目标仍允许改善。** 这 20 个裁剪上的 paired 谱目标均值：
+## Verified Mechanisms
 
-   | 诊断输入 | 部署代理后的谱误差 | 相对 identity DSP |
-   |---|---:|---:|
-   | 恒等输入 | 0.433288 | — |
-   | 参考幅度 + 输入相位 | 0.319498 | −26.26% |
-   | 参考幅度 + 参考相位 | 0.184423 | −57.44% |
+Diagnostic tool: `training/scripts/audit_head_collapse.py`.
+Prior to scoring, a fixed selection rule is registered:
+Take the first seed from P26, and select draw indices 0, 5397, 10794, and 16191 from the broad training schedule.
+Each batch consists of 4 music and 1 speech segments, with corresponding clean identity inputs added.
+Twenty paired cropped input windows are evaluated, fully isolated from the development/shifted intervals.
+Eight final endpoints are inspected; no training, no new candidate selection, no held-out scoring is performed.
+All following results are derived from this specific training mechanism and cannot be extrapolated to overall music quality or used to infer overfitting.
 
-   参考只用于 oracle 诊断，不能部署；这些是 Torch DSP 代理上的 pooled 训练诊断，
-   不是新模型收益、原生 Rust 新测量或听感。真实 Rust 完整链路的 P26 结果见
-   [完成报告](broad-budget-study.md)。改善空间存在，但此表不证明当前网络能预测 oracle。
-4. **损失冲突和共享梯度失衡存在，但没有证据支持直接删除 identity 约束。**
-   第一批固定训练样本上，分别计算 paired 谱、paired 波形、identity、复数一致性、
-   预算五项按原训练权重的梯度。在四个 broad 端点中，预算监督对共享参数的梯度范数
-   有三个分别约为 paired 谱项的 **176、22、4847 倍**，另一个为 0.93 倍；
-   paired 谱与 identity 的共享梯度余弦有三个为负，一个为正。
-   这是单批、最终端点的局部证据，不能据此断言整段训练都由预算或 identity 主导。
-   特别是 loss 数值大小不能代替参数梯度大小；预算分支仍在学习不代表残差分支有效。
+1. **GELU Hidden Layer Deactivation in the Residual Decoder.**
+   Across four broad endpoints and four paired input batches, the proportion of activations with `abs(activation) < 1e-8` is **72.47%–99.62%**.
+   Pre-activation mean values range from **−7.03 to −16.34**; 67.15%–99.30% of pre-activation values are below −6.
+   These are diagnostic thresholds and are **not used** in deployment, training release, or track curation.
+   Output `tanh` values with `abs(scaled_logit) > 3` are all zero—this cannot be attributed to tanh saturation.
+   The hidden layer has already entered a large portion of the negative saturation region of GELU under current distribution.
+   Expansion has not translated into effective residual prediction.
 
-来源与哈希：`data/runs/head-collapse-p27-20261019-v2/`，登记 SHA-256
-`33a4e4f745604658cfeb5d723e0778f3b0ad059bc665424222ad4af85dd3eb42`。
-八个 checkpoint 哈希与 P26 的最终端点登记逐一一致。第一版诊断保留在
-`data/runs/head-collapse-p27-20261019/`；第二版增加激活前值和分频带残差定位。
-两个版本均没有改变 P26 模型、目标、登记、评分或冻结源代码。
+2. **Not due to budget being fully zeroed, nor due to detector bypass.**
+   Broad endpoint budget RMS ranges from **0.0312 to 0.1899**.
+   Paired activation frame proportion ranges from **80.0% to 88.1%**.
+   RMS difference between the output and identity DSP in PCM space is only **8.2e-9 to 4.0e-7**.
+   Five-band analysis shows that some original residual content in low frequencies is lost during the existing band fusion process;
+   the absence of effective high-frequency residual is inherently small.
+   It is therefore invalid to claim that raw, unprocessed high-frequency residual volume can be used to compensate for missing high frequencies.
 
-## 表示与目标还存在什么限制
+3. **Same DSP and target still allow for improvement.**
+   The 20 paired cropped inputs show the following mean spectral error after deployment proxy:
 
-当前 `RestorationHead` 叫 complex head，但 `EnvelopeProbe.encode` 只接收
-短窗幅度、长窗幅度、全局尺度和检测条件。输入相位只在输出端旋转残差，
-并未作为学习特征输入网络。这使网络无法显式区分幅度相同、相位／瞬时频率不同的
-输入；在缺失频带，依赖原输入相位旋转也未必能提供稳定的生成载波。
-这是一项结构限制，尚不能把全部退化归因于它。
+| Diagnostic Input | Spectral Error After Deployment | Relative to Identity DSP |
+|---|---:|---:|
+| Identity Input   | 0.433288 | — |
+| Reference Magnitude + Input Phase | 0.319498 | −26.26% |
+| Reference Magnitude + Reference Phase | 0.184423 | −57.44% |
 
-主目标对 DSP 后的幅度和波形做回归，复数辅助项约束的是
-`(analysis(synthesis(ΔZ)) - ΔZ)`，并非直接的复数谱恢复误差。
-因此“有 complex 输出、有一致性 loss”不等于已经具备充分的相位建模与高频生成监督。
-不确定高频的逐点回归、身份保持、预算共享梯度共同导致保守解，是下一步需要
-受控消融的假设；本次定位到失活位置，没有宣称已证明其唯一成因。
+   Reference inputs are used only for oracle-level diagnosis and are **not deployable**.
+   These results are from pooled training diagnostics on Torch DSP proxies—**not** new model performance, native Rust evaluation, or perceptual quality.
+   Full Rust pipeline results for P26 are available in [Completion Report](broad-budget-study.md).
+   Improvement potential exists, but this table does **not prove** that the current network can predict the oracle.
 
-## 外部方法与适用边界
+4. **Loss conflict and shared gradient imbalance exist, but no evidence supports removing identity constraints.**
+   On the first batch of fixed training samples, gradients from paired spectrum, paired waveform, identity, complex consistency, and budget were computed under original training weights.
+   At the four broad endpoints, the budget supervision gradient norm for shared parameters was **176, 22, and 4847 times** that of the paired spectrum term in three cases, and 0.93 times in one.
+   The cosine of shared gradients between paired spectrum and identity were negative in three cases and positive in one.
+   This is local evidence from a single batch and final endpoint—**cannot be used to conclude** that the entire training process is dominated by budget or identity loss.
+   Particularly, loss magnitude does not imply gradient magnitude; the presence of budget branch learning does not imply effective residual branch performance.
 
-本轮查阅论文及官方实现，截至 2026-10-19。没有将第三方预训练权重、数据集或源码
-引入训练和发布制品；后续如引入，仍需单独核查实际文件许可证及训练来源。
+**Source and Hash:** `data/runs/head-collapse-p27-20261019-v2/`, SHA-256 hash:
+`33a4e4f745604658cfeb5d723e0778f3b0ad059bc665424222ad4af85dd3eb42`.
+All eight checkpoints match the final endpoint hash of P26.
+The first version of diagnosis is preserved in `data/runs/head-collapse-p27-20261019/`; the second version includes pre-activation values and per-band residual localization.
+Neither version altered the P26 model, objectives, registration, scoring, or frozen source code.
 
-| 方法／来源 | 可借鉴的机制 | 对 SoundEx 的限制与取舍 |
+---
+
+## Limitations in Representation and Objective
+
+The current `RestorationHead` is termed a "complex head," but `EnvelopeProbe.encode` only accepts:
+short-window magnitude, long-window magnitude, global scale, and detection conditions.
+Phase information is only rotated at the output and is **not fed as a learned feature** into the network.
+This prevents the model from distinguishing between inputs with identical magnitude but different phase or instantaneous frequency.
+In missing bands, relying on original phase rotation for carrier generation may not yield stable output.
+This is a structural limitation and does not justify attributing all degradation to it.
+
+The primary objective performs regression on magnitude and waveform after DSP, with a complex auxiliary term constraining `(analysis(synthesis(ΔZ)) - ΔZ)`.
+This is **not** a direct spectral recovery error.
+Therefore, "having complex output and consistency loss" does not imply sufficient phase modeling or high-frequency generation supervision.
+It remains uncertain whether high-frequency point-by-point regression, identity preservation, and shared budget gradients collectively lead to conservative behavior—this hypothesis requires controlled ablation in the next phase.
+The current diagnosis identifies a deactivation location, but does **not claim** it is the sole cause.
+
+---
+
+## External Methods and Applicability Boundaries
+
+Review of papers and official implementations up to 2026-10-19.
+No third-party pre-trained weights, datasets, or source code were introduced into training or released artifacts.
+Any future integration would require independent verification of actual file licenses and training sources.
+
+| Method / Source | Mechanisms that may be borrowed | Limitations and Trade-offs for SoundEx |
 |---|---|---|
-| [Opus 1.6 BWE](https://opus-codec.org/demo/opus-1.6/)；[论文](https://arxiv.org/html/2412.11392v2)；[官方 BBWENet](https://github.com/xiph/opus/blob/main/dnn/torch/osce/models/bbwe_net.py) | 约 370K 参数控制非线性激励、时变滤波与整形；使用瞬时频率特征；回归预训练后加入频域对抗目标 | 8–20 kHz 语音扩展，不能充当通用音乐权重。论文 10 ms 特征帧、约 0.27 ms 信号路径延迟不能移植成我们的 128 帧新增延迟；优先借鉴 DSP 激励与小型控制器的分工 |
-| [AERO 论文](https://arxiv.org/abs/2211.12232)与[官方实现](https://github.com/slp-rl/aero) | 实部／虚部谱 U-Net、重建与对抗／特征匹配监督，包含音乐实验 | 官方音乐实验是 MUSDB18-HQ 的 11.025→44.1 kHz 重采样任务，不等于多 codec 音乐修复；不引入其曲库或直接复用整段架构 |
-| [AP-BWE 论文](https://arxiv.org/abs/2401.06387)与[官方模型](https://github.com/yxlu-0102/AP-BWE/blob/main/models/model.py) | 输入幅度与相位双分支互相交互，幅相判别器 | 官方 generator 的 kernel-7/padding-3 卷积读取未来时间位置，需要因果改造；论文 CPU 18.1×实时是吞吐，不是逐 hop deadline 证明。主要证据为语音 |
-| [DSP-informed BWE](https://arxiv.org/abs/2407.15624) | 激励扩频与时变滤波分工，由声学特征控制目标谱形 | 8→48 kHz 语音实验，音乐和多声部效果需要本地验证；支持把“产生高频”和“控制包络”拆开验证 |
-| [PEBE，2026](https://www.mdpi.com/2076-3417/16/3/1439) | 编码损伤修复与带宽扩展两条并行分支，各自训练 | 面向编码语音；不是通用音乐结果。论文改造后的 AP-BWE 对照仍有 15 ms 算法延迟；我们只能借鉴任务拆分，不能照搬缓冲 |
-| [DeepFilterNet2](https://arxiv.org/abs/2205.05474)与[官方仓库](https://github.com/Rikorose/DeepFilterNet) | 低成本包络与复数滤波、完整实时工程实现 | 主要是语音降噪，过滤已存在频率不等于生成缺失频率；作为实时实现参考，不作为补频成功基线 |
-| [A2SB，2025](https://research.nvidia.com/labs/adlr/A2SB/)与[官方代码](https://github.com/NVIDIA/diffusion-audio-restoration)；[单步音乐 Flow Matching，2026](https://arxiv.org/abs/2601.14356) | 音乐恢复的生成式建模，以及频谱轮廓条件 | 与音乐任务更接近，但没有本项目逐 hop 因果 CPU <5 ms 证据；单步不等于低延迟。保留作离线质量研究参考，不进入当前部署路径 |
+| [Opus 1.6 BWE](https://opus-codec.org/demo/opus-1.6/); [Paper](https://arxiv.org/html/2412.11392v2); [Official BBWENet](https://github.com/xiph/opus/blob/main/dnn/torch/osce/models/bbwe_net.py) | ~370K parameters for non-linear excitation, time-varying filtering, and shaping; use of instantaneous frequency features; spectral adversarial loss after pre-training | Limited to 8–20 kHz speech extension; cannot serve as a general music restoration weight. Paper uses 10 ms feature frames and ~0.27 ms signal path latency—cannot be ported to our 128-frame input with added 128-frame delay. Prioritize borrowing DSP excitation and small controller design separation. |
+| [AERO Paper](https://arxiv.org/abs/2211.12232) and [Official Implementation](https://github.com/slp-rl/aero) | Real/Imaginary spectrum U-Net, reconstruction, and adversarial/feature matching supervision, including music experiments | Official music experiments involve MUSDB18-HQ at 11.025→44.1 kHz resampling—does not equate to multi-codec music restoration. No direct reuse of their dataset or full architecture. |
+| [AP-BWE Paper](https://arxiv.org/abs/2401.06387) and [Official Model](https://github.com/yxlu-0102/AP-BWE/blob/main/models/model.py) | Dual-branch input (magnitude and phase), mutual interaction, magnitude-phase discriminator | Official generator uses kernel-7/padding-3 convolutions reading future time positions—requires causal re-implementation. CPU 18.1× real-time is throughput, not proof of hop-level deadline compliance. Main evidence is speech-based. |
+| [DSP-informed BWE](https://arxiv.org/abs/2407.15624) | Separation of excitation spreading and time-varying filtering, controlled by acoustic features | 8→48 kHz speech experiments; music and polyphonic effects require local validation. Supports splitting "high-frequency generation" and "envelope control" for independent validation. |
+| [PEBE，2026](https://www.mdpi.com/2076-3417/16/3/1439) | Parallel branches for encoding damage repair and bandwidth extension, trained independently | Designed for encoded speech; not general music restoration. Modified AP-BWE baseline still shows 15 ms algorithmic delay; we can only borrow task decomposition, not the buffer design. |
+| [DeepFilterNet2](https://arxiv.org/abs/2205.05474) and [Official Repository](https://github.com/Rikorose/DeepFilterNet) | Low-cost envelope and complex filtering, full real-time engineering implementation | Primarily for speech denoising; filtering existing frequencies ≠ generating missing ones. Serves as a real-time implementation reference, not a baseline for successful high-frequency restoration. |
+| [A2SB, 2025](https://research.nvidia.com/labs/adlr/A2SB/) and [Official Code](https://github.com/NVIDIA/diffusion-audio-restoration); [Single-step Music Flow Matching, 2026](https://arxiv.org/abs/2601.14356) | Generative modeling for music restoration and spectral contour conditioning | Closer to music tasks, but lacks evidence of hop-by-hop causality with CPU <5 ms. Single-step does not imply low latency. Retained for offline quality research only—excluded from current deployment path. |
 
-源码核查快照保存在忽略目录 `data/research/20261019-upstream/`，仅供阅读。
-所读 Git blob：Opus BBWENet `66c8d92ad665b1d4c0793e289e7e37a445bbccd4`，
-AP-BWE model `ca89fff7d62eb9818176a17ba93eb56e939a3586`，
-AERO model `c50a01f51b17a9f4e3abed83d326bba8d0006ca5`。
+Source code snapshots are preserved in the ignored directory `data/research/20261019-upstream/` for reading only.
+Git blobs reviewed:
+- Opus BBWENet: `66c8d92ad665b1d4c0793e289e7e37a445bbccd4`
+- AP-BWE model: `ca89fff7d62eb9818176a17ba93eb56e939a3586`
+- AERO model: `c50a01f51b17a9f4e3abed83d326bba8d0006ca5`
 
-## 后续实验顺序
+---
 
-当前不再启动旧 640 宽度模型的续训或扩容。优先验证紧凑的因果控制器与 DSP 激励／
-谱形滤波路线：保留频段的修复与缺失频段生成分别监督，频带融合及低频保护保持共同对照。
-控制器增加可靠的复数／瞬时频率信息；生成载波不能只取缺失频带中不可靠的输入相位。
-多声部音乐、噪声状高频、瞬态及双声道连续性必须独立检验，不能照搬语音的单基频假设。
+## Next Experimental Sequence
 
-先用匹配小规模诊断分离“解码器归一化／负区梯度”“预算梯度是否共享”和
-“输入是否含相位信息”，不同时改三项后归功于其中一项。记录每个监督目标对各分支的
-梯度与有效激活，确认模型确实生成高频，再做完整同预算、多种子训练和冻结端点复核。
-这些结构与实验尚未实现，不能称为新权重已训练。
+No further training or expansion of the old 640-width model will be initiated.
+Prioritization will be on validating compact causal controllers and DSP excitation / spectral shaping pathways:
+- Separate supervision for preserved band restoration and missing band generation
+- Maintain shared control over band fusion and low-frequency protection
+- Enhance controller with reliable complex and instantaneous frequency information
+- High-frequency carrier generation must **not** rely solely on unreliable phase from missing bands
 
-损失仍以原始无损参考的谱形、能量、瞬态和保留频带保真为主；若引入判别器／特征匹配，
-只用于训练，不增加推理调用。但其收益必须与伪高频、波形误差、盲听一起判断。
-不因 oracle 有改善而保证真实预测一定改善，不以强制输出更多高频替代恢复质量。
+Multitrack music, noise-like high frequencies, transients, and stereo continuity must be tested independently—**cannot be assumed to follow speech-based single-fundamental assumptions**.
 
-最终仍要求 Rust 完整链路、逐 hop 吞吐、paced deadline、CPU/RSS 和稳定性验证。
-模型 + DSP 计算 <5 ms，不包含固定缓冲；48 kHz/hop128 的服务预算仍是 2.667 ms。
-新路线没有获得此项通过证据，固定 256 帧缓冲也仍需计入完整输出延迟。
+First, use small-scale, matched diagnostics to isolate:
+- "Decoder normalization / negative region gradient"
+- "Budget gradient sharing"
+- "Phase information in input"
 
-## 复现诊断
+Do **not** modify all three simultaneously and then attribute success to one.
+Record gradient and effective activation per supervision target per branch, and confirm that the model actually generates high-frequency content before proceeding to full budget, multi-seed training, and frozen endpoint recheck.
+These structural and experimental designs remain unimplemented and thus **cannot be considered** as new weights having been trained.
+
+Loss remains centered on original lossless reference: spectral, energy, transient, and preserved band fidelity.
+If discriminators or feature matching are introduced, they are used **only during training**, not in inference.
+However, any gains must be evaluated jointly with pseudo-high-frequency artifacts, waveform errors, and blind listening.
+**No improvement in oracle performance guarantees improved real-world prediction.**
+Forcing output of more high frequencies does not equate to improved restoration quality.
+
+Ultimately, the system must still pass:
+- Full Rust pipeline
+- Hop-by-hop throughput
+- Paced deadlines
+- CPU/RSS and stability validation
+
+Model + DSP computation <5 ms (excluding fixed buffer);
+for 48 kHz / hop128, the service budget remains **2.667 ms**.
+The new path has **not yet provided evidence** of meeting this requirement.
+A fixed 256-frame buffer is still required and must be included in the total output latency.
+
+---
+
+## Reproducibility of Diagnosis
 
 ```bash
 rtk proxy env PYTHONPATH=training training/.venv/bin/python \
@@ -117,7 +155,10 @@ rtk proxy env PYTHONPATH=training training/.venv/bin/python \
   --output data/runs/head-collapse-audit-new
 ```
 
-程序使用训练数据与原始目标，保存源码、检查点和选择规则哈希；结果保留在忽略目录。
-原始模型、默认权重、训练损失和 Rust DSP 均未修改。
-本地 548 项 Python 测试、Ruff 检查通过；完整运行了八个端点的诊断，并在删除旧缓存后
-重建一批输入，得到与清理前完全相同的检查结果。
+The script uses original training data and reference targets, preserving source code, checkpoints, and selection rule hashes.
+Results are stored in the ignored directory.
+Original model, default weights, training loss, and Rust DSP were **not modified**.
+Passed 548 Python unit tests and Ruff checks.
+Fully executed diagnostics across eight endpoints, and after deleting old cache, re-generated a batch of inputs to produce **identical results** as before cleanup.
+
+The registered set contains 20 paired crops. The output-tanh saturation diagnostic `abs(scaled_logit)>3` is zero throughout; this is distinct from the observed negative GELU saturation. Paired active-frame coverage is 80.0%–88.1%; RMS change relative to identity DSP spans `8.2e-9` to `4.0e-7`.

@@ -1,112 +1,140 @@
-# P7 loss 与弱高频误补审计
+# P7 Loss and Audit of Weak High-Frequency Energy Compensation
 
-结论：当前证据指向**频带能量校准失败，以及平均目标允许的跨样本折衷**。
-未发现 loss 梯度方向写反；高频 SC 的大幅退步也不能直接解释为谱形头失效。
-不修改默认权重，不剔除失败录音，不将复用开发集称为独立泛化验证。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 范围与复现
+**Conclusion:** Current evidence points to **spectral energy calibration failure and a compromise in average target allowance across samples**.
+No evidence of reversed loss gradient direction; the significant degradation in high-frequency SC cannot be directly attributed to failure of the spectral shape head.
+No change to default weights, no exclusion of failing recordings, and no reclassification of reused development set as independent generalization validation.
 
-审计 [P7](energy-coordinate-study-20261012.md) 四个冻结最佳权重，先验证检查点与评测哈希。
-重新在 CPU 预测音乐开发集 33 片段/26 录音、对应 33 个恒等输入、训练探针 32 录音；
-两个结构×两个种子合计 392 个预测记录。重算结果与原评测在 rtol/atol=1e-4 内一致。
-分项实现与原始 loss 的值、梯度逐项核对，包含 44.1/48 kHz、静音与弱能量。
-训练参数、loss、数据划分和候选选择全部保持不变。
+---
+
+## Scope and Reproduction
+
+Audited the four frozen best-weighted models from [P7](energy-coordinate-study-20261012.md), verifying checkpoint integrity and evaluation hash consistency.
+Re-ran CPU-based predictions on 33 music development segments across 26 recordings, with corresponding 33 identity inputs and 32 training probe recordings;
+Total of 392 prediction records (2 structures × 2 seeds).
+Recomputed results match original evaluation within rtol/atol = 1e-4.
+Per-component validation of loss value and gradient was performed, including 44.1/48 kHz, silence, and low-energy cases.
+All training parameters, loss function, data splits, and candidate selection remain unchanged.
 
 ```sh
 PYTHONPATH=training training/.venv/bin/python training/scripts/audit_energy_objective.py \
   --study data/runs/energy-p7-20261012/study
 ```
 
-完整本地结果：`data/runs/energy-p7-20261012/study/objective-audit.json`。
-报告保留检查点/脚本摘要、全部录音、逐频带分解、梯度检查及参考干预，不提交原始数据。
+Full local results: `data/runs/energy-p7-20261012/study/objective-audit.json`.
+Report retains checkpoint summaries, script overviews, all recordings, per-band decomposition, gradient checks, and reference interventions—raw data is not submitted.
 
-## 1. 大均值由尾部放大，但问题并不只在尾部
+---
 
-按录音聚合后，两个种子都是 **11/26** 个开发音乐录音的 SC 变差。
-同样三个录音贡献了正向 SC 退步总量的 **97.0% / 94.5%**。
-排除它们仅作为敏感性诊断，其余 23 个录音的平均 SC 差仍为 **+0.0740 / +0.1787**。
-这不是更新正式评分、排除许可，也不是三个独立片段：这三个录音覆盖五个开发片段。
+## 1. High Mean Driven by Tail Amplification, But the Problem Is Not Limited to the Tail
 
-极弱参考使相对谱误差放大，但实际预测能量也确实增加。以每个参考片段的全谱平均
-DFT 功率为基准，开发集中低于 -80 dB 的六个高频 clip-band，候选平均能量偏差为
-**+37.35 / +33.77 dB**，对照为 **+8.06 / +6.97 dB**。
-候选预测功率平均约为全谱的 **-57.96 / -61.54 dB**。这些是谱域相对功率，**不是 dBFS**，
-不能仅凭这些数值推断可闻程度或设备输出噪声。
+After aggregating across recordings, both seeds show degradation in Spectral Consistency (SC) for **11/26** development music recordings.
+Three specific recordings account for **97.0% / 94.5%** of the total positive SC degradation.
+Excluding these three for sensitivity analysis, the remaining 23 recordings still exhibit an average SC difference of **+0.0740 / +0.1787**.
+This is not a formal score update, nor a license exception, nor limited to three independent fragments—these three cover five development segments.
 
-分层阈值 -80/-60/-40 dB 仅用于描述参考强弱，不进入推理、训练、数据筛选或发布门槛。
+The weak reference amplifies relative spectral error, but actual predicted energy also increases. Using the full-spectrum DFT power of each reference fragment as baseline, for six high-frequency clip-bands below -80 dB, the candidate average energy deviation is **+37.35 dB / +33.77 dB**, compared to **+8.06 dB / +6.97 dB** for the reference.
+Candidate predicted power averages at **-57.96 dB / -61.54 dB** relative to full-spectrum. These are **spectral-domain relative powers**, not dBFS, and cannot be used to infer perceptual quality or device output noise.
 
-## 2. 原始谱误差主要是能量错误，不是形状错误
+The -80/-60/-40 dB thresholds are used only for descriptive reference strength and do not enter inference, training, data filtering, or release thresholds.
 
-冻结预测后，只在离线使用参考逐帧/逐带 RMS 或参考归一化谱形替换相应部分。
-保留 0–4 kHz，全部使用相同 80 hop 排除区。以下为 33 个音乐开发片段等权平均 SC：
+---
 
-| 候选路径 | 种子 12 | 种子 13 |
+## 2. Raw Spectral Error is Primarily Energy-Related, Not Shape-Related
+
+After freezing predictions, only offline reference-based per-frame or per-band RMS or normalized spectral shape replacement was applied.
+Retained 0–4 kHz band; used identical 80 hop exclusion zones. Below is the average SC across 33 music development segments, equally weighted:
+
+| Candidate Path | Seed 12 | Seed 13 |
 | --- | ---: | ---: |
-| 原始预测 | 4.4792 | 3.5576 |
-| 只提供正确频带能量，保留预测形状 | 0.4497 | 0.4510 |
-| 只提供正确带内形状，保留预测能量 | 4.3054 | 3.3888 |
+| Raw Prediction | 4.4792 | 3.5576 |
+| Correct band energy only, preserve shape | 0.4497 | 0.4510 |
+| Correct band shape only, preserve energy | 4.3054 | 3.3888 |
 
-给对照正确能量时 SC 为 **0.4294 / 0.4335**，说明候选形状也并非已优于对照；
-但形状差异不能解释原始 SC 从约 0.7 增大到 3–4 的绝大部分变化。
-SC 是幅度谱重建误差，包含能量与形状；此前简称“谱形误差”过于宽泛。
+When provided with correct energy, SC drops to **0.4294 / 0.4335**, indicating that the candidate shape is not inherently superior to the reference.
+However, shape differences cannot explain the majority of the SC increase—from ~0.7 to 3–4.
+SC is a magnitude spectrum reconstruction error, encompassing both energy and shape; prior terminology "spectral shape error" was overly broad.
 
-这些参考干预不能部署，也不是新模型的音质结果。其意义是定位错误来源。
+These reference interventions are not deployable and do not represent new model audio quality. Their purpose is diagnostic—identifying the source of error.
 
-## 3. 未发现符号错误；总体下降来自其他样本的补偿
+---
 
-对候选所有开发音乐高频帧，筛出预测功率超过参考 1% 的帧-频带，
-检查 `sum(dL/dp * p)`，即沿统一对数幅度增益方向的导数：
-两个种子 **10,449 / 12,486** 个过量帧-频带全部具有降低能量的下降方向，
-没有发现反向奖励增加能量的情况。此检查只针对冻结预测，不证明骨干能同时满足所有梯度。
+## 3. No Symbol Errors Detected; Overall Decline Arises from Compensation Across Samples
 
-分项求和与原函数吻合，参考正确时 loss 为零；所以不能把这次失败称为算式或反传符号写错。
-损失在失败录音上也变大，只是其他录音改善后，均值仍下降：
+For all high-frequency frames in development music, we screened frames where predicted power exceeded reference by more than 1%, and examined `sum(dL/dp * p)`—the derivative along the logarithmic magnitude gain direction:
 
-| 音乐片段组 / 结构 | 种子 12 总 loss | 种子 13 总 loss |
+- For both seeds, **10,449 / 12,486** over-predicted frame-band pairs exhibit **energy-decreasing gradient directions**.
+- No instances of reverse reward increasing energy were observed.
+This check was performed on frozen predictions and does not prove that the backbone can simultaneously satisfy all gradients.
+
+Per-component summation aligns with the original function. When reference energy is correct, loss is zero. Therefore, this failure cannot be attributed to a symbolic error in the loss function.
+Loss increases on failing recordings, but due to improvements in other recordings, the overall mean still declines:
+
+| Music Segment Group / Structure | Seed 12 Total Loss | Seed 13 Total Loss |
 | --- | ---: | ---: |
-| 三个尾部录音的五片段 / 对照 | 0.3010 | 0.2859 |
-| 相同片段 / 候选 | 1.0024 | 0.9727 |
-| 其余 28 片段 / 对照 | 1.1688 | 1.1888 |
-| 相同片段 / 候选 | 0.9061 | 0.9525 |
+| Three tail recordings (5 segments / reference) | 0.3010 | 0.2859 |
+| Same segments / candidate       | 1.0024 | 0.9727 |
+| Remaining 28 segments / reference | 1.1688 | 1.1888 |
+| Same segments / candidate       | 0.9061 | 0.9525 |
 
-## 4. 目标的排序确实与恢复指标存在冲突
+---
 
-两个固定合成反例验证了设计取舍，非曲目调参：
+## 4. Target Ordering Indeed Conflicts with Recovery Metrics
 
-- 单个稀疏高频带，正确形状但幅度只有参考 1%：总 loss **1.0881**，该带 SC **0.99**。
-  换为正确 RMS 的平坦谱形：loss 降到 **0.2809**，但 SC 增至 **1.3019**。
-- 正确形状，幅度为参考的 0.1 倍或 10 倍：总 loss 约 **0.5448 / 0.5449**，
-  但该带 SC 是 **0.9 / 9.0**。对数能量误差近似对称，而线性重建误差并不对称。
+Two fixed synthetic counterexamples validate design trade-offs, not per-track tuning:
 
-数学上这不是错误，也不代表应放弃补能量；它说明当前总分无法独立保证接近无损参考。
-归一化形状项基本移除了幅度尺度，无法补偿这个排序问题；保留的 log1p 幅度项权重较小。
+- **Single sparse high-frequency band**, correct shape but magnitude at only 1% of reference: total loss = **1.0881**, SC = **0.99**.
+  Replaced with flat spectrum having correct RMS: loss drops to **0.2809**, but SC increases to **1.3019**.
+- Correct shape, magnitude at 0.1× or 10× reference: total loss ≈ **0.5448 / 0.5449**,
+  but SC is **0.9 / 9.0**. Log-energy error is approximately symmetric, while linear reconstruction error is asymmetric.
 
-另外，参考相对 RMS 地板为 1e-4（绝对下限 1e-7 DFT 幅度）。上述六个最弱 clip-band
-约 **99.3%** 的帧低于地板，形状置信度均值仅 **0.067**。
-这种降权有数值稳定和避免拟合极弱噪声的作用；候选越过地板后的能量仍受惩罚，
-不能说这些频带“完全没有监督”。直接去掉地板也会让微小参考主导训练，不是合适修复。
+Mathematically, this is not an error—it does not imply we should abandon energy compensation.
+It demonstrates that the current objective function cannot independently guarantee near-lossless recovery.
+The normalized shape term largely removes amplitude scale, and cannot compensate for this ordering issue.
+The retained log1p magnitude term has low weight.
 
-## 5. 训练分布内和恒等输入也有问题
+Additionally, the reference RMS floor is set at 1e-4 (absolute floor at 1e-7 DFT magnitude).
+Of the six weakest clip-bands, **99.3%** of frames fall below this floor; average shape confidence is only **0.067**.
+This weighting provides numerical stability and prevents overfitting to extremely weak noise.
+Candidates are still penalized after exceeding the floor, so these bands are not "fully unmonitored."
+Directly removing the floor would allow tiny references to dominate training—this is not a viable fix.
 
-32 个训练录音探针的候选 SC 从对照 **0.6131 / 0.5614** 增至 **1.9307 / 1.8832**；
-低于 -80 dB 的七个高频 clip-band 平均能量偏差达到 **+24.00 / +23.24 dB**。
-所以这并不只是开发集偶然反例或单纯的训练/开发泛化差距。
-探针是训练录音中的固定裁剪，不能将这些数字当成整个训练集平均，更不能据此排除过拟合。
+---
 
-原生恒等输入在 **19/26、20/26** 个录音上 SC 变差，loss 在 **23/26、26/26** 上变差。
-正确能量干预可将候选恒等 SC 从 **4.2159 / 3.2823** 降到 **0.1363 / 0.1340**。
-这支持自然弱高频的能量误补判断，尚未证明模型为什么无法区分自然缺失与压缩裁切。
-这里只测原始幅度预测；恒等输入经过实际 DSP 后是否产生可闻改变，需要单独回放与听测，
-不能把这个结果直接表述为无损音频成品已被同等幅度地破坏。
+## 5. Issues Also Appear in Training Distribution and Identity Inputs
 
-## 后续处理顺序
+For 32 training probe recordings, candidate SC increases from reference **0.6131 / 0.5614** to **1.9307 / 1.8832**.
+In seven high-frequency clip-bands below -80 dB, average energy deviation reaches **+24.00 dB / +23.24 dB**.
+Thus, this is not merely an isolated failure in the development set or a simple training-to-development generalization gap.
+Probes are fixed crops from training recordings and cannot be generalized to the full training set average.
+They also do not justify claims of overfitting.
 
-1. 保留能量、谱形和参考瞬态监督，检验加入带数值地板的、与实际幅度误差一致的
-   频带归一化重建项。先要求合成反例排序合理、参考最优、弱能量梯度有限；不要只提高旧项权重。
-2. 将恒等和自然弱高频作为明确的分组约束，防止它们被总体均值抵消。分组规则用训练参考
-   定义并在新实验前固定，不按这三个开发录音定特例，也不把参考标签提供给推理。
-3. 再做相同架构/预算的目标对照，同时看能量恢复与误补、原始预测与真实 DSP。
-   若校准仍失败，再单独比较输入能量表示或恢复置信度分支，避免同时改 loss 和结构。
+Native identity inputs show degraded SC on **19/26 and 20/26** recordings, with loss increasing on **23/26 and 26/26**.
+Introducing correct energy correction reduces candidate identity SC from **4.2159 / 3.2823** to **0.1363 / 0.1340**.
+This supports the hypothesis of erroneous high-frequency energy compensation in natural, weakly excited regions.
+It has not yet been proven that the model fails to distinguish between natural absence and compression cropping.
 
-当前证据不足以将主因归结为模型容量不足、基线过拟合或相位/DSP。
-本次只做诊断和回归检查，未启动新一轮训练，未修改现有目标或晋级规则。
+This analysis only evaluates magnitude prediction; whether identity inputs, after actual DSP, produce audible differences requires separate playback and listening validation.
+Therefore, this result cannot be directly interpreted as the final audio product being equally degraded in amplitude.
+
+---
+
+## Next Steps for Handling
+
+1. **Retain energy, spectral shape, and reference transient supervision**. Test the addition of a normalized reconstruction term with numerical floor and actual amplitude error alignment.
+   Prioritize synthetic counterexamples with reasonable ordering, reference-optimized, and bounded weak-energy gradients.
+   Do not simply increase the weight of existing terms.
+
+2. **Treat identity and naturally weak high-frequency content as distinct, grouped constraints**, to prevent cancellation by overall mean.
+   Define grouping rules using training references and fix them prior to new experiments.
+   Do not treat the three development recordings as special cases, nor provide reference labels to inference.
+
+3. **Conduct a new round of identical architecture/budget objective comparison**, evaluating both energy recovery and overcompensation, and comparing raw predictions against true DSP.
+   If calibration continues to fail, conduct a separate analysis of input energy representation or recovery confidence branches—avoid modifying loss and structure simultaneously.
+
+**Current evidence is insufficient to attribute the primary cause to model capacity limits, baseline overfitting, or phase/DSP issues.**
+This investigation serves as diagnostic and regression verification only.
+No new training cycle has been initiated, and no modifications to the objective or promotion criteria have been made.

@@ -1,132 +1,118 @@
-# P33 固定端点机制诊断
+# P33 Fixed Endpoint Mechanism Diagnosis
 
-后续 [P34 小模型调试](risk-balance-study.md)已完成三轮、五个等预算端点；
-实测风险压缩、恒等权重和过补约束的收益与代价，全部候选仍保持实验状态。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-2026-10-21，承接 [P33 完整训练结果](broad-spectrum-study.md)。本次不训练、
-不调整生产 DSP 或默认权重。结论是：**多数抽查训练音乐上的恢复也很弱，不能只
-归因为泛化失败；弱参考尺度失衡和修复／恒等目标竞争值得优先处理。** 尚未通过
-训练干预证明唯一根因，不据此认定模型容量不足或已经收敛。
+Following [P34 Small Model Tuning](risk-balance-study.md), three rounds and five budget endpoint scenarios have been completed.
+The observed gains and costs associated with risk compression, identity weighting, and over-completion constraints remain under active evaluation, with all candidate hypotheses retained in experimental status.
 
-## 方法与证据边界
+On 2026-10-21, building upon [P33 Full Training Results](broad-spectrum-study.md). This iteration does **not** include training, nor any adjustment to production DSP or default weights. Conclusion: **The majority of randomly sampled music exhibits weak recovery performance, and cannot be attributed solely to generalization failure; imbalanced weak-side signal scaling and competition between restoration and identity objectives warrant immediate attention.** No definitive causal link has been established through training intervention, and thus we do not conclude either model capacity deficiency or convergence.
 
-固定四个最终端点，在每个种子的 16,192 次实际更新序列上等距选取 16 批。
-每种子 64 个音乐＋16 个语音训练裁剪，再加对应 identity；同种子的 control 和
-mr_add 使用相同片段。音乐分别覆盖 60／57 首录音，语音 16／15 条。所有样本
-确实在训练中出现，但不是全训练集重评分，也不是独立测试。
+---
 
-先登记片段选择及端点哈希，再运行正常预测与固定预算为 1 的推理消融，共
-1,280 个角色预测。每模型在固定第 0／5／10／15 批分析各项梯度，共 16 批。
-沿用 80 帧真实历史、原监督区域、原始未限幅参考与 MR v1；报告原始模型 OLA，
-不把这次 Python 诊断称为新的 Rust／设备验证。正常预测与预算消融都没有参数更新。
+## Methodology and Evidence Boundaries
 
-核对 180 个当前执行依赖与 P33 冻结源码哈希一致；manifest、抽样文件校验通过，
-实际裁剪由原加载器检查 PCM 校验和。运行前后四个权重哈希不变。
-另对发现的最大相对误差片段开展明确标记的事后检查，保留其完整同批样本。
+Four fixed endpoint configurations are maintained. For each seed, 16 batches are selected at equal intervals across 16,192 actual update sequences.
+Each seed includes 64 music + 16 speech training clips, plus corresponding identity references. Control and `mr_add` variants use identical clip segments.
+Music coverage spans 60/57 recordings, speech spans 16/15 samples. All samples appear in training, but this is not a full re-evaluation of the training set, nor an independent test.
 
-本地证据：`data/runs/p33-mechanism-audit-20261021/` 下的 `registration.json`、
-`selection-*.json`、四个端点报告、`summary.json`、`outlier.json` 与执行脚本。
-实验报告、脚本与数据继续在忽略目录，不上传原始音频或实验权重。
+Prior to execution, segment selection and endpoint hashes are recorded. Normal prediction and budget-1 inference ablation are then run, generating 1,280 role predictions. For each model, gradients are analyzed across the fixed batches 0, 5, 10, and 15—totaling 16 batches.
+The 80-frame real history, supervised region, original unclipped reference, and MR v1 are retained. Raw model OLA is reported; this Python-based diagnostic is not considered a new Rust or hardware validation. Neither normal prediction nor budget ablation results in parameter updates.
 
-## 训练见过的音乐也没有普遍学好
+Cross-verification confirms 180 current execution dependencies match the P33 frozen source code hash; manifest and sampling file integrity checks pass. Actual cropping is validated by the original loader via PCM checksum. Weight hashes remain unchanged before and after execution.
+For the most extreme relative error case, a post-hoc explicit tagging and full batch sample retention is performed.
 
-共同 MR v1，先按录音平均；越低越好。两种子样本不同，不能跨种子直接比较绝对值。
+Local evidence: `data/runs/p33-mechanism-audit-20261021/` containing `registration.json`, `selection-*.json`, four endpoint reports, `summary.json`, `outlier.json`, and execution script.
+Experimental reports, scripts, and data remain in the ignored directory and are not uploaded; raw audio or experimental weights are not shared.
 
-| 种子 | 输入均值 | control 均值 | mr_add 均值 | control 逐录音变化中位数 | mr_add 逐录音变化中位数 |
+---
+
+## Training-Seen Music Does Not Show Universal Improvement
+
+Using common MR v1, performance is evaluated per recording average—lower is better. The two seeds differ in sample composition, so absolute values cannot be directly compared across seeds.
+
+| Seed | Input Mean | Control Mean | mr_add Mean | Control Per-Recording Median Change | mr_add Per-Recording Median Change |
 |---|---:|---:|---:|---:|---:|
 | 20261012 | 2.245261 | 1.575598 | 1.508436 | −0.379% | **−0.165%** |
 | 20261013 | 0.359720 | 0.358622 | 0.357525 | −0.225% | **−0.248%** |
 
-中位数是每首相对输入变化的中位数，不是均值之比。两个种子各有 2／1 首输入
-评分为 0，百分比未定义；它们保留在均值和逐录音报告，不参与百分比中位数。
-不能因第一个种子的均值下降约 33% 就说训练成功：**单个 side 裁剪贡献了
-mr_add 净均值改善的 99.77%**。它主要在抑制额外噪声，详见下一节。
+Median values represent the median relative change per track, not the ratio of means. Two tracks per seed scored zero in input evaluation; percentages are undefined for these. They are preserved in both mean and per-recording reports, excluded from median percentage calculations.
+It is incorrect to infer training success from a 33% drop in input mean for the first seed: **99.77% of the mr_add mean improvement in this seed stems from a single side channel clip**—primarily through noise suppression, as detailed in the next section.
 
-分声道复核仍保留全部结果：mr_add 的 left/right/mono 组均值改善分别为
-0.187%／0.252%／0.085% 和 0.959%／0.458%／0.182%；每种子仅两个 mono
-裁剪，不足以证明单声道覆盖合格。mid、side 及所有退化例均保留。
+Per-channel recheck results remain: mr_add left/right/mono mean improvements are 0.187%/0.252%/0.085% and 0.959%/0.458%/0.182%; only two mono clips per seed are available, insufficient to establish monaural coverage adequacy.
+Mid, side, and all degraded examples remain preserved.
 
-因此，现有证据更支持“多数音乐的有效拟合不足”，而不是已经在训练音乐上
-恢复很好、到了新录音才失效。此判断只适用于固定诊断样本，不能据此排除
-过拟合、数据分布差异或历史验证选择偏差。
+Thus, the current evidence better supports the claim that **"a majority of music lacks effective fitting"**, rather than indicating strong performance on training music that degrades only on new recordings. This assessment applies only to the fixed diagnostic set and does not invalidate concerns of overfitting, distribution shifts, or historical validation selection bias.
 
-## 弱 side 信号暴露了损失尺度问题
+---
 
-最大例是训练音乐的 AAC 96 kbps、44.1 kHz、side 视图。完整批次事后检查显示：
+## Weak Side Signals Reveal a Loss Scaling Issue
 
-| 量 | 数值 |
+The most extreme case involves training music at AAC 96 kbps, 44.1 kHz, side-view. Post-hoc batch inspection reveals:
+
+| Metric | Value |
 |---|---:|
 | clean PCM RMS | 3.7961e-5（**−88.41 dBFS**） |
-| 输入相对 clean 的 PCM RMS 误差 | 0.00181175（−54.84 dBFS） |
-| mr_add 输出 PCM RMS 误差 | 0.00090682（−60.85 dBFS） |
-| 输入 → mr_add MR v1 | 115.5232 → 71.4138 |
-| 此样本按实际 0.1 批次权重计算的直接＋MR 梯度范数 | **50.43** |
-| 同批其余四个 paired 样本的最大对应梯度范数 | **0.01651** |
+| Input relative clean PCM RMS error | 0.00181175（−54.84 dBFS） |
+| mr_add output PCM RMS error | 0.00090682（−60.85 dBFS） |
+| Input → mr_add (MR v1) | 115.5232 → 71.4138 |
+| Direct + MR gradient norm (0.1 batch weight) | **50.43** |
+| Max corresponding gradient norm of other four paired samples | **0.01651** |
 
-这个片段在该冻结端点上产生的梯度约为同批其他 paired 样本最大值的 **3,054 倍**。
-参考归一化使极弱 side 信号中的压缩伪影获得很大的相对权重；全局梯度裁剪虽
-限制总范数，不能平衡批次内部各样本的方向。
+This segment produces a gradient magnitude approximately **3,054 times greater** than the maximum observed in the other paired samples within the same batch.
+Normalization against a reference scale amplifies the relative weight of compression artifacts in extremely weak side signals; while global gradient clipping limits total norm, it fails to balance directional contributions within the batch.
 
-收益主要来自 8–12 kHz 噪声减少：误差 RMS 0.001765 → 0.000862。
-与此同时 0–4、4–8、16–24 kHz 的绝对误差反而增加。故不能把总分下降解释为
-缺失高频成功 inpainting，也不以 −88 dBFS 推断可闻程度或删除这一反例。
-这些频带值使用监督区域的矩形 FFT 投影和正确 PCM 标度，只作诊断，不是部署滤波器。
+The primary benefit is reduction in 8–12 kHz noise: RMS error drops from 0.001765 → 0.000862.
+Concurrently, absolute errors in 0–4, 4–8, and 16–24 kHz bands **increase**. Therefore, the overall score decline cannot be interpreted as successful high-frequency inpainting, nor can the −88 dBFS level be used to infer perceptibility or justify removal of this counterexample.
+These frequency bands are evaluated using rectangular FFT projections from the supervised region and correct PCM scaling—used solely for diagnostic purposes, not for deployment filtering.
 
-历史四条训练共有 **186 次**预裁剪梯度范数超过原定阈值 5，其中 **180 次**
-所在批次含 side；每轨迹约 58% 批次含 side。mr_add 两种子的最大梯度分别
-404.93／367.10。但这些事件只占全部 64,768 次更新约 **0.29%**，且“批次含 side”
-不等于每一次都由 side 引起；不能推断它支配整轮训练或单独解释所有停滞。
+Historically, across four training tracks, there were **186 pre-clipping gradient norm exceedances** above the original threshold of 5. Of these, **180 occurred in batches containing side signals**. Each trajectory had approximately 58% of batches containing side content.
+The mr_add variants achieved peak gradients of 404.93 and 367.10, respectively. However, these events represent only about **0.29%** of the total 64,768 updates. Importantly, "batch contains side" does not imply the side signal caused the gradient spike—thus, it cannot be inferred that side signals dominate the training process or explain all stagnation.
 
-需要保留 side、弱能量与静音材料，重新检验归一化及梯度贡献。训练时可对照与
-原立体声参考能量关联的 side 尺度，或兼顾绝对误差的压缩域目标；具体形式必须
-预登记并通过静音、弱能量、参考零梯度、有限差分和非同调左右声道验证。
-不能针对这首曲目设置排除规则，也不能更换评分口径来制造改善。
+Side, weak-energy, and silence content must be preserved. A re-evaluation of normalization and gradient contribution is required. During training, the side signal scale should be compared against the original stereo reference energy, or a joint objective should be defined that accounts for absolute error in the compressed domain. The specific form must be pre-registered and validated through silence, weak-energy, reference-zero gradient, finite-difference, and non-homologous left/right channel checks.
+No exclusion rule should be established for this piece, nor should scoring criteria be altered to artificially improve results.
 
-## 目标竞争存在，但不能直接删除保真约束
+---
 
-mr_add 两种子共八个预选批次中，paired 修复与 identity 保持不变的共享参数
-梯度余弦全部为负，范围 **−0.863～−0.158**；在预算头上为 **−0.995～−0.227**。
-identity 共享梯度范数为 paired 的 **7.1%～174.7%**，部分批次足以明显影响方向。
+## Target Competition Exists, But Cannot Be Directly Removed
 
-相比之下，paired 的直接频谱与新增 MR 梯度余弦为 **+0.564～+0.996**。
-这不支持“新的频谱目标普遍与旧直接频谱目标反向”这一解释。预算辅助梯度的
-方向和相对强度随批次变化，也不能把所有问题归因于辅助项。
+Among the eight pre-selected batches for mr_add, the cosine of shared parameter gradients between paired restoration and identity remain consistently **negative**, ranging from **−0.863 to −0.158**. At the budget head, the range is **−0.995 to −0.227**.
+Identity shared gradient norms range from **7.1% to 174.7%** of paired gradients—enough in some cases to significantly influence direction.
 
-负余弦是局部竞争证据，不等于 identity 设计错误，更不是训练因果证明。
-下一次应在相同结构、数据和充分预算下，对照目标的尺度／梯度配比，继续保留
-原始无损 identity、低频、瞬态、声像和连续性验收，而非直接撤掉约束。
+In contrast, the cosine of direct spectrum and added MR gradient contributions is **+0.564 to +0.996**.
+This does not support the interpretation that "new spectral objectives are generally opposed to the original direct spectrum objectives." The direction and relative strength of budget-augmented gradients vary per batch, and thus cannot be used to attribute all issues to auxiliary terms.
 
-## 排除了哪些简单解释
+Negative cosine values indicate local competition, but do not imply identity design error, nor establish causal training failure. In the next round, under identical architecture, data, and sufficient budget, a comparative analysis of target scaling and gradient ratios should be conducted.
+The original lossless identity, low-frequency response, transient fidelity, stereo imaging, and continuity should be preserved—rather than being removed outright.
 
-- **解码器大面积失活不是此次小模型的主要表象。** mr_add 音乐 paired 的
-  GELU 负饱和比例仅 0.001%／0.010%，近零比例 0.090%／0.015%。不能把之前
-  大模型的失活结论直接套到这轮，也不能以此证明整个架构足够。
-- **直接放大预算不能解决。** 把预算强制为 1 后，mr_add 音乐 MR 均值从
-  1.50844 → 2.06841、0.35753 → 0.36329；identity 从
-  0.000164 → 0.025945、0.000476 → 0.028966，明显破坏保真。
-  这是端点推理消融，不是固定预算重新训练，不能由此否定所有预算改造。
-- **不能只怪 DSP。** 本次训练样本的原始 OLA 改善已很弱；P33 留出复核的
-  原始 OLA 也仅改善 0.166%／0.251%。P32 的融合损失仍存在，但不是本轮唯一问题。
-- **未发现本次测试覆盖内的 loss 数值实现回归。** 重新运行 MR、直接频谱和
-  残差预算测试，**37 项通过**，包括梯度、静音／弱信号及导出对应检查，5 条既有
-  ONNX 警告。数学行为通过不等于目标权衡适合真实训练分布。
+---
 
-## 下一轮优先级
+## Excluded Simple Explanations
 
-1. 先处理训练尺度：区分补充缺失能量与抑制额外伪影，报告二者在每频带上的收益；
-   为 weak side 的绝对／相对误差设计统一尺度对照。保留 MR v1 共同评分和全部反例。
-2. 在小模型上分开对照 identity 梯度配比与输出参数化。当前输出是“预算 × 小斜率
-   残差 × 输入相位载波”，直接高频幅度／包络预测与独立相位残差值得比较；
-   这只是待检验假设，不能把能量更足当作谱形恢复，也不重复把所有改变叠成一组。
-3. 通过充分的同预算、双种子训练确认多数训练音乐能改善，再判断录音隔离复核的
-   泛化；随后检验实际 Rust＋DSP、瞬态、立体声、盲听及逐 hop 时延。
-   当前没有证据支持直接扩大模型或无改动续训。
+- **Decoder-wide inactivation is not the primary manifestation in this small model.** For mr_add music, the GELU negative saturation ratio is only 0.001% / 0.010%, approaching zero at 0.090% / 0.015%. This does not support the inference that the previous large model's inactivation pattern applies here, nor does it prove the architecture is robust.
+- **Forced budget amplification does not resolve the issue.** After enforcing a budget of 1, mr_add music MR mean increased from 1.50844 → 2.06841, 0.35753 → 0.36329; identity increased from 0.000164 → 0.025945, 0.000476 → 0.028966—clearly degrading fidelity. This is a post-hoc inference ablation, not a retraining under fixed budget, and thus cannot be used to reject all budget modifications.
+- **We cannot blame DSP alone.** The original OLA improvement in this training set is already weak. The P33 held-out recheck shows only 0.166% / 0.251% improvement in OLA. The P32 fusion loss remains, though it is not the sole issue in this round.
+- **No regression in loss values was observed within the tested set.** Re-running MR, direct spectrum, and residual budget tests yields **37 passing cases**, including gradient, silence/weak-signal, and derived checks. Five ONNX warnings persist. Mathematical behavior passing does not imply that the objective trade-offs are suitable for the real training distribution.
 
-行业方法支持探索不同生成表示，但不能直接照搬性能结论：
-[BEHM-GAN](https://arxiv.org/abs/2204.06478) 使用复数谱与对抗学习，训练评估为
-古典独奏钢琴及历史录音；[流式 SEANet](https://arxiv.org/abs/2010.10677) 在
-8→16 kHz 语音上使用特征与对抗损失，论文流式结构延迟 16 ms。
-两者都不能证明我们 48 kHz 多曲风压缩恢复、128-hop 与模型＋DSP <5 ms 已可达。
-目前优先修正已测出的尺度与目标竞争；生成先验可作后续独立对照，而非立即换成大 GAN。
+---
 
-本轮没有启动下一轮训练或重新测时延，P33 的超时、未完成盲听和设备验收结论继续有效。
+## Next Round Priorities
+
+1. **Address training scale issues**: Differentiate between restoring missing energy and suppressing extraneous artifacts, and report gains per frequency band. Establish a unified scale for both absolute and relative error in weak side signals. Retain MR v1 joint scoring and all counterexamples.
+2. **Isolate and compare identity gradient ratio and output parameterization** in the small model. Current output is modeled as "**budget × small slope residual × input phase carrier**". Direct high-frequency amplitude and envelope prediction should be compared against independent phase residual predictions—this remains a hypothesis to be tested, not a justification for increased energy as equivalent to spectral recovery. No changes should be combined into a single composite.
+3. **Confirm, under sufficient budget and dual-seed training, that most training music shows measurable improvement** before evaluating generalization via recording isolation recheck. Subsequently, validate actual Rust + DSP, transient response, stereo fidelity, blind listening, and per-hop latency.
+   No evidence supports immediate model expansion or unmodified continuation training.
+
+Industry methods may support exploration of alternative generative representations, but performance claims cannot be directly transplanted:
+- [BEHM-GAN](https://arxiv.org/abs/2204.06478) uses complex spectra and adversarial learning, trained on classical solo piano and historical recordings;
+- [Streaming SEANet](https://arxiv.org/abs/2010.10677) employs feature and adversarial losses on 8→16 kHz speech, with 16 ms streaming latency.
+Neither demonstrates that 48 kHz multi-track compression recovery, 128-hop processing, or model + DSP <5 ms latency is achievable.
+Currently, priority is to correct identified scale and target competition issues. Generative priors may be explored in future, but should not be immediately replaced with large-scale GANs.
+
+No new training or re-verification of latency has been initiated. The P33 timeout, incomplete blind listening, and equipment acceptance conclusions remain valid.
+
+The frozen-budget inference ablation sets budget to 1. Gradient analysis uses
+registered batch indices 0, 5, 10 and 15 for each model. The two seeds respectively
+have 2 and 1 music recordings with zero input score: retain them in recording reports
+and means, but exclude undefined relative percentages from percentage medians.

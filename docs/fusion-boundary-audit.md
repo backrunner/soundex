@@ -1,166 +1,193 @@
-# P37：冻结模型，分离融合与检测条件
+# P37: isolate fusion and detector conditions with frozen models
 
-2026-10-22，接续[模型与 DSP 边界调研](dsp-model-boundary-review.md)。
-完成两个 P36 `compressed` 种子的全部对照，没有训练、改变 loss 或晋级权重。
-**幅度回混会抵消部分恢复，但取消融合的收益仍很小；不能把当前瓶颈全部归因于 DSP。**
+Completed 2026-10-22 following the [model/DSP boundary review](dsp-model-boundary-review.md).
+Both P36 `compressed` seeds completed every control without training, changing loss
+or promoting weights. **Magnitude remixing offsets some recovery, but removing
+fusion provides only small gains; DSP alone does not explain the current bottleneck.**
 
-## 固定协议及实现
+## Fixed protocol and implementation
 
-使用两个 431,015 参数、16,192 步冻结端点；89 个既有录音隔离片段，
-paired/identity 各一份。这里仍是复用留出复核，不是独立测试。
-模型、素材、80-hop 输出预热、监督区间和共同 MR v1 均固定，参考始终是原始未限幅无损。
-逐片段先评分，再按录音聚合；音乐 26 首，语音 54 条，不能将片段数当曲库覆盖。
+Use both frozen 431,015-parameter, 16,192-step endpoints on 89 existing recording-
+isolated clips, each in paired and identity roles. This is a reused held-out recheck,
+not an independent test. Models, material, 80-hop output warmup, supervised region
+and MR v1 remain fixed; the reference is always original unclipped lossless audio.
+Score clips first, then aggregate by recording: 26 music and 54 speech recordings.
+Clip count is not library coverage.
 
-| 输出设置 | 幅度 | 相位 | 检测/门控 |
-|---|---|---|---|
-| `current` | 现有回混 | 现有单位圆融合 | 保留 |
-| `magnitude-only` | 保留回混 | 直接预测 | 保留 |
-| `phase-only` | 直接预测 | 保留融合 | 保留 |
-| `unfused` | 直接预测 | 直接预测 | 保留 |
-| `safety-only` | 直接预测 | 直接预测 | 预热后强制 wet，仍有启动渐变 |
+| Output setting | Magnitude | Phase | Detection/gating |
+| --- | --- | --- | --- |
+| `current` | Existing remix | Existing unit-circle fusion | Retained |
+| `magnitude-only` | Existing remix | Direct prediction | Retained |
+| `phase-only` | Direct prediction | Existing fusion | Retained |
+| `unfused` | Direct prediction | Direct prediction | Retained |
+| `safety-only` | Direct prediction | Direct prediction | Forced wet after warmup, with startup fade retained |
 
-所有路径保留 OLA、安全限幅和数值边界。另对 current 输出单独修改模型输入条件：
-固定归一化 cutoff=0.5、固定 active=1，以及同时固定；采样率条件保持原值。
-这些修改从模型预热开始，实际 DSP 检测决策不变。它们仅是冻结模型的条件敏感性，
-不是移除条件并重新训练的实验，也没有叠加条件干预与输出干预来选择最佳组合。
+Every path retains OLA, safety limiting and numerical bounds. Separately, current
+output tests fixed normalized cutoff=0.5, fixed active=1 and both fixed; sample-rate
+conditioning remains real. Changes begin at model warmup; actual DSP decisions are
+unchanged. These are frozen-model sensitivity probes, not retraining without
+conditions. Condition and output interventions are not combined to select a best case.
 
-八种设置 × 两个种子 × 89 × 两种角色，共 **2,848 次 Rust 前端/ORT/DSP 回放**。
-五种输出设置的原始模型预测逐例哈希完全相同，因而隔离了输出处理的影响。
-current 原生逐片段 MR 与 P36 记录的最大差异为 **0**。
-采用实际 Rust 观测频谱的单声道代理，最大 PCM 差异 **2.98e-7**，
-低于既定 `2e-5`，没有改容差。真实立体声另走原生处理，不用独立单声道代理冒充共享门控。
+Eight settings × two seeds × 89 clips × two roles produce **2,848 Rust frontend/ORT/DSP
+replays**. Raw-prediction hashes match exactly across the five output paths, isolating
+output processing. Current native per-clip MR differs from P36 by **0**. The mono
+proxy uses actual Rust-observed spectra; maximum PCM difference is **2.98e-7**, below
+the unchanged `2e-5` tolerance. Real stereo uses native processing; independent mono
+proxies do not stand in for shared stereo gating.
 
-诊断选项仅位于 `soundex-context-replay` 与诊断构造器，不加入生产配置或权重契约。
-环境变量为 `SOUNDEX_DIAGNOSTIC_FUSION`、`SOUNDEX_DIAGNOSTIC_CONDITION`；
-默认仍是 current/native，未知值报错。
+Diagnostic options exist only in `soundex-context-replay` and diagnostic constructors,
+not production configuration or weight contracts. Environment variables are
+`SOUNDEX_DIAGNOSTIC_FUSION` and `SOUNDEX_DIAGNOSTIC_CONDITION`; defaults remain
+current/native and unknown values fail.
 
-## 输出侧结果
+## Output-side results
 
-下表是相对**同一 P36 权重、现有 DSP**的逐录音均值变化，负值较好；
-每格按种子 20261012 / 20261013 列出。不是相对未处理输入的收益。
+Recording-mean changes below compare **the same P36 weights with current DSP**;
+negative is better. Cells list seeds 20261012 / 20261013, not gains over untreated input.
 
-| 设置 | 音乐 MR | 音乐参考动态误差 | 音乐 PCM RMS | 语音 MR |
-|---|---:|---:|---:|---:|
-| 仅保留幅度融合 | −0.031% / −0.058% | +0.041% / +0.029% | +0.017% / +0.024% | −0.106% / −0.126% |
-| **仅保留相位融合** | **−0.123% / −0.137%** | **−0.109% / −0.107%** | **−0.155% / −0.166%** | **−0.472% / −0.540%** |
-| 不融合，保留门控 | −0.183% / −0.268% | −0.066% / −0.075% | −0.138% / −0.142% | −0.537% / −0.613% |
-| 合成加安全处理 | −0.183% / −0.268% | −0.066% / −0.075% | −0.138% / −0.142% | −0.537% / −0.614% |
+| Setting | Music MR | Music reference-dynamics error | Music PCM RMS | Speech MR |
+| --- | ---: | ---: | ---: | ---: |
+| Magnitude fusion only | −0.031% / −0.058% | +0.041% / +0.029% | +0.017% / +0.024% | −0.106% / −0.126% |
+| **Phase fusion only** | **−0.123% / −0.137%** | **−0.109% / −0.107%** | **−0.155% / −0.166%** | **−0.472% / −0.540%** |
+| Unfused, gating retained | −0.183% / −0.268% | −0.066% / −0.075% | −0.138% / −0.142% | −0.537% / −0.613% |
+| Synthesis plus safety | −0.183% / −0.268% | −0.066% / −0.075% | −0.138% / −0.142% | −0.537% / −0.614% |
 
-current 音乐 MR 是 `0.3787409035 / 0.3789824394`；仅保留相位融合为
-`0.3782741786 / 0.3784627003`；不融合为 `0.3780471609 / 0.3779681223`。
-仅保留相位融合的音乐逐录音 MR 是 20 胜/6 负、16 胜/10 负；没有消除反例。
-相对于 P35 同期控制，音乐动态仍约退步 0.10% / 0.13%，没有解决原筛选的全部问题。
+Current music MR is `0.3787409035 / 0.3789824394`; phase-only is
+`0.3782741786 / 0.3784627003`; unfused is `0.3780471609 / 0.3779681223`.
+Phase-only recording outcomes are 20 wins/six losses and 16 wins/10 losses, retaining
+counterexamples. Against the contemporaneous P35 control, music dynamics still
+regress about 0.10% / 0.13%; the original screen's failures are not all resolved.
 
-不融合的音乐原始 OLA 分数仍有 `0.3780627322 / 0.3779570620`。
-取消输出回混后远未接近无损，因此当前学习结果本身也需要改进。
-上一轮完美预测经过融合仍残留误差，说明接口会阻碍更强模型；
-本轮弱模型的改善有限，并不推翻该接口问题，也不能将 oracle 分数当可加的误差占比。
+Unfused raw music OLA still scores `0.3780627322 / 0.3779570620`. Removing remixing
+is far from perfect lossless recovery, so learning itself needs improvement. Prior
+oracle spectra still incur fusion error, showing an interface restriction for stronger
+models. Limited gains with these weak models do not disprove that restriction, and
+oracle scores are not additive shares of total error.
 
-频带细分也不支持“全面改善”：仅保留相位融合使 12–16 kHz 幅度误差下降
-0.155% / 0.143%、动态误差下降 0.294% / 0.272%；但 16 kHz 以上动态增加
-0.020% / 0.010%，该频带 PCM 误差增加 0.015% / 0.019%。
-0–4 kHz PCM 误差下降 0.272% / 0.289%，但动态误差增加 0.053% / 0.038%。
-所有频带、两种角色和原始/原生阶段均保留在本地报告，不按已知反例调整阈值。
+Phase-only reduces 12–16 kHz amplitude error by 0.155% / 0.143% and dynamics error by
+0.294% / 0.272%, but above 16 kHz increases dynamics by 0.020% / 0.010% and PCM error
+by 0.015% / 0.019%. At 0–4 kHz, PCM error falls 0.272% / 0.289% while dynamics error
+rises 0.053% / 0.038%. This is not uniform improvement. All bands, roles and raw/native
+stages remain in local reports; thresholds are not fitted to known counterexamples.
 
-## 恒等保护与条件输入
+## Identity preservation and conditioning
 
-取消幅度回混会增加原本无损输入上的模型改动。仅保留相位融合时，音乐 identity
-MR 比 current 增加 0.130% / 0.105%；语音 identity 增加 18.754% / 11.297%。
-直接取消全部门控也几乎没有额外 paired 收益，却令更多原本 bypass 的录音发生变化。
+Removing magnitude remixing increases model changes on lossless input. Phase-only
+music identity MR rises 0.130% / 0.105%, and speech identity MR 18.754% / 11.297%.
+Removing all gating adds almost no paired benefit but changes more previously
+bypassed recordings.
 
-语音 identity 原生 PCM RMS 的逐录音均值：
+Recording-mean native speech-identity PCM RMS:
 
-| 设置 | 种子 20261012 | 种子 20261013 |
-|---|---:|---:|
-| current | 4.64e-8 | 5.92e-8 |
-| 仅保留相位融合 | 4.71e-7 | 3.58e-7 |
-| 不融合，保留门控 | 4.82e-7 | 3.62e-7 |
-| 合成加安全处理 | 8.32e-7 | 5.29e-7 |
+| Setting | Seed 20261012 | Seed 20261013 |
+| --- | ---: | ---: |
+| Current | 4.64e-8 | 5.92e-8 |
+| Phase-only | 4.71e-7 | 3.58e-7 |
+| Unfused, gating retained | 4.82e-7 | 3.62e-7 |
+| Synthesis plus safety | 8.32e-7 | 5.29e-7 |
 
-仅保留相位融合的最差语音片段 RMS 为 `1.88e-6 / 1.67e-6`
-（−114.54 / −115.57 dBFS）。比例增大不能直接解释为可闻严重程度，也不能因绝对量小
-就认定合格。音乐 identity 相对原始参考的 RMS 均值约 8.2e-4，最差片段约 0.00954，
-其中包含既有安全限幅误差；不能将全部归为模型新增改动。
+Worst phase-only speech-clip RMS is `1.88e-6 / 1.67e-6`
+(−114.54 / −115.57 dBFS). Relative increases do not establish audible severity;
+small absolute values do not qualify the model. Music identity RMS against original
+references averages about 8.2e-4, with worst clip about 0.00954. Existing safety-limiter
+error is included and cannot all be attributed to new model changes.
 
-固定 cutoff 的 current 输出，音乐 MR 改善 0.161% / 0.171%；
-只固定 active 改善 0.006% / 0.013%；同时固定改善 0.173% / 0.189%。
-同时固定时语音 MR 改善 0.151% / 0.195%，但语音动态增加 0.061% / 0.053%。
-说明条件确实影响预测，cutoff 比 active 更值得继续检查；
-**不能据此认定检测器依赖是主因，也不能声称去条件训练已经有效。**
+With current output, fixed cutoff improves music MR by 0.161% / 0.171%, fixed active
+by 0.006% / 0.013%, and both fixed by 0.173% / 0.189%. Fixing both improves speech MR
+by 0.151% / 0.195% but worsens speech dynamics by 0.061% / 0.053%. Conditions affect
+predictions, with cutoff more influential here. **This does not establish detector
+dependence as the main cause or show that retraining without conditions succeeds.**
 
-## 连续性、立体声和时延
+## Continuity, stereo and timing
 
-补充使用一首既有真实立体声录音的同一原始 4 秒区间，44.1/48 kHz、MP3 CBR96
-实际编码且对齐，两个种子、五种输出设置。每组覆盖 paired、identity、静音、
-左声道静音、右声道独立单声道以及未来输入扰动，累计 **120 次原生回放**。
-这是有限诊断，不是新独立曲库测试。音乐类别、地区和复杂声像的覆盖仍不足。
+A supplement uses the same original four-second interval of one existing true-stereo
+recording, actually encoded/aligned as MP3 CBR96 at 44.1/48 kHz. Two seeds and five
+paths each cover paired, identity, silence, silent left channel, independent mono
+right channel and future-input perturbation: **120 native replays**. This is a limited
+diagnostic, not a new independent library test; genre, region and complex stereo
+coverage remain insufficient.
 
-- 修改后半段输入时，此前输出差异为 0，未发现未来读取。
-- 静音峰值最多 `8.73e-15`，静音左声道 RMS 最多 `3.10e-15`。
-- 同一右声道的单声道/立体声处理最大差异 `5.96e-8`，未发现明显串声。
-- 仅保留相位融合在该录音四个种子/采样率组合的 paired MR、动态和参考接缝差值均改善；
-  identity 的 MR 仍增加。报告包括 M/S 误差、逐物理声道 PCM 与参考相邻采样变化，
-  不把较平滑等同于更接近真实瞬态，也未以该单曲通过替代盲听。
+- Changing the latter input half changes earlier output by 0; no future reading was found.
+- Maximum silence peak is `8.73e-15`; silent-left RMS is at most `3.10e-15`.
+- Maximum mono/stereo difference for the same right channel is `5.96e-8`, with no
+  evident crosstalk in this probe.
+- Phase-only improves paired MR, dynamics and reference-relative seam changes in all
+  four seed/rate combinations for this recording, but identity MR still rises.
+  Reports include M/S error, physical-channel PCM and reference-relative adjacent
+  sample changes. Smoother output is not automatically more faithful to transients;
+  this one recording does not replace blind listening.
 
-两种采样率、两个种子、五种设置，真实 CPU ORT 加 DSP，共 **120,000 个计时 hop**
-（100,000 burst、20,000 paced）。立体声合成多音性能刺激，每进程先排除 100 hop 预热。
+Two rates, two seeds and five paths yield **120,000 CPU ORT-plus-DSP timing hops**:
+100,000 burst and 20,000 paced, using a synthetic stereo multitone. Exclude the first
+100 warmup hops in each process.
 
-| 项目 | 结果 |
-|---|---:|
-| 最大总计算耗时 | **0.992 ms** |
-| 各场景最高 P99 | **0.594 ms** |
-| ≥5 ms / 超 hop 周期 / paced 迟到 | **0 / 0 / 0** |
-| 峰值进程 RSS | **30.16 MiB** |
-| burst 累计 CPU / 墙钟 | 14.75 s / 14.82 s |
-| paced 累计 CPU / 墙钟 | 9.35 s / 61.97 s |
+| Metric | Result |
+| --- | ---: |
+| Maximum compute | **0.992 ms** |
+| Highest scenario p99 | **0.594 ms** |
+| ≥5 ms / service over hop / paced late | **0 / 0 / 0** |
+| Peak process RSS | **30.16 MiB** |
+| Burst summed CPU / wall time | 14.75 s / 14.82 s |
+| Paced summed CPU / wall time | 9.35 s / 61.97 s |
 
-CPU 统计包含进程初始化和报告开销。诊断实现仍执行部分随后被覆盖的融合计算，
-这不是优化后生产实现的性能排名。固定 256 帧缓冲仍为 48 kHz 下 5.33 ms、
-44.1 kHz 下 5.80 ms；不得将小于 1 ms 的计算耗时说成总输出延迟。
-没有完成真实音频设备、回调队列、故障恢复与长时间运行验收。
+Process CPU includes startup/reporting. Diagnostic paths still execute some fusion
+work before overriding it, so this is not a ranking of optimized production paths.
+Fixed 256-frame buffering remains 5.33 ms at 48 kHz and 5.80 ms at 44.1 kHz; sub-1 ms
+compute is not total output delay. Real devices, callback queues, failure recovery
+and long-duration operation remain unqualified. Later P38/P39 timing failures must
+also be retained, rather than superseded by this passing run.
 
-## 下一步决策
+## Decision at completion
 
-1. **输出接口优先试验取消幅度二次回混，暂保留相位融合和门控作为保护性对照。**
-   这只是研究方向，既有 identity 和局部频带反例尚未解决，不改生产默认。
-   不融合路径继续作上界诊断；不将启发式相位融合永久当成正确答案。
-2. **保持完整无损谱/复数残差的明确输出定义与直接监督。** OLA 后的多分辨率监督
-   仍针对原始无损；不让模型通过完整限幅链反传去学习反限幅或抵消强度旋钮。
-   本轮没有支持删除安全控制，也没有支持仅调整 DSP 就能突破当前恢复能力。
-3. **下一轮仍从同一小模型隔离检测条件。** 用同初始化、原抽样顺序、两种子、各
-   16,192 步控制和固定 cutoff/active 训练对照；保留 rate，统一从第一预热帧应用条件。
-   两组均用原直接谱目标/identity 1.0，不同时改动态权重、模型规模或预算。
-   端点全部冻结后，以 current 与仅相位融合两种路径共同复核；不能用本轮推理干预
-   代替训练消融。该训练尚未执行，也尚未形成正式运行登记。
+1. Investigate removal of magnitude remixing while retaining phase fusion/gating as
+   protective controls. Identity/local-band failures remain, so production defaults
+   do not change. Unfused remains a diagnostic; heuristic phase fusion is not assumed
+   permanently correct.
+2. Preserve explicit full lossless-spectrum/complex-residual output semantics and
+   direct supervision. Post-OLA MR targets the original lossless source. Do not train
+   through full limiting to learn inverse limiting or compensation for an intensity
+   knob. These results justify neither removing safety nor expecting DSP-only changes
+   to solve recovery.
+3. Isolate conditions in the same small model: identical initialization/schedules,
+   two seeds, 16,192 steps, control versus fixed cutoff/active, real rate, and conditions
+   applied from the first warmup frame. Keep direct targets, identity 1.0, dynamics,
+   size and budget unchanged. Freeze all endpoints, then review current/phase-only
+   paths. At P37 completion this training had not started; [P38](detector-condition-study.md)
+   subsequently completed it and rejected the fixed-condition route.
 
-当时独立 MPS 张量加法报 Metal 编译服务连接失败（`MTLCompilerService`、error 141）。
-后续 [P38 启动核查](detector-condition-study.md)纠正了阻塞判断：P36 实验执行器本来
-使用 CPU，Metal 故障不影响沿用相同设备启动这一对照。P37 自身没有执行新训练。
+The independent MPS addition probe failed with `MTLCompilerService` connection
+error 141. P38 startup corrected the blocking inference: P36 already used CPU, so
+Metal failure did not prevent the same-device comparison. P37 itself trained no model.
 
-## 工程检查与证据
+## Engineering checks and retained failures
 
-- Python CPU 套件 **648 passed，7 个 MPS 项未验证**；不能写成全平台通过。
-  系统 FFmpeg 缺少 x265 动态库，验证仅在进程 PATH 中使用已有 imageio FFmpeg 7.1，
-  未修改系统安装。新增四项消融测试通过，oracle 测试使用实际不同的观测/参考。
-- Rust core 单元 **39 passed，1 项 30 分钟压力测试 ignored**；默认及无 ORT 的
-  Clippy、Rust fmt、相关 Python Ruff/format 通过。
-- `training/scripts/audit_fusion_boundaries.py` 提供冻结注册、源码/模型哈希、全部
-  设置回放、预测不变检查、代理对应、逐录音和 PCM 评分。正式证据目录：
-  `data/runs/fusion-p37-20261022/`，登记 SHA-256
-  `872ca412748e3c086007a66d30c48272753360eb28f091b9c6769bfbc86d78e8`。
-- 正式运行的冻结二进制 SHA-256：
-  `a2b5539eca1a66214cd63f0bd5ff65e9fc94300ffce635887a435ef2a162896f`。
-  后续只修正无 ORT 编译条件和报告范围文字；正式结果仍绑定旧冻结文件。
-- 正式源码快照最初只收录 Python，补充脚本导入时发现缺 `parity_policy.json`；
-  已加资源副本及 `snapshot-resources.json` 旁证，未重写正式登记。
-  后续执行器将该资源一起注册和核验；正式执行源码与修复后的执行器明确分开。
-  修复版本在 `data/runs/fusion-p37-final-preflight-20261022/` 完成全部设置的
-  64 次原生预检，与正式运行对应片段的原始/原生 MR 差异均为 0；
-  最大代理差异 `2.38e-7`，冻结资源哈希及独立导入通过。
-- 立体声、频带汇总和性能证据位于
-  `data/runs/fusion-p37-supplement-20261022/`。本地原始音频、模型和报告均不推送。
+- Python CPU: **648 passed, seven MPS items unverified**; not an all-platform pass.
+  System FFmpeg lacked x265; the existing imageio FFmpeg 7.1 was used only in process
+  PATH. Four new ablation tests pass; oracle tests use genuinely different observations
+  and references.
+- Rust core: **39 passed, one 30-minute stress test ignored**. Default/no-ORT Clippy,
+  Rust fmt and relevant Python Ruff/format pass.
+- `training/scripts/audit_fusion_boundaries.py` registers hashes, every setting,
+  prediction invariance, proxy parity, recording scores and PCM errors. Formal evidence:
+  `data/runs/fusion-p37-20261022/`; registration SHA-256
+  `872ca412748e3c086007a66d30c48272753360eb28f091b9c6769bfbc86d78e8`.
+- Frozen formal binary SHA-256:
+  `a2b5539eca1a66214cd63f0bd5ff65e9fc94300ffce635887a435ef2a162896f`.
+  Later fixes address no-ORT conditional compilation and reporting scope; formal
+  measurements still bind to the original frozen binary.
+- The initial formal snapshot contained Python but omitted `parity_policy.json`,
+  discovered when importing the supplement. A resource copy and
+  `snapshot-resources.json` were added as supplemental evidence without rewriting
+  registration. Later executors register/check this resource explicitly. The fixed
+  executor remains distinct from the formal source. All-setting preflight in
+  `data/runs/fusion-p37-final-preflight-20261022/` completed 64 native roles: matching
+  raw/native MR differs from formal clips by 0, maximum proxy error is `2.38e-7`,
+  and frozen resource hashes/standalone imports pass.
+- Stereo, band summaries and timing are under
+  `data/runs/fusion-p37-supplement-20261022/`. Original audio, weights and reports
+  remain local and are not pushed.
 
-复核命令（使用新目录，拒绝覆盖已有证据）：
+Use a new output directory; existing evidence cannot be overwritten:
 
 ```bash
 rtk proxy env PYTHONPATH=training OMP_NUM_THREADS=1 training/.venv/bin/python \

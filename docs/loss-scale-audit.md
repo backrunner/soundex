@@ -1,119 +1,143 @@
-# P14：频谱 loss、梯度与合成链审计
+# P14: Spectral Loss, Gradients, and Synthesis Chain Audit
 
-## 结论
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-本轮没有改训练目标、模型、默认权重或运行时。审计发现：
+## Conclusion
 
-- loss 分解与原实现的数值和梯度一致，未发现本轮覆盖范围内的算式实现错误。
-- 开发音乐的损伤包含真实频谱误补。降低高频权重或增加归一化下限，不能直接当作修复。
-- 严重反例中，频带混合后的逐帧频谱经过 OLA（重叠相加）再分析，误差明显放大；
-  两个反例没有进入限幅区。下一步应优先定位跨帧重建不一致及跨频带串扰。
-- 不代表 OLA 算法本身有 bug，也不证明该机制解释所有泛化损伤。
-  当前模型本来就通过 DSP 输出计算 loss；这里揭示的是它在未见录音上的失效形式，
-  不能再把“加入 DSP loss”当作尚未尝试的解决方案。
+This round did not modify the training objective, model architecture, default weights, or runtime behavior. The audit reveals:
 
-## 审计范围与证据
+- Spectral loss decomposition matches the original implementation in both numerical values and gradients; no arithmetic errors were detected within the scope of this round.
+- Development music exhibits actual spectral misfilling. Reducing high-frequency weights or increasing the lower bound of normalization does not constitute a direct fix.
+- In severe counterexamples, the per-frame spectral content after inter-band mixing is analyzed again via OLA (Overlap-Add) and shows significantly amplified errors.
+  - Neither of the two counterexamples entered the clipping region. Next, we should prioritize identifying inconsistencies across frames and inter-band crosstalk.
+- This does not indicate a bug in the OLA algorithm itself, nor does it prove that this mechanism explains all generalization failures.
+  - The current model already computes loss through DSP output; what is revealed here is its failure mode on unseen recordings.
+  - It is no longer valid to treat "adding a DSP loss term" as an untried solution.
 
-以 P13 多位置组为输入，固定初始模型和两个种子的 step 2048，不选择新候选。
-全部 320 个训练位置（256 音乐、64 语音）及 89 个复用开发片段（33 音乐、56 语音）
-均覆盖；共 1,227 对预测、2,454 个成对/identity 角色案例。
-训练位置仍来自 40 段录音，不能把 320 位置当作 320 独立录音。
+## Audit Scope and Evidence
 
-为每个案例记录：各频带参考/输出 RMS、绝对误差、相对全谱误差、归一化下限、
-幅度与时间差分 loss、渲染后幅度坐标梯度、经 DSP 返回原始预测的梯度、
-模型参数梯度，以及成对恢复与 identity 参数梯度夹角。
-梯度均来自冻结模型的单对案例，不是原训练 minibatch 的历史梯度或 Adam 更新。
-没有依据这些梯度宣称原训练发生了梯度爆炸或频繁触发裁剪。
+Using the P13 multi-location set as input, with fixed initial model and two seeds at step 2048, no new candidates were selected.
+All 320 training positions (256 music, 64 speech) and 89 reused development snippets (33 music, 56 speech) are covered; a total of 1,227 prediction pairs and 2,454 paired/identity role cases.
+Training positions still originate from 40 audio recordings—thus, the 320 positions do not represent 320 independent recordings.
 
-另外对两个种子均位列开发音乐总分最差前三的片段，回放初始模型及两个最终模型：
-3 片段 × 2 角色 × 3 模型，共 18 次真实 Rust DSP 诊断回放。
-这是明确的事后反例诊断，不能作为新的质量验收集或外推全部音乐。
-最大代理/原生波形绝对误差 `2.980232238769531e-7`，小于原 `2e-5` 容差。
+For each case, we recorded:
+- RMS values of reference and output per band
+- Absolute error
+- Relative full-spectrum error
+- Normalization lower bound
+- Amplitude and time-difference loss
+- Rendered amplitude coordinate gradients
+- Gradients returned from DSP after receiving raw predictions
+- Model parameter gradients
+- Cosine angle between paired recovery and identity parameter gradients
 
-主审计源码冻结于 `81257f95415adff11e5d4d1e4c46397435311170`，
-P13 checkpoint、完成回执、采样表、评分文件、manifest 和 native 契约均校验哈希。
-后处理与分阶段脚本另外记录源码哈希；分阶段比较使用相同 frame 89 至末尾有效帧，
-identity 在每一阶段都使用该阶段的初始输出作参考，避免混入原有 limiter 失真。
+All gradients were computed from a frozen model on individual pairs—**not** from historical gradients in the original training minibatch or Adam updates.
+No claims are made that the original training experienced gradient explosion or frequent clipping based on these gradients.
 
-## 结果
+Additionally, for two seeds that ranked in the top three worst development music snippets overall, we replayed the initial and final models:
+- 3 snippets × 2 roles × 3 models = 18 real-time Rust DSP diagnostics.
+- This constitutes a post-hoc counterexample diagnosis and cannot be used as a new quality validation set or for generalization across music.
+- Maximum proxy/original waveform absolute error: `2.980232238769531e-7`, which is less than the original `2e-5` tolerance.
 
-### 训练侧和开发侧差距
+The primary audit code is frozen at commit `81257f95415adff11e5d4d1e4c46397435311170`.
+P13 checkpoint, completion receipts, sample lists, scoring files, manifest, and native contract hashes have all been verified.
+Post-processing and stage-by-stage scripts independently record source code hashes.
+Stage comparisons use the same frame range from 89 to the end of valid frames.
+For identity, each stage uses the output from that stage’s initial pass as reference, avoiding contamination from prior limiter distortion.
 
-下面均为音乐内部的逐案例均值。identity loss 衡量相对初始 DSP 的额外损伤。
+## Results
 
-| 指标 | 种子 20261012 | 种子 20261013 |
+### Training vs. Development Gap
+
+All values below are per-case averages within music. Identity loss measures additional degradation relative to the initial DSP.
+
+| Metric | Seed 20261012 | Seed 20261013 |
 | --- | ---: | ---: |
-| 训练位置成对恢复 loss | 0.572272 | 0.572836 |
-| 开发成对恢复 loss | 0.734712 | 0.719533 |
-| 训练位置 identity loss | 0.009352 | 0.012118 |
-| 开发 identity loss | 0.198158 | 0.179015 |
-| 开发 identity 的 16 kHz 以上频谱项 | 0.146681 | 0.135564 |
+| Paired recovery loss (training) | 0.572272 | 0.572836 |
+| Paired recovery loss (development) | 0.734712 | 0.719533 |
+| Identity loss (training) | 0.009352 | 0.012118 |
+| Identity loss (development) | 0.198158 | 0.179015 |
+| High-frequency (16 kHz+) in development identity | 0.146681 | 0.135564 |
 
-初始成对恢复 loss：训练位置 0.598178、开发 0.588365；初始 identity 增量为零。
-开发 identity 损伤约 74% / 76% 来自 16 kHz 以上频谱项。
-这些是误差比例，不是主观音质损失比例。
+Initial paired recovery loss: training = 0.598178, development = 0.588365; initial identity delta is zero.
+Development identity degradation accounts for approximately 74% / 76% of the loss in the 16 kHz+ spectral components.
+These are error ratios, not subjective perceptual quality loss ratios.
 
-训练音乐中 16 kHz 以上参考能量低于归一化下限的比例为 38/256（14.8%），
-开发为 3/33（9.1%）。弱高频并非训练集中完全缺失；需要进一步检查局部频谱边缘、
-时间变化和模型修正方式，不能只增加“弱高频”标签的抽样权重。
+In training music, 38 out of 256 (14.8%) have reference energy below the normalization lower bound in the 16 kHz+ band.
+In development, only 3 out of 33 (9.1%) fall below the threshold.
+High-frequency content is not entirely absent from the training set; further investigation into local spectral edges, temporal dynamics, and model correction behavior is required.
+Adding sampling weight for "weak high frequencies" alone is insufficient.
 
-训练音乐最终单对平均风险的参数梯度 L2 中位数为 0.399 / 0.378，
-最大值 2.697 / 3.938；对应开发最大值 77.528 / 59.830。
-严重反例的成对恢复与 identity 梯度余弦为 0.956 至 0.9997：
-在这些案例上，两项要求大体一致，不能把其损伤简单解释为两项 loss 互相冲突。
-这不排除不同录音间存在梯度冲突，也不反推训练历史稳定性。
+The median L2 norm of final per-pair risk parameter gradients in training is 0.399 / 0.378, with maximums of 2.697 / 3.938.
+Corresponding development maxima are 77.528 / 59.830.
+In severe counterexamples, the cosine between paired recovery and identity gradients ranges from 0.956 to 0.9997:
+- On these cases, both losses are largely aligned, so the degradation cannot be simply attributed to conflicting loss objectives.
+- This does not rule out gradient conflicts across different recordings, nor does it imply instability in the training history.
 
-### 放大发生在哪个阶段
+### Where Amplification Occurs
 
-以下只比较 identity 的频谱项，包含参考时间差分，不含波形项；数值越低越好。
+The following compares only spectral components (excluding waveform terms), including time-differenced reference bands. Lower values are better.
 
-| 音乐范围 / 种子 | 频带混合后的逐帧频谱 | OLA 后再分析 | 最终限幅输出 |
+| Music Range / Seed | Post-mix per-frame spectrum | After OLA re-analysis | Final limited output |
 | --- | ---: | ---: | ---: |
-| 训练 / 20261012 | 0.009937 | 0.009505 | 0.009327 |
-| 训练 / 20261013 | 0.012853 | 0.012231 | 0.012057 |
-| 开发 / 20261012 | 0.117986 | 0.203507 | 0.197676 |
-| 开发 / 20261013 | 0.107732 | 0.184107 | 0.178389 |
+| Training / 20261012 | 0.009937 | 0.009505 | 0.009327 |
+| Training / 20261013 | 0.012853 | 0.012231 | 0.012057 |
+| Development / 20261012 | 0.117986 | 0.203507 | 0.197676 |
+| Development / 20261013 | 0.107732 | 0.184107 | 0.178389 |
 
-严重 blues 反例 `9d95e7f035f878fa1a6ab421`：
+Severe blues counterexample `9d95e7f035f878fa1a6ab421`:
 
-| 种子 | 混合后频谱项 | OLA 后频谱项 | 最终频谱项 | 限幅前峰值 |
+| Seed | Post-mix spectral | After OLA | Final spectral | Peak before limiter |
 | --- | ---: | ---: | ---: | ---: |
 | 20261012 | 0.092319 | 2.273647 | 2.273647 | 0.690754 |
 | 20261013 | 0.061887 | 2.087301 | 2.087301 | 0.690739 |
 
-两个峰值均低于 0.855 限幅起点，评分区域 gate=1；这个反例的放大出现在 OLA 合成，
-不是 limiter 或 gate 开关。最终 16 kHz 以上能量相对 identity 参考高约 25.10 / 24.45 dB。
-参考频带很弱，因此该相对能量变化不能直接解释为整体响度变化或已证实可闻的噪音。
-另一个 unlabeled 反例在 8–12 kHz 出现主要损伤，同样没有触发限幅；
-不能只给 16 kHz 以上加特殊规则。
+The scoring region has gate=1. Both peaks remain below 0.855—the limiter threshold—so the amplification occurs during OLA synthesis, **not** due to limiter or gate switching.
+The final 16 kHz+ energy relative to identity reference is elevated by approximately 25.10 dB / 24.45 dB.
+Given the weak reference bandwidth, this relative energy change cannot be directly interpreted as a perceptible loudness change or verified audible noise.
+Another unlabeled counterexample shows primary degradation in the 8–12 kHz band, also without triggering clipping.
+No special rules should be applied only to the 16 kHz+ band.
 
-## 下一轮方向
+## Next-Phase Direction
 
-1. 在冻结预测上逐频带隔离修正残差，测量 OLA 后各频带的误差传递，确认是邻频串扰、
-   跨帧变化还是其他机制。训练侧同步做同类诊断；开发反例只用于说明，不能进入训练。
-2. 若确认是合成不一致，再注册“原目标 / 加入合成一致性辅助约束”的单因素对照。
-   固定模型、P13 多位置采样、预算和种子；辅助项尺度只能用训练材料校准。
-   不能只要求平滑，也不能惩罚参考中本来存在的瞬态变化。
-3. 仍以原始无损参考及固定 P13 指标验收，同时报告真正的高频恢复和 identity 损伤；
-   回退到恒等输出不是成功。若没有跨录音改善，转向更多录音覆盖或表示结构对照。
+1. Perform per-band isolation correction of residual errors on frozen predictions, and measure error propagation after OLA synthesis per band.
+   Confirm whether the degradation stems from adjacent-band crosstalk, inter-frame inconsistencies, or other mechanisms.
+   Perform parallel diagnostics on the training side.
+   Development counterexamples are for diagnostic use only and **must not be used in training**.
 
-本轮没有启动新的权重训练；先完成上述机制隔离后再确定辅助项，避免凭一个均值改 loss。
-模型参数量、导出预算与实时执行路径不变；没有新增盲听或实时合格结论。
+2. If confirmed as synthesis inconsistency, register a single-factor control experiment:
+   "Original objective + added synthesis consistency auxiliary constraint."
+   - Fix model, P13 multi-location sampling, budget, and seed.
+   - Auxiliary term scale must be calibrated using training data only.
+   - Do not require smoothness, nor penalize transient changes that exist in the reference.
 
-## 复现与本地产物
+3. Continue using original lossless references and fixed P13 metrics for acceptance.
+   Report actual high-frequency recovery and identity degradation.
+   Retreating to identity output is not a success.
+   If no improvement across recordings, shift toward broader audio coverage or structural alignment.
 
-根目录 `data/runs/loss-audit-p14-20261013/`（全部忽略，不推送素材或检查点）：
+No new weight training was initiated in this round.
+We must complete the above mechanism isolation before introducing auxiliary terms, to avoid baseless loss modifications based on a single average.
+Model parameter count, export budget, and real-time execution path remain unchanged.
+No new blind listening or real-time pass judgment has been conducted.
 
-- `audit/registration.json`、`audit/summary.json`：输入登记与产物哈希。
-- `audit/{training_bank,development}-{initial,final-20261012,final-20261013}.json`：完整逐例数据。
-- `audit/analysis.json`：分语料汇总及分位数。
-- `render-stages-common.json`：相同有效帧支持下的分阶段比较；使用这一版作正式阶段诊断。
+## Reproducibility and Local Artifacts
 
-脚本为 `training/scripts/audit_loss_scale.py`、`analyze_loss_scale.py`、
-`audit_render_stages.py`。生产 loss 和推理实现保持不变。
+Root directory: `data/runs/loss-audit-p14-20261013/` (all content ignored; no materials or checkpoints pushed)
 
-验证：441 项本地 Python 测试通过，Ruff lint/format 与 diff 检查通过。
-覆盖 loss 数值/梯度一致性、静音及弱能量、有限差分、冻结权重不变、
-分阶段帧支持相同及最终输出与原 render 一致。
-[主审计冻结代码 CI](https://github.com/backrunner/soundex/actions/runs/38394842452)已通过；
-后处理脚本的最新远程 CI 以仓库实际状态为准。
+- `audit/registration.json`, `audit/summary.json`: Input registration and output hash records.
+- `audit/development-{initial,final-20261012,final-20261013}.json`, `audit/training-{initial,final-20261012,final-20261013}.json`: Full per-case data.
+- `audit/analysis.json`: Per-linguistic and per-percentile summaries.
+- `render-stages-common.json`: Stage-by-stage comparison across identical valid frame ranges; this version is used for official stage-level diagnosis.
+
+Scripts: `training/scripts/audit_loss_scale.py`, `analyze_loss_scale.py`, `audit_render_stages.py`
+Production loss and inference implementations remain unchanged.
+
+Verification: 441 local Python tests passed. Ruff lint/format and diff checks passed.
+Coverage includes: loss value and gradient consistency, silence and low-energy cases, finite difference, frozen weights, frame alignment across stages, and final output matching original render.
+[Main audit frozen code CI](https://github.com/backrunner/soundex/actions/runs/38394842452) passed;
+latest remote CI for post-processing scripts is valid as of the repository's current state.
+
+Complete per-case evidence is retained in `audit/{training_bank,development}-{initial,final-20261012,final-20261013}.json`, under the local audit root. It includes the original counterexamples; no threshold is fitted to a single case.

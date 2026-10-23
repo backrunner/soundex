@@ -1,222 +1,180 @@
-# 2026-10-10 高频恢复优化记录
+# 2026-10-10 High-Frequency Recovery Optimization Log
 
-## 判断目标与当前决策
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-目标见 [AGENTS.md](../AGENTS.md) 与[高频 inpainting 设计](inpainting-objective.md)：
-恢复压缩缺失的高频，并通过模型与 DSP 协作使最终音频接近原始无损参考。
-波形改善只是一个约束，不以“减少增强”替代恢复效果。
-本次开发候选与报告保留在本地，不构成独立测试、盲听或正式发布资格。
+## Decision Target and Current Assessment
 
-所有续训从原生无损音乐/VCTK 的 epoch168 初始化，只加载生成器；优化器与判别器
-重新开始，不使用 GAN。配方 `7fda9e58…`、manifest 集 `a1401918…` 与原训练相同，
-音乐/语音实际抽样为 253/254 与 1/254。没有新增或重新引入 MUSDB、Slakh 数据。
-父 checkpoint SHA-256 为 `a4fed7e7f4a463c01213d2a0705286c85a63b8e3b34c6681dcd9124cf7530650`。
-原源码收据差异仍按[损失审计](loss-audit-20261010.md)公开区分，不改写旧 artifact 字节。
+Target defined in [AGENTS.md](../AGENTS.md) and [High-Frequency Inpainting Design](inpainting-objective.md):
+Recover missing high-frequency content from compressed audio, and through collaboration between model and DSP, achieve output that closely approximates the original lossless reference.
+Waveform improvement is a constraint only; it does not serve as a substitute for effective high-frequency recovery.
+Candidate developments and reports are retained locally and do not constitute independent testing, blind listening, or formal release eligibility.
 
-## 先前的单因素续训
+All continuation training begins from native lossless music/VCTK at epoch168, loading only the generator. Optimizers and discriminators are reinitialized; GANs are not used. Recipe `7fda9e58…`, manifest set `a1401918…`, and original training configuration remain identical. Actual music/voice samples are drawn from 253/254 and 1/254. No new or reintroduced datasets (MUSDB, Slakh) are used.
+Parent checkpoint SHA-256 is `a4fed7e7f4a463c01213d2a0705286c85a63b8e3b34c6681dcd9124cf7530650`.
+Source code divergence is still publicly disclosed per [Loss Audit](loss-audit-20261010.md), and no old artifact bytes are rewritten.
 
-高频权重 4 倍、以及冻结 BatchNorm 统计的两份候选各完成 8 轮/1024 updates，分别
-选中 epoch1 与 epoch4。两份 ONNX 均为 3,309,786 字节，13 个跨运行时数值案例通过。
+## Prior Single-Factor Continuation Training
 
-共同 CPU FP32 单线程、同 896 验证行、同 V2 权重下的比较：
+Two candidates were trained:
+- 4x higher high-frequency weight
+- Freezing BatchNorm statistics
 
-| 指标 | 原 epoch168 | 高频权重 4 倍候选 | 冻结统计候选 |
+Each completed 8 epochs / 1024 updates, selected at epoch1 and epoch4. Both ONNX files are 3,309,786 bytes (13 cross-runtime numerical cases passed).
+
+Common CPU FP32 single-threaded, 896 validation rows, V2 weights-based comparison:
+
+| Metric | Original epoch168 | 4x High-Frequency Weight | Frozen Statistics |
 |---|---:|---:|---:|
-| 共同 V2 total | 1.568438 | 1.573078 | 1.566426 |
-| 高频幅度 dB | 10.871966 | 10.930850 | 10.854841 |
-| 原始波形 L1 | 0.006845969 | 0.006845560 | 0.006844368 |
+| V2 Total | 1.568438 | 1.573078 | 1.566426 |
+| High-Frequency Amplitude (dB) | 10.871966 | 10.930850 | 10.854841 |
+| Raw Waveform L1 | 0.006845969 | 0.006845560 | 0.006844368 |
 
-真实 Rust 验证用固定覆盖集合 89 行/80 录音，其中音乐 33 行/26 录音、语音
-56 行/54 录音，覆盖所有已选录音、品类、角色、语料/codec/采样率组合。
-这个覆盖总体不是训练抽样比例，也不是预期播放分布。
+Rust-based validation uses a fixed coverage set of 89 rows / 80 recordings:
+- Music: 33 rows / 26 recordings
+- Speech: 56 rows / 54 recordings
+This coverage includes all selected recordings, genres, speakers, and language/codec/sample rate combinations.
+This set is not representative of training sampling distribution nor expected playback distribution.
 
-| 部署指标 | 原 epoch168 | 高频权重候选 | 冻结统计候选 |
+| Deployment Metrics | Original epoch168 | High-Frequency Weight Candidate | Frozen Statistics Candidate |
 |---|---:|---:|---:|
-| 高频 LSD dB，越低越好 | 20.297498 | 20.218301 | 20.523769 |
-| 高频能量误差 dB，越低越好 | 4.121040 | 4.123657 | 4.232135 |
-| SI-SDR dB，越高越好 | 28.261367 | 28.269559 | 28.284253 |
-| 低频保留 LSD dB，越低越好 | 3.940090 | 3.975398 | 3.790242 |
+| High-Frequency LSD (dB), lower is better | 20.297498 | 20.218301 | 20.523769 |
+| High-Frequency Energy Error (dB), lower is better | 4.121040 | 4.123657 | 4.232135 |
+| SI-SDR (dB), higher is better | 28.261367 | 28.269559 | 28.284253 |
+| Low-Frequency Preservation LSD (dB), lower is better | 3.940090 | 3.975398 | 3.790242 |
 
-高频权重候选的配对高频 LSD 变化为 -0.079197，录音聚类 95% CI
-[-0.186249, 0.053353]；低频保留误差增加 0.035308 [0.004249, 0.066008]。
-冻结统计候选高频 LSD 增加 0.226272 [0.067155, 0.415446]，高频能量误差也增加。
-两者均未提升为默认权重。冻结统计对音乐的高频 LSD 改善 -0.147317 的区间仍跨零，
-语音则退化 +0.446422 [0.239853, 0.712943]。
+The high-frequency weight candidate shows a paired high-frequency LSD improvement of -0.079197, with 95% CI [-0.186249, 0.053353]; low-frequency preservation error increases by +0.035308 [0.004249, 0.066008].
+The frozen statistics candidate shows a high-frequency LSD increase of +0.226272 [0.067155, 0.415446], with corresponding increase in high-frequency energy error.
+Neither approach improves upon baseline weights. For music, the high-frequency LSD improvement of -0.147317 remains statistically non-significant (crosses zero); for speech, degradation occurs by +0.446422 [0.239853, 0.712943].
 
-单独保留输入相位的诊断保持原模型幅度输出逐位不变，SI-SDR 增加 0.138593，
-但高频 LSD 增加 1.152563 [0.444060, 1.948102]；按本项目目标同样不采用。
-这些结果不能将问题单独归因于架构、BatchNorm 或训练不足。
+Isolating input phase preservation yielded unchanged magnitude output per bit, with SI-SDR increasing by +0.138593, but high-frequency LSD increasing by +1.152563 [0.444060, 1.948102]. This result does not support attributing performance degradation to architecture, BatchNorm, or training deficiency alone.
+No single factor can be isolated as the root cause.
 
-## 神经 / DSP / 组合路径对照
+## Neural / DSP / Hybrid Pathway Comparison
 
-使用同一原 epoch168 ONNX、同一 Rust 二进制和上述 89 行/80 录音。`Neural`
-包含已有分频/响度/相位/限幅处理；不是移除全部 DSP 的裸模型输出。
-DSP 与 Hybrid 的详细算法和重现命令见[设计文档](inpainting-objective.md)。
+Using the same original epoch168 ONNX, same Rust binary, and 89 rows / 80 recordings:
 
-| 部署指标 | 压缩输入 | Neural | DSP | Hybrid |
+| Deployment Metric | Compressed Input | Neural | DSP | Hybrid |
 |---|---:|---:|---:|---:|
-| 高频 LSD dB | 45.260553 | 20.297498 | 28.010917 | 20.387972 |
-| 高频谱收敛 | 0.766668 | 0.764139 | 1.496539 | 0.764212 |
-| 高频能量误差 dB | 5.604920 | 4.121040 | 4.157431 | 4.212022 |
-| 高频正向 spectral flux 误差 | 0.896177 | 1.045593 | 1.823120 | 1.041811 |
+| High-Frequency LSD (dB) | 45.260553 | 20.297498 | 28.010917 | 20.387972 |
+| High-Frequency Spectral Convergence | 0.766668 | 0.764139 | 1.496539 | 0.764212 |
+| High-Frequency Energy Error (dB) | 5.604920 | 4.121040 | 4.157431 | 4.212022 |
+| High-Frequency Forward Spectral Flux Error | 0.896177 | 1.045593 | 1.823120 | 1.041811 |
 | SI-SDR dB | 28.707313 | 28.261367 | 28.592249 | 28.265583 |
 
-组合路径约束 DSP 候选的子带功率、保留模型相位，相比最初的幅度/相位直接混合
-试验已减少退化。最终组合路径的瞬态指标配对变化 -0.003782，95% CI
-[-0.008717, -0.000893]，但高频 LSD 增加 0.090474 [0.069217, 0.112537]，
-能量误差增加 0.090983 [0.070792, 0.111446]。**仍不启用为默认路径。**
+The hybrid path constrains DSP subband power and retains model phase, reducing degradation compared to direct amplitude/phase mixing. The final hybrid path shows a transient metric change of -0.003782, 95% CI [-0.008717, -0.000893], but a high-frequency LSD increase of +0.090474 [0.069217, 0.112537], and energy error increase of +0.090983 [0.070792, 0.111446]. **This path is not activated as default.**
 
-单独 DSP 的音乐谱收敛与瞬态误差尤其差，说明从保留频段搬移纹理、控制能量与
-输出安全仍不足以证明恢复了正确细节。所有路径输出有限，峰值 <0.95，两个任意
-分块模式误差为零；这不构成没有听感伪影的证据。
+The standalone DSP shows particularly poor performance in music spectral convergence and transient error, indicating that transferring texture across frequency bands, controlling energy, and output safety do not guarantee correct detail recovery. All paths have limited output, peak <0.95, and zero error in any arbitrary block; this does not constitute evidence of absence of audible artifacts.
 
-重新加入的高频谱收敛与 flux 指标也揭示：降低弱频点 LSD、扩展可见频谱并不
-一定改善高频结构或瞬态，必须相对无损参考综合比较。所有 CI 是开发诊断中的
-名义 95% 区间，不是反复调参后的独立确认试验。
+Reintroduced high-frequency spectral convergence and flux metrics reveal: reducing weak-frequency LSD and expanding visible spectrum does not necessarily improve high-frequency structure or transient behavior—comprehensive comparison against lossless reference is required. All confidence intervals are nominal 95% ranges from development diagnostics and not independently validated through repeated tuning.
 
-## Objective v3 短程验证
+## Objective v3 Short-Term Validation
 
-V3 围绕缺失高频的幅度、谱形、能量、时序细节及重建后频谱设计，同时保留
-波形、有效相位、保留频段与接缝约束。具体公式、初始梯度与可微 DSP 代理的
-缺失环节见[目标设计](inpainting-objective.md)。训练源码冻结于 `3cfaceb`，
-8 个训练因果帧、冻结统计、8 轮/1024 updates；新总分只在相同 V3 下比较。
+Objective v3 focuses on amplitude, spectral shape, energy, and temporal detail of missing high frequencies, as well as post-reconstruction spectral fidelity, while preserving waveform, effective phase, preserved frequency bands, and seam continuity. Specific formulas, initial gradients, and missing differentiable DSP proxies are detailed in [Objective Design](inpainting-objective.md). Training code is frozen at `3cfaceb`, with 8 causal frames, frozen statistics, 8 epochs / 1024 updates; new scores are compared under identical V3 conditions.
 
-8 轮已完成，选中 epoch8。相同 896 验证行、CPU FP32 单线程的 V3 对照：
+8 epochs completed, selected at epoch8. Identical 896 validation rows, CPU FP32 single-threaded, V3 comparison:
 
-| V3 指标 | 原 epoch168 | 新 epoch8 |
+| V3 Metric | Original epoch168 | New epoch8 |
 |---|---:|---:|
 | total | 1.043180 | 1.037225 |
-| 高频谱收敛 | 0.254824 | 0.253302 |
-| 高频能量包络 dB | 1.539460 | 1.518960 |
-| 高频时序变化 | 0.259837 | 0.253542 |
-| 重建后高频谱收敛 | 0.267116 | 0.258646 |
-| 高频幅度 dB（V3 参考底线） | 5.442011 | 5.466953 |
-| 相对干声波形误差 | 0.913570 | 0.914328 |
+| High-Frequency Spectral Convergence | 0.254824 | 0.253302 |
+| High-Frequency Energy Envelope (dB) | 1.539460 | 1.518960 |
+| High-Frequency Temporal Change | 0.259837 | 0.253542 |
+| Post-Reconstruction High-Frequency Spectral Convergence | 0.267116 | 0.258646 |
+| High-Frequency Amplitude (V3 Reference Baseline) | 5.442011 | 5.466953 |
+| Relative Dry Waveform Error | 0.913570 | 0.914328 |
 
-新版 total 改善约 0.57%，重建后高频误差改善约 3.17%；原始波形 L1 仅从
-0.006829523 降至 0.006829151，不能据此声称全面保真改善。
-相位与接缝项退化，V3 的高频 dB 共同底线也不等于旧版未截断幅度误差。
+New total improves by ~0.57%, post-reconstruction high-frequency error improves by ~3.17%; raw waveform L1 decreases from 0.006829523 to 0.006829151—insufficient to claim overall fidelity improvement. Phase and seam terms degrade; V3 high-frequency dB baseline does not equal the unclipped magnitude error of the original.
 
-同一 89 行/80 录音通过实际 Rust 的结果：
+Same 89 rows / 80 recordings validated via actual Rust:
 
-| 部署指标 | 原 epoch168 | V3 epoch8 | 配对变化及 95% CI |
+| Deployment Metric | Original epoch168 | V3 epoch8 | Paired Change & 95% CI |
 |---|---:|---:|---|
-| 高频 LSD dB | 20.297498 | 18.735151 | -1.562347 [-2.050557, -0.966657] |
-| 高频谱收敛 | 0.764139 | 0.748853 | -0.015286 [-0.023188, -0.008368] |
-| 高频能量误差 dB | 4.121040 | 3.992897 | -0.128142 [-0.330731, 0.059175] |
-| 高频 flux 误差 | 1.045593 | 1.048841 | +0.003248 [-0.015506, 0.018863] |
+| High-Frequency LSD (dB) | 20.297498 | 18.735151 | -1.562347 [-2.050557, -0.966657] |
+| High-Frequency Spectral Convergence | 0.764139 | 0.748853 | -0.015286 [-0.023188, -0.008368] |
+| High-Frequency Energy Error (dB) | 4.121040 | 3.992897 | -0.128142 [-0.330731, 0.059175] |
+| High-Frequency Flux Error | 1.045593 | 1.048841 | +0.003248 [-0.015506, 0.018863] |
 | SI-SDR dB | 28.261367 | 28.239244 | -0.022123 [-0.045407, -0.003317] |
-| 低频保留 LSD dB | 3.940090 | 4.114803 | +0.174713 [0.076362, 0.271892] |
+| Low-Frequency Preservation LSD (dB) | 3.940090 | 4.114803 | +0.174713 [0.076362, 0.271892] |
 
-总体高频 LSD 改善约 7.70%，谱收敛改善约 2.00%，但主要受覆盖集合中的语音
-改善影响；总体不是按 99.61% 音乐播放占比加权的产品得分。分别看：
+Overall high-frequency LSD improves by ~7.70%, spectral convergence improves by ~2.00%, primarily driven by speech improvements; overall score is not weighted by 99.61% music playback share. Per category:
 
-| 配对变化 | 音乐 33 行/26 录音 | 语音 56 行/54 录音 |
+| Paired Change | Music (33 rows / 26 recordings) | Speech (56 rows / 54 recordings) |
 |---|---|---|
-| 高频 LSD dB | -0.226640 [-1.054935, 0.869795] | -2.349459 [-2.744221, -1.950998] |
-| 高频谱收敛 | -0.008341 [-0.024760, 0.006173] | -0.019379 [-0.026653, -0.011960] |
-| 高频能量误差 dB | -0.433949 [-0.905795, -0.039037] | +0.052065 [-0.129025, 0.231624] |
+| High-Frequency LSD (dB) | -0.226640 [-1.054935, 0.869795] | -2.349459 [-2.744221, -1.950998] |
+| High-Frequency Spectral Convergence | -0.008341 [-0.024760, 0.006173] | -0.019379 [-0.026653, -0.011960] |
+| High-Frequency Energy Error (dB) | -0.433949 [-0.905795, -0.039037] | +0.052065 [-0.129025, 0.231624] |
 | SI-SDR dB | -0.059254 [-0.117705, -0.013111] | -0.000243 [-0.008552, 0.007973] |
-| 低频保留 LSD dB | +0.249416 [0.093948, 0.451828] | +0.130691 [0.020067, 0.244346] |
+| Low-Frequency Preservation LSD (dB) | +0.249416 [0.093948, 0.451828] | +0.130691 [0.020067, 0.244346] |
 
-音乐高频能量匹配有进展，但谱形改善尚不确定，波形与保留频段出现代价。**将 V3
-保留为进一步恢复优化的候选，epoch168 继续作基线；未替换默认或发布权重。**
-下一步应优先核对在线截止频率、响度控制与重建代理的差异，减少保留频段污染，
-同时改善音乐瞬态，不能仅靠延长训练或只优化 SI-SDR。
+Music shows progress in high-frequency energy matching, though spectral shape improvements remain uncertain. Waveform and preserved band fidelity incur cost. **V3 is retained as a candidate for further high-frequency recovery optimization; epoch168 remains the baseline. Default or release weights are not replaced.**
+Next steps should prioritize verifying cutoff frequency, loudness control, and reconstruction proxy differences to reduce preserved band contamination, and improve music transient fidelity—not merely extending training or optimizing SI-SDR.
 
-新 ONNX 为 3,309,786 字节（3.16 MiB），SHA-256
-`c07ada11f603609962168e40db62d8692c642e1636c48daaf92e2cd57bf39f83`。
-13 个 PyTorch/ORT/Rust 数值案例通过；所有 162 个 BN 统计 buffer 与父权重逐位
-一致、236 个参数 tensor 已更新且全部有限。任意分块输出误差为零，所有输出
-有限且峰值 <0.95。它只经过本次开发验证，不能称为独立测试/盲听或无伪影保证。
+New ONNX is 3,309,786 bytes (3.16 MiB), SHA-256 `c07ada11f603609962168e40db62d8692c642e1636c48daaf92e2cd57bf39f83`.
+13 PyTorch/ORT/Rust numerical cases passed. All 162 BN statistics buffers and parent weights are bit-identical. 236 tensor parameters updated and finite. Arbitrary block output error is zero; all outputs are bounded and peak <0.95. This model has only undergone development validation and cannot be considered independent testing, blind listening, or artifact-free.
 
-## 工作线程调度诊断
+## Workload Scheduling Diagnostics
 
-新增 worker 固定内存直方图，将排队与处理 p99 分开报告；回调不读写这些直方图。
-原生实时线程仍采用提前 500 µs、50 µs 轮询、无闲置自旋的既有策略，固定 256 帧
-输出延迟与失效回退不变。
+Added worker memory histogram to separate queueing and processing p99 reporting; histograms are not read or written in callbacks.
+Native real-time threads retain existing strategy: 500 µs and 50 µs polling, idle self-spin, fixed 256-frame output latency, and failure fallback unchanged.
 
-早先四条件各 30 秒、同父模型及音乐 PCM 的调度试验：
+Prior 4-condition 30-second scheduling trials with parent model and music PCM:
 
-| 策略 | 44.1 mono / stereo / 48 mono / stereo 的迟到次数 | 决策 |
+| Strategy | 44.1 mono / stereo / 48 mono / stereo late callback count | Decision |
 |---|---|---|
-| 带直方图的既有策略 | 4 / 11 / 5 / 54 | 本次整组未通过 |
-| 原生实时闲置自旋 75 µs | 124 / 2 / 1 / 1 | 不采用，代码已撤回 |
-| 仅 QoS、普通线程自旋 | 239 / 35 / 45 / 155 | 不采用；仅保留显式诊断开关 |
+| Histogram-enabled existing strategy | 4 / 11 / 5 / 54 | Failed entire group |
+| Native real-time idle spin 75 µs | 124 / 2 / 1 / 1 | Not adopted; code reverted |
+| QoS only, normal thread spin | 239 / 35 / 45 / 155 | Not adopted; explicit diagnostic toggle retained |
 
-既有策略 44.1 mono 回调最大 718.25 µs，也超出 500 µs 门槛。其余条件最大
-35–119 µs；worker 处理 p99 上界约 1.575–1.800 ms。不能拼接各试验较好的条件
-制造“全条件通过”。训练与质量验证在该轮计时前已经结束，但过程快照记录到
-`PerfPowerServices` 约 198.6% 单核心 CPU。它是带背景负载的宿主诊断，不能从此
-将全部迟到归因于某一个进程、直方图或模型计算。未终止其他应用或系统进程。
+Existing strategy had 44.1 mono callback max of 718.25 µs, exceeding 500 µs threshold. Other conditions maxed at 35–119 µs; worker processing p99 upper bound ~1.575–1.800 ms.
+No combination of conditions can be stitched together to produce a "fully passing" result. Training and quality validation concluded prior to timing, but process snapshots recorded ~198.6% single-core CPU usage. This is a host-level diagnostic under background load and cannot be used to attribute all latencies to a single process, histogram, or model computation. No other application or system process was terminated.
 
-30 分钟**样本时间**的加速故障/恢复连续性测试通过；仍缺真实声卡、30 分钟墙钟、
-x86_64 参考机器、盲听与正式音质资格。软件延迟目标/红线、回调与 worker 可用性
-继续独立验收，详见[实时标准](realtime-standard.md)。
+30-minute **sample time** accelerated failure/recovery continuity test passed; still lacks real audio hardware, 30-minute wall-clock, x86_64 reference machine, blind listening, or formal audio quality certification. Software latency targets, redlines, callback behavior, and worker availability remain independently verifiable, per [Realtime Standard](realtime-standard.md).
 
-## 处理时延、资源与连续输出
+## Processing Latency, Resource Usage, and Continuous Output
 
-Apple M5 Max，CPU ORT 单线程，256 FFT / 128 hop，同一真实 PCM；每个同步条件
-使用独立进程、预热 32 hops，再处理 10 秒**音频时长**。这是非实时跑速测量，
-不是 10 秒墙钟或真实声卡验收。逐 hop p99（µs）：
+Apple M5 Max, CPU ORT single-thread, 256 FFT / 128 hop, same real PCM; each condition runs in a separate process, pre-warmed with 32 hops, then processes 10 seconds of **audio duration**. This is a non-real-time throughput measurement, not 10 seconds wall-clock or real audio card validation. Per-hop p99 (µs):
 
-| 路径 / 权重 | 44.1 mono | 44.1 stereo | 48 mono | 48 stereo |
+| Path / Weight | 44.1 mono | 44.1 stereo | 48 mono | 48 stereo |
 |---|---:|---:|---:|---:|
 | Neural / epoch168 | 943.792 | 1691.458 | 785.709 | 1655.166 |
-| DSP-only / 不加载模型 | 18.000 | 11.375 | 7.125 | 11.792 |
+| DSP-only / no model load | 18.000 | 11.375 | 7.125 | 11.792 |
 | Hybrid / epoch168 | 968.083 | 1424.458 | 1025.958 | 1314.208 |
 | Neural / V3 epoch8 | 551.792 | 1192.042 | 623.292 | 1511.292 |
 
-DSP 和 Hybrid 复用既有频谱，不新增帧缓存延迟；同步 STFT 本身延迟 128 样本。
-不同轮次背景负载不同，不能把 Hybrid 较低的个别 p99 解释成 DSP 带来负计算成本，
-也不能从单次跑速声称 V3 提速。父模型计时前的快照记录到 PerfPowerServices、
-Node、Paseo Renderer 等背景 CPU 负载；训练与质量评估已结束，未终止其他进程。
+DSP and Hybrid reuse existing frequency spectrum, no new frame buffer latency introduced; STFT sync itself introduces 128-sample delay. Background load varies across runs, so Hybrid's lower individual p99 cannot be interpreted as negative computational cost from DSP, nor can a single run's speed claim imply V3 performance gain. Snapshots from before model processing show background CPU load from PerfPowerServices, Node, Paseo Renderer, etc. Training and quality assessment completed; no other processes terminated.
 
-| 路径 / 权重 | 每进程 peak RSS MiB | RTF 范围 | 10 秒音频的 user + sys CPU 秒范围 |
+| Path / Weight | Per-process peak RSS (MiB) | RTF Range | 10-second audio user + sys CPU (seconds) range |
 |---|---:|---:|---:|
 | Neural / epoch168 | 35.62–36.08 | 0.201–0.405 | 2.04–4.05 |
 | DSP-only | 8.25–8.34 | 0.00177–0.00350 | 0.03–0.06 |
 | Hybrid / epoch168 | 35.59–35.72 | 0.208–0.383 | 2.07–3.88 |
 | Neural / V3 epoch8 | 35.52–35.75 | 0.177–0.390 | 1.83–3.93 |
 
-RSS 来自 `/usr/bin/time -l` 的整个短进程峰值，包含构造和读取 PCM；RTF 是各 hop
-墙钟处理时间总和 / 音频时长，**不是 CPU 占用百分比**。CPU 秒计数分辨率约
-0.01 秒，尤其 DSP-only 的 CPU 数值仅能粗略参考。Spectral 没有模型加载和推理，
-其可执行文件仍编译了 ORT 支持；未据此测得独立无 ORT 二进制的分发大小。
+RSS from `/usr/bin/time -l` peak of entire short process, including construction and PCM read; RTF is total hop wall-clock time summed / audio duration, **not CPU utilization percentage**. CPU time resolution is ~0.01 seconds, especially for DSP-only, which provides only a coarse reference. Spectral has no model load or inference; its executable still compiled with ORT support; no independent ORT-free binary size measurement derived.
 
-随后进行了每条件 10 秒墙钟、128 帧节拍输出诊断：
+Subsequently, 10-second wall-clock, 128-frame beat output diagnostics were conducted:
 
-| 路径 / 权重 | 四条件 worker 迟到次数 | 最大软件增加延迟预算 ms | 本轮整组可用性 |
+| Path / Weight | Four-condition worker late callback count | Max software increase latency budget (ms) | Group availability |
 |---|---|---:|---|
-| Neural / epoch168 | 0 / 1 / 0 / 0 | 5.845 | 短程通过 |
-| Hybrid / epoch168 | 0 / 0 / 0 / 0 | 5.889 | 短程通过 |
-| Neural / V3 epoch8 | 10 / 0 / 2 / 0 | 5.832 | 未通过 |
+| Neural / epoch168 | 0 / 1 / 0 / 0 | 5.845 | Short-term pass |
+| Hybrid / epoch168 | 0 / 0 / 0 / 0 | 5.889 | Short-term pass |
+| Neural / V3 epoch8 | 10 / 0 / 2 / 0 | 5.832 | Failed |
 
-各轮所有条件输出帧数与预期完全一致、无 NaN/Inf、回调预算通过。V3 回调 p99
-为 1.708–4.125 µs、最大 10.084–32.458 µs，但 44.1 mono 的 worker 迟到比例
-0.2904% >0.1%，连续 8 hops / 23.220 ms >20 ms，且发生 1 次输入队列溢出。
-该条件输出使用既有平滑干声回退，固定时间轴没有丢帧；**有限值和帧数正确不等于
-无听感伪影，也不能将固定延迟 <8 ms 当作全链路实时合格**。48 mono 有 2 次迟到
-（0.0534%，最长 5.333 ms），其余 V3 条件未迟到。
+All conditions produced exactly the expected number of frames, no NaN/Inf, and callback budget passed. V3 callback p99: 1.708–4.125 µs, max 10.084–32.458 µs. However, 44.1 mono worker latency rate of 0.2904% > 0.1%, with 8 consecutive hops / 23.220 ms > 20 ms, and 1 input queue overflow. This condition uses existing smooth dry-sound fallback, fixed timeline with no frame loss. **Finite values and frame count correctness does not imply absence of audible artifacts, nor does a fixed delay <8 ms constitute full end-to-end real-time qualification.** 48 mono had 2 late callbacks (0.0534%), longest 5.333 ms; all other V3 conditions had no lateness.
 
-这些预算是固定 256 样本软件输出延迟加回调耗时，不含声卡、系统音频缓冲、
-输入设备或 DAC。各轮长度和宿主负载不同，后续 10 秒通过不能抹去前述 30 秒
-失败证据。未进行真实设备或 30 分钟墙钟验收；候选权重和 Hybrid 均保持实验状态。
+These budgets are fixed at 256-sample software output delay plus callback overhead, excluding audio card, system audio buffer, input device, or DAC. Run durations and host load vary; the 10-second pass cannot override the earlier 30-second failure evidence. No real device or 30-minute wall-clock validation performed; candidate weights and Hybrid remain in experimental status.
 
-## 工程检查
+## Engineering Checks
 
-Python 全套 232 个测试通过；Rust workspace 测试、fmt、Clippy（warnings 作为错误）
-及无默认特性构建检查通过。Spectral 无 ORT 模式的实际处理测试通过；三模式的
-启动、饱和回退及非有限输入清理回调均无 Rust 堆分配。13 个候选导出一致性案例
-与这些工程检查只证明对应数值/行为，不能代替音质和持续实时资格。
+Python suite passed 232 tests; Rust workspace tests, fmt, Clippy (warnings as errors), and no-default-feature builds passed. Spectral passed actual processing without ORT mode; all three modes passed startup, saturation fallback, and non-finite input cleanup callbacks with no Rust heap allocation. 13 candidate export consistency cases and these engineering checks only verify numerical and behavioral consistency—cannot replace audio quality or continuous real-time certification.
 
-实现提交 `acd9bf9` 的远程 [CI](https://github.com/backrunner/soundex/actions/runs/38055656325)
-两项检查通过。训练源码固定于 `3cfaceb`，运行测量绑定各自 ONNX 与二进制哈希，
-文档及追加回调覆盖的后续提交保持单独的版本记录。
+Commit `acd9bf9` remote [CI](https://github.com/backrunner/soundex/actions/runs/38055656325) passed two checks. Training source code fixed at `3cfaceb`; runtime measurements bound to respective ONNX and binary hashes. Documentation and callback extensions in subsequent commits are version-controlled separately.
 
-## 本地证据
+## Local Evidence
 
-原始指标、权重、校验值、配对 bootstrap、过程计时、源码/二进制收据保存在
-`data/reports/optimization-followup-20261010/`。训练 run 保存在 `data/runs/`。
-这些目录忽略于 Git；训练原始素材与实验权重没有推送。
-未使用的可重现 61 秒重复 PCM 已清理，原 31 秒 PCM 与生成来源仍保留。
+Original metrics, weights, checksums, paired bootstrap, process timing, source code, and binary receipts are preserved in `data/reports/optimization-followup-20261010/`. Training runs are saved in `data/runs/`. These directories are ignored in Git; original materials and experimental weights are not pushed.
+Unused 61-second repeat PCM has been cleaned; original 31-second PCM and generation sources remain preserved.
+
+The earlier continuation increased preserved-low-band error by 0.035308 [0.004249, 0.066008]. Frozen statistics increased high-band LSD by 0.226272 [0.067155, 0.415446]. Keeping input phase increased SI-SDR by 0.138593 dB but worsened high-band LSD by 1.152563 [0.444060, 1.948102]. The DSP comparison used the same `Neural` path and original epoch168. The follow-up DSP change increased high-band LSD by 0.090474 [0.069217, 0.112537] and energy error by 0.090983 [0.070792, 0.111446], so it remained disabled by default. The host snapshot recorded `PerfPowerServices` at about 198.6% of one CPU core. See the [inpainting objective](inpainting-objective.md) for the subsequent objective design.

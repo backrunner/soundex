@@ -1,5 +1,13 @@
 # Research status and experiment history
 
+Latest completed diagnostics: [P39 objective gradients](objective-conflict-audit.md)
+and [balanced-order CPU timing](interleaved-timing-audit.md). Shared encoder gradients
+conflict while high-band output-coordinate gradients mostly align. The >16 kHz
+dB-only chain also reverses after the encoder Jacobian, so removing phase supervision
+alone does not address the observed conflict. Timing retained three ≥5 ms calls, eight service overruns
+and 119 paced delays over 160,000 hops, with max compute 9.280 ms. No new training
+or promotion. The [failure registry](failed-experiments.md) is mandatory before a repeat.
+
 Latest completed training: [P38 detector-condition controls](detector-condition-study.md).
 All four 16,192-step CPU trajectories and native reviews completed. Fixing explicit
 cutoff/active worsened music MR by 0.19–0.56% against matched controls, already present

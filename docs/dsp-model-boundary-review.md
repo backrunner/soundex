@@ -1,207 +1,148 @@
-# 模型与 DSP 的职责边界：调研及 P36 审计
+# Model and DSP Responsibility Boundaries: Survey and P36 Audit
 
-日期：2026-10-22。范围是低延迟、有损音乐恢复；语音降噪、理想低通超分辨率
-与乐器合成只提供可迁移的机制，不混作同任务的性能证明。本文结合论文、官方代码
-和本地冻结实验；没有导入第三方权重/训练数据，没有改部署或启动新训练。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 判断与方案调整
+Date: 2026-10-22. Scope: Low-latency, lossy audio restoration; speech denoising, ideal low-pass super-resolution. Instrument synthesis provides only transferable mechanisms and does not constitute performance validation for the same task. This document combines academic papers, official code, and local frozen experiments; no third-party weights or training data were imported, and no new deployment or training was initiated.
 
-模型应学习原始无损音频的频谱、细节与时间变化，不应被迫学习抵消任意后处理的
-衰减、相位偏置或限幅。用户对职责边界的担心成立。但“所有 DSP 均不能进入训练”
-过于宽泛：分析/合成变换本身是 DSP，正确的可微合成能让 loss 评价真实可播放的
-输出；参数化合成器或滤波器也可以是刻意选择的模型结构。
+## Decision and Strategy Adjustment
 
-对 SoundEx 更合适的约束是：**保持直接无损监督，固定且准确的分析/合成进入
-训练；保护性后处理不成为恢复目标或教师；先验证融合不会系统性扭曲正确预测，
-再决定是否需要通过它优化模型。**
+The model should learn the spectral, fine details, and temporal dynamics of original lossless audio, and should not be forced to learn to compensate for any post-processing attenuation, phase bias, or clipping. User concerns about responsibility boundaries are valid. However, the statement "no DSP should enter training" is overly broad: analysis/synthesis transforms themselves are DSP; differentiable, correct synthesis enables loss evaluation of truly playable outputs; parametric synthesizers or filters can also be intentionally chosen as model architecture.
 
-这调整了[上一轮动态诊断](risk-temporal-diagnosis.md)提出的优先顺序：暂不直接
-新增完整部署链的动态 loss。先审计、减少融合与无损恢复的冲突。把 DSP 参数固定
-并不隔离梯度；只要对 `DSP(model(x))` 反传，模型仍然可能学习逆向补偿。
+A more appropriate constraint for SoundEx is: **maintain direct, lossless supervision with fixed and accurate analysis/synthesis during training; protective post-processing should not become a recovery target or teacher; first verify that fusion does not systematically distort correct predictions before deciding whether to optimize through it.**
 
-## 文献与官方实现
+This adjusts the priority order proposed in the previous [dynamic diagnosis](risk-temporal-diagnosis.md): temporary suspension of introducing a full deployment chain with dynamic loss. First, audit and reduce conflicts between fusion and lossless recovery. Fixing DSP parameters does not isolate gradients; as long as backpropagation passes through `DSP(model(x))`, the model may still learn inverse compensation.
 
-| 工作 | 模型与 DSP 的分工 | 对本项目的意义和边界 |
+## Literature and Official Implementations
+
+| Work | Model and DSP Division | Relevance and Boundary Implications |
 |---|---|---|
-| [AudioSR，2023](https://arxiv.org/html/2309.07314v1) | 扩散模型估计高分辨率 mel，声码器合成，之后分别替换低频 mel 和波形 STFT 内容 | 后处理保护已有信息有先例；论文依赖低频与目标相同的假设，并使用整段 roll-off，不能直接照搬为有损编码恢复或因果检测 |
-| [AERO，ICASSP 2023](https://arxiv.org/abs/2211.12232) | 直接预测完整复数频谱，通过 iSTFT 输出，结合频域、时域和感知训练 | 说明全频恢复是合理路线，低高频后拼接不是必需；其重采样任务及官方整段归一化不能直接满足我们的流式契约 |
-| [Apollo，2024](https://arxiv.org/html/2409.08514v1) | 针对编码损伤，分频带建模后直接重建复数频谱，再 iSTFT；GAN 与重建目标联合训练 | 比单纯语音降噪更接近音乐反压缩；借鉴频带/时间建模与直接复数合成，不照搬规模、训练素材或实时宣传 |
-| [RNNoise，2018](https://arxiv.org/abs/1709.08243) | 网络估计频带增益，传统 pitch filter 补充谐波间降噪 | 神经网络与 DSP 混合有效，但目标是抑制噪声，不能据此认为增益滤波就足够恢复被删除的音乐高频 |
-| [DeepFilterNet，2022](https://arxiv.org/abs/2110.05588) | ERB 增益估计与复数多帧过滤共同构成增强模型 | 滤波是显式模型结构，并非模型先输出正确信号后再被任意改写；语音任务、未来帧选项及整段 RTF 不能代替我们的逐 hop 验证 |
-| [DDSP，ICLR 2020](https://arxiv.org/abs/2001.04643) | 网络输出参数，谐波/噪声合成器等可微 DSP 生成音频，谱损失监督音频 | 学习控制 DSP 本身并非错误；但这是另一种输出定义，不等于直接恢复完整复数频谱，强乐器先验也未证明适合复杂混音 |
-| [可微一致性约束，ICASSP 2019](https://research.google/pubs/differentiable-consistency-constraints-for-improved-deep-speech-enhancement/) | 将 STFT 一致性等投影并入网络 | 需要评价可实现波形的频谱；不能由此推导“必须匹配启发式后处理”，也不能将混合源守恒约束套用于缺失信息生成 |
+| [AudioSR，2023](https://arxiv.org/html/2309.07314v1) | Diffusion model estimates high-resolution mel, vocoder synthesis, then separately replaces low-frequency mel and waveform STFT content | Post-processing protection of existing information has precedent; the paper relies on the assumption of identical low-frequency content and uses full roll-off, which cannot be directly adopted for lossy encoding recovery or causal detection |
+| [AERO，ICASSP 2023](https://arxiv.org/abs/2211.12232) | Directly predicts full complex spectrum, outputs via iSTFT, with training in frequency, time, and perceptual domains | Demonstrates that full-spectrum recovery is a valid path; low/high-frequency stitching is not essential; its resampling task and full-segment normalization cannot directly satisfy our streaming contract |
+| [Apollo，2024](https://arxiv.org/html/2409.08514v1) | Targets encoding damage, models per-band, directly reconstructs complex spectrum, then iSTFT; jointly trains GAN and reconstruction objectives | More closely aligned with music de-compression than simple speech denoising; draws on band/time modeling and direct complex synthesis, without adopting scale, training data, or real-time claims |
+| [RNNoise，2018](https://arxiv.org/abs/1709.08243) | Network estimates band gains, supplemented by traditional pitch filter for harmonic suppression | Neural and DSP fusion works effectively, but the goal is noise suppression—this does not imply that gain filtering is sufficient to recover deleted high-frequency music content |
+| [DeepFilterNet，2022](https://arxiv.org/abs/2110.05588) | ERB gain estimation and multi-frame complex filtering form an enhancement model | Filtering is an explicit model structure, not a model that first outputs correct signals and then gets arbitrarily rewritten; speech tasks, future-frame options, and full-segment RTF cannot replace our hop-by-hop validation |
+| [DDSP，ICLR 2020](https://arxiv.org/abs/2001.04643) | Network outputs parameters, harmonic/noise synthesizers as differentiable DSP generate audio, with spectral loss supervising audio | Learning to control DSP itself is not erroneous; however, this defines a different output, not direct recovery of full complex spectrum; strong instrument priors are unproven for complex mixes |
+| [Differentiable Consistency Constraints, ICASSP 2019](https://research.google/pubs/differentiable-consistency-constraints-for-improved-deep-speech-enhancement/) | Projects STFT consistency into the network | Requires evaluation of achievable waveform spectra; cannot infer that "a heuristic post-processing must match," nor can mixed source conservation constraints be applied to missing information generation |
 
-官方代码进一步核验：
+Official code further validation:
 
 - [AudioSR postprocessing](https://github.com/haoheliu/versatile_audio_super_resolution/blob/main/audiosr/latent_diffusion/models/ddpm.py)
-  先进行 mel 低频替换，之后对输入/输出 STFT 作低频替换和能量比调整；整段峰值归一化
-  也不适合直接搬进我们的实时流。代码中的 `ground truth` 注释在此指观测低通输入，
-  不是推理阶段可以取得原始无损参考。
+  First performs low-frequency mel replacement, then replaces input/output STFT low frequencies and adjusts energy ratios; full-segment peak normalization is unsuitable for direct porting into our real-time stream. The `ground truth` comment in the code refers to observed low-pass input, not a recoverable reference during inference.
 - [AERO forward](https://github.com/slp-rl/aero/blob/main/src/models/aero.py)
-  转换实虚通道、输出复数谱后合成；均值/方差在整段特征上计算。它支持研究直接谱
-  重建的方向，不能证明原实现因果。
-- [Apollo 实现](https://github.com/JusperLee/Apollo/blob/main/look2hear/models/apollo.py)
-  输出实虚子带再拼接 iSTFT。论文讨论因果化的可能性，但本次所查默认时间卷积
-  `causal=False`、居中 padding，STFT 也未显式关闭 centering；不能称该默认实现
-  已满足我们的过去/当前帧约束。论文窗口 20 ms、hop 10 ms，所列速度为 GPU 上
-  处理 1 秒音频，不能换算为我们 128 帧 CPU 每 hop 的合格证据。
-- [DDSP 官方示例](https://github.com/magenta/ddsp)明确展示可微合成器加多尺度谱损失；
-  [DeepFilterNet 官方实现](https://github.com/Rikorose/DeepFilterNet)则另有可选 postfilter。
-  “结构中的 DSP”与“附加后处理”在这些工程中也不是同一件事。
+  Converts real/imaginary channels, outputs complex spectrum, then synthesizes; mean/variance computed over full segment features. It supports research into direct spectral reconstruction, but does not prove causal implementation.
+- [Apollo implementation](https://github.com/JusperLee/Apollo/blob/main/look2hear/models/apollo.py)
+  Outputs real/imaginary subbands, then concatenates and iSTFT. The paper discusses the possibility of causality, but the current implementation defaults to `causal=False`, centered padding, and STFT without explicit centering closure. This default does not satisfy our past/future frame constraints. The paper uses 20 ms window, 10 ms hop; the reported speed is for processing 1 second of audio on GPU, and cannot be converted into evidence for our 128-frame CPU per hop requirement.
+- [DDSP official example](https://github.com/magenta/ddsp) explicitly demonstrates differentiable synthesizers with multi-scale spectral loss; the [DeepFilterNet official implementation](https://github.com/Rikorose/DeepFilterNet) includes an optional postfilter.
+  "DSP within the structure" and "additional post-processing" are not equivalent in these engineering implementations.
 
-也检索了较新的相关研究：
-[TVF，2026-03](https://arxiv.org/html/2603.02794v1)用约 1M 参数网络控制
-35 段 IIR，仍是语音降噪概念验证，报告的推理算法延迟为 21 ms；
-[频谱自适应损失，2026-08 预印本](https://arxiv.org/html/2608.30739v1)讨论不可靠相位
-监督导致高频幅度被压低。后者是值得检查的机制，不是 SoundEx 已被证实的根因，
-也不构成直接采用其权重的依据。它的幅度幂压缩与 P36 的逐样本 `log1p(loss)` 不同。
+Additional recent work reviewed:
+[TVF, 2026-03](https://arxiv.org/html/2603.02794v1) uses a ~1M parameter network controlling 35 IIR filters—conceptual speech denoising, with reported inference latency of 21 ms;
+[Adaptive Spectral Loss, 2026-08 preprint](https://arxiv.org/html/2608.30739v1) discusses unreliable phase supervision leading to high-frequency amplitude suppression. This mechanism is worth investigating, but is not the proven root cause of SoundEx, nor constitutes justification for adopting its weights. Its amplitude power compression differs from P36's per-sample `log1p(loss)`.
 
-以上证据不构成统一 SOTA 排名：任务、数据、延迟、听评和硬件都不同。网页及默认
-分支代码按本次访问状态引用，未将外部实现或权重纳入仓库。
+None of the above constitutes a unified SOTA ranking: tasks, datasets, latency, listening evaluation, and hardware differ. Web pages and default branch code are referenced as of the current access state; no external implementations or weights were incorporated into the repository.
 
-## 当前 P36 实际学了什么
+## What Does Current P36 Actually Learn?
 
-代码核查入口：
-`training/scripts/run_risk_attribution_study.py::training_terms`、
-`training/models/direct_spectrum_objective.py`、`multires_spectrum.py`、
-`budget_objective.py`、`envelope_probe.py` 和 `restoration_head.py`。
+Code entry points:
+`training/scripts/run_risk_attribution_study.py::training_terms`,
+`training/models/direct_spectrum_objective.py`, `multires_spectrum.py`, `budget_objective.py`, `envelope_probe.py`, and `restoration_head.py`.
 
-1. paired 的 direct 目标是原始无损幅度/复数谱/包络/变化；MR 目标是原始预测经
-   固定 OLA 后，与原始未限幅无损参考作多分辨率频谱比较。所有频点都有监督，
-   不因部署缺失带掩码关闭而取消监督。
-2. 额外 0.1 倍预算项的目标是参考与观测的复数残差能量，不是谐波 DSP 的输出。
-   P36 没有调用旧 `balanced_risk` 的部署重建项来优化模型；同文件存在旧函数
-   不能据此判断当前目标仍在使用它。
-3. P36 端点为新初始化训练，不能把历史部署 loss 的权重直接继承解释为其退化来源。
-4. 模型输入确实包括 **采样率、检测 cutoff、active 标志**。所以它不是完全与
-   DSP 无关的映射：可以依赖检测器统计。有效带宽是合理的退化条件，但 active
-   是策略决定；是否形成有害依赖需单独消融，不能仅由存在输入就断言已经发生。
-5. 实际 P36 使用 Neural、Model gain、Model phase、smooth-knee 限幅。
-   没有启用传统谐波纹理 Hybrid 混合，也没有 MatchEdge 的边缘响度匹配。
-   它仍经过检测掩码、幅度 crossover、单位圆相位插值、OLA、wet/dry 门控与限幅。
+1. The paired direct target is the original lossless magnitude, complex spectrum, envelope, and dynamics; the multi-resolution (MR) target is the prediction after fixed OLA, compared against the original unclipped lossless reference via multi-resolution spectral comparison. All frequency bins are supervised, and supervision is not canceled due to deployment masking.
+2. An additional 0.1x budget term targets the complex residual energy between reference and observation—not the output of harmonic DSP. P36 does not invoke the old `balanced_risk` deployment reconstruction term to optimize the model; the existence of a deprecated function in the same file does not imply current usage.
+3. P36 is a new initialization training run; historical deployment loss weights cannot be inherited as evidence of degradation.
+4. Model inputs indeed include **sample rate, detection cutoff, and active flags**. Thus, it is not a mapping entirely disconnected from DSP: it can leverage detector statistics. Effective bandwidth is a reasonable degradation condition, but `active` is a strategic decision; harmful dependencies require separate ablation and cannot be inferred solely from input presence.
+5. Actual P36 uses Neural, Model gain, Model phase, and smooth-knee limiting. Traditional harmonic texture Hybrid mixing and MatchEdge edge loudness matching are not enabled. It still passes through detection masking, amplitude crossover, unit-circle phase interpolation, OLA, wet/dry gating, and limiting.
 
-因此，“现在的主要 loss 在教模型模仿传统 DSP 补频”不符合当前代码。
-“预测被部署规则改变，未来部署 loss 可能诱导补偿，且输入依赖检测器”则有明确依据。
+Therefore, the claim that "the current primary loss is teaching the model to mimic traditional DSP boosting" does not align with current code. The assertion that "predictions are being adjusted by deployment rules, future deployment loss may induce compensation, and input dependencies on detectors" has clear basis.
 
-## 已确认的融合冲突
+## Confirmed Fusion Conflicts
 
-### 幅度：正确预测也会被拉回压缩输入
+### Magnitude: Correct Predictions Are Pulled Back to Compressed Input
 
-当前每频点幅度规则为 `A_out = (1 − w) A_input + w A_model`。
-当 `A_model = A_ref` 时，仍有 `A_out − A_ref = (1 − w)(A_input − A_ref)`。
-只有 `w=1` 或输入已经等于参考等情况下，融合才保留正确幅度。
+Current per-bin magnitude rule is:
+`A_out = (1 − w) A_input + w A_model`.
+When `A_model = A_ref`, we have `A_out − A_ref = (1 − w)(A_input − A_ref)`.
+Only when `w=1` or input equals reference is the correct magnitude preserved.
 
-使用当前 Python 对应实现进行单频点验证：输入幅度 0.1，目标 0.2，`w=0.25`。
-模型正确输出 0.2 时，最终幅度仅 0.125；若只要求最终输出 0.2，模型必须输出
-**0.5**。正确预测处的最终幅度平方 loss 对预测 dB 的梯度为 `−8.63e-4`，仍推动
-模型增加幅度。一般所需预测为 `A_input + (A_ref − A_input)/w`，小权重处容易
-产生过量补偿；`w=0` 时模型没有纠正能力。
+Single-frequency point validation using current Python implementation: input magnitude 0.1, target 0.2, `w=0.25`.
+When the model correctly outputs 0.2, the final magnitude is only 0.125. To achieve a final output of 0.2, the model must output **0.5**.
+The gradient of the final magnitude squared loss with respect to prediction dB is `−8.63e-4`, still pushing the model to increase magnitude. In general, the required prediction is `A_input + (A_ref − A_input)/w`. At small weights, overcompensation is easily induced; when `w=0`, the model has no correction capability.
 
-这是局部数学冲突，不是实测 P36 已经学成这种补偿的证据。P36 的直接目标正是
-把预测拉向 0.2，尚未加入上述最终 loss。换成普通复数线性混合也仍存在
-`X + w(P − X)` 的衰减，不能只改插值坐标就宣称解决。
+This is a local mathematical conflict—not evidence that P36 has learned such compensation. The direct objective of P36 is to pull predictions toward 0.2, and no such final loss is currently included. A simple linear blend `X + w(P − X)` still suffers attenuation, and cannot be claimed to resolve simply by changing the interpolation coordinate.
 
-### 相位：PhaseSmoother 不是时间平滑器
+### Phase: PhaseSmoother Is Not a Time-Averaging Filter
 
-`crates/soundex-dsp/src/phase.rs` 仅在单帧内插值观测和预测的单位相量，无跨帧状态。
-即使观测频点幅度很弱，其相位仍按单位向量参与。该处理不保证 STFT 时间一致性，
-也不是经过校准的相位置信度估计。
+`crates/soundex-dsp/src/phase.rs` only interpolates unit vectors between frames, with no inter-frame state. Even when observed magnitude is weak, the phase still participates as a unit vector. This does not guarantee STFT temporal consistency, nor is it a calibrated phase reliability estimate.
 
-对于 `0<w<0.5`，单位圆混合后可偏离输入相位的最大角为
-`asin(w/(1−w))`。数值扫描在 `w=0.25` 时得到 **19.4712°**，与公式一致。
-即使模型可输出任意相位，单频点的最终相位仍可能无法达到参考相位；不能要求
-训练解决被这个输出映射排除的目标。这一局部约束不等于整个 OLA 波形的严格
-性能上限，仍需真实样本的分阶段验证。
+For `0 < w < 0.5`, the maximum angular deviation after unit circle mixing is `asin(w/(1−w))`. Numerical scan at `w=0.25` yields **19.4712°**, consistent with the formula.
+Even if the model can output arbitrary phase, the final phase at a single bin may still fail to reach the reference phase. This local constraint does not equate to a strict upper bound on OLA waveform performance—validation with real samples across stages is still required.
 
-### 完美预测经过真实 Rust 后还剩多少误差
+### How Much Error Remains After Perfect Prediction, Then Real Rust Processing?
 
-对全部 89 个复用片段的 paired 和 identity 两种角色，以正确参考频谱替代模型
-输出，保留原始输入的检测、融合、门控、限幅及共同监督区间。累计 **178 次**
-原生预测回放；这使用不可部署的无损参考，只诊断处理链，不评估学习泛化。
+For all 89 reused segments, in paired and identity roles, the correct reference spectrum replaces model output, and original input detection, fusion, gating, limiting, and shared supervision intervals are preserved. A total of **178** native predictions were replayed; this uses an undeployable lossless reference to diagnose the processing chain, not to evaluate learning generalization.
 
-共同 MR v1，按录音聚合，参考始终为原始未限幅音频：
+Common MR v1, aggregated by recording, with reference always being the original unclipped audio:
 
-| 阶段 | 音乐 paired | 语音 paired |
+| Stage | Music Paired | Speech Paired |
 |---|---:|---:|
-| 完美频谱经原始 OLA | 1.12e-8 | 6.42e-9 |
-| 输入检测控制的融合后 | 0.219961 | 0.236473 |
-| 门控后、未限幅 | 0.219961 | 0.236481 |
-| 实际 Rust 最终输出 | **0.220684** | **0.236481** |
+| After perfect spectrum via original OLA | 1.12e-8 | 6.42e-9 |
+| After detection-controlled fusion | 0.219961 | 0.236473 |
+| After gating, unclipped | 0.219961 | 0.236481 |
+| Final Rust output | **0.220684** | **0.236481** |
 
-音乐 identity 完美预测在融合后误差约 `1.20e-8`，限幅后为 `0.006973`；
-说明保护性限幅与完整原始参考并不总是一致。音乐 paired 原生相对原始参考的
-PCM RMS 为 `0.0123593`，语音为 `0.00339318`，均为逐录音 RMS 均值，
-不作听感或爆音判断。
+For music identity, perfect prediction error after fusion is ~1.20e-8, and after limiting is 0.006973—indicating that protective limiting and the original reference are not always aligned.
+For music paired, the native relative RMS to original reference is 0.0123593; for speech, 0.00339318—both are per-recording RMS averages, not evaluated for listening quality or peak clipping.
 
-保留输入的区域仍包含编码误差，因此上述残余不能全部叫“DSP 新增伪影”；
-也不能把 0.2207 除以候选分数当成 DSP 的误差占比，MR 非可加因果分解。
-它不是所有可能过补偿预测的严格误差下界。它证明的是：**当前融合不是保持
-正确恢复结果的映射**，完整原始无损目标与保留观测区域的策略存在冲突。
+The retained input region still contains encoding errors, so these residuals cannot be fully attributed to "new DSP artifacts."
+Dividing 0.2207 by a candidate score does not represent DSP error contribution—MR is not additive, and causal decomposition is not valid.
+This proves: **current fusion is not a mapping that preserves correct recovery results**—there is a conflict between the full, original lossless target and the strategy of preserving observed regions.
 
-原生输出剩余的音乐幅度误差，4–8、8–12、12–16、16 kHz 以上频带分别为
-0.2150、0.2257、0.1104、0.0317。不能把问题仅解释为最高频生成不足；对编码
-损伤，“检测 cutoff 以下全部可靠”并不成立。
+Residual magnitude errors in music across 4–8, 8–12, 12–16, and above 16 kHz bands are 0.2150, 0.2257, 0.1104, and 0.0317, respectively.
+The issue cannot be explained solely as insufficient high-frequency generation. For encoding damage, "reliable below cutoff" does not hold.
 
-首轮代理使用 Python 输入特征，在第 11 个 paired 片段出现 `2.70e-5` 差异，
-超过原有 `2e-5` 容差，已停止并保留记录。改为实际 Rust 观测频谱后，完整回放
-最大差异为 **2.98e-7**，未修改容差。这说明代理核验需要包含前端特征，而不只是
-相同公式；没有把失败轮次当作通过或改门槛放行。
+The first proxy using Python input features detected a difference of `2.70e-5` in the 11th paired segment—exceeding the original `2e-5` tolerance—triggering a stop and record. After switching to actual Rust-observed spectrum, full replay maximum difference is **2.98e-7**, unchanged from tolerance. This confirms that proxy validation must include front-end features, not just identical formulas. Failures must be recorded, not passed off as success.
 
-## 推荐的职责边界
+## Recommended Responsibility Boundaries
 
-| 部分 | 建议 |
+| Component | Recommendation |
 |---|---|
-| 模型 | 估计原始无损复数谱或有明确含义的残差，学习谱形、细节、包络和参考时间变化 |
-| 固定 STFT/iSTFT/OLA | 保留在训练重建链中；监督真实可实现波形的频谱，验证完美重建及时间轴 |
-| 保留频段/融合 | 作为需要证据支持的信号策略，不作为无损教师；避免再次全频重塑已正确预测的幅相 |
-| cutoff / active 条件 | 作为待审计的耦合项；采样率保留，cutoff 和 active 应做独立敏感性与同预算去条件训练对照 |
-| 安全限幅、故障回退、换模淡入淡出 | 独立保护与状态管理；保留原生验证，不通过主重建目标要求模型反限幅或预测故障状态 |
-| 传统补频/响度匹配 | P36 未启用；若未来评估，保持显式可关闭的独立对照，不用它的输出替代无损监督 |
+| Model | Estimate original lossless complex spectrum or a well-defined residual; learn spectral shape, detail, envelope, and reference temporal dynamics |
+| Fixed STFT/iSTFT/OLA | Retain in training reconstruction chain; supervise the spectrum of a truly realizable waveform, verifying perfect reconstruction and temporal alignment |
+| Retained bands/fusion | As a signal strategy with evidence-based justification; not as a lossless teacher; avoid full-spectrum reshaping of already-correctly predicted magnitude/phase |
+| Cutoff / active conditions | As a pending item for audit; sample rate preserved; cutoff and active should undergo independent sensitivity and budget-conditioned training comparisons |
+| Safe limiting, fault fallback, mode fade-in/fade-out | Independent protection and state management; preserve native validation; do not require the main reconstruction objective to reverse-limit or predict fault states |
+| Traditional boosting/peak matching | P36 is not enabled; if future evaluation is conducted, maintain explicit, toggleable independent controls—do not use its output to replace lossless supervision |
 
-相位是模型重建的一部分，不能简单全部交给后处理；缺失频带的输入相位不一定
-有参考价值。直接 iSTFT 也不是“模型学习 DSP 副作用”：它是固定表示的物理实现。
-用户可调强度的混合若故意减少增强，是产品取舍，评估时必须固定强度；不能反过来
-训练主模型抵消旋钮，从而破坏不同强度设置的含义。
+Phase is part of the model's reconstruction—cannot be simply handed off to post-processing. Missing-band input phase may lack reference value.
+Direct iSTFT is not "the model learning DSP side effects"—it is a fixed physical implementation.
+User-adjustable mixing strength, if intentionally reduced, is a product design trade-off; evaluation must fix intensity.
+Reversing the model to cancel such controls undermines the meaning of different intensity settings.
 
-## 后续实验顺序
+## Recommended Experimental Sequence
 
-步骤 1 已由 [P37 冻结融合对照](fusion-boundary-audit.md)完成：幅度回混有小幅可测代价，
-取消全部门控没有带来明显额外 paired 收益，不能用删减 DSP 替代模型学习改进。
-新训练仍未启动；完整结果、接口取舍和当前环境阻塞见该报告。
+Step 1 has been completed in [P37 Frozen Fusion Audit](fusion-boundary-audit.md): magnitude remixing shows a small, measurable cost; removing all gating yields no significant gain in paired performance, and cannot replace model learning improvements.
+New training has not been initiated; full results, interface decisions, and current environment blockers are detailed in this report.
 
-1. **先冻结模型审计 DSP。** 保留 current 控制，比较直接模型合成、仅安全处理、
-   分别保留幅度融合/相位融合的诊断路径。增加零残差、完美参考、弱幅相位、
-   真实瞬态、cutoff 变化与真实立体声检查。裸模型直接全频输出只是对照，未经
-   保留频段/连续性验证不得作为默认部署。
-2. **确定恢复接口。** 明确是直接完整谱，还是定义清楚的修复残差；避免完整谱
-   被重复缩放，也不把预测目标偷偷改成逆 DSP 的频谱。若选择保留某些观测频段，
-   必须公开其剩余编码误差和恢复收益之间的取舍。硬切频带可能产生接缝/振铃，
-   不能以删除 crossover 代替验证。所有诊断干预采用因果、统一规则，不按曲目调参。
-3. **再做小模型训练对照。** 以 P36 compressed、identity 1.0 为控制，优先比较
-   原始无损谱/动态监督与减少检测器条件依赖；一次隔离一个因素，同初始化、采样
-   和充分预算。现在不直接上“完整限幅链反传”的新目标。
-4. **必要时才加受约束的部署项。** 先验证正确参考处是否仍有推动错误补偿的梯度，
-   以及与 raw 目标是否冲突。对限幅/故障策略不反传主恢复梯度；简单 detach 整条
-   部署输出会失去训练信号，不能冒充仍在优化最终恢复。任何停止梯度或替代梯度
-   都要说明与实际部署的差异。原生最终质量始终验收，不能仅凭 raw 改善晋级。
+1. **First, freeze the model and audit DSP.** Retain current control, compare direct model synthesis, only safe processing, and separately retain magnitude/phase fusion diagnostic paths. Add zero-residue, perfect reference, weak magnitude/phase, real transients, cutoff changes, and stereo validation. Bare model full-band output is only a baseline; without validation of continuity and retention of bands, it cannot be considered a default deployment.
+2. **Define the recovery interface.** Clarify whether it is full-spectrum output or a clearly defined residual repair. Avoid full-spectrum re-scaling, nor secretly modify the prediction target to the inverse of DSP spectrum. If bands are retained, the trade-offs between residual error and recovery gain must be publicly disclosed. Hard-cut bands may introduce seams or ringing; removing crossover cannot replace validation. All diagnostic interventions must follow causal, unified rules and not be tuned per track.
+3. **Then conduct small-model training comparison.** Use P36 compressed and identity 1.0 as control; prioritize comparing original lossless spectrum, dynamic supervision, and reduced detector condition dependency. Isolate one factor at a time, with identical initialization, sample rate, and sufficient budget. No direct "full-limiting chain backprop" target is introduced.
+4. **Add constrained deployment only if necessary.** First verify whether gradients still push toward erroneous compensation at correct reference points, and whether they conflict with raw target. Limiting/fault strategies should not backprop gradients to the main recovery path; simple `detach` of the full deployment output loses training signal and cannot be used to claim optimization of final recovery. Any gradient stop or substitution must explain differences from actual deployment. Native final quality must always be verified—promotion cannot be based solely on raw output improvement.
 
-全部研究继续满足模型加 DSP 计算 <5 ms，以及 48 kHz/hop128 的 2.667 ms
-持续吞吐要求；固定 256 帧缓冲单列。分频带的共享时间建模可以借鉴 Apollo，
-但本次没有运行外部模型 CPU benchmark，不能宣称任何引用架构已符合该要求。
-现有复核集用于定位，不证明没有过拟合；候选稳定后仍需独立录音和盲听。
+All research continues to satisfy model plus DSP computation <5 ms, and 48 kHz/hop128 with 2.667 ms sustained throughput. A fixed 256-frame buffer is maintained.
+Frequency-band shared time modeling can be inspired by Apollo, but external model CPU benchmarking was not run—no claim is made that any referenced architecture meets the requirement.
+The existing validation set is for localization, not proof of absence of overfitting; after candidate stability, independent recording and blind listening are still required.
 
-## 本地证据
+## Local Evidence
 
-`data/runs/dsp-boundary-p36-20261022/`（忽略目录）：
+`data/runs/dsp-boundary-p36-20261022/` (ignore directory):
 
-- `oracle.py`、`native-observed/registration.json`：全部片段、父实验、二进制、
-  回放契约、脚本哈希；执行依赖使用 P36 冻结源码。
-- `native-observed/report.json`、`band-summary.json`：所有阶段、逐片段评分、PCM
-  绝对误差与频带汇总，没有删除反例。
-- `single-bin.json`：幅度补偿梯度与相位可表达范围的代数验证。
-- `oracle-initial.py`、`registration.json`、`initial-attempt.json`：首轮失败代理的证据。
+- `oracle.py`, `native-observed/registration.json`: all segments, parent experiments, binary, replay contracts, script hashes; execution depends on frozen P36 source code.
+- `native-observed/report.json`, `band-summary.json`: all stages, per-segment scoring, PCM absolute error, and band-level summaries—no counterexamples removed.
+- `single-bin.json`: algebraic validation of magnitude compensation gradient and phase expressibility range.
+- `oracle-initial.py`, `registration.json`, `initial-attempt.json`: evidence of early proxy failure.
 
-复核入口：从仓库根目录用 `training/.venv/bin/python` 运行 `oracle.py`，环境为
-`PYTHONPATH=data/runs/risk-attribution-p36-20261022/source/training`、
-`OMP_NUM_THREADS=1`。这是诊断性原生回放，不是 ORT 模型能力、生产候选、设备回调
-稳定性或新的训练结果。
+Recheck entry: run `oracle.py` from the repository root using `training/.venv/bin/python`, environment set to `PYTHONPATH=data/runs/risk-attribution-p36-20261022/source/training` and `OMP_NUM_THREADS=1`. This is a diagnostic native replay, not a test of ORT model capability, production candidate, device callback stability, or new training results.
+
+For the unit-circle fusion bound, the stated domain is `0<w<0.5`. Perfect music-identity prediction has fusion error about `1.20e-8`, increasing to `0.006973` after limiting. Native paired PCM RMS versus original references averages `0.0123593` for music and `0.00339318` for speech. These quantities do not establish audible severity or a deployable oracle.

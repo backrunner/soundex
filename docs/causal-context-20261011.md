@@ -1,127 +1,89 @@
-# 有限因果上下文实验
+# Causal Context Experiment
 
-后续已完成[连续重建与多分辨率监督实验](multires-reconstruction-20261011.md)，
-使用真实 DSP 预热和统一 CPU 复核，报告新的质量取舍与处理链诊断。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-本轮在小型频谱 refiner 上加入过去八帧，验证时间线索是否能改善缺失高频，
-两组匹配实验均完成八轮，随后完成两轮仅训练时间分支的开发集探索。
-**本轮未取得综合恢复质量优势，不替换默认权重。** 因果模型符合本机短测资源预算，
-但高频能量恢复退步、历史依赖微弱，且真实帧数值审计仍超出预算。
+The subsequent work on continuous reconstruction and multi-resolution supervision has been completed, as reported in [multires-reconstruction-20261011.md](multires-reconstruction-20261011.md). This round introduces a real DSP warmup and employs unified CPU recheck for quality assessment and diagnostic analysis.
 
-## 结论与后续方向
+In this iteration, a history of the past eight frames is introduced to a small-scale spectral refiner to verify whether temporal cues can improve high-frequency recovery. Both matched experiments completed eight rounds of training, followed by two additional rounds of exploration focused solely on training the temporal branch. **No overall improvement in recovery quality was achieved, and the default weights are not replaced.** The causal model aligns with the local short-term resource budget, but exhibits degradation in high-frequency energy recovery, weak historical dependencies, and persistent discrepancies in real-frame numerical audits beyond budget.
 
-固定同一 CPU 验证协议，因果模型 total 比逐帧续训低约 **0.050%**，但比父模型高约
-**0.195%**。历史留出复核中，因果减逐帧的音乐/语音高频能量误差分别增加
-**0.162/0.110 dB**，95% CI 均为正；谱收敛和瞬态改善未形成稳定证据。
-统一裁掉启动段后，能量退步仍在，不能用 warmup 差异解释全部结果。
+## Conclusions and Next Steps
 
-冻结父模型、只优化时间参数的两轮探索将 CPU loss 比父模型降低 **0.013%**，
-但移除真实历史仅改变 total 约 **5e-7**。这不足以支持长时间追加同配置训练，
-也不能证明时间结构已经学到有效信息。单种子短训不能排除其他因果结构的潜力。
+Using the same CPU validation protocol, the causal model achieves a total loss that is approximately **0.050% lower** than frame-by-frame training, yet **0.195% higher** than the parent model. In historical held-out rechecks, the causal model shows increased high-frequency energy errors relative to frame-by-frame training—specifically, **+0.162 dB for music and +0.110 dB for speech**, both with positive 95% confidence intervals. Evidence for spectral convergence and transient improvements remains unstable and unconfirmed. After removing the startup segment, degradation persists, and cannot be fully explained by differences in warmup behavior.
 
-资源方面，923,526 参数和 3.622 MiB ONNX 满足规模预算；本机四组60秒因果路径
-测试的新增软件延迟为5.344–5.848 ms，worker miss为0。它满足本轮短测门槛，
-不等于声卡、跨平台或30分钟稳定性验收。质量与数值资格仍独立未通过。
+Freezing the parent model and optimizing only the temporal parameters for two rounds reduces CPU loss by **0.013%** compared to the parent, though removing real history only changes the total loss by approximately **5e-7**. This marginal change does not justify extending training with the same configuration, nor does it confirm that the temporal structure has learned meaningful information. Short-term training with a single seed cannot rule out the potential of alternative causal structures.
 
-下一轮优先检验下列假设，**本轮尚未实现**：
+From a resource perspective, 923,526 parameters and 3.622 MiB ONNX fall within the established scale budget. Testing four parallel 60-second causal paths on this machine introduces a new software latency of **5.344–5.848 ms**, with zero worker misses. While this meets the threshold for short-term testing, it does not imply performance on sound cards, cross-platform compatibility, or 30-minute stability. Quality and numerical integrity remain independently unverified.
 
-1. 延长连续重建监督，加入更长窗口的多分辨率频谱与参考瞬态误差，核对 loss 对
-   时间分支的有效梯度；继续保留独立音乐/语音及不伤保留频段的约束。
-2. 缩小训练 DSP 代理与实际 Rust cutoff、增益控制和状态演化的差异，分别审计
-   模型原始预测与 DSP 后的结果，定位高频能量与瞬态退步的来源。
-3. 在相同延迟预算内比较因果长窗辅助编码、子带表示等结构。更长的过去观察不增加
-   lookahead，但必须重新测量计算开销；先验证历史确实有效，再扩大参数或训练时长。
+The next round of experiments will prioritize the following hypotheses, **none of which were achieved in this round**:
 
-原始研究及来源见[架构调研](architecture-study-20261011.md)。以上是由本轮数据
-支持的实验优先级，不是已经证实可提升音质的方案。
+1. Extend continuous reconstruction supervision by incorporating longer-window multi-resolution spectral and transient reference errors to verify gradient effectiveness in the temporal branch. Continue to preserve independent music/voice and non-attenuated band constraints.
+2. Reduce the discrepancy between the training DSP proxy and actual Rust behavior, including cutoff, gain control, and state evolution. Audit raw model predictions and DSP-posted outputs separately to identify sources of high-frequency energy and transient degradation.
+3. Compare within the same latency budget causal long-window auxiliary encoding, subband representations, and similar structures. Longer past observations do not increase lookahead, and must be re-measured for computational overhead. First, verify that historical information is indeed effective before expanding parameters or training duration.
 
-## 结构与协议
+Original research and sources are detailed in [architecture-study-20261011.md](architecture-study-20261011.md). The following hypotheses represent experiment priorities supported by current data—not yet proven to improve audio quality.
 
-- 父模型为上一轮 `shape-small` epoch4，905,734 参数；因果分支增加 17,792 参数，
-  共 923,526 参数。保留原有 gain/圆周谱形表示与有界幅度、相位修正。
-- 九帧共享频谱编码，depthwise 时间卷积与零初始化 mixing 合并当前 latent。
-  原 U-Net 只处理当前帧；不用未来帧、循环隐状态或迭代生成。
-- artifact/architecture 1.4：输入 `[B,2,9,129]`，输出 `[B,2,1,129]`，
-  float32、opset17、动态 batch 1/2。输入按最旧到当前排序。
-  graph 的 `stateless` 指无隐式递归状态，host 仍负责保存每个物理声道的频谱历史。
-- Rust 每个观察到的 hop 都推进历史，包括静音与 bypass；按物理声道缓存后再组 batch，
-  防止活跃 batch 位置变化造成串音。reset、worker 序号缺口、模型重载清空历史。
-  冷历史为 -200 dB / 0 rad；前八 hop 输出对齐 dry，第九 hop 才允许增强并走已有淡入。
-- 历史填充约 21.33/23.22 ms 是增强启动时间，不是额外播放延迟；输出仍遵守固定
-  256 samples 的实时适配器时间轴。ORT 控制线程预热不推进音频历史。
-- 缓存只用预分配空间；回调零分配、不阻塞，推理留在 worker。历史会增加内存和
-  推理工作量，仍须测量 CPU、RSS、逐 hop 时延、miss 与恢复，不能仅凭参数估计。
+## Architecture and Protocol
 
-## 公平训练与选择
+- The parent model is the `shape-small` epoch 4 from the prior round, with 905,734 parameters. The causal branch adds 17,792 parameters, for a total of 923,526 parameters. Retains original gain and circular spectral shape representations, with bounded magnitude and phase correction.
+- Shared spectral encoding across nine frames, using depthwise temporal convolutions and zero-initialized mixing to combine the current latent. The original U-Net processes only the current frame; no future frames, cyclic hidden states, or iterative generation are used.
+- Artifact/Architecture 1.4: Input `[B,2,9,129]`, output `[B,2,1,129]`, float32, opset17, dynamic batch size 1/2. Input is ordered from oldest to current. The graph is `stateless`, meaning no implicit recursive state; the host remains responsible for maintaining per-channel spectral history.
+- Rust advances history on every observed hop, including silence and bypass. Spectral history is batched per physical channel to prevent crosstalk due to variable active batch positions. Resets, worker index gaps, and model reloads clear the history. Cold history is set to -200 dB / 0 rad. The first eight hops output align with dry, and only the ninth hop allows enhancement and fade-in.
+- Historical padding of approximately 21.33/23.22 ms is used to extend startup time, not to add playback delay. Output still adheres to a fixed 256-sample real-time adapter timeline. ORT control thread pre-warmup does not advance audio history.
+- Caching uses only pre-allocated memory; callbacks are zero-allocated and non-blocking. Inference remains within the worker. Historical processing increases memory and inference workload, and must be measured for CPU, RSS, hop-by-hop latency, miss rate, and recovery—results cannot be inferred from parameter count alone.
 
-`prepare_temporal_study.py` 从同一审核过的父检查点生成 frame-control 与 causal。
-保持原生无损数据、划分、253/254 音乐及 1/254 语音抽样、V6 loss 不变；
-每组八轮 / 1,024 updates，LR 2e-5、128-step warmup/cosine、clip1、冻结 BN、无 GAN。
-两组都取八帧真实 warmup 加八帧监督，固定相同裁剪和验证 896 行。
-控制组同样跳过前八帧监督；上一轮无 warmup 的总分不能直接相比较。
+## Fair Training and Selection
 
-显式 `--initialize-temporal-refiner` 只引入四个新张量，mix 权重和 bias 为零，
-不沿用旧 optimizer。共享参数和 RNG 保持一致；九帧 GEMM 与单帧计算可能存在
-FP32 舍入差异，迁移检查用严格绝对容差，而非要求逐位相同。
-Loss 仍使用现有短片段 DSP 代理；本轮只改变时间观察，尚未实现更长多分辨率
-监督或可学习 DSP 增益，以免混淆结构收益。
+`prepare_temporal_study.py` generates frame-control and causal branches from the same audit-approved parent checkpoint. Native, lossless data, splits, 253/254 music and 1/254 speech samples, and V6 loss are preserved. Each group undergoes eight rounds / 1,024 updates, with LR 2e-5, 128-step warmup/cosine, clip1, frozen BN, and no GAN. Both groups use eight real warmup frames and eight supervised frames, with identical cropping and validation at 896 rows. The control group skips the first eight frames of supervision; the total score from the prior round without warmup cannot be directly compared.
 
-各组按验证 total 选 epoch，高频幅度打破平局；用同一 CPU FP32、8+8 裁剪的
-V6 total 在两组之间选候选，评分历史留出前冻结模型哈希。此前用过的测试录音
-明确标作留出复核。总分、实际 Rust 音质、实时表现与听感是独立证据。
+Explicit `--initialize-temporal-refiner` introduces only four new tensors, with zero mixing weights and biases. It does not inherit the old optimizer. Shared parameters and RNG are kept consistent. FP32 rounding differences in nine-frame GEMM and single-frame computation may exist, and migration checks use strict absolute tolerance, not bit-level identity.
 
-## 验证与证据
+Loss continues to use the existing short-segment DSP proxy. This round only modifies temporal observation and has not yet implemented longer multi-resolution supervision or learnable DSP gain, to avoid confounding structural gains.
 
-实现测试覆盖：非零学习后的过去帧影响、未来隔离、逐帧与窗口一致性、动态
-batch、PyTorch/ORT/Rust 数值 parity、历史轴与声道切换、冷启动/reset/重载、
-不规则分块、真实 worker 饱和恢复以及回调/固定 hop 的 Rust 零分配。
-`temporal-probe.onnx` 是合成协议测试器，不是修复模型。
+Each group is selected by validation total, with high-frequency magnitude as tiebreaker. A single CPU FP32, 8+8 crop, V6 total is used to select candidates, with historical hash of the frozen model as a tiebreaker. All previously used test recordings are explicitly labeled as held-out rechecks. Total score, actual Rust audio quality, real-time performance, and subjective listening are independent evidence.
 
-实验配置/检查点写入 `data/runs/causal-context-20261011/`；
-质量、资源与选择报告写入 `data/reports/causal-context-20261011/`。
-训练原始音频和实验产物留在忽略目录。下列结果均绑定实际评估的模型哈希。
+## Validation and Evidence
 
-## 训练与导出结果
+Test coverage includes: non-zero influence of past frames, future isolation, frame-by-frame and window consistency, dynamic batch, PyTorch/ORT/Rust numerical parity, history axis and channel switching, cold start/reset/reload, irregular chunking, real worker saturation recovery, and zero-allocated Rust callbacks. `temporal-probe.onnx` is a synthetic protocol tester, not a restoration model.
 
-冻结源码 `52ca6b93f12f9cb8298fd649106768c615c81fb7`。两组均完成八轮 / 1,024 updates；固定 CPU FP32 规则选中 **causal**。
-162 个 BN 缓冲与父权重逐位一致，所有张量有限。数值检查另列，诊断图不冒称合格导出。
+Experiment configuration and checkpoints are written to `data/runs/causal-context-20261011/`. Quality, resource, and selection reports are written to `data/reports/causal-context-20261011/`. Original audio and experimental outputs are stored in ignored directories. All results are tied to actual evaluation model hashes.
 
-| 路径 | 参数 | ONNX MiB | best epoch | CPU V6 total |
+## Training and Export Results
+
+Frozen source code: `52ca6b93f12f9cb8298fd649106768c615c81fb7`. Both groups complete eight rounds / 1,024 updates. Using fixed CPU FP32 rules, **causal** is selected.
+
+162 BN buffers are bit-identical to parent weights. All tensors are bounded. Numerical checks are listed separately; diagnostic plots are not claimed as qualified exports.
+
+| Path | Parameters | ONNX MiB | best epoch | CPU V6 total |
 |---|---:|---:|---:|---:|
 | parent | 905,734 | 3.550 | 4 | 1.34916061 |
 | frame-control | 905,734 | 3.550 | 6 | 1.35246801 |
 | causal | 923,526 | 3.622 | 4 | 1.35179364 |
 
-| 路径 | checkpoint SHA-256 | ONNX SHA-256 |
+| Path | checkpoint SHA-256 | ONNX SHA-256 |
 |---|---|---|
 | frame-control | `e7d4782f1d9d8d270861cf6de8513d7783295c58a255096f17c0dff20f132841` | `d0ecce2d2410a3cb3b3c47fc1d0823bfd826bac41e50d15de71784db72ad03c2` |
 | causal | `f15e78b4b09111c6d3deb02558f8d36420bd2048b3c3b9f35af032a7f92a56b5` | `71cb4ffae8fa4812c5c3db84f3f17e60b18a476c5c596a0843b8c256253b9523` |
 
-### 数值一致性状态
+### Numerical Consistency Status
 
-| 模型 | 13项 parity | 真实512帧失败batch / 256 | 部署数值资格 |
+| Model | 13-item parity | Failed 512-frame batch / 256 | Deployment qualification |
 |---|---|---:|---|
-| frame-control | 未通过 | 8 | 未通过 |
-| causal | 通过 | 10 | 未通过 |
+| frame-control | Not passed | 8 | Not passed |
+| causal | Passed | 10 | Not passed |
 
-仍使用原有 v2 数值预算，未修改阈值；逐帧对照被标准导出器拒绝，另行生成本地 `diagnostic.onnx` 用于分析。因果模型通过固定导出检查，但更广的真实帧审计仍超出预算，因此同样只保留为诊断产物。
-后续音质和资源表描述实际诊断图的行为，不代表取得部署或发布资格。
+Original v2 numerical budget remains unchanged, with thresholds unmodified. Frame-by-frame comparison is rejected by standard exporters; a local `diagnostic.onnx` is generated for analysis. The causal model passes fixed export checks, but broader real-frame audits still exceed budget and are therefore retained only as diagnostic artifacts. Future audio quality and resource reports describe actual diagnostic behavior and do not imply deployment or release qualification.
 
-真实帧审计使用连续九帧窗口，覆盖两种采样率、13段验证录音、512输出帧/256个
-双样本案例，不用未来或填充历史冒充连续输入。固定13案例通过不足以替代此检查。
-当前预算为复数相对RMS <=2e-4、逆FFT峰值 <=6.1035e-5 等（见[数值预算](parity.md)）。
-实际最大逆FFT差值：逐帧约2.239e-4，因果约9.000e-5。
+Real-frame audits use a nine-frame window, covering two sample rates, 13 validation tracks, 512 output frames, and 256 dual-sample cases. Future or padded history is not used to simulate continuity. Passing 13 cases is insufficient to replace this check. Current budget is defined as relative RMS ≤ 2e-4 and inverse FFT peak ≤ 6.1035e-5 (see [numerical budget](parity.md)). Actual maximum inverse FFT difference: per-frame ~2.239e-4, causal ~9.000e-5.
 
-FP64 对照和不同 ORT 优化级别表明，部分漂移来自 FP32 舍入敏感性；这并不自动
-说明可听见伪影，也不应将“数值漂移”误判成训练损坏。显式 BN 融合探针虽将逐帧
-扩展审计失败数从8降至3，仍不满足预算，未纳入正式导出。没有放宽阈值或给标准
-导出器添加跳过检查的路径；质量退步另有实际 Rust 输出证据。
+FP64 comparisons and different ORT optimization levels indicate some drift stems from FP32 rounding sensitivity. This does not automatically imply audible artifacts, nor should "numerical drift" be misinterpreted as training damage. While explicit BN fusion probes reduce per-frame audit failures from 8 to 3, it still fails the budget and is not included in official exports. No thresholds were relaxed, nor was a path added to standard exporters to skip checks. Quality degradation is further supported by actual Rust output evidence.
 
-### 原始预测与 DSP 代理分项
+### Raw Prediction vs. DSP Proxy Breakdown
 
-同一 896 行，未乘权重，越低越好；不同单位不可直接相加。`reconstruction_*` 为可微代理；仍存在短片段初始化和在线状态差异。
+Same 896 rows, unweighted, lower is better; units are non-comparable. `reconstruction_*` are differentiable proxies; short-segment initialization and online state differences remain.
 
-| 指标 | parent | frame-control | causal |
+| Metric | parent | frame-control | causal |
 |---|---:|---:|---:|
 | high_band_magnitude | 5.547667 | 5.561699 | 5.559763 |
 | high_band_energy | 1.601419 | 1.572136 | 1.589927 |
@@ -135,40 +97,35 @@ FP64 对照和不同 ORT 优化级别表明，部分漂移来自 FP32 舍入敏�
 | reconstruction_temporal | 0.272218 | 0.273066 | 0.273255 |
 | spectral_consistency | 0.183919 | 0.191896 | 0.186510 |
 
-### 历史依赖诊断
+### Historical Dependency Diagnostics
 
-保持因果模型不变，把九个输入位置全部替换为当前帧：CPU total 从 1.35179364 变为 1.35179366。
-这是分布外的历史依赖探针，不是另训对照；原候选选择已冻结。结果只用于提出下述独立开发集探索，没有回改原配对实验。
+With the causal model fixed, replacing all nine input positions with the current frame results in a CPU total change from 1.35179364 to 1.35179366. This is an out-of-distribution historical dependency probe, not a retrained control. The original candidate selection is frozen. This result is used solely to inform independent development set exploration and does not result in any back-feeding to the original paired experiment.
 
-## 实际 Rust 质量对照
+## Actual Rust Quality Comparison
 
-Neural / MatchEdge，固定开发集 89 行 / 80 段录音；音乐 33 行 / 26 段，语音 56 行 / 54 段。
-HF 三项越低越好，SI-SDR 越高越好。配对 CI 按录音 cluster bootstrap 2,000 次、95%，未做多重比较校正。
+Neural / MatchEdge, fixed development set of 89 rows / 80 segments, 33 rows / 26 music, 56 rows / 54 speech. High-frequency (HF) metrics: lower is better; SI-SDR higher is better. Pairwise confidence intervals (CIs) are bootstrapped per track/split_group/source at 2,000 iterations, 95%, with no multiple comparison correction.
 
-### 开发集音乐
+### Development Set Music
 
-| 模型 | HF 谱收敛 | HF 能量误差 dB | HF flux | SI-SDR dB |
+| Model | HF Spectral Convergence | HF Energy Error (dB) | HF flux | SI-SDR dB |
 |---|---:|---:|---:|---:|
 | frame-control | 0.909382 | 4.023011 | 1.404272 | 26.623741 |
 | causal | 0.900147 | 3.926692 | 1.400837 | 26.618250 |
 
-### 开发集语音
+### Development Set Speech
 
-| 模型 | HF 谱收敛 | HF 能量误差 dB | HF flux | SI-SDR dB |
+| Model | HF Spectral Convergence | HF Energy Error (dB) | HF flux | SI-SDR dB |
 |---|---:|---:|---:|---:|
 | frame-control | 0.653674 | 4.432797 | 0.807768 | 29.265411 |
 | causal | 0.654100 | 4.554872 | 0.807965 | 29.267906 |
 
-## 历史留出复核
+## Held-Out Historical Recheck
 
-78 行 / 39 段录音，其中 21 段音乐、18 段语音，含 AAC160 和两种采样率。
-核对 track/split_group/source checksum 与 train/validation 隔离；未声称 artist 隔离。
-这是反复诊断过的历史材料，**不是新的独立测试**；音乐缺中国、country、hiphop、jazz 等覆盖。
-在评分前已绑定所有模型哈希；同时记录两组结构的对照，不据此重新选择候选。
+78 rows / 39 segments, 21 music, 18 speech, including AAC160 and two sample rates. Track/split_group/source checksums and train/validation isolation are verified; artist-level isolation is not claimed. This is repeated-validated historical material, **not a new independent test**. Music coverage lacks Chinese, country, hip-hop, jazz, etc. Prior to scoring, all model hashes are bound. Both model structures are recorded in parallel, and no reselection is made based on this.
 
-### 留出音乐
+### Held-Out Music
 
-| 模型 | HF 谱收敛 | HF 能量误差 dB | HF flux | SI-SDR dB |
+| Model | HF Spectral Convergence | HF Energy Error (dB) | HF flux | SI-SDR dB |
 |---|---:|---:|---:|---:|
 | causal | 0.721379 | 2.797578 | 1.068937 | 25.778961 |
 | frame-control | 0.725154 | 2.635807 | 1.077788 | 25.772837 |
@@ -176,18 +133,18 @@ HF 三项越低越好，SI-SDR 越高越好。配对 CI 按录音 cluster bootst
 | parent | 0.728370 | 2.821492 | 1.089917 | 25.772151 |
 | v6 | 0.733257 | 2.782127 | 1.092556 | 25.770247 |
 
-因果分支减去逐帧对照：
+Causal vs. frame-control:
 
-| 指标 | 平均变化 | 95% CI |
+| Metric | Average Change | 95% CI |
 |---|---:|---|
 | enhanced_high_spectral_convergence | -0.003775 | [-0.020836, +0.007734] |
 | enhanced_high_band_energy_error_db | +0.161772 | [+0.039963, +0.277121] |
 | enhanced_high_flux_error | -0.008851 | [-0.033852, +0.010318] |
 | enhanced_si_sdr_db | +0.006124 | [+0.001188, +0.013725] |
 
-### 留出语音
+### Held-Out Speech
 
-| 模型 | HF 谱收敛 | HF 能量误差 dB | HF flux | SI-SDR dB |
+| Model | HF Spectral Convergence | HF Energy Error (dB) | HF flux | SI-SDR dB |
 |---|---:|---:|---:|---:|
 | causal | 0.546814 | 3.162596 | 0.691594 | 30.015756 |
 | frame-control | 0.547795 | 3.052518 | 0.688465 | 30.012989 |
@@ -195,121 +152,101 @@ HF 三项越低越好，SI-SDR 越高越好。配对 CI 按录音 cluster bootst
 | parent | 0.544782 | 3.199011 | 0.692443 | 30.015958 |
 | v6 | 0.547228 | 3.208142 | 0.691184 | 30.016087 |
 
-因果分支减去逐帧对照：
+Causal vs. frame-control:
 
-| 指标 | 平均变化 | 95% CI |
+| Metric | Average Change | 95% CI |
 |---|---:|---|
 | enhanced_high_spectral_convergence | -0.000981 | [-0.003784, +0.001854] |
 | enhanced_high_band_energy_error_db | +0.110078 | [+0.042986, +0.180141] |
 | enhanced_high_flux_error | +0.003129 | [-0.000244, +0.006977] |
 | enhanced_si_sdr_db | +0.002767 | [+0.001087, +0.004686] |
 
-## 启动段与稳态补充
+## Startup Segment and Steady-State Supplement
 
-为避免把八个 hop 的 dry warmup 当作时间信息收益，额外对所有路径统一裁去开头0.25秒和末尾256 samples，完整处理后再评分。
-协议在留出评分前记录，保留全片指标，不据此改选或调参。下面仍是历史留出诊断。
+To avoid treating the eight-hop dry warmup as a gain in temporal information, all paths uniformly truncate the first 0.25 seconds and last 256 samples, then fully process and score. This protocol is recorded before held-out scoring, and full-length metrics are preserved for reference, without influencing selection or tuning. The following remains historical held-out diagnostics.
 
-| 语料 | 指标 | 因果减逐帧 | 95% CI |
+| Corpus | Metric | Causal vs. Frame-Control | 95% CI |
 |---|---|---:|---|
-| 音乐 | enhanced_high_band_energy_error_db | +0.124436 | [+0.005181, +0.239638] |
-| 音乐 | enhanced_high_flux_error | -0.023870 | [-0.076889, +0.007634] |
-| 音乐 | enhanced_high_spectral_convergence | -0.009715 | [-0.037038, +0.007059] |
-| 音乐 | enhanced_si_sdr_db | +0.001091 | [-0.002744, +0.005192] |
-| 语音 | enhanced_high_band_energy_error_db | +0.089212 | [+0.028807, +0.150668] |
-| 语音 | enhanced_high_flux_error | +0.004391 | [+0.000764, +0.008664] |
-| 语音 | enhanced_high_spectral_convergence | +0.000314 | [-0.002318, +0.003080] |
-| 语音 | enhanced_si_sdr_db | +0.002385 | [+0.000765, +0.004219] |
+| Music | enhanced_high_band_energy_error_db | +0.124436 | [+0.005181, +0.239638] |
+| Music | enhanced_high_flux_error | -0.023870 | [-0.076889, +0.007634] |
+| Music | enhanced_high_spectral_convergence | -0.009715 | [-0.037038, +0.007059] |
+| Music | enhanced_si_sdr_db | +0.001091 | [-0.002744, +0.005192] |
+| Speech | enhanced_high_band_energy_error_db | +0.089212 | [+0.028807, +0.150668] |
+| Speech | enhanced_high_flux_error | +0.004391 | [+0.000764, +0.008664] |
+| Speech | enhanced_high_spectral_convergence | +0.000314 | [-0.002318, +0.003080] |
+| Speech | enhanced_si_sdr_db | +0.002385 | [+0.000765, +0.004219] |
 
-## 定向优化新增时间分支
+## Targeted Optimization: Added Temporal Branch
 
-匹配八轮实验的“全部历史替换为当前帧”探针只使总 loss 改变约 2.29e-08，没有显示可辨的总体历史收益；非零参数本身不证明学会使用历史。
-因此追加一个预先固定两轮 / 256 updates 的开发集探索：从同一shape-small父模型开始，所有父参数和BN缓冲冻结，只更新17,792个时间参数，LR1e-3、warmup32/cosine。
-它改变了优化范围和学习率，不能当作原配对实验的第三个同条件arm；不改原选择，不新增留出评分。
-训练源码 `9fd534d7ce6c4d446737865ee457d9b91803a292`，最佳epoch2。
+A matched eight-round experiment probe, where all nine input positions are replaced with the current frame, shows only a total loss change of approximately **2.29e-08**, indicating no discernible benefit from historical information. Non-zero parameters do not imply learning to use history. Therefore, a targeted development set exploration is added: starting from the same `shape-small` parent, all parent parameters and BN buffers are frozen, and only the 17,792 temporal parameters are updated, with LR 1e-3, warmup 32/cosine. This changes the optimization scope and learning rate and is not considered a third arm of the original paired experiment. No reselection or new held-out scoring is added. The training source code is `9fd534d7ce6c4d446737865ee457d9b91803a292`, best epoch 2.
 
-| 项目 | 数值 |
+| Item | Value |
 |---|---:|
-| 父模型CPU total | 1.349160610 |
-| 定向时间分支CPU total | 1.348985210 |
-| 相对父模型 | -0.01300% |
-| 重复当前帧的total | 1.348985707 |
-| 去除真实历史后的变化 | +0.000000497 |
-| 参数 / ONNX MiB | 923,526 / 3.622 |
+| Parent Model CPU Total | 1.349160610 |
+| Targeted Temporal Branch CPU Total | 1.348985210 |
+| Relative to Parent | -0.01300% |
+| When Repeating Current Frame | 1.348985707 |
+| Change After Removing Real History | +0.000000497 |
+| Parameters / ONNX MiB | 923,526 / 3.622 |
 
-父模型所有已存张量逐位保持一致：`true`。13项固定parity：`true`。
-此探索分支只做开发诊断，未做新的留出、512帧数值复查或该哈希的实时资源验收，不替换默认权重。
+All parent tensor values are bit-identical: `true`. 13-item parity is preserved: `true`. This exploration is for development diagnostics only and has not undergone new held-out, 512-frame numerical recheck, or real-time resource acceptance. It does not replace default weights.
 
-| 开发语料 | HF谱收敛 | HF能量误差dB | HF flux | SI-SDR dB |
+| Development Corpus | HF Spectral Convergence | HF Energy Error (dB) | HF flux | SI-SDR dB |
 |---|---:|---:|---:|---:|
-| 音乐 | 0.896314 | 3.902270 | 1.391737 | 26.598961 |
-| 语音 | 0.653902 | 4.634331 | 0.808085 | 29.269911 |
+| Music | 0.896314 | 3.902270 | 1.391737 | 26.598961 |
+| Speech | 0.653902 | 4.634331 | 0.808085 | 29.269911 |
 
-定向检查点 SHA-256：`6419d9d82679eab398c5116a790f2f1d7e400afe3b611d9871ef4af0fc4c3789`。
-定向诊断ONNX SHA-256：`9b49b3210a3d616adb6a5080a70babc0c9800271649cd9acd4ef58f930f05c87`。
+Targeted checkpoint SHA-256: `6419d9d82679eab398c5116a790f2f1d7e400afe3b611d9871ef4af0fc4c3789`.
+Targeted diagnostic ONNX SHA-256: `9b49b3210a3d616adb6a5080a70babc0c9800271649cd9acd4ef58f930f05c87`.
 
-## 相对压缩原音及低频保护
+## Relative Compression and Low-Frequency Preservation
 
-下面是因果输出减压缩输入，均相对同一无损参考；HF指标越低越好，SI-SDR越高越好。
-不能把高频覆盖或LSD下降单独解释成恢复成功。
+Below shows causal output minus compressed input, all relative to the same lossless reference. Lower HF metrics are better, higher SI-SDR is better. High-frequency recovery cannot be interpreted as success based on coverage or LSD reduction alone.
 
-| 留出语料 | 指标 | 变化 | 95% CI |
+| Held-Out Corpus | Metric | Change | 95% CI |
 |---|---|---:|---|
-| 音乐 | high_band_energy_error_db | -1.147499 | [-1.837656, -0.464422] |
-| 音乐 | high_spectral_convergence | +0.000373 | [-0.074853, +0.105814] |
-| 音乐 | high_flux_error | +0.194616 | [+0.072430, +0.379076] |
-| 音乐 | si_sdr_db | -1.167524 | [-2.193579, -0.425649] |
-| 语音 | high_band_energy_error_db | -0.017767 | [-0.816191, +0.701631] |
-| 语音 | high_spectral_convergence | +0.039663 | [+0.001161, +0.085179] |
-| 语音 | high_flux_error | +0.068196 | [+0.036020, +0.104973] |
-| 语音 | si_sdr_db | -0.116365 | [-0.228763, -0.045449] |
+| Music | high_band_energy_error_db | -1.147499 | [-1.837656, -0.464422] |
+| Music | high_spectral_convergence | +0.000373 | [-0.074853, +0.105814] |
+| Music | high_flux_error | +0.194616 | [+0.072430, +0.379076] |
+| Music | si_sdr_db | -1.167524 | [-2.193579, -0.425649] |
+| Speech | high_band_energy_error_db | -0.017767 | [-0.816191, +0.701631] |
+| Speech | high_spectral_convergence | +0.039663 | [+0.001161, +0.085179] |
+| Speech | high_flux_error | +0.068196 | [+0.036020, +0.104973] |
+| Speech | si_sdr_db | -0.116365 | [-0.228763, -0.045449] |
 
-音乐高频能量接近参考，但瞬态和全波形保真退步；语音的谱形和瞬态也未形成改善。
-这再次说明“补出高频”尚未等同于“恢复更接近无损”。
+Music high-frequency energy approaches reference, but transient and full waveform fidelity degrades. Speech spectral and transient quality also shows no improvement. This again demonstrates that "recovery of high frequencies" does not equate to "recovery closer to lossless."
 
-低频相对输入的能量残差均值约为音乐−53.41 dB、语音−59.37 dB；绝对功率变化
-约0.00568/0.00204 dB。音乐该诊断只有21行/15段有足够有效频点，不能外推全部42行。
-对应弱频点敏感的低频 preservation LSD 仍约3.48/3.67 dB，不能仅凭功率小就宣称低频逐点不变。
+Low-frequency relative energy residuals are approximately -53.41 dB (music), -59.37 dB (speech) compared to input. Absolute power changes are about 0.00568/0.00204 dB. Music has only 21 rows/15 segments with sufficient effective frequency content, so extrapolation to 42 rows is not valid. Low-frequency preservation LSD remains weak at ~3.48/3.67 dB, and cannot be inferred from small power differences.
 
-## 连续性与试听
+## Continuity and Listening
 
-两组开发输出和因果留出输出均无非有限值；固定128帧及31/512/997/7不规则分块对照最大误差为0。
-另测两首同步立体声 rock/electronic 原音，完整 MP3 编解码并对齐后截取12秒，两种采样率；因果模型做10个静音、脉冲、单边输入案例。
-本地试听页：`data/reports/causal-context-20261011/listening/index.html`。
-五个条件为无损参考、压缩输入、原生epoch168、逐帧对照与因果模型；24-bit WAV，整段 RMS 匹配后共同峰值保护，非LUFS匹配。
-不规则分块最大误差为0；10个边界案例长度正确、输出有限，静音与空右声道保持精确0。
-同步立体声因果输出的宽度误差约0.021–0.056 dB、相关系数误差0.00096–0.00220，
-声道间相位误差0.0166–0.0794 rad，相对逐帧结果有改善也有退步。
-评分表尚未填写，`listening_performed: false`；不声称通过主观验收。
+Both development outputs and causal held-out outputs contain no non-finite values. For 128-frame and 31/512/997/7 irregular chunking, maximum error is zero. Additional testing on two synchronized stereo rock/electronic original tracks, full MP3 encoding/decoding and aligned, 12-second segments, two sample rates; causal model performs 10 cases of silence, pulse, and mono input. Local listening page: `data/reports/causal-context-20261011/listening/index.html`. Five conditions: lossless reference, compressed input, original epoch168, frame-by-frame comparison, and causal model. 24-bit WAV, full RMS matching with peak protection, not LUFS-matched. Irregular chunking maximum error is zero; 10 boundary cases have correct length, finite output, and silence and empty right channel remain exactly zero. Synchronized stereo causal output has width error of ~0.021–0.056 dB, correlation coefficient error 0.00096–0.00220, and inter-channel phase error 0.0166–0.0794 rad. Relative to frame-by-frame results, both improvements and regressions are present. Listening scores have not been filled; `listening_performed: false`. No subjective validation is claimed.
 
-## 推理时延与资源
+## Inference Latency and Resource Usage
 
-M5 Max，CPU ORT单线程；本项目训练/质量评估结束后测量；机器仍有媒体分析、图形程序及模拟器等背景负载，并非隔离基准环境。
-两组 × 两种采样率 × mono/stereo × 三轮同步测试，交错顺序，每案例处理10秒真实音乐。
-范围混合了不同声道/采样率，不能把极值相除当作配对加速比。
+M5 Max, CPU ORT single-thread; measured after training and quality assessment; machine has background loads from media analysis, graphics programs, and simulators, not an isolated benchmark. Two groups × two sample rates × mono/stereo × three rounds of synchronized testing, interleaved, each case processing 10 seconds of real music. Mix of different channels and sample rates prevents division of extreme values as performance ratios.
 
-| 模型 | 同步 p99 ms 范围 | 最大 RSS MiB |
+| Model | Sync p99 ms Range | Max RSS MiB |
 |---|---:|---:|
 | frame-control | 0.579–1.408 | 37.92 |
 | causal | 0.576–1.533 | 38.64 |
 
-两组各四案例×60秒wall-clock pacing，同一61秒真实音乐PCM、默认预热及调度请求。
+Each group runs four cases × 60 seconds wall-clock pacing, same 61-second real music PCM, default pre-warmup, and scheduling request.
 
-| 模型 | 软件延迟 ms | CPU % 单核归一 | RSS MiB | callback p99 μs | callback max μs | worker miss |
+| Model | Software Latency (ms) | CPU % (Single Core Normalized) | RSS MiB | callback p99 μs | callback max μs | worker miss |
 |---|---:|---:|---:|---:|---:|---:|
 | frame-control | 5.341–5.858 | 45.08 | 38.48 | 5.667 | 52.917 | 3 |
 | causal | 5.344–5.848 | 52.04 | 38.78 | 5.875 | 46.292 | 0 |
 
-逐帧组的3次miss均为孤立单hop（最长2.667 ms），因果组0次；八案例可用率预算均通过，
-并非逐帧组也实现了零miss。所有案例输出长度正确、无非有限值、峰值<=0.95。
-原始callback计时数组、miss位图及预算公式复算通过；丢失增强时维持对齐dry时间轴。
-CPU/RSS是整个四案例进程的资源，包含ORT/DSP/报告缓存；原始时间数组、miss位图和输入/模型/二进制哈希另行复核。
-worker交付可用率不等于模型每hop都在增强：静音、带宽bypass与因果历史填充会输出dry。
-这是短期模拟时钟测试；没有声卡测试、30分钟验收或x86_64实机性能结论。
-固定256帧软件时间轴不包含设备/驱动/宿主已有缓冲；额外接入缓冲仍须计入10ms红线。
+The frame-by-frame group has three misses, all isolated to a single hop (longest 2.667 ms), while the causal group has zero misses. All cases achieve 8-case availability within budget. The frame-by-frame group does not achieve zero misses, but the causal group achieves zero. All cases produce correct output length, no non-finite values, and peak ≤ 0.95. Raw callback timing arrays, miss bitmaps, and budget formulas are re-verified. During loss enhancement, time alignment with dry axis is maintained. CPU/RSS reflects the entire four-case process, including ORT/DSP/reporting cache. Original time arrays, miss bitmaps, and input/model/binary hashes are separately re-verified. Worker delivery availability does not imply that the model enhances every hop—silence, bandwidth bypass, and causal history padding produce dry output. This is a short-term simulation test; no sound card testing, 30-minute stability, or x86_64 real-world performance conclusions are drawn. The fixed 256-frame software timeline does not include device/driver/host buffering; additional buffer insertion must still be within the 10ms red line.
 
-## 证据与交付
+## Evidence and Delivery
 
-- 源码CI：[38120407415](https://github.com/backrunner/soundex/actions/runs/38120407415)，Rust/export-contract均成功；本地Python267项通过。
-- `data/runs/causal-context-20261011/`：冻结源码、配置、训练日志及检查点。
-- `data/reports/causal-context-20261011/`：选择/哈希绑定、CPU验证、实际Rust音质、历史诊断、试听和原始资源记录。
-- 数据、实验检查点及ONNX留在Git忽略目录；没有新增音频来源、外部预训练权重或教师输出。
+- Source CI: [38120407415](https://github.com/backrunner/soundex/actions/runs/38120407415), Rust/export-contract both succeeded; local Python 267 items passed.
+- `data/runs/causal-context-20261011/`: frozen source code, configuration, training logs, and checkpoints.
+- `data/reports/causal-context-20261011/`: selection, hash binding, CPU validation, actual Rust audio quality, historical diagnostics, listening, and raw resource records.
+- Data, experiment checkpoints, and ONNX files remain in Git-ignored directories; no new audio sources, external pre-trained weights, or teacher outputs were introduced.
+
+The opening comparison's music high-band energy errors increase by 0.162/0.110 dB; both 95% confidence intervals are positive. These are regressions, despite small loss changes. The common warmed scoring region excludes the first 0.25 seconds and final 256 samples.
+
+Fixed/irregular block comparisons have maximum error 0; the causal worker has 0 misses in the short paced test. The framewise worker has 3 isolated single-hop misses; the causal group has 0. Reducing extended parity failures from 8 to 3 still does not pass; 0 failures are required under the unchanged tolerance. No 0-miss short run replaces long-duration/device evidence.

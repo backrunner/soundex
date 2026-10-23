@@ -1,247 +1,238 @@
-# V6：部署增益与重建瞬态的受控续训
+# V6: Deployment-Aware Gain and Transient Reconstruction with Controlled Continuation
 
-本轮针对 [V5 复核](goal-refinement-20261011.md) 暴露的训练代理与实际 DSP 差异，
-将 Neural/MatchEdge 增益纳入重建 loss，并增加重建后、相对无损参考的瞬态约束。
-默认模型与 Rust 算法不变；本轮候选为本地实验权重。8 轮训练、导出、实际流处理、消融及一分钟实时测试均已完成。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 实验约束
+This round addresses the discrepancies between the training proxy and actual DSP behavior exposed in the [V5 recheck](goal-refinement-20261011.md), by incorporating Neural/MatchEdge gain into the reconstruction loss and adding a transient constraint based on a lossless reference. The base model and Rust algorithm remain unchanged; this round's candidate is derived from local experimental weights. Eight training rounds, export, real-time stream processing, ablation, and one-minute live testing have all been completed.
 
-- 冻结源码：`e6946b2e037cce8afb81bc3653623f4b14409def`。
-- V4 父检查点 SHA-256：`a152f00c6907221a4af80986364f621c1d884e9df0af22ba001ff419a574ccab`。
-- 8 轮、每轮 2,048 个抽样、batch 16，共 1,024 次更新；LR 2e-5、128 步 warmup、cosine、梯度裁剪 1。
-- 仅生成器热启动；优化器重新初始化，无 GAN，162 个 BatchNorm 状态缓冲冻结。
-- 原始频率轴双流架构，806,276 参数，FFT 256 / hop 128；不增加模型状态或未来帧。
-- 训练与验证的模型调用仍逐帧独立；8 个连续帧仅用于构造重建损失。
-- 保持原生无损 300 首音乐及 VCTK 的数据协议，训练音乐/语音比例为 253/254 和 1/254。
-  配置模板中的比例为示例，实际运行从父检查点配置解析，canonical data hash 相等。
-- recipe SHA：`7fda9e58ab583617f3514f9dd9cfcf87f29871ae0587e91ca29ac0ddaf6b29d4`；
-  manifest set SHA：`a14019181a6303417a72285b45f4e28988b349ab9d164f39b64b82f44150dab4`。
-- 固定 896 条开发验证样本（768 音乐、128 语音），V6 total 最低的 epoch 为候选。
-  导出后先冻结模型哈希，再进行既有 78 条、39 段录音的留出复核。
-  这些录音此前已经用于诊断，不是新的独立测试，仍有曲风/地区覆盖缺口。
-- 原始训练数据、检查点、ONNX、音频结果及完整报告均留在忽略目录。
+## Experimental Constraints
 
-## Loss 与 DSP 边界
+- **Frozen source code**: `e6946b2e037cce8afb81bc3653623f4b14409def`.
+- **V4 parent checkpoint SHA-256**: `a152f00c6907221a4af80986364f621c1d884e9df0af22ba001ff419a574ccab`.
+- **8 rounds**, each with 2,048 samples, batch size 16, totaling 1,024 updates; learning rate 2e-5, 128-step warmup, cosine decay, gradient clipping 1.
+- **Only generator is warmed up**; optimizer is reinitialized, no GAN, 162 BatchNorm state buffers are frozen.
+- **Dual-stream architecture on raw frequency axis**, 806,276 parameters, FFT 256 / hop 128; no additional model state or future frame prediction.
+- Model calls during training and validation remain frame-by-frame independent; only 8 consecutive frames are used to construct the reconstruction loss.
+- Native, lossless 300-song music and VCTK datasets are preserved, with a training split ratio of 253/254 music to 254/254 speech (1/254 speech). The template ratio is illustrative; actual runtime uses configuration parsed from the parent checkpoint, with identical canonical data hash.
+- Recipe SHA: `7fda9e58ab583617f3514f9dd9cfcf87f29871ae0587e91ca29ac0ddaf6b29d4`;
+  Manifest set SHA: `a14019181a6303417a72285b45f4e28988b349ab9d164f39b64b82f44150dab4`.
+- Fixed 896 development validation samples (768 music, 128 speech), with V6 selecting the lowest epoch as candidate.
+  After export, the model hash is frozen before undergoing a held-out recheck on 78 tracks (39 segments).
+  These recordings were previously used for diagnosis and are not new independent tests; there remain gaps in genre and regional coverage.
+- All original training data, checkpoints, ONNX outputs, audio results, and full reports are retained in the ignore directory.
 
-[V6 公式与实现边界](inpainting-objective.md#v6-deployment-aware-continuation-experimental)
-保留 V5 的原始幅度、能量、相位及变化误差；重建路径额外使用 Rust 相同的
-截止频点取整、边缘参考 RMS、-6 dB 比例目标、[0.25, 2] 目标增益和 0.1 平滑递推。
-仅对 crossover 权重大于零的生成频点施加增益，再进行极坐标融合、因果 OLA 和重新分析。
-新增权重 0.25 的重建时间差误差，同时监督攻击与衰减，不奖励恒定频谱。
+## Loss and DSP Boundary
 
-短训练片段没有此前的增益历史，因此使用首帧目标增益的 detached 值初始化；
-这是稳态近似，不能称为完整部署等价。截止频率仍来自静态配对元数据；
-在线 detector、gate、limiter、wet/dry ramp 和异步回退仍以实际 Rust 输出验证。
-V6 的 identity generator 分数也经过增益代理，不是未处理的 dry 基线。
-不把 V5 与 V6 total 直接相比。
+[See V6 Formula and Implementation Boundary](inpainting-objective.md#v6-deployment-aware-continuation-experimental)
+Retains V5's original magnitude, energy, phase, and change error; the reconstruction path additionally uses Rust's identical cutoff frequency binning, edge reference RMS, −6 dB target ratio, [0.25, 2] gain target, and 0.1 smooth recursive update.
+Only frequency bins with crossover weight greater than zero are subject to gain, followed by polar coordinate fusion, causal OLA, and re-analysis.
+A new weight of 0.25 is introduced for time difference error, while supervising both attack and decay, without rewarding constant spectra.
 
-64 个训练抽样的 MPS 梯度诊断中，新重建时间项加权参数梯度 L2 均值为 4.7030；
-重建谱收敛为 3.3550、原始幅度为 1.7504、相位为 2.4490，均有限。
-这个检查用于发现明显失衡，不证明权重配置最优。
+Since short training segments lack prior gain history, the first-frame target gain is used to initialize the detached value—this is a steady-state approximation and cannot be considered equivalent to full deployment. The cutoff frequency remains from static pairing metadata; online detector, gate, limiter, wet/dry ramp, and asynchronous fallback are still validated against actual Rust output.
+The V6 identity generator score is also processed through the gain proxy, not a dry baseline.
+No direct comparison between V5 and V6 total scores is made.
 
-## 理想输入诊断：DSP 也存在误差来源
+Among 64 training samples, the L2 mean of the new reconstruction time term gradient (weighted by parameter) is 4.7030; spectral convergence is 3.3550, raw magnitude is 1.7504, and phase is 2.4490—all bounded.
+This check is used to detect significant imbalance, not to prove optimal weight configuration.
 
-在同一批 64 个训练抽样上，用 CPU FP32 将预测幅度、相位分别替换为无损参考。
-这是不可部署的诊断输入，使用 V6 代理，不是测试成绩或可实现的模型上界。
-下列指标均越低越好，只比较同定义的分项，不比较跨版本总分：
+## Ideal Input Diagnostics: DSP Also Has Error Sources
 
-| 输入条件 | 重建高频谱收敛 | 重建高频复数误差 | 重建高频能量误差 dB | 重建时间差误差 |
+On the same 64 training samples, we replace predicted magnitude and phase with lossless reference values using CPU FP32. This is an undeployable diagnostic input, evaluated using the V6 proxy, not a test score or achievable upper bound.
+All following metrics are lower is better, and comparisons are only made within the same metric definition, not across versions:
+
+| Input Condition | High-Frequency Spectral Convergence | High-Frequency Complex Error | High-Frequency Energy Error (dB) | Time-Difference Error |
 |---|---:|---:|---:|---:|
-| V4 预测 + MatchEdge 代理 | 0.246946 | 0.340057 | 1.396734 | 0.242808 |
-| 正确幅度 + 预测相位 + MatchEdge | 0.203532 | 0.352519 | 1.197768 | 0.194629 |
-| 预测幅度 + 正确相位 + MatchEdge | 0.236687 | 0.241924 | 1.398647 | 0.208724 |
-| 正确幅度与相位 + MatchEdge | 0.182366 | 0.186335 | 1.205929 | 0.135519 |
-| 正确幅度与相位，不施加边缘增益 | 0.050710 | 0.060730 | 0.118810 | 0.045789 |
+| V4 Prediction + MatchEdge Proxy | 0.246946 | 0.340057 | 1.396734 | 0.242808 |
+| Correct Magnitude + Predicted Phase + MatchEdge | 0.203532 | 0.352519 | 1.197768 | 0.194629 |
+| Predicted Magnitude + Correct Phase + MatchEdge | 0.236687 | 0.241924 | 1.398647 | 0.208724 |
+| Correct Magnitude + Correct Phase + MatchEdge | 0.182366 | 0.186335 | 1.205929 | 0.135519 |
+| Correct Magnitude + Correct Phase, no edge gain | 0.050710 | 0.060730 | 0.118810 | 0.045789 |
 
-可见正确幅度并不能弥补预测相位造成的全部复数误差；固定的边缘能量比例也能
-偏离正确参考。最后一行仍有输入保留频带及 crossover 等误差。
-对于现有 V4 预测，去掉边缘增益反而把代理高频能量误差从 1.3967 增至 1.5338 dB，
-因此不能由理想输入诊断推断应直接关闭增益控制。它支持进一步研究自适应增益，
-不能代替当前模型的真实流处理验证。
+It is evident that correct magnitude cannot fully compensate for complex errors introduced by predicted phase; a fixed edge energy ratio still deviates from the correct reference. The last row retains errors in retained frequency bands and crossover regions.
+For existing V4 predictions, removing edge gain increases the high-frequency energy error from 1.3967 dB to 1.5338 dB, so it cannot be inferred that the gain control should be disabled. This supports further research into adaptive gain, and it cannot replace real-time stream processing validation.
 
-## 训练与部署结果
+## Training and Deployment Results
 
-8 轮已完成；按预设规则选中第 4 轮。以下使用相同 896 条样本、相同 V6 目标、CPU FP32 单线程重算：
+All 8 rounds completed; the 4th round is selected based on predefined rules. The following uses the same 896 samples, same V6 objective, and CPU FP32 single-threaded re-computation:
 
-| 指标 | V4 父模型 | V6 候选 |
+| Metric | V4 Parent Model | V6 Candidate |
 |---|---:|---:|
 | V6 total | 1.351980 | 1.348875 |
-| 原始高频幅度误差 dB | 5.485374 | 5.475147 |
-| 原始高频时间差 | 0.249465 | 0.247553 |
-| 重建高频谱收敛 | 0.276458 | 0.275842 |
-| 重建高频复数误差 | 0.392754 | 0.383451 |
-| 重建低频复数误差 | 0.001027 | 0.000985 |
-| 重建高频能量误差 dB | 1.702155 | 1.712001 |
-| 重建时间差 | 0.279467 | 0.276602 |
-| 相对波形误差 | 0.916551 | 0.915600 |
-| 频谱一致性 | 0.188507 | 0.193432 |
+| Raw High-Frequency Magnitude Error (dB) | 5.485374 | 5.475147 |
+| Raw High-Frequency Time Difference | 0.249465 | 0.247553 |
+| Reconstructed High-Frequency Spectral Convergence | 0.276458 | 0.275842 |
+| Reconstructed High-Frequency Complex Error | 0.392754 | 0.383451 |
+| Reconstructed Low-Frequency Complex Error | 0.001027 | 0.000985 |
+| Reconstructed High-Frequency Energy Error (dB) | 1.702155 | 1.712001 |
+| Reconstructed Time Difference | 0.279467 | 0.276602 |
+| Relative Waveform Error | 0.916551 | 0.915600 |
+| Spectral Consistency | 0.188507 | 0.193432 |
 
-总分下降约 0.230%；改善集中在复数重建、低频残差和瞬态，高频能量与频谱一致性略有退步。
-不能将总分微降解释为整体音质达标。
+Total score decreased by approximately 0.230%; improvements are concentrated in complex reconstruction, low-frequency residuals, and transients, while high-frequency energy and spectral consistency show slight degradation.
+This small drop in total score cannot be interpreted as overall audio quality meeting standards.
 
-候选检查点 SHA-256：`22c39a78baca386c2b30d34641f02dea7cf83a331f00eefd8390d769f0a8a433`。
-ONNX SHA-256：`18ea464cfcc4c978b252f1b6ad04ce5e1fc427dc225b58759b6a8e69d2b57336`。
-13 项 PyTorch/ORT/Rust parity 通过；162 个 BN 缓冲与父模型逐位一致，所有参数有限。
+Candidate checkpoint SHA-256: `22c39a78baca386c2b30d34641f02dea7cf83a331f00eefd8390d769f0a8a433`.
+ONNX SHA-256: `18ea464cfcc4c978b252f1b6ad04ce5e1fc427dc225b58759b6a8e69d2b57336`.
+13 out of 13 PyTorch/ORT/Rust parity checks passed; all 162 BatchNorm buffers match the parent model bit-for-bit, and all parameters are finite.
 
-### 固定开发音频：89 条，80 段录音
+### Fixed Development Audio: 89 Tracks, 80 Segments
 
-实际 Rust Neural/MatchEdge；音乐 33 条/26 段录音，语音 56 条/54 段录音。
-以下前三项越低越好，SI-SDR 越高越好；dry 是未经增强的压缩输入。
+Actual Rust Neural/MatchEdge; 33 music tracks / 26 segments, 56 speech tracks / 54 segments.
+The first three metrics are lower is better, higher is better for SI-SDR. Dry is the unenhanced compressed input.
 
-**音乐**
+**Music**
 
-| 路径 | 高频谱收敛 | 高频能量误差 dB | 高频 flux 误差 | SI-SDR dB |
+| Path | High-Frequency Spectral Convergence | High-Frequency Energy Error (dB) | High-Frequency Flux Error | SI-SDR dB |
 |---|---:|---:|---:|---:|
-| 压缩输入 | 0.839516 | 5.488903 | 1.051229 | 27.563202 |
-| 原始 epoch168 | 0.932430 | 3.956168 | 1.445967 | 26.577054 |
+| Compressed Input | 0.839516 | 5.488903 | 1.051229 | 27.563202 |
+| Raw Epoch168 | 0.932430 | 3.956168 | 1.445967 | 26.577054 |
 | V4 | 0.909426 | 3.845271 | 1.404426 | 26.549455 |
 | V5 calibrated | 0.915956 | 3.648472 | 1.423574 | 26.521046 |
 | V6 | 0.904906 | 3.895419 | 1.405710 | 26.598670 |
 
-**语音**
+**Speech**
 
-| 路径 | 高频谱收敛 | 高频能量误差 dB | 高频 flux 误差 | SI-SDR dB |
+| Path | High-Frequency Spectral Convergence | High-Frequency Energy Error (dB) | High-Frequency Flux Error | SI-SDR dB |
 |---|---:|---:|---:|---:|
-| 压缩输入 | 0.723740 | 5.673287 | 0.804808 | 29.381521 |
-| 原始 epoch168 | 0.664968 | 4.218196 | 0.809657 | 29.253909 |
+| Compressed Input | 0.723740 | 5.673287 | 0.804808 | 29.381521 |
+| Raw Epoch168 | 0.664968 | 4.218196 | 0.809657 | 29.253909 |
 | V4 | 0.651650 | 4.585417 | 0.809905 | 29.265028 |
 | V5 calibrated | 0.647373 | 4.368251 | 0.811117 | 29.251306 |
 | V6 | 0.655987 | 4.634038 | 0.807928 | 29.271228 |
 
-V6 对 V5 的音乐谱形/flux/SI-SDR 均值改善，但高频能量更差；谱形和 flux 的
-录音聚类 95% bootstrap 差值区间跨零，不能把均值改善称为稳定胜出。
-SI-SDR 差值 +0.07762 dB，95% CI [0.01740, 0.16547]；能量误差差值
-+0.24695 dB，95% CI [-0.05950, 0.60770]。语音高频谱收敛和能量相对 V5 退步。
-V6 对 V4 的音乐能量和 flux 没有改善证据；不能只凭 V5 的局部对比宣称超越基线。
+V6 shows improvement over V5 in music spectral shape, flux, and SI-SDR, though high-frequency energy is worse.
+Spectral shape and flux clustering shows 95% bootstrap confidence interval crossing zero, so the mean improvement cannot be declared as statistically significant.
+SI-SDR difference: +0.07762 dB (95% CI [0.01740, 0.16547]); energy error difference: +0.24695 dB (95% CI [-0.05950, 0.60770]).
+Speech high-frequency spectral convergence and energy are worse than V5.
+No evidence of improvement over V4 in music energy or flux.
+No claim of surpassing the baseline can be made based solely on V5 comparisons.
 
-沿用既有 canonical 指标与 2,000 次 track-level bootstrap。弱参考高频会放大谱收敛/flux；
-本轮不改动阈值、分母或验收规则。所有 89 条候选在 128 帧及不规则分块
-`31,512,997,7` 下与离线输出最大差值为 0。
+Using the same canonical metrics and 2,000 track-level bootstrap. High-frequency reference bias amplifies spectral convergence and flux; thresholds, denominators, and acceptance rules remain unchanged.
+All 89 candidates show maximum deviation from offline output of zero under 128-frame and irregular chunking `31,512,997,7`.
 
-### 留出复核：78 条，39 段录音
+### Held-Out Recheck: 78 Tracks, 39 Segments
 
-音乐 42 条/21 段录音，语音 36 条/18 段录音；每段录音两个条件覆盖 44.1/48 kHz，
-包括 AAC 160 held-out codec。训练/验证的 track、split_group、source checksum 与这些
-录音无交集，但录音此前已经用于诊断，所以不是新的独立测试，也不是 artist-disjoint。
-候选选择收据在这次评分前冻结，评估后没有修改模型、DSP、指标或选择规则。
+42 music tracks / 21 segments, 36 speech tracks / 18 segments; each segment tested at both 44.1/48 kHz, including AAC 160 held-out codec.
+Training and validation track, split_group, and source checksums do not intersect with these recordings, though they were previously used for diagnosis—thus not a new independent test, nor artist-disjoint.
+Candidate selection receipt was frozen prior to scoring; no model, DSP, metric, or selection rule was modified after evaluation.
 
-**音乐**
+**Music**
 
-| 路径 | 高频谱收敛 | 高频能量误差 dB | 高频 flux 误差 | SI-SDR dB |
+| Path | High-Frequency Spectral Convergence | High-Frequency Energy Error (dB) | High-Frequency Flux Error | SI-SDR dB |
 |---|---:|---:|---:|---:|
-| 压缩输入 | 0.721006 | 3.945078 | 0.874321 | 26.946485 |
-| 原始 epoch168 | 0.745696 | 2.503481 | 1.119915 | 25.751111 |
+| Compressed Input | 0.721006 | 3.945078 | 0.874321 | 26.946485 |
+| Raw Epoch168 | 0.745696 | 2.503481 | 1.119915 | 25.751111 |
 | V4 | 0.742269 | 2.876600 | 1.117913 | 25.760181 |
 | V5 calibrated | 0.761708 | 2.843306 | 1.141697 | 25.740227 |
 | V6 | 0.733257 | 2.782127 | 1.092556 | 25.770247 |
 
-**语音**
+**Speech**
 
-| 路径 | 高频谱收敛 | 高频能量误差 dB | 高频 flux 误差 | SI-SDR dB |
+| Path | High-Frequency Spectral Convergence | High-Frequency Energy Error (dB) | High-Frequency Flux Error | SI-SDR dB |
 |---|---:|---:|---:|---:|
-| 压缩输入 | 0.507151 | 3.180363 | 0.623398 | 30.132120 |
-| 原始 epoch168 | 0.553484 | 2.934310 | 0.684675 | 30.009073 |
+| Compressed Input | 0.507151 | 3.180363 | 0.623398 | 30.132120 |
+| Raw Epoch168 | 0.553484 | 2.934310 | 0.684675 | 30.009073 |
 | V4 | 0.538776 | 3.188172 | 0.694500 | 30.017263 |
 | V5 calibrated | 0.531532 | 3.013707 | 0.692345 | 30.014774 |
 | V6 | 0.547228 | 3.208142 | 0.691184 | 30.016087 |
 
-音乐相对 V5：谱收敛差值 −0.02845（95% CI [−0.04592, −0.01230]），
-flux 差值 −0.04914（[−0.07977, −0.02449]，均值下降约 4.3%），
-SI-SDR +0.03002 dB（[0.00508, 0.06689]）；能量差值 −0.06118 dB，区间跨零。
-相对 V4，音乐 flux 也下降 −0.02536（[−0.05742, −0.00471]），其他三项差值区间跨零。
-相对原始 epoch168，音乐能量误差 **增加 0.27865 dB**（[0.03230, 0.50896]）；
-语音相对 V5 的谱形/能量也退步。因此不能宣称全面超越原始基线或总体达标。
+Compared to V5: music spectral convergence difference is −0.02845 (95% CI [−0.04592, −0.01230]), flux difference is −0.04914 (95% CI [−0.07977, −0.02449], average drop ~4.3%), SI-SDR +0.03002 dB (95% CI [0.00508, 0.06689]), energy difference −0.06118 dB (CI crosses zero).
+Compared to V4, music flux also decreased by −0.02536 (95% CI [−0.05742, −0.00471]), other metrics have CI crossing zero.
+Compared to raw epoch168, music energy error **increased by 0.27865 dB** (95% CI [0.03230, 0.50896]); speech spectral shape and energy also degraded relative to V5.
+Therefore, no claim of overall superiority over the original baseline or overall success can be made.
 
-全部 78 条候选输出有限，两种分块模式与离线差值为 0。57 条 mono/left/right 物理声道
-的低频绝对能量变化均值为 0.003380 dB，低频残差功率/输入均值为 −57.151 dB，
-无新增超过 full-scale 的输出。低频 LSD 不等同于音量变化。
+All 78 tracks output is bounded; both chunking modes show zero deviation from offline output.
+Low-frequency absolute energy variation across 57 mono/left/right physical channels has a mean of 0.003380 dB; low-frequency residual power/input mean is −57.151 dB.
+No new output exceeds full-scale. Low-frequency LSD does not imply volume change.
 
-### Dry 与 DSP 消融
+### Dry and DSP Ablation
 
-相对未经增强的压缩输入，V6 的留出音乐高频能量误差下降 1.16295 dB
-（95% CI [−1.87244, −0.41811]），但 flux 误差增加 0.21824
-（[0.06976, 0.46325]），SI-SDR 降低 1.17624 dB
-（[−2.20386, −0.43075]）。开发音乐也仍有同方向的瞬态/波形退步。
-因此局部超越 V4/V5 并不等于完成反压缩目标。
+Relative to unenhanced compressed input, V6 reduces music high-frequency energy error by 1.16295 dB (95% CI [−1.87244, −0.41811]), but increases flux error by 0.21824 (95% CI [0.06976, 0.46325]) and reduces SI-SDR by 1.17624 dB (95% CI [−2.20386, −0.43075]).
+Development music also shows transient/waveform degradation in the same direction.
+Thus, local superiority over V4/V5 does not equate to successful de-compression.
 
-在同一 89 条开发样本上另做实际 Rust 增益消融；这是诊断，没有用来重新选择
-留出候选或调整默认设置。关闭 MatchEdge、直接采用模型幅度时：
+On the same 89 development samples, we perform actual Rust gain ablation: a diagnostic test, not used to reselect the held-out candidate or adjust default settings.
+With MatchEdge disabled and direct model magnitude used:
 
-| V6 音乐路径 | 高频能量误差 dB | 高频 flux 误差 | SI-SDR dB |
+| V6 Music Path | High-Frequency Energy Error (dB) | High-Frequency Flux Error | SI-SDR dB |
 |---|---:|---:|---:|
 | MatchEdge | 3.895419 | 1.405710 | 26.598670 |
 | Model gain | 5.286458 | 1.267314 | 26.748162 |
 
-音乐能量误差增加 1.39104 dB（95% CI [0.74283, 2.06328]），
-语音也增加 0.94717 dB（[0.62758, 1.27927]）。能量欠填更多时 flux/SI-SDR
-反而可以改善，说明不能仅靠减少增强认定恢复成功。保留默认 MatchEdge。
+Music energy error increases by 1.39104 dB (95% CI [0.74283, 2.06328]); speech increases by 0.94717 dB (95% CI [0.62758, 1.27927]).
+When energy is underfilled, flux and SI-SDR can improve—indicating that reducing enhancement does not guarantee recovery success.
+Default MatchEdge is retained.
 
-### 立体声与边界
+### Stereo and Boundary
 
-两首既有 rock/electronic 留出录音先完整 MP3-128 编码并对齐，再取同步立体声
-12 秒片段，各测 44.1/48 kHz。四个候选结果全部有限，两种分块与离线差值为 0，
-峰值最大 0.87734。不是把不同起点的 left/right 训练片段拼成立体声。
-10 个静音、脉冲、单侧声道用例输出长度正确且有限，静音和未输入的右声道精确为零。
-声像宽度误差均值为 0.03938 dB（原始模型 0.03605、V4 0.03992），
-声道间相位误差为 0.04776 rad（原始模型 0.04758、V4 0.04773）。
-样本很少，不能外推全部立体声音乐；这些检查不代替真实播放或主观听感。
+Two existing rock/electronic held-out recordings are fully MP3-128 encoded and aligned, then a 12-second stereo snippet is extracted, tested at both 44.1/48 kHz.
+All four candidates are bounded; both chunking modes show zero deviation from offline output.
+Peak maximum is 0.87734.
+Not constructed by concatenating left/right training segments from different start points.
+10 use cases (silence, pulse, mono, single channel) produce correct output length and bounded results; silence and uninput right channel are exactly zero.
+Average panning width error is 0.03938 dB (V4: 0.03605, original model: 0.03992); inter-channel phase error is 0.04776 rad (original model: 0.04758, V4: 0.04773).
+Sample size is small; cannot extrapolate to all stereo music.
+These checks do not replace real playback or subjective listening.
 
-新的 20 个匿名 24-bit WAV 与本地播放器位于
-`data/reports/deployment-refinement-20261011/listening/index.html`。
-五条件为无损、压缩输入、原始模型、V4、V6；按每段完整 RMS 匹配后共同峰值衰减，
-不是 LUFS 匹配。评分表未填写，未进行盲听，不将材料生成作为听感合格证据。
+New 20 anonymous 24-bit WAV files and local player are located at:
+`data/reports/deployment-refinement-20261011/listening/index.html`.
+Five conditions: lossless, compressed input, original model, V4, V6; scored based on peak RMS matching and common peak decay, not LUFS.
+No scoring sheet was completed; no blind listening was conducted; materials are not considered evidence of acceptable listening quality.
 
-### 资源与一分钟连续输出
+### Resource and One-Minute Continuous Output
 
-M5 Max，本机 CPU ORT 单线程；benchmark 源码为 `d837c5e`，模型源码仍为 `e6946b2`。
-训练、音质评估和资源测量顺序执行，测量时没有本轮训练/音质评估任务重叠。
-44.1/48 kHz × mono/stereo，各连续 60 秒，预热开启，producer/worker 实时调度请求均获接受。
+M5 Max, local CPU ORT single-threaded; benchmark source code is `d837c5e`, model source code remains `e6946b2`.
+Training, audio evaluation, and resource measurement are executed sequentially; no overlap during measurement.
+44.1/48 kHz × mono/stereo, 60 seconds continuous, warmup enabled, producer/worker real-time scheduling requests all accepted.
 
-| 项目 | V6 实测 |
+| Metric | V6 Measured |
 |---|---:|
-| ONNX 大小 | 3,309,786 bytes（3.16 MiB） |
-| 同步完整 hop p99，四种配置范围 | 0.642–1.396 ms |
-| 同步进程峰值 RSS | 35.70 MiB |
-| paced 附加软件延迟范围 | 5.3399–5.8129 ms |
-| 四种配置中最大 callback p99 | 2.500 μs |
-| 四种配置中最大 callback max | 7.917 μs |
-| paced 整组 CPU，单核百分比 | 32.08% |
-| paced 整组峰值 RSS | 41.11 MiB |
+| ONNX Size | 3,309,786 bytes（3.16 MiB） |
+| Synchronous full hop p99, across four configurations | 0.642–1.396 ms |
+| Synchronous process peak RSS | 35.70 MiB |
+| Paced additional software latency range | 5.3399–5.8129 ms |
+| Maximum callback p99 across four configurations | 2.500 μs |
+| Maximum callback max across four configurations | 7.917 μs |
+| Paced overall CPU, single core percentage | 32.08% |
+| Paced overall peak RSS | 41.11 MiB |
 | worker deadline misses / queue overflows | 0 / 0 |
 
-同步 V4 对照 p99 为 1.010–1.726 ms，峰值 RSS 35.86 MiB；只有一次顺序运行，
-不能据此声称 V6 的相同架构更快。paced CPU = (user + system) / wall，覆盖
-240.39 秒整组进程，包括启动、测试工具和报告缓存，不是整机 CPU 百分比；
-RSS 也包含测试工具。与上轮 30 秒测试的资源数字不直接作模型成本因果比较。
+Synchronous V4 p99 is 1.010–1.726 ms, peak RSS 35.86 MiB; only one sequential run was performed, so cannot claim V6's architecture is faster.
+Paced CPU = (user + system) / wall, covering 240.39 seconds of full process, including startup, test tool, and report caching—not overall machine CPU percentage; RSS includes test tools.
+No direct causal comparison to prior 30-second test resource numbers.
 
-四个用例的有限值、输出长度、连续输出检查、增强可用性、回调预算均通过；
-原始 callback 纳秒序列和 worker miss 位图独立重算 p99、miss/burst 与延迟，4/4 通过。
-固定延迟仍为 256 samples，满足 <8 ms 目标和 <10 ms 红线。没有新增模型前视或缓冲。
-这不是物理声卡、完整设备端到端、跨平台或 30 分钟发布验收。
+All four use cases pass bounded values, output length, continuous output checks, enhancement availability, and callback budget.
+Original callback nanosecond sequences and worker miss bitmaps were independently recalculated for p99, miss/burst, and latency; all 4 passed.
+Fixed latency remains at 256 samples, meeting <8 ms target and <10 ms redline. No new model lookahead or buffering.
+This is not a physical sound card, full device end-to-end, cross-platform, or 30-minute release validation.
 
-首次一分钟 paced 测试沿用了仅 31 秒的旧 PCM，在 31.42 秒遇到输入 EOF，
-不计为通过；收据保存在 `cost-short-input-failed/`。已给两个 benchmark 的输入
-加载器增加所需帧数检查（包括完整 hop 和同步 warmup），旧短文件分别在 0.032 /
-0.033 秒被拒绝。新 PCM 是同源完整录音重新 MP3 编码、对齐后从第 10 秒起截取
-61 秒，前 31 秒与旧文件逐字节一致，无循环拼接；原始 SHA、PCM SHA 和对齐结果
-保存在 `realtime-pcm/receipt.json`。这个修复只影响测试工具，不改变音频产品处理路径。
+The first one-minute paced test reused only the first 31 seconds of the old PCM, encountering input EOF at 31.42 seconds—this is not counted as passed.
+Receipt saved in `cost-short-input-failed/`. Two benchmark input loaders were updated with required frame count checks (including full hop and synchronized warmup); old short files were rejected in 0.032 / 0.033 seconds.
+The new PCM is derived from the original full recording, re-encoded to MP3, aligned, and truncated from the 10th second onward for 61 seconds.
+First 31 seconds match the old file byte-for-byte, no looping or stitching; original SHA, PCM SHA, and alignment result saved in `realtime-pcm/receipt.json`.
+This fix only affects test tools and does not alter the audio product processing path.
 
-## 当前决策
+## Current Decision
 
-保留原始 epoch168 基线，V6 作为本地实验候选。新训练目标在留出音乐瞬态上取得
-可测进展，但开发/留出、音乐/语音之间仍有取舍，高频能量和输入保真没有整体达标。
-8 轮中最优在第 4 轮，后四轮没有进一步降低选择目标；本轮没有支持直接追加
-相同配方训练轮数的证据。也没有证明架构已达上限。
+Retain the raw epoch168 baseline; V6 is selected as a local experiment candidate.
+Measurable progress is achieved in transient reconstruction on held-out music, but trade-offs remain in development and held-out, music and speech.
+High-frequency energy and input fidelity have not met overall standards.
+The best round among 8 is round 4; the next four rounds did not further reduce the selection target.
+No evidence supports extending the same recipe for additional training rounds.
+No proof of architectural ceiling has been established.
 
-下一步优先验证学习式/条件化增益控制，减少固定边缘比例与真实高频能量的冲突；
-同时考虑只使用过去帧的非线性时序上下文来监督相位和瞬态。需要新的受控实验，
-保持无前视、固定延迟及回调预算。还需要补齐独立评估的曲风/地区和主观听感证据。
-这些是后续方向，不是本轮已实现的功能。
+Next steps prioritize validating learnable/conditioned gain control to reduce conflict between fixed edge ratios and actual high-frequency energy;
+simultaneously, consider using only non-linear temporal context from past frames to supervise phase and transient.
+New controlled experiments are required, maintaining no lookahead, fixed latency, and callback budget.
+Additional independent evaluation of genre/region and subjective listening evidence is needed.
+These are future directions, not functionalities achieved in this round.
 
-## 可复核材料
+## Recheckable Materials
 
-完整本地报告：`data/reports/deployment-refinement-20261011/`。
-训练记录：`data/runs/deployment-continuation-20261011/`。
-源码和配置已提交；原始数据及实验权重不推送。
-本地 Python 全套 254 项通过；源码 CI
-[38079133782](https://github.com/backrunner/soundex/actions/runs/38079133782) 的 Rust 与 export-contract 均成功。
+Complete local report: `data/reports/deployment-refinement-20261011/`.
+Training logs: `data/runs/deployment-continuation-20261011/`.
+Source code and configuration have been submitted; original data and experimental weights are not pushed.
+Full local Python suite passed 254 tests; CI for source code [38079133782](https://github.com/backrunner/soundex/actions/runs/38079133782) shows successful Rust and export-contract execution.
+
+The run completes 8 epochs and selects epoch 4; later epochs do not further improve the selection objective. Fixed versus irregular block comparisons have maximum differences 0 for development, 0 for held-out and 0 for the synchronized stereo probes. These numerical equalities do not establish listening quality.

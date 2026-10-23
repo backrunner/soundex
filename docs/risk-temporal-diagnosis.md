@@ -1,168 +1,137 @@
-# P36：缺失高频、时间变化与恒等反例诊断
+# P36: Diagnosis of High-Frequency Loss, Temporal Dynamics, and Identity Counterexamples
 
-2026-10-22，对已冻结的 P36 `compressed`（仅误差压缩、identity 权重 1.0）
-与同种子 P35 `control` 继续分析。两个种子依次为 20261012、20261013；
-模型均为 431,015 参数、各训练 16,192 步。没有更新权重、部署 DSP 或筛选门槛。
-完整训练和实时结果见 [P36 两因素对照](risk-attribution-study.md)。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-结论：恢复收益确实包含输入缺失高频的改善，但补偿的时间变化还不够准确。
-音乐动态退化在模型原始输出中已经存在，频带融合进一步放大；恒等频谱均值的
-退化则主要由极弱参考频带的一个反例拉高。这些是不同问题，不宜通过整体降低
-增强量、单纯平滑输出或删除弱能量样本一起处理。
+2026-10-22 — Analysis of the frozen P36 `compressed` model (only error compression, identity weight = 1.0) and the corresponding P35 `control` model with the same seed. Seeds are 20261012 and 20261013, respectively. Both models have 431,015 parameters and were trained for 16,192 steps. No weight updates, DSP deployment, or threshold filtering occurred. Full training and real-time results are available in [P36 Two-Factor Comparison](risk-attribution-study.md).
 
-## 范围与方法
+**Conclusion:** The restored performance indeed includes improvements in the recovery of high-frequency content, but the compensation for temporal dynamics remains inaccurate. Dynamic degradation already exists in the raw model output and is further amplified by spectral fusion. The degradation in identity spectrum mean is primarily driven by a single counterexample from a very weak reference band. These are distinct issues and should not be addressed collectively through overall reduction of enhancement magnitude, simple smoothing of output, or removal of low-energy samples.
 
-- 使用全部 89 个既有复核片段（音乐 33、语音 56）；同一录音的片段先聚合，
-  再按录音取均值。音乐共 26 首，片段数与录音数不可混用。
-- 对 P36 四个新增端点执行 712 个实际 Rust 前端/ORT 的 paired、identity 角色，
-  分解原始 OLA、频带融合、无限幅门控、限幅与原生输出。阶段代理与原生输出的
-  最大误差为 `4.17e-7`，无容差失败。保留 169 个训练 Python 源文件的冻结副本并核对哈希。
-- 对 P35 control 与 P36 compressed 的四个端点额外执行 356 次原生 paired 推理，
-  分析输入缺失/过量频点和时间变化误差；不是新增训练样本或独立测试。
-- 所有阶段仍对原始、未限幅无损参考评分。恒等 DSP 只用于分离额外改动。
-  全部反例保留，不设置曲目专属或事后弱能量放行阈值。
+---
 
-## 恢复了哪些频率
+## Scope and Methodology
 
-共同 MR v1 的音乐 paired 原生输出，逐频带相对同种子控制的误差变化：
+- All 89 existing held-out verification segments (33 music, 56 speech) were used. For each recording, segments were first aggregated, then averaged per recording. Music comprises 26 tracks; segment count and recording count must not be conflated.
+- For the four new endpoints of P36, 712 actual Rust frontend/ORT paired and identity roles were executed, decomposing the original OLA, band-level fusion, unclipped gating, clipping, and native output. The maximum error between stage proxies and native output was `4.17e-7`, with no tolerance failure. 169 frozen Python source files from training were preserved and verified via hash consistency.
+- Additional 356 native paired inferences were performed on P35 control and P36 compressed at four endpoints, analyzing input frequency loss/gain and temporal dynamic errors. These are not new training samples or independent test cases.
+- All stages were scored against the original, unclipped, lossless reference. Identity DSP was used solely for isolating additional modifications. All counterexamples were retained; no per-track or post-hoc thresholds were applied to weak energy content.
 
-| 频带 | 幅度误差 | 对数谱形误差 | 动态误差 |
+---
+
+## Which Frequencies Were Recovered?
+
+Common MR v1 music native output, per-band relative error compared to the same-seed control:
+
+| Band | Amplitude Error | Log-Spectral Shape Error | Dynamic Error |
 |---|---:|---:|---:|
 | 8–12 kHz | −0.128% / +0.097% | −1.104% / −0.798% | +0.084% / +0.173% |
 | 12–16 kHz | −0.387% / −0.369% | −2.112% / −2.165% | −0.059% / −0.017% |
-| 16 kHz 至 Nyquist | **−3.752% / −3.279%** | **−10.206% / −10.391%** | **+0.964% / +0.933%** |
+| 16 kHz to Nyquist | **−3.752% / −3.279%** | **−10.206% / −10.391%** | **+0.964% / +0.933%** |
 
-0–4 kHz 指标近乎不变，4–8 kHz 幅度变化约 −0.001%。高频谱形、幅度和
-时间变化的结果不一致：幅度更接近参考，不代表变化时刻、变化幅度也恢复准确。
+The 0–4 kHz metrics remain nearly unchanged; 4–8 kHz amplitude variation is approximately −0.001%. Results for spectral shape and amplitude show inconsistency: amplitude is closer to reference, but this does not imply accurate recovery of timing or magnitude changes.
 
-另外以输入幅度是否低于参考定义固定缺失频点，不随模型输出改变掩码，也不排除
-弱频点。在 256/1024/2048 点 Hann 分析、4 kHz 以上四个频带上，按参考功率及
-固定底噪归一化的平方幅度误差显示：
+Additionally, missing frequency points were defined based on whether input amplitude was below reference, independent of model output. This mask was fixed and not adjusted by model predictions, and weak frequency components were not excluded. For 256/1024/2048-point Hann analysis and the four bands above 4 kHz, normalized squared amplitude error (based on reference power and fixed normalization floor) is shown below:
 
-| 音乐缺失频点诊断 | 种子 20261012 | 种子 20261013 |
+| Music Missing Frequency Diagnosis | Seed 20261012 | Seed 20261013 |
 |---|---:|---:|
-| 原生输出总缺失区误差变化 | −3.861% | −3.661% |
-| 仍欠缺的幅度误差变化 | −3.973% | −3.755% |
-| 未归一化缺失区误差功率变化 | −0.963% | −0.961% |
-| 原生输出新过量幅度误差功率 | 5.15e-8 | 5.54e-8 |
-| 控制的新过量幅度误差功率 | 1.90e-8 | 1.90e-8 |
+| Total missing region error change (native output) | −3.861% | −3.661% |
+| Still deficient amplitude error change | −3.973% | −3.755% |
+| Unnormalized missing region error power change | −0.963% | −0.961% |
+| New over-amplitude error power (native output) | 5.15e-8 | 5.54e-8 |
+| Control new over-amplitude error power | 1.90e-8 | 1.90e-8 |
 
-语音缺失区归一化误差也下降 8.132% / 8.552%。这支持收益包含真正的缺失频谱
-补偿，而非仅抑制输入的多余能量。不过新过量误差也增加，不能宣称精确逆转压缩。
-这组平方功率诊断与共同 MR 的开方、加权方式不同，不能替换主要评分；校准的
-谱幅差功率也不是波形差值的 PCM dBFS，不能由此判断可闻程度。
+Speech missing region normalized error also decreased by 8.132% / 8.552%. This supports the claim that the gain includes actual compensation of missing spectral content, not merely suppression of excess energy. However, new over-amplitude errors increased, so we cannot claim precise reversal of compression. This power-based diagnosis differs from the square-root, weighted approach of the common MR metric and cannot replace the primary scoring metric. Calibrated spectral amplitude power differences are not equivalent to PCM dBFS waveform differences and thus cannot be used to infer audible quality.
 
-## 动态退化发生在哪里
+---
 
-音乐 paired 的共同 MR 动态项，相对控制的逐录音均值变化：
+## Where Does Dynamic Degradation Occur?
 
-| 阶段 | 种子 20261012 | 种子 20261013 |
+Common MR dynamic metrics for music, per-recording average relative to control:
+
+| Stage | Seed 20261012 | Seed 20261013 |
 |---|---:|---:|
-| 原始模型 OLA | +0.150% | +0.173% |
-| 频带融合后 | +0.217% | +0.249% |
-| 无限幅门控后 | +0.217% | +0.249% |
-| 原生最终输出 | +0.214% | +0.242% |
+| Raw model OLA | +0.150% | +0.173% |
+| After band fusion | +0.217% | +0.249% |
+| After unclipped gating | +0.217% | +0.249% |
+| Final native output | +0.214% | +0.242% |
 
-因此不能仅修 DSP，也不能把全部问题归给模型容量。实际融合采用幅度线性插值和
-单位圆上的相位插值，不能用复数频谱线性混合公式直接解释它。音乐 paired 的
-33 个片段在监督区间均没有 active 开关或 gate 变化，但频带掩码都随时间变化。
-这排除了这些片段中的门控切换解释；尚未通过干预实验区分掩码变化、相位融合与
-重叠合成各自的贡献，不能把相关性写成融合机制已定位。
+Therefore, fixing the DSP alone is insufficient, and attributing all issues to model capacity is premature. The actual fusion process uses linear amplitude interpolation and phase interpolation on the unit circle—this cannot be directly explained by complex-spectrum linear mixing. In the 33 music segments, no active switches or gating events occurred within the supervised region, yet band masks still varied over time. This rules out time-varying gate changes as the cause. The contribution of mask variation, phase fusion, and overlap synthesis has not yet been disentangled, so temporal correlation cannot be interpreted as a confirmed fusion mechanism.
 
-原生音乐动态在 26 首录音中分别 **16 / 19 首退步**，不是只有一个异常点。
-语音原生动态均值也退步 0.092% / 0.066%；两个种子均有 26 首退步，分别
-19 / 21 首改善，其余持平。因此后续监督实验需要同时保留音乐和语音的验收。
-`heiyaoyao-adaa234fc0509f0b-a73ef28fdfb5440b` 的较弱 right 片段贡献了全部
-正向退化量的 36.9% / 45.8%，但正常音量的电子音乐
-`sideways-city-bdb28d27eb409b05` 也在两个种子中明显退步。
-后者参考全频 RMS 为 −9.36 dBFS，候选相对恒等 DSP 的额外 PCM RMS 为
-−52.75 / −51.95 dBFS，不能用“全是极弱信号”解释剩余动态问题。
+Native music dynamics degraded in 16 out of 26 recordings in seed 20261012 and 19 out of 19 in seed 20261013—this is not isolated to a single anomaly. Speech native dynamic average also degraded by 0.092% / 0.066%; both seeds show 26 recordings with degradation, 19/21 improved, and the rest unchanged. Thus, future supervised experiments must retain both music and speech validation. The relatively weak right-hand segment (`heiyaoyao-adaa234fc0509f0b-a73ef28fdfb5440b`) contributed 36.9% / 45.8% of all positive dynamic degradation. However, the normal-voiced electronic track `sideways-city-bdb28d27eb409b05` also shows clear degradation in both seeds. Its reference full-band RMS is −9.36 dBFS, and the candidate relative to identity DSP shows an additional PCM RMS of −52.75 / −51.95 dBFS—this cannot be explained by "all signals are extremely weak."
 
-该电子音乐片段第二种子的 16 kHz 以上参考 RMS 为 −39.37 dBFS，原生输出为
-−51.29 dBFS，恒等 DSP 为 −61.57 dBFS：补偿增加了缺失能量，但仍显著欠缺。
-这不是要求把高频普遍压低的证据，也不构成听感结论。
+In the second seed, the 16 kHz and above reference RMS for this electronic track is −39.37 dBFS, while the native output is −51.29 dBFS, and identity DSP is −61.57 dBFS: the compensation adds back missing energy, but still significantly underperforms. This is not evidence that high frequencies are being uniformly suppressed, nor does it constitute a perceptual conclusion.
 
-### 时间变化的诊断分解
+---
 
-令 P、X、T 分别为输出、输入、参考的 STFT 幅度，定义
-`q = Δ(P − X)`、`r = Δ(T − X)`。逐频带有：
+### Temporal Dynamics Diagnosis Breakdown
 
-`||q − r||² = ||r||² + ||q||² − 2〈q,r〉`。
+Let P, X, T denote the output, input, and reference STFT magnitudes, respectively. Define
+`q = Δ(P − X)` and `r = Δ(T − X)`. Then:
 
-这里衡量补偿变化是否跟随参考所需的变化，不惩罚参考本身的真实瞬态。
-在相同固定分析窗、频带、归一化下，音乐原生输出的归一化诊断为：
+`||q − r||² = ||r||² + ||q||² − 2〈q, r〉`
 
-| 量 | 控制（两个种子） | 仅压缩（两个种子） |
+This measures whether the model's compensation follows the required temporal changes in the reference, without penalizing the reference's own transient behavior. Under identical fixed analysis window, band, and normalization, the native music output results are:
+
+| Metric | Control (both seeds) | Only Compressed (both seeds) |
 |---|---:|---:|
-| 补偿变化功率 `||q||²` | 0.0001580 / 0.0001636 | 0.0003857 / 0.0003661 |
-| 与所需变化的对齐项 `2〈q,r〉` | 0.0001124 / 0.0001411 | 0.0003127 / 0.0002430 |
-| 最终变化误差 `||q−r||²` | 0.0638452 / 0.0638221 | 0.0638726 / 0.0639227 |
+| Compensation change power `||q||²` | 0.0001580 / 0.0001636 | 0.0003857 / 0.0003661 |
+| Alignment term `2〈q, r〉` | 0.0001124 / 0.0001411 | 0.0003127 / 0.0002430 |
+| Final change error `||q−r||²` | 0.0638452 / 0.0638221 | 0.0638726 / 0.0639227 |
 
-候选的对齐项增加，但不足以抵消新增补偿变化。在原始 OLA 中，对齐项则超过
-补偿变化功率。这个平方诊断下原始 OLA 相对控制略改善，而主要 MR 动态指标
-仍退步；两者的开方和归一化聚合不同，不能挑选较好的诊断替代主要结论。
-未归一化时间误差功率也是一个种子改善、另一个退步，须保留相对与绝对两种视角。
+The alignment term increases, but is insufficient to offset the added compensation. In the raw OLA, the alignment term exceeds the compensation power. In this squared error metric, raw OLA shows a slight improvement over control, but the primary dynamic metrics still degrade. The square root and normalized aggregation differ between the two, so one cannot be used to override the main conclusion. The unnormalized temporal error power shows one seed improved and the other degraded—both perspectives must be retained.
 
-已验证分解恒等式、参考输出零误差、不修改输入时补偿为零、同相半幅差的平方
-误差为四分之一、静音参考上的非零输出有惩罚，以及普通/弱/静音参考的缺失区
-零误差。这些只检查诊断代数，不是新训练 loss 的梯度验收或音质通过条件。
+All algebraic identities were verified: the decomposition of the identity, zero error in reference output, zero compensation when input is unchanged, a same-phase half-amplitude difference having one-quarter of the squared error, and non-zero output on silence reference being penalized. Additionally, missing regions in normal/weak/silent references show zero error. These are algebraic consistency checks and do not constitute gradient validation of a new training loss or perceptual pass condition.
 
-## 恒等退化不能只看均值百分比
+---
 
-音乐 identity 频谱相对控制的平均误差仍上升 5.331% / 1.629%，但逐录音分布为：
+## Identity Degradation Cannot Be Judged by Mean Percentages Alone
 
-| 种子 | 改善 | 退步 | 持平 | 差值中位数 |
+The average identity spectral error for music relative to control still increases by 5.331% / 1.629%, but per-recording distribution shows:
+
+| Seed | Improvements | Degrades | Stays Flat | Median Deviation |
 |---|---:|---:|---:|---:|
 | 20261012 | 17 | 5 | 4 | −5.37e-6 |
 | 20261013 | 18 | 4 | 4 | −2.52e-5 |
 
-上述弱 right 片段单独占全部正向 MR 退化量的 **91.4% / 92.5%**。
-它的参考全频 RMS 为 −42.43 dBFS，16 kHz 以上参考仅 −143.72 dBFS；
-候选相对恒等 DSP 的全频新增 PCM RMS 为 **−111.51 / −109.78 dBFS**。
-第一种子的 16 kHz 以上相对原始参考误差为 −112.43 dBFS。
-这些是带校准的 PCM 量级；这个相对分数反例并不是绝对 PCM 误差最大的片段。
+The weak right-hand segment alone accounts for **91.4% / 92.5%** of all positive MR degradation. Its full-band reference RMS is −42.43 dBFS, with 16 kHz and above reference at −143.72 dBFS; the candidate relative to identity DSP shows a full-band additional PCM RMS of **−111.51 / −109.78 dBFS**. In seed 20261012, the 16 kHz and above relative error to raw reference is −112.43 dBFS. These are calibrated PCM-level values; this relative fraction counterexample is not the largest absolute PCM error segment.
 
-因此不能由均值百分比断言出现明显爆音，也不能因其绝对量级很小直接判定恢复
-合格。保留全部反例和既定研究筛选结果，后续同时考察相对谱形、绝对误差与盲听。
+Therefore, we cannot conclude from mean percentage that audible pops are present, nor can we claim restoration success simply because the absolute magnitude is small. All counterexamples and prior study results are preserved. Future work should simultaneously examine relative spectral shape, absolute error, and blind listening.
 
-## 下一步建议
+---
 
-后续[模型与 DSP 职责调研](dsp-model-boundary-review.md)发现完美预测也会被当前
-融合改写，已将优先级调整为先审计/简化融合，再决定部署监督。下述三组训练是
-本轮最初建议，尚未启动，不再作为直接执行的下一步。
+## Next Steps Recommended
 
-当前 MR 动态项已经针对预测与参考幅度误差的时间差分，并非简单惩罚输出变化。
-P35/P36 主要频谱监督在原始模型 OLA 路径上；实际 DSP 输出的参考动态不是本轮
-直接优化对象。现有证据支持先研究监督路径与目标取舍，尚不支持“参数不足”结论。
+Following the [Model and DSP Boundary Review](dsp-model-boundary-review.md), we found that even perfect prediction can be rewritten by current fusion mechanisms. Priority has been adjusted to first audit and simplify the fusion process before deciding on deployment supervision. The following three training configurations were initially proposed but remain uninitiated and are not to be executed as immediate next steps.
 
-建议保持小模型、误差压缩和 identity 1.0，进行三个同预算组合：原目标控制、
-加强原始 OLA 的参考动态监督、增加部署路径的参考动态监督。后两组应先在训练
-材料上确定可比尺度与梯度预算，再预登记正式训练；保留直接无损谱重建目标，
-不让部署保真项代替高频恢复。各组都从共同初始化完成同等预算，冻结后统一复核。
+Current MR dynamic metrics are based on time-differenced amplitude errors between prediction and reference, not a simple penalty for output change. P35/P36 primary spectral supervision occurs along the raw model OLA path; actual DSP output dynamic behavior is not directly optimized in this round. Existing evidence supports first investigating supervision path and objective trade-offs, and does not support a "parameter insufficiency" conclusion.
 
-在训练前先验证精确参考、静音/弱能量、瞬态、有限差分，以及融合/限幅代理与
-实际 Rust 输出的对应关系。部署链本身可能阻止输出等于未限幅参考，须单独
-报告其不可消除误差，不能通过修改参考绕过。尚不能确定阶段差异由哪种融合机制
-造成，暂不同时修改 DSP；也不重用此前未能转移收益的过量保护项来叠加调参。
+We recommend maintaining a small model, error compression, and identity weight at 1.0, and conducting three equivalent-budget combinations:
+- Original control target
+- Enhanced reference dynamic supervision on raw OLA
+- Additional reference dynamic supervision on deployed path
 
-本次只完成诊断，没有启动新训练或晋级默认权重。上述材料均为反复使用的留出
-复核，不能证明独立泛化；缺少新的盲听和真实设备连续流音质证据。
+The latter two should first be validated on training materials for comparable scale and gradient budget, then pre-registered for formal training. The direct lossless spectral reconstruction goal must be preserved—no deployment fidelity objective should replace high-frequency recovery. All groups start from the same initialization and are frozen and uniformly rechecked.
 
-## 本地证据与复核
+Prior to training, validate the exact reference, silence/weak-energy, transients, finite-difference, and the correspondence between fusion/limiting proxies and actual Rust output. The deployment chain may inherently prevent output from matching the unclipped reference; such irreducible errors must be reported separately and cannot be circumvented by modifying the reference. The causal mechanism behind stage differences has not yet been identified, so no fusion mechanism should be modified simultaneously. Additionally, we do not reuse previously failed over-protection terms for additive tuning.
 
-详细输出保留在忽略目录，不提交原始素材、权重或实验 JSON：
+This analysis concludes with diagnosis only—no new training was initiated, and no default weights were promoted. All materials are reused held-out rechecks and cannot prove independent generalization. No new blind listening or real-device continuous audio evidence is available.
 
-- `data/runs/risk-stages-p36-20261022/`：全部新端点的阶段审计及冻结训练源码。
-- `data/runs/risk-diagnosis-p36-20261022/recording-band-audit.json`：全部录音、
-  频带、胜负、中位数、正负贡献与原生 PCM 量级。
-- 同目录 `directions-registration.json`、`directions-*.json`：固定输入掩码、
-  端点/二进制/脚本哈希、全部 paired 频谱方向和时间变化分解。
-- 同目录 `metric-check.json`、`mask-inventory.json`：代数检查与全部片段的门控/掩码统计。
-- 同目录 `aggregate.py`、`directions.py`、`masks.py`：本次事后诊断脚本。
-  `directions.py` 使用哈希绑定的历史 `risk-directions-p34-guard-20261021/audit.py`
-  中的纯评分函数；不执行该历史实验或训练。
+---
 
-脚本从仓库根目录运行，使用 `training/.venv/bin/python` 与
-`PYTHONPATH=data/runs/risk-attribution-p36-20261022/source/training`、
-`OMP_NUM_THREADS=1`。阶段审计入口为 `training/scripts/audit_spectrum_stages.py`，
-指定 P36 study、上述输出目录与登记的 `soundex-context-replay` 二进制。
+## Local Evidence and Recheck
+
+Detailed outputs are preserved in the ignore directory; raw materials, weights, or experiment JSON are not submitted:
+
+- `data/runs/risk-stages-p36-20261022/`: Full stage audits and frozen training source code for all new endpoints.
+- `data/runs/risk-diagnosis-p36-20261022/recording-band-audit.json`: Per-recording, per-band, win/loss, medians, positive/negative contributions, and native PCM magnitude levels.
+- Same directory: `directions-registration.json`, `directions-*.json`: Fixed input masks, endpoint/binary/script hashes, and full paired spectral and temporal change decompositions.
+- Same directory: `metric-check.json`, `mask-inventory.json`: Algebraic validation and per-segment gate/mask statistics.
+- Same directory: `aggregate.py`, `directions.py`, `masks.py`: Post-hoc diagnosis scripts.
+  The `directions.py` script uses hash-bound historical `risk-directions-p34-guard-20261021/audit.py` with pure scoring functions; it does not execute the historical experiment or training.
+
+Scripts are run from the root repository, using `training/.venv/bin/python` and
+`PYTHONPATH=data/runs/risk-attribution-p36-20261022/source/training`,
+`OMP_NUM_THREADS=1`. The stage audit entry point is `training/scripts/audit_spectrum_stages.py`, specifying P36 study, the above output directory, and the registered `soundex-context-replay` binary.
+
+The residual decomposition is `||q − r||² = ||r||² + ||q||² − 2〈q,r〉`; the cross-term `2〈q,r〉` measures alignment, not merely added energy.

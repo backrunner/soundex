@@ -1,122 +1,81 @@
-# 恢复收益停滞：归因审计与实验顺序调整
+# Recovery Gain Stagnation: Attribution Auditing and Experiment Sequence Adjustment
 
-2026-10-12，基点 `b0dc7d2`。本轮暂停追加训练，只检查冻结权重与现有数据。
-结论不是“所有修改都无用”：已有工程、运行成本和限幅改善，但最近 P3/P4 没有形成
-足以发布的完整恢复质量收益。继续在同一路线上添加能量惩罚缺乏依据。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-后续进展：[P5 幅度表示判别实验](envelope-study-20261012.md)已按本审计顺序完成六组训练，
-并进一步拆分了逐帧频带强度与带内谱形误差；以下保留审计时的冻结证据和原始计划。
+2026-10-12, baseline `b0dc7d2`. This round of training is paused; no additional training is being added. Only frozen weights and existing data are being evaluated.
 
-## 本次新证据
+Conclusion is not "all modifications are useless": existing engineering, operational cost, and clipping improvements have been achieved. However, P3/P4 have not yet produced a complete, publishable recovery quality gain. Adding energy penalty terms along the current path lacks justification.
 
-冻结 P3 control / P4 balanced 的第一种子，沿用 32 个训练音乐探针和 33 个开发音乐片段
-（26 个开发录音），不使用新的留出数据、不选新权重。所有输入来自原登记配置和缓存。
-固定同一输入检测、Model gain、smooth-knee DSP；只分别替换网络的幅度、相位或完整复数谱。
-参考信息仅用于离线定位，oracle 不是可部署的模型成绩。
+Future progress: [P5 magnitude-based discrimination experiments](envelope-study-20261012.md) have been completed across six training runs, following this audit sequence, and further decomposed the per-frame band intensity and intra-band spectral shape errors. The audit evidence and original plan remain preserved as documented.
 
-下表是开发音乐片段等权均值；按原始时间轴与既有实际输出报告对齐。
-可微代理外，在事先固定的前两个训练、前两个开发片段上，逐种干预经过 Rust replay，
-两个模型共 40 次回放，稳定区最大波形差 **6.04e-7**。
-这支持该探针的代理精度，不宣称所有音频都经过了完整部署一致性证明。
+## New Evidence
 
-| P4 balanced 的预测替换 | 高频谱形 SC ↓ | 高频 flux 误差 ↓ | 高频能量误差 dB ↓ | ΔSI-SDR dB ↑ |
+The first seed of frozen P3 control / P4 balanced was evaluated, using 32 training music probes and 33 development music snippets (26 development recordings), without introducing new held-out data or new weights. All inputs were drawn from original registration configuration and cached sources. Fixed input detection, model gain, and smooth-knee DSP were maintained. Only the magnitude, phase, or full complex spectrum of the network was replaced.
+
+Reference information was used solely for offline localization; the oracle is not a deployable model performance.
+
+The table below shows the mean values over development music snippets, aligned with the original time axis and actual output reports. Outside of differentiable proxies, on the first two training and first two development snippets, per-intervention replay was performed via Rust replay, resulting in 40 total replays across both models. The maximum waveform difference in the stable region was **6.04e-7**, supporting the proxy's accuracy, though this does not constitute a full deployment-level consistency proof for all audio.
+
+| P4 Balanced Prediction Replacement | High-Frequency Spectral Shape SC ↓ | High-Frequency Flux Error ↓ | High-Frequency Energy Error (dB) ↓ | ΔSI-SDR dB ↑ |
 | --- | ---: | ---: | ---: | ---: |
-| 原模型 | 1.28360 | 1.21830 | 5.92832 | -0.33256 |
-| 正确幅度 + 模型相位 | 0.32872 | 0.57243 | 1.03228 | -0.32974 |
-| 模型幅度 + 正确相位 | 1.15632 | 1.36888 | 5.81142 | -0.17381 |
-| 正确幅度 + 正确相位 | 0.15362 | 0.28950 | 0.26452 | +0.46533 |
-| 正确复数谱受当前输出头边界约束 | 0.15410 | 0.29055 | 0.27208 | +0.46424 |
+| Original Model                    | 1.28360 | 1.21830 | 5.92832 | -0.33256 |
+| Correct Magnitude + Model Phase  | 0.32872 | 0.57243 | 1.03228 | -0.32974 |
+| Model Magnitude + Correct Phase | 1.15632 | 1.36888 | 5.81142 | -0.17381 |
+| Correct Magnitude + Correct Phase | 0.15362 | 0.28950 | 0.26452 | +0.46533 |
+| Correct Complex Spectrum (constrained by current output head boundary) | 0.15410 | 0.29055 | 0.27208 | +0.46424 |
 
-P3 control 的对应 SC 为 **1.18844 / 0.34058 / 1.08119 / 0.15362**，方向一致。
-不能用几项误差相减计算独立贡献百分比：这些干预相互作用，幅度/相位交换后的谱也可能
-不满足相邻帧合成一致性。可以确认的是：
+Corresponding spectral consistency (SC) values for P3 control are **1.18844 / 0.34058 / 1.08119 / 0.15362**, showing consistent trends.
 
-1. **幅度与谱形预测首先存在明显不足。** 只给正确幅度即可大幅改善谱形和瞬态；
-   只给正确相位仍保留大部分谱形误差。继续把问题统称为相位或 limiter 失真不充分。
-2. **幅度补对仍不等于波形恢复。** 正确幅度配模型相位时，ΔSI-SDR 几乎没有改善；
-   同时给正确复数谱才出现明显波形收益。频带功率 loss 无法独自决定这些细节。
-3. **当前合成链和残差输出范围允许明显更好的结果。** 把 clean residual 限制到模型的
-   每分量 `±2 * input_RMS_spectrum` 后，oracle 基本保留收益。输出范围不是本探针的主要瓶颈。
-   这不证明 width=144 的共享网络能学会该映射，也不排除隐藏表示、优化或泛化能力不足。
+It is not valid to compute independent contribution percentages by subtracting individual error terms: these interventions interact, and swapping magnitude/phase can result in spectral outputs that fail adjacent-frame synthesis consistency. However, the following can be confirmed:
 
-## 为什么新增能量 loss 容易变成指标取舍
+1. **Magnitude and spectral shape prediction are initially deficient.** Providing only correct magnitude leads to significant improvements in spectral shape and transient fidelity. Providing only correct phase retains most spectral shape errors. Referring to this as a "phase" or "limiter" distortion is insufficient—this reflects a deeper issue in phase or texture generation.
+2. **Correct magnitude alone does not imply waveform recovery.** When correct magnitude is paired with model phase, ΔSI-SDR shows almost no improvement. Only when both correct magnitude and correct phase are provided does a clear waveform benefit emerge. Band power loss cannot independently determine these fine-grained details.
+3. **The current synthesis chain and residual output range allow for significantly better results.** When the clean residual is constrained to ±2× input RMS spectrum per component, the oracle retains most of its benefit. Output range is not the primary bottleneck for this probe. This does not prove that a shared network with width=144 can learn this mapping, nor does it rule out limitations in latent representations, optimization, or generalization.
 
-对冻结 P4 balanced 第一种子，计算其 decoder 参数上的两组局部梯度：
-`0.25 * output_band_energy` 与 `output_waveform + 0.2 * raw_high_complex`。
-32 个训练探针中 **22 个**夹角余弦为负，中位数 **-0.3713**；
-33 个开发片段中 **20 个**为负，中位数 **-0.0762**。
+## Why Adding Energy Loss Easily Becomes a Trade-Off
 
-这是当前权重、当前样本附近的梯度冲突证据，既不等于 AdamW 的实际更新方向，
-也不能证明两项目标在正确解处必然冲突。它解释了为什么“加大能量恢复”容易把当前
-错误幅相一起放大，而“惩罚额外能量”又把有效恢复一同削弱。总 loss 可以有限、梯度可以
-正确，但其局部优化方向未必产生我们想要的恢复。下一步应先改善可预测的谱形表示，
-再判断缺失成分的相位/纹理如何生成，而非继续叠加相近的功率项。
+For the first seed of frozen P4 balanced, two local gradients on the decoder parameters were computed:
+`0.25 * output_band_energy` and `output_waveform + 0.2 * raw_high_complex`.
 
-另一个敏感性探针：输入整体反相时，目标幅度谱理应相同。当前模型的预测高频幅度
-变化除以目标高频幅度范数，中位数为 P3 **0.1646**、P4 **0.1608**（开发音乐）。
-它说明模型会受这一物理等价变换影响；这不是可闻失真比例，也尚未证明它就是泛化退化的主因。
-现有训练抽样只增加增益扰动，未显式提供极性控制；应作为小规模受控检验项。
+Among 32 training probes, **22** had negative cosine similarity, with a median of **-0.3713**; among 33 development snippets, **20** were negative, with a median of **-0.0762**.
 
-## 训练问题的定义也不够统一
+This represents evidence of gradient conflict in the current weights and sample neighborhood. It does not equate to the actual update direction of AdamW, nor does it prove that the two objectives necessarily conflict at the correct solution. It explains why "increasing energy recovery" tends to amplify existing amplitude and phase errors, while "penalizing excess energy" simultaneously weakens valid recovery. A total loss can be well-behaved and gradients can be correct, but the local optimization direction may not lead to the desired recovery. The next step should be to first improve the predictability of spectral shape representation, then determine how missing components—phase or texture—can be generated, rather than continuing to add closely related power terms.
 
-- 网络输入实际只有短窗 log magnitude、压缩 Re/Im 和采样率。输入侧在线检测器的截止频率、
-  gate 和频带掩码用于合成及 loss，没有作为显式网络条件。网络只能间接推断合成区域。
-- 训练代理使用逐 hop 在线 cutoff 合成，多分辨率监督使用其时间平均；最终 HF 指标使用
-  预处理时整个 2–4 秒片段、8192 点分析获得的另一个静态 cutoff。此次开发片段两者均值差
-  的绝对值中位数 **1016 Hz**，最大 **10869 Hz**。这不是音频对齐 bug 或一定错误的指标，
-  但三者衡量的区域不同，不能把总 loss 与报告的 HF 指标当作同一个目标。
-- 新 P4 功率项覆盖固定 8 kHz 以上；它不能单独覆盖某些 codec 在 8 kHz 以下开始的损伤。
-  基础项仍覆盖动态检测区域，所以不是“整个模型没有监督该频段”。
-- 相对 loss 的参考能量 floor、实际 SC 的分母、带正负变化的时间差分与仅正向 flux 的定义
-  也不同。必须在固定频带和动态区域并行观察，保留弱高频的绝对 dBFS 与相对误差，
-  不能为了得分临时提高 floor 或删除反例。
+Another sensitive probe: when input is globally inverted, the target magnitude spectrum should remain unchanged. The current model's predicted high-frequency magnitude deviation relative to the target high-frequency magnitude norm has a median of **0.1646** for P3 and **0.1608** for P4 (development music). This indicates the model is sensitive to this physically equivalent transformation. This is not a perceptible distortion ratio, and it has not yet been proven to be the primary cause of generalization degradation. The current training sampling only introduces gain perturbations and does not explicitly include polarity control; this should be tested under small-scale, controlled conditions.
 
-当前检测器本质上识别有效带宽，无法仅靠一个能量边界证明是 codec 删掉了内容。
-自然低带宽音乐与真正缺失高频必须在训练任务与报告中区分；恒等控制是必要部分，
-但增加一批恒等样本尚未证明解决了生成量判断。
+## Training Task Definition Is Not Uniform
 
-## 数据与预算：数量不能替代有效覆盖
+- Network input consists of only short-window log magnitude, compressed Re/Im, and sample rate. The cutoff frequency, gate, and band masking from the online detector are used for synthesis and loss computation, but are not explicitly passed as network conditions. The network can only indirectly infer the synthesis region.
+- The training proxy uses per-hop online cutoff synthesis, with multi-resolution supervision using time-averaged values; the final HF metrics use a static cutoff derived from pre-processing of the entire 2–4 second snippet, 8192-point analysis. The absolute difference in mean cutoff values between the two approaches has a median of **1016 Hz**, with a maximum of **10869 Hz**. This is not an audio alignment bug or a guaranteed error in the metric, but the three measures evaluate different frequency regions and cannot be treated as a single objective.
+- The new P4 power term covers a fixed 8 kHz and above; it does not cover damage starting below 8 kHz in certain codecs. The base term still covers dynamic detection regions, so it does not imply the model lacks supervision in any frequency band.
+- Reference energy floor in relative loss, denominator in actual SC, time-differenced positive/negative variations, and the definition of positive flux are all different. It is essential to observe these under fixed frequency bands and dynamic regions simultaneously, preserving absolute dBFS of weak HF and relative error, and not arbitrarily adjusting the floor or removing counterexamples for scoring purposes.
 
-本次重新读取实际清单：训练音乐 **253 个作品、22 个 artist_id**；
-前五个 artist_id 合计 **149 首（58.9%）**。已准备 **71,327 个音乐训练配对条目**，
-并非只用 253 个短片段。条目有编解码、采样率、声道角色等相关变体，不能当成同等数量的
-独立作品或独立音乐模式。
+The current detector identifies effective bandwidth, and cannot be used to prove content loss simply by a single energy boundary. Natural low-band music and actual high-frequency loss must be distinguished in both training tasks and reporting. Identity control is essential, but adding a batch of identity samples has not yet been shown to resolve the issue of generation quantity estimation.
 
-253 首中 **171 首**的整曲 16 kHz 以上功率占比低于 1e-4。它不能证明伪无损，
-也不能推出相对每个 codec 截止频率都没有可恢复细节；自然弱高频必须保留作为正确不生成的控制。
-需要统计与具体损伤相关的有效高频、谐波和瞬态覆盖，再调整音乐内部抽样，而非继续凑曲目总数。
-现有音乐/语音 253/254、1/254 比例保持不变，任何变化须另行登记。
+## Data and Budget: Quantity Cannot Replace Effective Coverage
 
-第一种子 P2 4096 步实际抽了 16,384 个训练片段、14,286 个不同清单 row；
-计入重复/不同 codec 视图的监督时长约 **145.2 分钟**。
-P4 每组 1024 步的基础抽样监督时长约 **36.35 分钟**，其中 12.5% 换成恒等控制。
-这不是独立音频时长或完整数据遍历比例，不能仅凭几轮短续训认定架构已达到上限。
+Re-examining the actual list: 253 music works, 22 artist IDs. The first five artist IDs account for **149 tracks (58.9%)**. A total of **71,327 music training pairs** have been prepared, not just 253 short clips. These entries include variants such as codec, sample rate, and channel role, and cannot be treated as equivalent in number or as independent music patterns.
 
-## 对近期实验顺序的纠正
+Of the 253 tracks, **171** have less than 1e-4 total 16 kHz power. This does not prove pseudo-lossless behavior, nor does it imply that no high-frequency detail is recoverable per codec; natural weak high-frequency content must be preserved as a correct non-generation control. Effective high-frequency, harmonic, and transient coverage must be statistically analyzed and tied to specific damage types before adjusting internal music sampling. The music/voice ratio of 253/254, 1/254, remains unchanged; any deviation must be formally registered.
 
-此前通过数值、导出和实时检查，证明了实现能够正确执行；这些检查不能证明学习任务
-已经设计得足够好。P3/P4 连续围绕弱带功率、峰值和恒等约束推进，形成了局部修补循环。
-[原架构重建方案](architecture-reset-20261011.md)规划的过去长窗特征、分频带条件编码、
-保真/生成分工、纹理训练等，尚未被当前短窗 TCN 实现或充分检验。
-因此这些续训的负结果，不应扩展成“更合适的表示和结构也没有用”。
+For the first seed P2, 4096 steps resulted in 16,384 training snippets and 14,286 distinct row entries. When including repetitions and different codec views, total supervision time was **145.2 minutes**. For P4, each 1024-step group has a baseline supervision time of **36.35 minutes**, with 12.5% allocated to identity controls. This is not equivalent to independent audio duration or a complete data traversal ratio. It cannot be concluded that the architecture has reached its performance ceiling based on a few rounds of short continuation training.
 
-验收也要纠正过度解读：上一轮 **0.003 dB** 量级的 SI-SDR 退步不能单独作为否决依据，
-未盲听也不能称可闻退化。P4 不晋级的依据是尚未建立整体恢复收益：谱形/瞬态未改善，
-平均能量收益的配对区间跨零，开发反例仍在；不是机械要求每个数字都变好。
-后续应事先约定主指标、分层绝对误差和保真容忍范围，再进行固定听感评测，禁止事后调标准。
+## Correction of Recent Experiment Sequence
 
-## 接下来的最小判别实验，不在本轮自动启动
+Prior work demonstrated correct execution via numerical, exported, and real-time checks. These checks do not prove that the learning task has been designed well. P3/P4 have continuously focused on weak-band power, peak, and identity constraints, forming a local patching loop. The [original architecture reset plan](architecture-reset-20261011.md), which included long-window features, band-specific conditioning, fidelity/generation separation, and texture training, has not been implemented or sufficiently validated by the current short-window TCN approach. Therefore, the negative results from these continuation runs should not be extended to the claim that "better representations and structures are also ineffective."
 
-1. **先验证幅度包络是否能泛化。** 在相同小预算、相同来源划分上，比较当前短窗条件与
-   past-only 1024/2048 分辨率条件；先隔离谱形/包络任务。过去长窗只作为已到达输入的特征，
-   不要求等待未来，也不能凭此宣称运行成本合格。胜出后才接入完整复数输出比较。
-2. **再验证目标冲突的来源。** 固定胜出表示，分开检查可靠谐波的幅相与不确定高频纹理；
-   对比当前联合输出，观察实际合成后谱形、瞬态、波形，而非只看频带总功率。
-   不直接启用 GAN、扩大模型或长训来覆盖尚未定位的问题。
-3. **同步建立有效数据与评价闭环。** 统计相对损伤的高频有效时长、原生窄带控制、来源和
-   瞬态覆盖；冻结主评价区域和容忍范围。现有开发/历史留出继续标明复用，另准备按作品及
-   来源隔离的新测试，最后才进行候选晋级和绑定 SHA 的长时实时验证。
+Evaluation must also correct overinterpretation: a degradation of SI-SDR by **0.003 dB** in the prior round is not sufficient to reject the model outright without blind listening. The failure to advance P4 is not due to a mechanical requirement for every metric to improve. The lack of overall recovery gain—unimproved spectral shape/transient fidelity, zero-crossing average energy gain, and persistent development counterexamples—justifies the non-promotion. Future work should establish a primary metric, layered absolute error bounds, and fidelity tolerance ranges in advance, followed by fixed perceptual evaluation. Post-hoc standard adjustments are prohibited.
 
-本轮未改默认模型、DSP、loss 或训练抽样，未启动新训练。诊断脚本与逐片段证据在本地
-`data/reports/root-cause-20261012/`：`audit.py`、`registration.json`、`diagnostics.json`、
-`bounds.py`、`bounds.json`。第一种子、短片段、事后诊断边界均保留。
+## Next Minimum Discrimination Experiment Will Not Be Auto-Triggered
+
+1. **First, verify whether magnitude envelope generalization is possible.** On the same small budget and same data split, compare the current short-window condition against the past-only 1024/2048 resolution condition. Isolate the spectral shape and envelope tasks. The past long-window features should be treated as available input features only, not as a requirement for future prediction. Winning this test should precede full complex output comparison.
+2. **Then, investigate the source of target conflicts.** Fix the winning representation and separately evaluate reliable harmonic amplitude and phase, versus uncertain high-frequency textures. Compare the actual synthesized output—spectral shape, transient, and waveform—not just total band power. Do not directly enable GANs, expand model size, or conduct long training to cover unlocalized issues.
+3. **Synchronize the establishment of an effective data and evaluation loop.** Statistically track effective high-frequency duration, native narrowband controls, sources, and transient coverage. Freeze the primary evaluation region and tolerance range. Existing development and historical held-out data remain marked as reused. A new set of tests, isolated by work and source, will be prepared before candidate promotion and binding to a SHA for long-term real-time validation.
+
+No changes were made to the default model, DSP, loss, or training sampling. No new training was initiated. Diagnostic scripts and per-fragment evidence are stored locally at:
+`data/reports/root-cause-20261012/`
+including: `audit.py`, `registration.json`, `diagnostics.json`, `bounds.py`, `bounds.json`. The first seed, short snippets, and post hoc diagnostic boundaries are preserved.
+
+The original residual range was `±2 * input_RMS_spectrum`; this bound concerns representation and does not establish generalization.

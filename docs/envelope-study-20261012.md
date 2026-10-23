@@ -1,51 +1,56 @@
-# P5：先检验幅度谱形的可学习性
+# P5: First, Validate the Learnability of Magnitude Spectral Shape
 
-承接[停滞归因审计](restoration-root-cause-20261012.md)，本实验在正式训练前登记。
-首先比较表示方法，不延续 P4 权重、不增加功率惩罚，也不把幅度误差当作音频质量。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 固定协议
+Building upon [Restoration Root-Cause Audit](restoration-root-cause-20261012.md), this experiment records findings prior to formal training.
 
-- 三组 `short / tiled / past`，各两个种子 `20261012 / 20261013`，从相同随机权重初始化。
-  每组 1024 更新、batch 4、AdamW 1e-4、余弦衰减至 0.1 倍、weight decay 1e-4、梯度裁剪 5。
-  每个种子共用 `seed+30000` 的固定抽样；来源/作品/校验和隔离沿用已审核清单。
-  训练音乐/语音仍为 253/254、1/254，随后每八个抽样固定一个替换为对应原生恒等输入。
-- 共同 256 FFT / 128 hop，幅度输入消除整体反相敏感性；显式输入在线 cutoff、active、采样率。
-  TCN width 144，dilation 1/2/4/8/16/32，共同历史预热 64 hop，不对预热反传或评分。
-- `past` 加入过去及当前 1024/2048 点 Hann FFT 幅度，以 `256/N` 归一化；
-  每四 hop 更新一次，其余保持最近值。帧 t 只读到 `(t+1)*128`，不读未来。
-  `tiled` 以当前 256 点原始帧重复构造长窗，同频率更新；`short` 长窗槽为零。
-  三组参数数量相同，但 short 未激活的输入权重不等于相同有效容量；tiled 用于补充控制。
-  short 同样有 TCN 时间历史；比较对象是过去音频的频率分辨率与编码表示，并非有无历史。
-- 输出为 `abs(input_magnitude + input_RMS * 2*tanh(delta))`，允许恒等与填充缺失频点。
-  本实验不预测相位，不使用 DSP/波形 loss，不输出可直接部署的音频模型。
-- 固定频带 0–4、4–8、8–12、12–16、16–Nyquist kHz。
-  log1p 幅度 L1 与参考有符号时间差分 L1，时间项权重 0.25；低频带权重 0.25，
-  四个高频带各 1，除以 4.25。参考谱 RMS 的 1%（最低 1e-5 DFT 幅度）用于压缩尺度，
-  不修改 clean 目标。该总分与 P2/P3/P4 不可直接比较。
-- 每 256 步开发验证，固定音乐/语音加权后再按 paired 87.5%、identity 12.5% 选最佳。
-  最终报告原始幅度 SC、正向 flux、能量偏差/绝对误差及参考绝对谱功率；
-  固定频带与 loss 一致，参考谱功率使用 DFT 单位，不能标成波形 dBFS。
-  单独报告训练探针、开发音乐、语音、恒等，以及固定权重替换历史特征的消融。
-  本轮不读取历史 test 评分，更不能宣称新的独立测试通过。
+We begin by comparing representation methods, without continuing P4 weights, without adding power penalties, and without treating magnitude error as an audio quality metric.
 
-## 判读与后续门槛
+## Fixed Protocol
 
-按录音配对比较 past 与 short、tiled；预先要求两个种子的开发音乐主幅度目标同向改善，
-同时核查 SC、flux、弱带能量和恒等控制。置信区间跨零视为证据不足，不把微小均值胜出
-称为突破。冻结 past 权重的输入消融应支持它实际利用历史，消融不用来重新选权重。
-训练探针与开发结果分开判断优化不足和泛化差距；不能用 1024 步否定长窗表示的容量上限。
+- Three groups: `short / tiled / past`, each with two seeds (`20261012 / 20261013`), initialized from identical random weights.
+  Each group undergoes 1024 updates, batch size 4, AdamW learning rate 1e-4, cosine decay to 0.1, weight decay 1e-4, gradient clipping at 5.
+  Each seed shares a fixed sampling scheme of `seed+30000`; source/track/SHA-256 isolation follows the previously approved validation list.
+  Training audio/speech remains at 253/254, 1/254, with every eighth sample replaced by the corresponding native identity input.
+- Common 256 FFT / 128 hop; magnitude input eliminates sensitivity to global phase inversion; explicit online cutoff, active, and sample rate are provided.
+  TCN width 144, dilation 1/2/4/8/16/32, shared history warmup for 64 hops, no backpropagation or scoring during warmup.
+- The `past` group includes Hann-windowed FFT magnitude from past and current 1024/2048 points, normalized by `256/N`;
+  Updated every four hops, others remain at the most recent value. Frame `t` only accesses `(t+1)*128`, not future frames.
+  The `tiled` group constructs a long window by repeating the current 256-point frame; updated at the same frequency. The `short` group has zero-long window slots.
+  All three groups have identical parameter counts, though the `short` group's inactive input weights do not equate to the same effective capacity; `tiled` is used as a control.
+  The `short` group also includes TCN temporal history; the comparison is between the frequency resolution of past audio and its encoded representation, not whether history is present.
+- Output is `abs(input_magnitude + input_RMS * 2*tanh(delta))`, allowing identity and filling missing frequency bins.
+  This experiment does not predict phase, does not use DSP/waveform loss, and does not output a directly deployable audio model.
+- Fixed frequency bands: 0–4, 4–8, 8–12, 12–16, 16–Nyquist kHz.
+  Log1p magnitude L1 loss and signed time-differenced L1 loss with time-weight 0.25 and low-frequency band weight 0.25; each of the four high-frequency bands has weight 1, divided by 4.25.
+  Reference spectrum RMS (1% of reference spectrum RMS, minimum 1e-5 DFT magnitude) is used for scale compression; clean reference is not modified.
+  This total score is not directly comparable to P2/P3/P4 results.
+- Every 256 steps, a development validation is performed; the music and speech are weighted and then the best model is selected from paired 87.5% and identity 12.5%.
+  Final report includes raw magnitude SC, positive flux, energy deviation/absolute error, and reference absolute spectral power.
+  Band and loss settings are consistent; reference spectral power is in DFT units and cannot be converted to waveform dBFS.
+  Separate reports are provided for training probe, development music, speech, and identity, as well as ablation of historical features with fixed weights.
+  This round does not load historical test scores, nor can any new independent test be claimed.
 
-仅当谱形判别得到支持，下一阶段才接入完整幅相与实际 Rust DSP；
-届时重做音频质量、盲听、固定时间轴和实时连续性验证。
-本阶段可测诊断 ONNX 与前端逐 hop 成本，Python 前端耗时不等于 Rust 回调成本，
-过去长窗无需前瞻也不等于完整新增延迟已经合格。
-仍遵守 <=2M 参数、ONNX <8 MiB；默认模型不变。
+## Interpretation and Next-Stage Thresholds
 
-## 实现与复现
+Compare `past` and `short`, `tiled` using audio pairing; pre-requirement: both seeds must show consistent improvement in the primary magnitude target during development.
+Additionally, verify SC, flux, weak-band energy, and identity control. Confidence intervals crossing zero are considered insufficient evidence; small mean differences are not considered breakthroughs.
+Ablation of `past` weights should support actual utilization of history; such ablation is not used to re-select weights.
+Development probe and development results are judged separately for optimization deficiency and generalization gap; a 1024-step result cannot be used to deny the capacity ceiling of long-window representations.
 
-`training/scripts/run_envelope_study.py` 保存冻结配置、源码哈希、数据清单、检测器、抽样、
-完整优化器/RNG 检查点及最佳权重哈希；恢复时校验来源、配置与抽样签名。
-运行锁防止同目录并发，数据和实验产物保留在忽略目录。
+Only when spectral shape discrimination is supported will the next stage proceed to full magnitude and phase, and actual Rust DSP.
+At that point, full audio quality, blind listening, fixed time axis, and real-time continuity validation will be re-run.
+This phase allows measurement of ONNX and frontend per-hop cost; Python frontend latency does not equal Rust callback cost.
+Long windows without lookahead do not imply complete latency is acceptable.
+All constraints remain: ≤2M parameters, ONNX <8 MiB; default model unchanged.
+
+## Implementation and Reproducibility
+
+`training/scripts/run_envelope_study.py` saves frozen configuration, source code hash, data list, detector, sampling, complete optimizer/RNG checkpoint, and best weight hash.
+On recovery, source, configuration, and sampling signatures are verified.
+Run lock prevents concurrent execution in the same directory; data and experiment outputs are preserved in ignored directories.
 
 ```sh
 PYTHONPATH=training training/.venv/bin/python training/scripts/run_envelope_study.py \
@@ -53,15 +58,15 @@ PYTHONPATH=training training/.venv/bin/python training/scripts/run_envelope_stud
   --output data/runs/envelope-p5-20261012/study
 ```
 
-## 已完成结果
+## Completed Results
 
-六组均完成 1024 步，训练源码冻结于 `7d57c8d`。
-short 第二种子选中 768 步，其余选中 1024 步。以下为开发音乐 **33 片段 / 26 录音**的
-片段等权均值；这套原始幅度、固定频带指标不能和旧 P4 的动态区域 DSP 指标直接比较。
+All six configurations completed 1024 steps; training source code is frozen at `7d57c8d`.
+The `short` group selected seed 2 at step 768; all others selected at 1024 steps. Below are the development music **33 fragments / 26 recordings** averaged equally.
+These raw magnitude, fixed-band metrics cannot be directly compared to the dynamic region DSP metrics from prior P4 experiments.
 
-| 组别 / 种子 | 幅度主目标 ↓ | 高频 SC ↓ | 高频 flux ↓ | 高频能量误差 dB ↓ |
+| Group / Seed | Primary Magnitude Target ↓ | High-Frequency SC ↓ | High-Frequency Flux ↓ | High-Frequency Energy Error (dB) ↓ |
 | --- | ---: | ---: | ---: | ---: |
-| 未处理压缩输入 | 0.285981 | 0.54717 | 0.71683 | 8.77455 |
+| Unprocessed Compressed Input | 0.285981 | 0.54717 | 0.71683 | 8.77455 |
 | short / 12 | 0.270985 | 2.26158 | 1.65550 | 5.25112 |
 | tiled / 12 | 0.271799 | 2.01782 | 1.47198 | 5.22810 |
 | past / 12 | 0.272362 | 1.99483 | 1.39421 | 5.33293 |
@@ -69,80 +74,78 @@ short 第二种子选中 768 步，其余选中 1024 步。以下为开发音乐
 | tiled / 13 | 0.271843 | 1.77597 | 1.48814 | 5.25324 |
 | past / 13 | 0.270899 | 1.83056 | 1.35158 | 5.24923 |
 
-同一录音内先平均片段差，再按 26 个录音 bootstrap（2000 次，固定种子），
-past 相对 short 的幅度主目标差分别为 **+0.001971**（95% 区间 -0.000847～+0.004841）和
-**+0.001457**（-0.001641～+0.004545）。均未满足预先要求的双种子主目标改善。
-相对 tiled 的方向亦不一致（+0.000571 / -0.001183，区间均跨零）。
-这些区间是复用开发录音的诊断，不是独立测试或多重比较校正后的发布证明。
+Within the same recording, fragment differences are first averaged, then bootstrapped across 26 recordings (2000 samples, fixed seed).
+Relative magnitude target differences between `past` and `short` are **+0.001971** (95% CI: -0.000847 to +0.004841) and **+0.001457** (-0.001641 to +0.004545). Neither meets the pre-defined requirement for improvement in both seeds.
+Directional differences relative to `tiled` are inconsistent (+0.000571 / -0.001183), with both confidence intervals crossing zero.
+These intervals are derived from reused development recordings and are not independent tests or corrected for multiple comparisons.
 
-不能说长窗完全无效：past 相对 short 的 flux 配对差为 **-0.28878 / -0.27278**，
-两区间都在零以下；固定 past 权重替换成短窗或重复帧特征时，flux 均恶化。
-但这只支持模型对历史表示有依赖及一项瞬态收益，不能替代主幅度/谱形改善。
-past 在训练音乐探针上的幅度目标也未比 short 更好，不符合简单的“训练收益很好，
-只是开发过拟合”解释；预算只有 1024 步，也不能据此证明长窗结构不可学或已到容量上限。
+We cannot conclude that long windows are completely ineffective: the flux pairing difference between `past` and `short` is **-0.28878 / -0.27278**, both intervals below zero.
+When the `past` weights are replaced with short window or repeated frame features, flux degrades.
+This supports the model's dependence on historical representations and a transient benefit, but does not constitute a primary magnitude or spectral shape improvement.
+The `past` group also fails to outperform `short` on the training music probe magnitude target, inconsistent with a simple "good training gain, only overfitting in development" explanation.
+With only 1024 steps, this result does not prove the long window structure is unlearnable or has reached capacity limits.
 
-另外审计了预热边界：长窗启动状态经过 64-hop TCN 后，完整组合历史需要约 80 hop。
-原协议的训练/选模保持 64，不事后换权重；对同一组冻结权重额外排除前 80 hop 评分，
-past 相对 short 的幅度配对差仍为 **+0.002026 / +0.001617**（区间均跨零），
-flux 差仍为 **-0.30713 / -0.26499**（区间均低于零），判读不变。
-后续结构实验须把完整组合历史预热登记到训练和评分中，而不只沿用 TCN 本身的 64 hop。
+Additionally, we audited the warmup boundary: after 64-hop TCN initialization, full historical context requires approximately 80 hops.
+The original protocol maintains 64 hops for training and selection, without post-hoc weight swapping; for each group, we further exclude the first 80 hops of scoring.
+Even after this exclusion, the magnitude pairing difference between `past` and `short` remains **+0.002026 / +0.001617** (both intervals cross zero), and flux difference remains **-0.30713 / -0.26499** (both below zero), unchanged.
+Future structural experiments must record full historical context warmup in both training and scoring, not just the TCN's 64-hop baseline.
 
-语音幅度目标 short/tiled/past 为第一种子 **0.19709 / 0.19872 / 0.19962**，第二种子
-**0.19869 / 0.19930 / 0.19842**，没有稳定优势。原生恒等音乐的幅度目标 past 为
-**0.03734 / 0.03104**，高频能量误差 **1.943 / 1.732 dB**，仍有不必要的修改。
-全部六组都比压缩输入降低压缩尺度上的幅度目标和能量误差，却增加高频 SC/flux，
-所以不能用总 loss 或能量恢复宣布成功。
+For speech magnitude targets, `short/tiled/past` are: first seed **0.19709 / 0.19872 / 0.19962**, second seed **0.19869 / 0.19930 / 0.19842**—no consistent advantage.
+For native identity music, `past` magnitude target is **0.03734 / 0.03104**, with high-frequency energy error **1.943 / 1.732 dB**, still showing unnecessary modifications.
+All six groups reduce magnitude target and energy error compared to compressed input, while increasing high-frequency SC/flux.
+Thus, success cannot be declared based on total loss or energy recovery.
 
-## 新的定位：频带强度与带内细节需要分开检验
+## New Positioning: Band-Level Intensity and In-Band Detail Require Separate Evaluation
 
-训练完成后的参考干预，不参与训练/选择，也不是可部署分数。固定 past 两个种子，
-分别用 clean 提供每帧每频带的 L2 范数，或提供带内归一化幅度形状；其他因子保持原预测，
-0–4 kHz 不变。开发音乐结果：
+Post-training interventions, not involved in training or selection, nor used as deployable scores.
+For the `past` group, two seeds are fixed and evaluated using clean reference per-frame per-band L2 norm, or per-band normalized magnitude shape; all other factors remain unchanged, with 0–4 kHz unchanged.
+Development music results:
 
-| 干预 | SC，种子 12 / 13 ↓ | flux，种子 12 / 13 ↓ |
+| Intervention | SC, seed 12 / 13 ↓ | Flux, seed 12 / 13 ↓ |
 | --- | ---: | ---: |
-| 原预测 | 1.99483 / 1.83056 | 1.39421 / 1.35158 |
-| 正确逐帧频带能量、原预测带内形状 | 0.45821 / 0.46665 | 0.66890 / 0.67390 |
-| 原预测能量、正确带内形状 | 1.82348 / 1.65441 | 1.90284 / 1.71622 |
+| Original Prediction | 1.99483 / 1.83056 | 1.39421 / 1.35158 |
+| Correct per-frame per-band energy, original per-band shape | 0.45821 / 0.46665 | 0.66890 / 0.67390 |
+| Original energy, correct per-band shape | 1.82348 / 1.65441 | 1.90284 / 1.71622 |
 
-**逐帧频带生成强度是当前相对谱误差的重要来源。** 不是简单的全局增益调节；
-oracle 使用每帧、每带的参考信息，不能当作实际能实现的控制器。
-同时，给正确带内形状的幅度主目标降到约 0.160，而给正确频带能量只有约 0.209：
-合并的压缩幅度目标与相对谱误差存在不同取舍，数值实现正确不等于优化优先级已充分符合产品目标。
+**Per-frame per-band energy generation is a major source of current relative spectral error.**
+It is not a simple global gain adjustment; the oracle uses per-frame, per-band reference information and cannot be treated as a feasible controller.
+Simultaneously, the per-band magnitude target is reduced to approximately 0.160, while per-band energy is raised to about 0.209:
+The merged compressed magnitude target and relative spectral error reflect different trade-offs—correct numerical values do not imply alignment with product objectives.
 
-第一种子原生恒等输入中，16 kHz 以上平均能量偏高约 **3.80 dB**，但低频 SC 只有 0.00076。
-弱带很小的绝对误差可放大相对 SC；这是需要同时保留绝对谱功率与能量偏差的原因，
-不能直接外推可闻失真，也不能以提高评测 floor 消除反例。
+In the first seed's native identity input, average energy above 16 kHz is elevated by approximately **3.80 dB**, though low-frequency SC is only 0.00076.
+Small absolute errors in weak bands can amplify relative SC—this underscores the need to preserve both absolute spectral power and energy deviation.
+We cannot directly extrapolate audible distortion, nor can we eliminate counterexamples by raising the evaluation floor.
 
-下一项结构实验应明确拆分 **频带能量包络** 与 **带内归一化细节**，加入原生无需生成的控制，
-在共同预算下与本轮短窗幅度头比较；先证明强度估计和谱形同时改善，再进入相位/纹理与 DSP。
-本轮没有盲目延长旧路线训练，也没有把 1024 步负结果扩展成整个架构方向的否定。
+The next structural experiment should explicitly separate **band-level energy envelope** and **in-band normalized detail**, introducing native, non-generated controls.
+These should be compared under shared budget against the short window magnitude head; first demonstrate improvement in both strength and spectral shape before advancing to phase, texture, and DSP.
+This round did not blindly extend the old path or extend a 1024-step negative result into a denial of the entire architecture.
 
-## 规模与计算成本
+## Scale and Computational Cost
 
-三组均 **805,953 参数**。第一种子 past 的诊断导出 **3,254,457 B（3.104 MiB）**，
-SHA-256 `ffd4eb3a34792ab9516e71aeff9fdde3434e8aa81cdc6a4f5e7fbe87bbd28c08`。
-单声道/双声道连续状态 PyTorch–ORT 最大幅度差 **1.19e-7**。
+All three groups have **805,953 parameters**.
+The first seed's `past` diagnostic export is **3,254,457 B (3.104 MiB)**, SHA-256 `ffd4eb3a34792ab9516e71aeff9fdde3434e8aa81cdc6a4f5e7fbe87bbd28c08`.
+Maximum per-frame difference in single-channel/stereo continuous state (PyTorch–ORT) is **1.19e-7**.
 
-Apple M5 Max、AC、低电量模式关闭、单线程 ORT；正式训练结束后，每种原生采样率/声道组合
-测 5 秒，预热 96 hop，输入为合成信号，双声道使用 batch=2。前端含短窗 FFT、
-每四 hop 的长窗 FFT 和 Python 转换，未包含在线带宽检测、DSP、队列、回调及设备。
+Apple M5 Max, AC, low-power mode disabled, single-thread ORT; after formal training, each native sample rate/channel combination is tested for 5 seconds, with 96-hop warmup, synthetic input, stereo using batch=2.
+Frontend includes short window FFT, long window FFT every four hops, and Python conversion; does not include online bandwidth detection, DSP, queue, callback, or device overhead.
 
-| 采样率 / 声道 | 前端+推理 P99 ms | 最大 ms | 超过 hop 计算预算 |
+| Sample Rate / Channel | Frontend + Inference P99 ms | Max ms | Exceeds Hop Computation Budget |
 | --- | ---: | ---: | ---: |
 | 44.1k / mono | 0.12267 | 0.32558 | 0 |
 | 44.1k / stereo | 0.20694 | 1.09763 | 0 |
 | 48k / mono | 0.11975 | 0.20967 | 0 |
 | 48k / stereo | 0.20304 | 1.33758 | 0 |
 
-按消耗的进程 CPU 时间折算音频速率，约占单核 **3.48%–6.21%**，不是实际回调 CPU 实测。
-含 PyTorch 导出/验证的诊断进程峰值 RSS 290.83 MiB；另起仅 NumPy/ORT 进程，
-导入后峰值 43.50 MiB、加载后 61.94 MiB、推理后 63.02 MiB，峰值增量 19.52 MiB。
-这些是不同测试进程的口径，均不等于完整 Rust 部署 RSS。
-规模和算子成本可行，**尚未证明完整新增延迟、持续音频质量或发布级实时稳定性合格**。
+Using CPU time consumption to estimate audio rate, the total load is approximately **3.48%–6.21% of single-core usage**, not actual callback CPU measured.
+Peak RSS during PyTorch export/validation is 290.83 MiB; separate NumPy/ORT process:
+- After import: peak 43.50 MiB
+- After load: 61.94 MiB
+- After inference: 63.02 MiB
+- Peak increase: 19.52 MiB
+These are distinct process metrics and do not represent the full Rust deployment RSS.
+Scale and operator cost are feasible, **but no conclusive evidence exists for acceptable full latency, continuous audio quality, or production-grade real-time stability**.
 
-本地全部 **330 项测试通过**；训练/分析源码 `524b122` 的远程 CI 通过。
-训练原始音频、缓存、检查点与逐片段报告均未提交。主要本地产物位于
-`data/runs/envelope-p5-20261012/study/`：`summary.json`、`comparisons.json`、
-`factorization-audit.json`、`warmup-sensitivity.json`、`diagnostic-cost.json`、`diagnostic-memory.json`。
-实验权重不替换默认模型。
+All **330 test cases passed locally**; remote CI passed for training and analysis source code `524b122`.
+Original audio, cache, checkpoints, and per-fragment reports were not submitted. Primary local outputs are located at:
+`data/runs/envelope-p5-20261012/study/`: `summary.json`, `comparisons.json`, `factorization-audit.json`, `warmup-sensitivity.json`, `diagnostic-cost.json`, `diagnostic-memory.json`.
+Experiment weights do not replace the default model.

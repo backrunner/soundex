@@ -1,67 +1,92 @@
-# P7：缺失频带的能量参数化
+# P7: Parametrization of Energy in Missing Bands
 
-承接 [P6 对照](factorized-envelope-study-20261012.md)，本轮只改变频带能量的输出坐标，
-检验严重裁切时相对输入能量的乘法更新是否妨碍学习。以下规则在正式训练前登记。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 假设与隔离探针
+Building upon [P6 Comparison](factorized-envelope-study-20261012.md), this round modifies only the output coordinates of band-level energy, evaluating whether multiplicative updates relative to input energy are obstructing learning under severe band suppression. The following rules are registered prior to formal training.
 
-P6 的频带输出为 `s * exp(clamp(log(r/s) + d, -30, 2))`：`s` 是输入全谱 RMS，
-`r` 是输入该带的平滑 RMS，`d = 4 * energy_head(latent)`。
-当 `r/s = 1e-8` 且未触发限幅时，对 `d` 的导数只有 `r`。
-零梯度缺陷已在 P6 修复，但非零梯度仍可能对应很差的优化条件。
+## Hypothesis and Isolation Probe
 
-候选使用 `s * min(sqrt((r/s + d)^2 + 1e-16), exp(2))`，在全谱 RMS 单位中直接
-增加或抑制该带能量。平滑绝对值保证非负并避免零点不定梯度；上限与 P6 相同。
-零头初始化保留近似恒等输出，缺失带只存在约 1e-8 的数值地板。
-输出头参数数量、带内形状归一化、骨干和输入特征完全相同。
-这仍是输入 RMS 上的加法残差，不冒称已经实现无锚点绝对包络预测。
+The P6 band-level output is defined as:
+`s * exp(clamp(log(r/s) + d, -30, 2))`
+where `s` is the RMS of the full spectrum input,
+`r` is the smoothed RMS of the band, and
+`d = 4 * energy_head(latent)`.
 
-固定已知均匀目标谱形，只训练一个能量偏置，lr=1e-4、AdamW、clip=5、128 更新：
-严格缺失带的目标 RMS 为 0.01，乘法头 loss **1.94196→1.94196**，输出 RMS
-**8.16e-10→8.60e-10**；加法头 loss **1.94195→0.25063**，RMS **1.15e-9→0.00418**。
-这是双精度、单参数合成诊断；其初始输出能量差异仅来自数值地板。
-新坐标也会显著放大初始梯度，因此保留梯度裁剪，并在真实训练中检查非有限值。
-该结果不能证明骨干充分学习、真实音乐收敛或跨录音泛化。
+When `r/s = 1e-8` and no clipping occurs, the derivative of `d` with respect to the output is non-zero only in `r`.
+A zero-gradient deficiency was already resolved in P6, though non-zero gradients may still correspond to poor optimization conditions.
 
-复现入口：`training/scripts/diagnose_energy_coordinates.py`；本地结果为
-`data/runs/energy-p7-20261012/coordinate-probe.json`。
+A candidate alternative is proposed:
+`s * min(sqrt((r/s + d)^2 + 1e-16), exp(2))`
+This directly adds or suppresses energy within the full-spectrum RMS unit. The absolute value smoothing ensures non-negativity and avoids undefined gradients at zero; the upper bound remains consistent with P6.
+The zero-head initialization preserves an approximately identity output, with missing bands exhibiting only a numerical floor of approximately 1e-8.
+The number of parameters in the energy head, per-band shape normalization, backbone, and input features remains identical.
+This remains an additive residual in input RMS units and does not claim to achieve anchor-free absolute envelope prediction.
 
-## 正式对照
+A fixed, uniformly distributed target spectral shape is used, with training on a single energy bias.
+Training parameters: lr=1e-4, AdamW, clip=5, 128 updates.
+The target RMS for severely missing bands is set to 0.01.
+- Multiplicative head loss: **1.94196 → 1.94196**
+- Output RMS: **8.16e-10 → 8.60e-10**
+- Additive head loss: **1.94195 → 0.25063**
+- Output RMS: **1.15e-9 → 0.00418**
 
-| 组别 | 能量输出 | 其他部分 |
+This is a double-precision, single-parameter diagnostic. The initial energy difference in output arises solely from numerical flooring.
+The new coordinate system also amplifies initial gradients significantly, so gradient clipping is retained, and non-finite values are monitored during actual training.
+These results do not prove that the backbone has learned sufficiently, that convergence to real music has occurred, or that generalization across recordings is achieved.
+
+Reproduction entry: `training/scripts/diagnose_energy_coordinates.py`
+Local result: `data/runs/energy-p7-20261012/coordinate-probe.json`
+
+## Formal Comparison
+
+| Group | Energy Output | Other Components |
 | --- | --- | --- |
-| factorized | P6 相对输入 RMS 的对数增益 | 共同初始化、特征、形状头、loss |
-| rms_residual | 全谱 RMS 单位中的加法残差 | 同上 |
+| factorized | Log-gain relative to input RMS | Shared initialization, features, shape head, loss |
+| rms_residual | Additive residual in full-spectrum RMS units | Same as above |
 
-两个种子 `20261012/20261013`，每组从头训练 **2048 更新、batch 4**，总计四组。
-同种子所有初始参数逐张量相同，均为 **807,398 参数**，不加载 P6 权重。
-AdamW lr=1e-4，余弦衰减至 0.1 倍，weight decay=1e-4，clip=5。
-采用 `seed+50000` 的新固定抽样，每种子 8192 个，其中 1024 个恒等控制。
-沿用核验后的来源与录音隔离；语音抽样比例、恒等替换方式不变。
+Two seeds: `20261012` and `20261013`. Each group is trained from scratch for **2048 updates**, batch size 4, totaling four runs.
+All initial parameters are tensor-wise identical across seeds, with a total of **807,398 parameters**. No P6 weights are loaded.
+Optimizer: AdamW, lr=1e-4, cosine decay to 0.1×, weight decay=1e-4, clip=5.
+A new fixed sampling scheme is used: `seed + 50000`, with 8192 samples per seed, including 1024 identity control points.
+Source and recording isolation protocols are preserved, as verified in P6.
+Speech sampling ratios and identity substitution methods remain unchanged.
 
-所有组保持过去 1024/2048 点上下文、80 hop 完整预热排除区和 P6 的能量/谱形/动态 loss。
-共同评分、每 512 步验证、初始权重可被选中、音乐/语音及恒等权重均不变。
-模型结构测试覆盖同初始化、能量/形状独立、零与弱输入梯度、有限差分、因果性、
-分块和声道隔离、MPS/CPU 对应。继承的 loss 不改权重和数值地板。
+All groups maintain the same 1024/2048 context window, 80-hop warmup exclusion zone, and P6's energy/spectral shape/dynamic losses.
+A common scoring metric is used, with validation every 512 steps; initial weights are selectable.
+Music and speech weights, as well as identity weights, are unchanged.
+Model structure tests cover identical initialization, independent energy/shape heads, zero/weak input gradients, finite-difference checks, causality, chunking, channel isolation, and MPS/CPU correspondence.
+Inherited losses do not alter weights or numerical floors.
 
-## 判读与合成验证
+## Interpretation and Synthesis Validation
 
-预定比较为 `rms_residual - factorized`，两个种子分别做录音级配对 bootstrap。
-共同 loss 只负责选模，不负责单独晋级；要求能量恢复与高频谱形共同改善，并审查
-flux、保留低带、恒等、语音和压缩输入。区间跨零或种子不一致时保留不确定性。
-全部最佳若位于预算边界，仍不能称已收敛。
+The comparison of interest is `rms_residual - factorized`, with bootstrap pairing at the per-recording level.
+The shared loss only serves for mode selection and does not drive individual promotion.
+Requirements include improved energy recovery and concurrent enhancement of high-frequency spectral shape, with review of flux, low-band preservation, identity, speech, and compressed input.
+When results cross zero or show seed-level inconsistency, uncertainty is retained.
+Even if the best results lie at the budget boundary, convergence cannot be claimed.
 
-训练完成后自动执行共同评分、第一种子候选 ONNX 导出、逐 hop CPU 成本与独立 RSS 测量。
-诊断模型仍受 <=2M 参数、<8 MiB 限制。benchmark 不与本轮训练并行。
-随后对对应种子的冻结 P3 相位做实际 Rust DSP 对照：原 P3、恒等 DSP、两个能量头配
-P3 相位，以及候选配输入相位。全部开发 89 片段×5路径×2种子，共 890 次回放。
-共同启动区和裁剪同 P6；同时报告动态 HF、固定 4 kHz 以上，以及同 FFT 网格的五频带
-原始/输出指标，避免把口径差异误认为合成损伤。原生/代理最大误差门槛仍为 2e-5。
+After training, a common scoring is automatically executed, followed by ONNX export of the top candidate from the first seed, and per-hop CPU cost and independent RSS measurements.
+The diagnostic model remains constrained to ≤2M parameters and <8 MiB.
+The benchmark is not run concurrently with this training session.
 
-这是复用开发集的实验，不读取独立 test，不通过诊断重新选模或改阈值。
-默认权重不替换；真实流式集成、完整延迟、稳定性和盲听仍未被这个幅度实验覆盖。
+Subsequently, actual Rust DSP validation is performed on frozen P3 phase outputs:
+- Original P3 phase
+- Identity DSP
+- Both energy heads paired with P3 phase
+- Candidate paired with input phase
 
-## 执行与产物
+A total of 89 segments × 5 paths × 2 seeds = **890** independent playback instances are evaluated.
+Common start and clipping windows are identical to P6.
+Dynamic HF, fixed above 4 kHz, and five-band raw/output metrics on the same FFT grid are reported to avoid misattributing differences in output to synthesis artifacts.
+The native/proxy maximum error threshold remains at **2e-5**.
+
+This is a reuse of the development set—no independent test set is read, and no re-scoring or threshold adjustment is performed.
+Default weights are not replaced.
+True streaming integration, full latency, stability, and blind listening have not been evaluated in this magnitude of experiment.
+
+## Execution and Outputs
 
 ```sh
 PYTHONPATH=training training/.venv/bin/python training/scripts/run_energy_study.py \
@@ -78,26 +103,38 @@ PYTHONPATH=training training/.venv/bin/python training/scripts/replay_factorized
   --replay-binary target/debug/soundex-prediction-replay
 ```
 
-正式运行从提交后的冻结源码执行，记录 launch、pipeline 阶段和日志；检查点保存优化器与 RNG。
-只共享按输入哈希寻址的缓存，不复用其他实验的权重。原始数据、检查点及报告保留本地忽略目录。
-## 正式运行结果
+Formal execution runs from the frozen source code after submission, logging launch, pipeline stages, and logs; checkpoints preserve the optimizer and RNG.
+Only cache is shared via input hash lookup; no weights are reused across experiments.
+Original data, checkpoints, and reports are retained in local directories and ignored.
 
-四组均已完成 2048 更新，最佳权重均在末步；这不证明已经收敛。
-实际 Rust DSP 完成 890 次回放，最大代理误差 **4.54e-6**，没有晋级默认权重。
-同 P3 相位、同窗五频带口径的音乐开发片段平均结果：
+## Formal Results
 
-| 路径 / 种子 | 输出高频 SC ↓ | 输出 flux ↓ | 输出能量误差 dB ↓ |
+All four groups completed 2048 updates, with best weights occurring at the final step—this does not imply convergence.
+A total of 890 Rust DSP re-plays were completed, with maximum proxy error of **4.54e-6**, and no promotion of default weights.
+
+Per-seed performance on music development segments (same window, 5-band, fixed FFT grid) averaged as follows:
+
+| Path / Seed | Output HF SC ↓ | Output Flux ↓ | Output Energy Error (dB) ↓ |
 | --- | ---: | ---: | ---: |
 | factorized / 12 | 0.6964 | 0.8072 | 6.8698 |
 | rms_residual / 12 | 3.7355 | 2.7455 | 5.4420 |
 | factorized / 13 | 0.6189 | 0.7636 | 7.0865 |
 | rms_residual / 13 | 2.7273 | 2.3186 | 5.8591 |
 
-按录音配对，SC 和 flux 的退步在两个种子的 95% bootstrap 区间均高于零；
-能量误差改善的区间均跨零。选模分数下降不构成整体恢复收益。
-第一种子候选 ONNX **3,277,624 B**，807,398 参数；CPU 前端+推理双声道 P99
-为 44.1k **0.22883 ms**、48k **0.22050 ms**，独立 NumPy/ORT RSS 峰值增量 **20.8125 MiB**。
-这些沿用上文诊断范围，不是完整部署延迟或内存。360 项本地测试及对应远程 CI 通过。
+Per-recording bootstrap analysis shows that degradation in SC and flux is statistically significant (above zero) in 95% of cases across both seeds.
+The improvement in energy error shows a cross-zero interval—indicating no net gain.
+The decline in scoring does not constitute overall recovery benefit.
 
-后续的[loss 与弱高频误补审计](energy-objective-audit.md)表明，原始 SC 退步主要由能量误补
-驱动，不能把 SC 当作只反映归一化谱形的指标。新方案未被采用。
+First-seed candidate ONNX: **3,277,624 B**, 807,398 parameters.
+CPU frontend + inference (dual channel):
+- 36kHz: **44.1k, 0.22883 ms**
+- 48kHz: **48k, 0.22050 ms**
+Independent NumPy/ORT RSS peak increment: **20.8125 MiB**.
+
+These metrics are consistent with the earlier diagnostic range and do not represent full deployment latency or memory footprint.
+360 local tests and corresponding remote CI passes were successfully completed.
+
+Subsequent audit of [loss and weak high-frequency misfill](energy-objective-audit.md) reveals that the degradation in original SC is primarily driven by energy misfill—indicating that SC cannot be treated as a sole proxy for normalized spectral shape.
+The new approach was not adopted.
+
+The exact seeds are `20261012/20261013`; the new fixed sampling schedule uses `seed+50000`. This preserves the registered distinction between initialization and sampling randomness.

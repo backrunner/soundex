@@ -1,68 +1,48 @@
-# P34：单一小模型的损失尺度与恒等保护诊断
+# P34: Loss Scale and Identity Preservation Diagnostics for a Single Small Model
 
-2026-10-21。依据 [P33 机制诊断](broad-spectrum-diagnosis.md)，用户要求先用
-单一小参数模型，等待实际训练结果，再据结果反复调试。本轮固定宽度 96、
-431,015 参数的同一结构，只比较训练目标；不扩容、不改 DSP、不晋级默认权重。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 预先固定的第一轮
+2026-10-21. Based on the [P33 Mechanism Diagnosis](broad-spectrum-diagnosis.md), the user requested a preliminary investigation using a single, small-parameter model, with actual training results to guide iterative tuning. This round uses a fixed width of 96, with a total of 431,015 parameters and a consistent architecture. Only the training objective is compared; no expansion, no DSP modifications, and no default weight promotion are performed.
 
-| 配置 | 直接频谱与 MR 风险 | paired 系数 | identity 系数 | 预算辅助 |
+## First Round: Initial Setup
+
+| Configuration | Direct Spectral and MR Risk | Paired Coefficient | Identity Coefficient | Budget Auxiliary |
 |---|---|---:|---:|---:|
-| control | 保持 P33 mr_add 原目标 | 0.5 | 0.5 | 0.1 |
-| compressed | 每样本两项目标分别取 log1p | 0.5 | 0.5 | 0.1 |
-| compressed_identity | 同上 | 0.5 | 0.05 | 0.1 |
+| control | Maintains original P33 mr_add target | 0.5 | 0.5 | 0.1 |
+| compressed | Each sample takes log1p of two separate targets | 0.5 | 0.5 | 0.1 |
+| compressed_identity | Same as above | 0.5 | 0.05 | 0.1 |
 
-`log1p` 是无量纲风险的平滑单调压缩，导数为 `1/(1+risk)`。不删除样本、
-不改 clean 参考，不把风险裁零；它也会减弱困难的真实恢复样本梯度，必须用原来的
-未压缩 MR v1 和全部反例评估取舍。压缩不保证解决每个频带的尺度问题。
-identity 的 0.1 相对权重是本次预登记的十倍敏感性对照，不是假定最优值或发布阈值。
-paired 系数不随 identity 改动重新归一化，预算头目标与辅助系数保持原样。
+`log1p` is a smooth, monotonically increasing, dimensionless compression of risk, with derivative `1/(1+risk)`. No samples are removed, clean references are unchanged, and risk is not clipped to zero. This compression also weakens gradients for difficult real recovery samples, and must be evaluated using the original, uncompressed MR v1 and all counterexamples. Compression does not guarantee resolution of scale issues across frequency bands. The identity coefficient of 0.1 is a tenfold sensitivity contrast from the pre-registered baseline—not a presumed optimal value or published threshold. The paired coefficient is not re-normalized upon identity changes; the budget head objective and auxiliary coefficient remain unchanged.
 
-三组均从相同种子 `20261012`、相同初始张量开始；Adam 1e-4、无 decay、全局
-梯度范数上限 5，各 **1,024 步**，串行训练。固定 16 批循环，每批 4 首不同音乐
-及 1 条语音，外加对应 clean identity。80 帧 no-grad 真实历史预热，监督区域沿用
-`[89*128, 32768-128)`。全部端点冻结后才评分，不中途选优、砍组或调整预算。
+All three groups start from the same seed `20261012` and the same initial tensor; Adam optimizer with learning rate 1e-4, no decay, global gradient norm capped at 5, for **1,024 steps**, trained sequentially. Fixed at 16 batch cycles, each batch contains 4 distinct music pieces and 1 speech sample, plus corresponding clean identity. 80-frame no-grad warmup period, with supervision region retained as `[89*128, 32768-128)`. Evaluation occurs only after all endpoints are frozen—no early selection, pruning, or budget adjustment during training.
 
-这是单种子、有限裁剪池的可学习性诊断，不能用于宣布收敛、充分训练、容量上限
-或架构优劣。第一轮所有组完成后，才根据共同评分登记新的修正实验；不覆盖历史结果。
+This is a learnability diagnostic under a single seed and a finite, curated dataset, and cannot be used to declare convergence, sufficient training, capacity limits, or architectural superiority. After completion of all three groups, a new corrected experiment is registered based on shared scoring; historical results are not overwritten.
 
-## 数据与验收
+## Data and Acceptance Criteria
 
-拟合池从 P33 种子 20261012 的完整更新序列等距选取 16 批，与机制诊断一致：
-64 个音乐裁剪／60 首录音、16 个语音裁剪／16 条录音。去除预热及重叠后的独立
-监督时间为 **29.97 秒音乐、7.28 秒语音**；不能冒称整个 253 首音乐库都参与本轮训练。
-每条轨迹有 4,096 次音乐、1,024 次语音裁剪曝光，重复时间不算新覆盖。
+The fitting pool is selected from the full update sequence of the P33 seed `20261012`, with 16 batches sampled at equal intervals, matching the mechanism diagnosis: 64 music clips / 60 speech recordings, 16 speech clips / 16 speech recordings. After removing warmup and overlaps, the independent supervision time is **29.97 seconds of music, 7.28 seconds of speech**; it is not valid to claim that the entire 253-song music library participated in this training. Each trajectory has 4,096 music and 1,024 speech clip exposures, with repeated exposures not counted as new coverage.
 
-另选 16 批训练域复核片段：64 个音乐裁剪／59 首录音、16 个语音裁剪／15 条录音，
-分别 29.43／7.40 秒独立监督时间。按源校验和与源时间核查，含预热的完整输入窗口
-与拟合池不重叠；重叠候选只按序列位置向后找下一批，不依据得分选择。录音可重叠，
-且都是既有训练域数据，不能称独立验证或跨录音泛化。
+Additionally, 16 batches of training domain recheck fragments are selected: 64 music clips / 59 speech recordings, 16 speech clips / 15 speech recordings, with independent supervision time of **29.43 seconds of music, 7.40 seconds of speech**. All segments are verified by source checksum and source time. The full input window including warmup does not overlap with the fitting pool; overlapping candidates are only considered by shifting backward to the next batch, not by score. Speech clips may overlap, and all are drawn from existing training domain data—thus, they cannot be considered independent validation or cross-recording generalization.
 
-保留 mono、left、right、mid、side 和全部弱能量例，包括上次主导均值的 side 片段。
-拟合池只有两个音乐 mono 裁剪，复核池没有音乐 mono；未覆盖真实同步立体声。
-沿用九种编码档位、44.1/48 kHz，不引入新来源、原始数据或许可变更。
+Mono, left, right, mid, side, and all weak-energy cases are retained, including the side fragments that dominated the previous average. The fitting pool contains only two mono music clips; the recheck pool contains no mono music. True stereo synchronization is not covered. Nine encoding bitrates and sample rates of 44.1/48 kHz are retained; no new sources, raw data, or licensing changes are introduced.
 
-每个端点分别评估原始 OLA、恒等 DSP、实际 Rust 前端→ORT→DSP；拟合／未拟合
-训练域、音乐／语音、paired／identity 分开报告。保留共同 MR v1 及各分量、逐录音
-均值与变化中位数、绝对 PCM／频带误差、所有反例。不同优化目标总 loss 不作排名。
-统一实际原生回放与标准逐 hop 基准；时延仍须区分 <5 ms 计算要求、2.667 ms hop
-吞吐和固定 256 帧缓冲。没有真实设备或盲听证据时保持实验状态。
+Each endpoint is evaluated separately: original OLA, identity DSP, actual Rust frontend → ORT → DSP. Results are reported separately for fitting vs. non-fitting training domains, music vs. speech, paired vs. identity objectives. The original MR v1 and all component-level metrics—including per-recording mean, median change, absolute PCM and band-level errors, and all counterexamples—are preserved. The total loss across different optimization objectives is not ranked. All actual native playback and standard hop-by-hop baselines are maintained; latency remains subject to the same requirements: <5 ms computation, 2.667 ms hop throughput, and fixed 256-frame buffer. Without real device or blind listening evidence, the experiment remains in a reported state.
 
-## 实现与预检
+## Implementation and Pre-Check
 
-损失入口 `training/models/risk_balance.py`，训练入口
-`training/scripts/run_risk_balance_study.py`，结果分析
-`training/scripts/analyze_risk_balance_study.py`。相同的旧目标实现、模型和部署链
-继续保留；新增实验只改变风险聚合。
+Loss entry point: `training/models/risk_balance.py`
+Training entry: `training/scripts/run_risk_balance_study.py`
+Result analysis: `training/scripts/analyze_risk_balance_study.py`
+The same old objectives, model, and deployment chain are retained; new experiments only modify risk aggregation.
 
-相关测试 **44 项通过**，包括风险导数、有限差分、静音／弱能量参考梯度、缺失高频
-下降方向、恒等权重不改变 paired 梯度，以及既有 MR／直接频谱／预算导出检查。
-独立预检每组两步，已完成导出、60 个完整原生 PCM 角色及另 60 个原生 MR 角色。
-预检仅验证流程，不用于选组或质量结论。
+**44 tests passed**, including risk derivative, finite difference, silence/weak-energy reference gradients, high-frequency drop direction, identity weight not altering paired gradient, and verification of existing MR/direct spectral/budget exports.
+Each group undergoes independent pre-check for two steps, with exports and 60 complete native PCM and 60 complete native MR roles generated. Pre-checks validate the pipeline only and are not used for group selection or quality judgment.
 
-第一轮目录 `data/runs/risk-balance-p34-20261021/`，预检目录
-`data/runs/risk-balance-p34-preflight-20261021/`。原始音频、实验权重与详细报告留在
-忽略目录。登记绑定音频、抽样、184 个执行依赖与端点哈希，并冻结执行源码。
+First round directory: `data/runs/risk-balance-p34-20261021/`
+Pre-check directory: `data/runs/risk-balance-p34-preflight-20261021/`
+Original audio, experiment weights, and detailed reports are retained in ignored directories. Audio, sampling, 184 execution dependencies, and endpoint hashes are registered, and the execution source code is frozen.
 
 ```sh
 rtk proxy env PYTHONPATH=training training/.venv/bin/python \
@@ -72,139 +52,74 @@ rtk proxy env PYTHONPATH=training training/.venv/bin/python \
   --native-binary data/runs/small-mechanisms-p28-20261019/binaries/soundex-context-replay
 ```
 
-## 第一轮完成结果
+## First Round Results
 
-三组全部完成 1,024 步，原生 PCM 和额外 MR 回放各 **960 个角色**完成。
-合成最大误差 **4.17e-7**，零合成容差失败。以下均为原 MR v1、原始无损参考，
-不是用于优化的压缩分数；均值按录音等权，中位数是逐录音相对输入变化。
+All three configurations complete 1,024 steps, with **960 roles** of native PCM and additional MR playback completed. The maximum synthetic error is **4.17e-7**, with zero tolerance failure. The following values are based on original MR v1 and lossless reference, not compressed scores; means are computed equally across recordings, while medians are per-recording relative input changes.
 
-| 配置 | 拟合音乐部署 MR 均值 | 拟合音乐变化中位数 | 未拟合训练域音乐部署 MR 均值 | 未拟合音乐变化中位数 |
+| Configuration | Fitted Music Deployment MR Mean | Fitted Music Median Change | Non-fitted Training Domain Music Deployment MR Mean | Non-fitted Music Median Change |
 |---|---:|---:|---:|---:|
 | control | 2.236254 | −1.119% | 0.495104 | −0.709% |
 | compressed | 2.234127 | −0.286% | 0.497587 | −0.121% |
 | compressed_identity | 2.218000 | −4.725% | 0.495518 | −1.082% |
 
-仅压缩大误差的配置更保守，未拟合音乐均值比 control **差 0.501%**。
-恒等相对权重 0.1 的配置恢复了更多谱形：拟合音乐 49 首优于 control、8 首退步，
-未拟合音乐 35 首优于、24 首退步，但未拟合均值仍比 control **差 0.084%**。
-不能只凭中位数或胜出数量宣布总体超过控制；不同数据组的绝对分数不可横向排名。
+Only the compressed configuration shows conservative error behavior. The non-fitted music mean is **0.501% worse** than control.
+The identity weight of 0.1 recovers more spectral shape: 49 music pieces outperform control, 8 underperform; 35 music pieces outperform, 24 underperform, though the non-fitted mean remains **0.084% worse** than control.
+It is not valid to declare overall superiority over control based on median or win count; absolute scores across different data sets cannot be cross-ranked.
 
-0.1 配置未拟合音乐的包络与对数谱形误差下降，但幅度和动态误差上升；其无损
-identity 部署 MR 从 control 的 0.015594 增到 **0.032744**，模型相对恒等 DSP
-的扰动 RMS 从 **3.44e-5 增到 1.49e-4**（逐录音均值）。该绝对量不等于可闻评级，
-但保真取舍明确，不能直接晋级。未拟合语音的频谱均值比 control 改善 3.07%，
-仍需与音乐、瞬态和 identity 一起判断。
+For the 0.1 identity weight configuration, the envelope and log-spectrum error of non-fitted music show improvement, though amplitude and dynamic errors increase. The lossless identity deployment MR increases from control's 0.015594 to **0.032744**, and the RMS perturbation relative to identity DSP increases from **3.44e-5 to 1.49e-4** (per-recording mean). This absolute metric does not equate to audible quality, but the preservation trade-off is clear—no promotion is justified. The non-fitted speech spectrum mean improves by 3.07% and requires further evaluation alongside music, transients, and identity.
 
-拟合池的弱 side 例继续保留。control 原始 OLA 的整体均值看似改善很大，但
-部署后大部分收益消失，不能用原始均值代替最终恢复；其他样本、分量和原生绝对
-频带误差全部保留在 `assessment.json`、`spectrum-review/` 与 `native-audit/`。
+Weak side examples remain in the fitting pool. Although the original OLA mean appears to improve significantly, most of the benefit vanishes upon deployment. The raw mean cannot replace final recovery performance. All other samples, components, and native absolute band-level errors are preserved in `assessment.json`, `spectrum-review/`, and `native-audit/`.
 
-优化机制得到验证：control 触发 50 次梯度裁剪，最大范数 **41.19**；compressed
-和 compressed_identity 均为 0 次，最大 **2.05／1.88**。另在冻结 P33 端点上
-核对，同一个异常 side 片段的单样本重建梯度从 50.43 降到 **0.458**，普通样本仍有
-有效梯度。但优化稳定不等于恢复效果更好，第一轮尚未解决这一取舍。
+Optimization mechanism is validated: control triggers 50 gradient clippings, with maximum norm **41.19**; compressed and compressed_identity trigger zero clippings, with maximum norms of **2.05 / 1.88**. Additionally, on the frozen P33 endpoints, a single-sample reconstruction gradient for a known anomalous side fragment drops from 50.43 to **0.458**, while normal samples still retain effective gradients. However, optimization stability does not imply better recovery performance—this round has not resolved the trade-off.
 
-标准基准 21 个进程、**210,000 hop**：零次 ≥5 ms，最大 **2.744 ms**（control），
-各测试最大 p99 **0.785 ms**，1 次服务超出 hop，4 次 paced 完成迟到；进程峰值
-RSS 最大 **31.875 MiB**。不是物理设备验收，不覆盖旧 P33 的长尾反例。
-固定 256 帧缓冲仍为 5.333／5.805 ms，另计。第一轮完整流程已完成，默认权重不变。
+Standard baseline: 21 processes, **210,000 hops**. Zero instances ≥5 ms, maximum **2.744 ms** (control), p99 maximum **0.785 ms**, one service exceeds hop, 4 paced completions are delayed; peak RSS reaches **31.875 MiB**. This is not a physical device validation and does not cover long-tail counterexamples from prior P33. The fixed 256-frame buffer remains at 5.333 / 5.805 ms, and is counted separately. The full first-round pipeline is complete; default weights remain unchanged.
 
-## 第二轮：中间恒等权重
+## Second Round: Intermediate Identity Weight
 
-根据第一轮结果，追加 **compressed_identity_mid**：恒等相对权重取 **0.3**，
-即 paired 系数保持 0.5、identity 系数为 0.15。这是事后提出并在训练前登记的
-下一次调试，不是假装原先预登记的第四组，也不能把复用的复核片段叫新留出集。
+Based on first-round results, we introduce **compressed_identity_mid**: identity relative weight set to **0.3**, maintaining paired coefficient at 0.5 and identity coefficient at 0.15. This is a post-hoc addition and registered prior to training, representing the next debugging step—not a fabricated fourth group, nor can reused recheck fragments be called a new held-out set.
 
-仍从相同初始化开始，使用完全相同的拟合／复核清单、架构、优化器与 1,024 步预算；
-复用第一轮冻结端点作等预算比较，不额外给新组续训。预算辅助、DSP 和共同评分
-保持原样。登记绑定第一轮 assessment、登记、端点哈希并检查数据、预算及结构一致。
+Starting from identical initialization, using the same fitting and recheck lists, architecture, optimizer, and 1,024-step budget; the frozen endpoints from the first round are reused for equal-budget comparison. Budget auxiliary, DSP, and shared scoring remain unchanged. The first-round assessment, registration, and endpoint hashes are recorded and verified for data, budget, and structure consistency.
 
-第二轮目录 `data/runs/risk-balance-p34-followup-20261021/`。首轮源码已冻结在原目录，
-后续重放首轮需使用其 `source/training`，不能用修改后的源码通过旧依赖检查。
-第二轮已完成：音乐部署 MR，拟合池为 **2.227201**、未拟合训练域为 **0.493596**，
-分别比 control 下降 **0.405%／0.305%**。变化中位数为 −2.680%／−1.081%；
-未拟合音乐 41 首优于 control、18 首退步。未拟合音乐幅度、包络、对数谱形分别
-改善 0.322%／0.123%／0.657%，但动态误差增加 **0.210%**，identity MR 增加
-3.017%。模型相对恒等 DSP 的 identity 扰动 RMS 为 3.27e-5，略低于 control
-的 3.44e-5；原始无损的 PCM 误差也单独保留，不能把 DSP 控制当原始目标。
-未拟合语音 MR 比 control 增加 0.062%，没有全领域共同改善。
+Second round directory: `data/runs/risk-balance-p34-followup-20261021/`
+The first-round source code is frozen in the original directory; subsequent replay must use its `source/training` and cannot use modified source code to pass old dependency checks.
 
-第二轮 320 个完整原生 PCM 角色与另 320 个 MR 角色完成，合成最大误差 2.98e-7、
-零容差失败。70,000 hop 最大 **1.494 ms**，最大 p99 **0.787 ms**，零次 ≥5 ms、
-零次服务超 hop、零次 paced 完成迟到。单次基准仍不代替设备验收。
+Second round completed: music deployment MR, fitted pool at **2.227201**, non-fitted training domain at **0.493596**, both down from control by **0.405% / 0.305%**. Median changes: −2.680% / −1.081%; 41 music pieces outperform control, 18 underperform. For non-fitted music, amplitude, envelope, and log-spectrum improve by 0.322% / 0.123% / 0.657%, though dynamic error increases by **0.210%**, and identity MR increases by 3.017%. The RMS perturbation relative to identity DSP is **3.27e-5**, slightly below control's 3.44e-5. Native lossless PCM error is preserved and cannot be conflated with DSP control as a primary objective. Speech paired MR improves by 0.062% over control—no broad domain improvement is observed.
 
-### 缺失与过量频谱的事后拆分
+Second round completes 320 complete native PCM roles and 320 MR roles, with synthetic maximum error at **2.98e-7**, zero tolerance failure. 70,000 hops: maximum **1.494 ms**, p99 maximum **0.787 ms**, zero instances ≥5 ms, zero service over hop, zero paced completion delay. Single-baseline does not replace device validation.
 
-四个端点在全部 160 个 paired 裁剪上补做实际 Rust 回放，共 640 个角色。
-使用相同 256/1024/2048 Hann／Parseval 标度，在 4–24 kHz 按“原始输入幅度
-低于／高于／等于参考”固定分类，再计算各类误差；分类不读取候选预测。
-保留 exact-equal（包括静音）频点，不通过阈值排除弱参考。
+### Post-hoc Splitting of Missing and Overfilled Spectra
 
-这是事后诊断的归一化幅度**平方误差**，不是原 MR 总分，也不是波形 PCM dBFS；
-同时保留校准幅度谱绝对误差，真实 PCM／频带 RMS 仍见原生报告。证据位于
-`data/runs/risk-directions-p34-20261021/`，不用于追溯修改原评分或选择阈值。
+Actual Rust playback is performed for all four endpoints across all 160 paired clips, resulting in 640 roles. Using identical 256/1024/2048 Hann/Parseval scaling, and classifying frequency bands (4–24 kHz) by whether the original input amplitude is below, above, or equal to the reference, the error is computed per category. Classification does not read candidate predictions. Exact equality (including silence) frequency points are preserved and not excluded by threshold.
 
-中间权重组在未拟合音乐上，相对 control：“没补够”的误差下降 **1.561%**，
-但新过补项从 0.001974 增到 0.005743，使原缺失频点的总归一化平方误差反增
-**1.109%**。其绝对幅度谱缺失误差功率反而下降 1.214%，说明弱参考的相对尺度
-也影响判断；不能将相对增幅直接解释为可闻严重程度。原过量频点的归一化误差
-下降 2.063%。因此，整体 MR 小幅改善不能全部解释为缺失频谱 inpainting 成功。
+This is a normalized squared amplitude error, not the total MR score, nor wave-level PCM dBFS. Absolute calibrated amplitude spectrum error is retained, and true PCM and band-level RMS are preserved in native reports. Evidence is stored in `data/runs/risk-directions-p34-20261021/` and is not used to retroactively modify original scores or thresholds.
 
-## 第三轮：只约束缺失频点的过补
+For the intermediate weight group, on non-fitted music: the error for "missing" decreased by **1.561%**, but the new overfill term increased from 0.001974 to 0.005743, causing the total normalized squared error for missing points to increase by **1.109%**. The absolute amplitude spectrum error for missing points decreased by 1.214%, indicating that relative scale of weak references affects judgment—thus, the relative increase cannot be interpreted as audible severity. For overfilled points, the normalized error decreased by **2.063%**. Therefore, the overall MR improvement is modest and cannot be fully attributed to successful inpainting of missing spectra.
 
-在第二轮固定结构、数据、初始化、1,024 步和 identity 相对权重 0.3 基础上，
-追加 `compressed_identity_guard`。辅助项使用上述原输入／原始参考确定的缺失
-频点，在 4–24 kHz 对 `max(predicted_amplitude - reference_amplitude, 0)`
-施加与原 MR 相同的平滑归一化幅度约束。三尺度、四高频带等权，paired 总系数
-为 `0.5 × 0.1`；不根据曲目、反例或候选结果改变阈值。
+## Third Round: Constraining Only Overfilled Points
 
-此辅助项在尚未超过参考的频点没有梯度，不直接惩罚正常补频；共享参数变化仍
-可能间接影响其他频点，所以必须实际训练验证。参考只进入训练监督。原直接＋MR
-损失继续负责缺失能量、原过量频点、静音、相位和动态，不能拿这个单项替代整体目标。
+On the foundation of the second round—fixed structure, data, initialization, 1,024 steps, and identity relative weight 0.3—we introduce `compressed_identity_guard`. The auxiliary term applies a smooth, normalized amplitude constraint to `max(predicted_amplitude - reference_amplitude, 0)` at frequencies where the original input amplitude is below the reference, using the same smoothing and normalization as the original MR. The constraint is applied across three scales and four high-frequency bands, with equal weighting; the total paired coefficient is `0.5 × 0.1`. Thresholds are not adjusted based on track, counterexample, or candidate outcome.
 
-相关测试现为 **47 项通过**，新增验证参考／未填满时零梯度、普通／弱能量过补时
-下降方向及有限差分、静音行为。第三轮独立预检与训练目录分别为
-`risk-balance-p34-guard-preflight-20261021/` 与 `risk-balance-p34-guard-20261021/`。
-第三轮已完整完成，结果没有优于第二轮的整体取舍。音乐部署 MR，拟合为
-**2.219717**、未拟合训练域为 **0.494063**，相对 control 改善 0.739%／0.210%；
-但未拟合音乐比中间权重组退步 **0.095%**，仅 32 首优于 control、27 首退步。
-未拟合音乐动态误差相对 control 增加 **1.346%**，identity MR 增加 **42.687%**；
-模型相对恒等 DSP 的 identity 扰动 RMS 为 **6.96e-5**，高于中间权重的 3.27e-5。
-语音 paired 均值比 control 改善 0.847%，也不能抵消音乐和保真方面的退化。
+This auxiliary term has no gradient when the predicted amplitude does not exceed the reference—thus, it does not directly penalize normal fill-in. Shared parameter changes may indirectly influence other points, so actual training must be performed to validate. The reference is only used in training supervision. The original direct + MR loss continues to handle missing energy, overfilled points, silence, phase, and dynamics—this auxiliary term cannot replace the overall objective.
 
-320 个完整原生 PCM 角色与另 320 个 MR 角色全部完成，合成最大误差 2.98e-7、
-零容差失败。70,000 hop 最大 **1.927 ms**，最大 p99 **0.794 ms**，零次 ≥5 ms、
-服务超 hop 或 paced 完成迟到。优化仍无梯度裁剪，最大范数 2.17。
+Current test suite: **47 tests passed**, including new validations for reference/underfilled zero gradient, normal/weak-energy overfill direction and finite difference, and silence behavior.
+Pre-check and training directories for this round: `risk-balance-p34-guard-preflight-20261021/` and `risk-balance-p34-guard-20261021/`.
+The third round is complete. Results do not outperform the second round in overall trade-offs.
+Fitted music deployment MR: **2.219717**, non-fitted training domain: **0.494063**, improving by 0.739% / 0.210% over control. However, the non-fitted music performance regresses by **0.095%** compared to the intermediate weight group, with only 32 pieces outperforming control and 27 underperforming. Dynamic error increases by **1.346%** over control, and identity MR increases by **42.687%**. The RMS perturbation relative to identity DSP reaches **6.96e-5**, higher than the intermediate weight group's 3.27e-5. Speech paired MR improves by 0.847%, but fails to offset degradation in music and fidelity.
 
-因此，不把第三轮过补约束加入默认训练路径，不晋级候选。实现保留为显式实验，
-其参考／梯度数学检查通过不等于能在新片段上改善恢复。追加五配置、800 个 paired
-原生回放的分项复核，结果存于 `data/runs/risk-directions-p34-guard-20261021/`；
-保留缺失、过量、exact-equal、过补与未补足的相对及绝对谱幅误差。
+320 complete native PCM roles and 320 MR roles are completed, with synthetic maximum error at **2.98e-7**, zero tolerance failure. 70,000 hops: maximum **1.927 ms**, p99 maximum **0.794 ms**, zero instances ≥5 ms, zero service over hop, or paced completion delay. No gradient clipping occurs; maximum norm is 2.17.
 
-该复核已完成。未拟合音乐的实际部署过补归一化功率相对第二轮增加 **75.97%**；
-对应的平均校准谱幅误差功率从 **6.21e-8 增到 2.72e-7**，不将其冒称波形
-PCM 误差或听感严重度。未补足项下降 4.135%，缺失频点总归一化平方误差下降
-0.939%，但原过量频点误差增加 0.735%；存在更激进补充与额外伪影的取舍。
+Therefore, the third round's overfill constraint is not included in the default training path and is not promoted. The implementation is retained as an explicit experiment; mathematical verification of reference and gradient is not sufficient to claim improved recovery on new segments. Five configurations, 800 paired native rechecks, are independently validated and results are stored in `data/runs/risk-directions-p34-guard-20261021/`. Missing, overfilled, exact-equal, overfilled, and underfilled relative and absolute spectral amplitude errors are preserved.
 
-为区分实现错误和迁移失败，还用两个冻结端点重算同一个训练辅助项：在原 4:1
-音乐／语音批次上，拟合池加权 overshoot 从 **0.00171748 降到 0.00091856**，
-下降约 46.5%；未拟合训练域却从 **0.00042628 增到 0.00091151**，上升约 113.8%。
-这与通过的有限差分共同支持“辅助项确实参与了拟合，但收益未迁移”，而不是
-简单的惩罚方向写反。训练的均方根聚合、上述平方误差聚合和部署处理链也不同，
-三者必须分开报告。证据为第三轮的 `guard-component-audit.json`。
+This recheck is complete. The actual deployment overfill power for non-fitted music increases by **75.97%** relative to the second round; the average calibrated spectral amplitude error power increases from **6.21e-8 to 2.72e-7**—this cannot be claimed as waveform PCM error or audible severity. The underfilled term decreases by 4.135%, missing point total normalized squared error decreases by 0.939%, but overfilled point error increases by 0.735%; indicating a more aggressive fill and potential for additional artifacts.
 
-## 本次闭环与后续边界
+To distinguish between implementation error and migration failure, two frozen endpoints are re-computed for the same training auxiliary term: on the original 4:1 music/speech batch, the fitted pool's weighted overshoot drops from **0.00171748 to 0.00091856** (a ~46.5% drop), while the non-fitted training domain increases from **0.00042628 to 0.00091151** (a ~113.8% rise). This supports the conclusion that "the auxiliary term actively participates in fitting, but benefits are not migrated"—not due to a simple gradient direction error. The root-mean-square aggregation, the above-squared error aggregation, and the deployment processing chain all differ and must be reported separately. Evidence is in the third round's `guard-component-audit.json`.
 
-已完成三轮、五条各 1,024 步训练，共 **5,120 步**；保持同一 431,015 参数结构、
-单种子、同样的拟合数据与预算。五条端点均完成实际输出验证后才作上述判断。
-完整原生一致性共 1,600 个角色，另有 1,600 个原生 MR 评分角色。35 万 hop 标准
-计时合计零次 ≥5 ms、最大 2.744 ms，仍有 1 次服务超 hop 和 4 次 paced 完成迟到。
+## Final Loop and Future Boundaries
 
-确定的进展是降低了异常梯度支配，并找到比原对照稍好的中间权重配置；第二轮
-未拟合训练域音乐 MR 均值改善 0.305%，不是显著突破或独立泛化证明。第三轮
-揭示额外的合理损失项也可能加剧拟合／迁移取舍，不能盲目叠加或不断调权重追均值。
+Three rounds, five configurations, each with 1,024 steps, are completed—**5,120 total steps**—maintaining the same 431,015-parameter structure, single seed, identical fitting data, and budget. All five endpoints complete actual output validation before judgment. Full native consistency spans 1,600 roles, with an additional 1,600 native MR scoring roles. 350,000 hops standard timing: zero instances ≥5 ms, maximum 2.744 ms, one service exceeds hop, and 4 paced completions are delayed.
 
-后续保持小模型，优先用更广训练覆盖和第二种子检验中间权重方案，并同时跟踪
-缺失频点、过补、动态及 identity。有限池只有约 37 秒独立监督，不能代替充分广覆盖
-训练；复用的训练域复核也已参与调试，不能再称新留出验证。没有启动下一轮后台
-训练，生产模型、DSP 和正式权重均未改变，盲听／真实设备尚未验收。
+Confirmed progress includes reduced dominance of anomalous gradients and the identification of a slightly better intermediate weight configuration. The non-fitted music MR mean improves by 0.305%—not a significant breakthrough or independent generalization proof. The third round reveals that additional reasonable loss terms may exacerbate fitting and migration trade-offs, and thus cannot be blindly added or iteratively adjusted without caution.
+
+Future work will maintain the small model, prioritize broader training coverage, and validate the intermediate weight scheme with a second seed. Simultaneously, tracking of missing points, overfill, dynamics, and identity will continue. The limited dataset provides only about 37 seconds of independent supervision—insufficient to replace comprehensive coverage. Reused training domain rechecks have already participated in debugging and cannot be considered new held-out validation. No new background training is initiated; production models, DSP, and official weights remain unchanged. Blind listening or real device validation has not been conducted.
+
+For the 0.1 identity-weight arm, 35 unfitted music recordings improved over control and 24 regressed. The three first-round arms each used 1,024 updates of 4 music crops and 1 speech crop plus clean identity. Compressed arms triggered 0 gradient clips. Across all three rounds the 350,000-hop total retained 1 service overrun and 4 paced late completions; successful shorter runs do not erase those failures.

@@ -1,52 +1,55 @@
-# P23 弱高频异常：绝对误差与处理阶段核查
+# P23 Weak High-Frequency Anomalies: Absolute Error and Stage-by-Stage Verification
 
-结论是两件事同时存在：模型确实生成了本来极弱的高频；现有相对频谱指标又显著
-放大了这部分绝对幅度很小的误差。不能把此前高频 SC 的巨大倍率解释为相同程度的
-可闻失真或爆音，也不能仅因此删除反例或改分数放行。当前仍无经过盲听及完整设备
-验证的新权重；本轮没有修改训练 loss、模型、DSP 或验收阈值。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 核查范围与方法
+**Conclusion**: Two phenomena coexist: the model genuinely generates extremely weak high-frequency components; and existing relative spectral metrics significantly amplify these small absolute amplitude errors. The previously observed large amplification factors in high-frequency spectral content cannot be interpreted as equivalent perceptible distortions or burst noises. Similarly, counterexamples cannot be dismissed or scores adjusted arbitrarily based solely on these metrics. At this time, no new weights have undergone blind listening or full-end-to-end equipment validation. No modifications were made to the training loss, model architecture, DSP pipeline, or acceptance thresholds in this round.
 
-固定 P23 四种模型、两个种子、全部最终 16,192 步检查点。对全部 89 个开发片段的
-paired / identity 角色重新测量，共 **1,424 条记录**，并核对重建的原 loss 与冻结
-报告一致。训练集 2,088 裁剪、开发 89、shifted 40 另做参考频带覆盖扫描。
-四个实际 Rust 对照案例包括主异常、次异常和按参考高频比例选取的音乐/语音中位
-案例；8 个模型分别回放 paired/identity，加同条件恒等 DSP，共 **128 次角色回放**。
-候选波形与代理的最大误差为 `2.98023e-7 < 2e-5`。
+---
 
-监督区域沿用既定 warmup 与输出对齐，长度 21,248 样本；48 kHz 下约 0.443 秒。
-没有将不同位置的左右声道拼成立体声。绝对 RMS 用完整该区域的 PCM 计算，
-频带使用 4,096 点 Hann 功率谱、单边谱端点权重与窗口能量校准。
-单位 PCM 幅度为满幅 1，单位峰值正弦 RMS 为 -3.0103 dBFS；相关单元测试覆盖
-44.1/48 kHz、频带归属、恒等、静音、幅度缩放和非法输入。
-4,096 点 FFT 仅用于离线审计，不改变模型 FFT256/hop128 或实时延迟。
+## Verification Scope and Methodology
 
-精确零功率在 JSON 中以 null 表示其 dB，而不是人为加噪声底。
-旧报告中的未归一化 DFT 功率读数不得当作这里的 PCM dBFS。
+Fixed: four P23 model variants, two seeds, and all final 16,192-step checkpoints. For each of the 89 development clips, paired and identity roles were re-evaluated, resulting in **1,424 records**. Reconstruction of the original loss and frozen report consistency was verified. Training set: 2,088 cropped segments; development set: 89 clips; shifted reference: 40 additional clips for cross-band spectral coverage analysis.
 
-## 主异常的绝对量级
+Four actual Rust reference cases were included: primary anomaly, secondary anomaly, and mid-range music/speech examples selected based on reference high-frequency content proportion. Eight models were replayed in both paired and identity modes, under identical identity DSP conditions, yielding **128 total role re-plays**.
 
-`d2599868e6a472eff47c1674`、起点 40244，来自作者原始 WAV 中的一个右声道片段。
-原音 RMS **-42.43 dBFS**，峰值约 0.02166。以下均为 identity 输入下，最终输出
-减去同条件恒等 DSP 的差值；不是 MP3 输入相对无损参考的全部压缩误差。
+Maximum waveform deviation from proxy and reference was measured at `2.98023e-7 < 2e-5`.
 
-| 模型 | 种子 | 额外残差 RMS | 占原音 RMS | 残差峰值 |
+- Supervised region: retained original warmup and output alignment, length 21,248 samples (~0.443 seconds at 48 kHz). Stereo channels were not concatenated into a stereo stream.
+- Absolute RMS was computed over the full supervised segment using PCM values.
+- Band-level analysis used 4,096-point Hann windowed power spectra, with endpoint weighting and window energy normalization.
+- Unit PCM amplitude corresponds to full-scale 1; unit peak sine RMS = -3.0103 dBFS.
+- Unit tests cover 44.1/48 kHz sampling, band assignment, identity processing, silence, amplitude scaling, and invalid input handling.
+- 4,096-point FFT used solely for offline audit and does not alter the model’s real-time FFT256/hop128 configuration or introduce latency.
+
+Zero power is represented as `null` in JSON (in dB), not artificially injected with noise floor.
+The unnormalized DFT power values reported in prior reports must not be interpreted as equivalent to the current PCM dBFS.
+
+---
+
+## Absolute Magnitude of the Primary Anomaly
+
+`d2599868e6a472eff47c1674`, starting at sample 40244, extracted from a right-channel snippet of the original author’s WAV file.
+Original audio RMS: **-42.43 dBFS**, peak amplitude ≈ 0.02166.
+All values below are differences between final output and identity DSP under identical conditions — **not** the total compression error between MP3 input and lossless reference.
+
+| Model | Seed | Extra Residual RMS | % of Original RMS | Residual Peak |
 | --- | --- | ---: | ---: | ---: |
-| anchored 控制 | 20261012 | -93.04 dBFS | 0.295% | 0.000168 |
-| anchored 控制 | 20261013 | -83.12 dBFS | 0.923% | 0.000326 |
-| 175 万 | 20261012 | -93.56 dBFS | 0.278% | 0.000124 |
-| 175 万 | 20261013 | -105.87 dBFS | 0.067% | 0.000035 |
-| 459 万 | 20261012 | -91.84 dBFS | 0.338% | 0.000191 |
-| 459 万 | 20261013 | -92.79 dBFS | 0.303% | 0.000144 |
-| 1,192 万 | 20261012 | -97.15 dBFS | 0.184% | 0.000095 |
-| 1,192 万 | 20261013 | -92.10 dBFS | 0.329% | 0.000166 |
+| anchored control | 20261012 | -93.04 dBFS | 0.295% | 0.000168 |
+| anchored control | 20261013 | -83.12 dBFS | 0.923% | 0.000326 |
+| 175k | 20261012 | -93.56 dBFS | 0.278% | 0.000124 |
+| 175k | 20261013 | -105.87 dBFS | 0.067% | 0.000035 |
+| 459k | 20261012 | -91.84 dBFS | 0.338% | 0.000191 |
+| 459k | 20261013 | -92.79 dBFS | 0.303% | 0.000144 |
+| 1,192k | 20261012 | -97.15 dBFS | 0.184% | 0.000095 |
+| 1,192k | 20261013 | -92.10 dBFS | 0.329% | 0.000166 |
 
-最大模型在此例的绝对扰动小于同种子的 anchored，却在旧相对谱形指标上显著更差。
-这直接说明两种指标排序不同，而非大模型在所有意义上都更差。
+The largest model exhibits a smaller absolute perturbation than the anchored control for the same seed, yet performs significantly worse in the prior relative spectral metric. This directly demonstrates that the two metrics rank differently — it does not imply that the large model is universally inferior in all aspects.
 
-最大模型的频带残差（identity，两个种子）：
+High-frequency band residuals (identity, two seeds):
 
-| 频带 | 种子 20261012 | 种子 20261013 |
+| Band | Seed 20261012 | Seed 20261013 |
 | --- | ---: | ---: |
 | 0–4 kHz | -181.31 dBFS | -177.73 dBFS |
 | 4–8 kHz | -106.39 dBFS | -101.93 dBFS |
@@ -54,66 +57,92 @@ paired / identity 角色重新测量，共 **1,424 条记录**，并核对重建
 | 12–16 kHz | -118.13 dBFS | -109.95 dBFS |
 | 16 kHz–Nyquist | -103.83 dBFS | -98.89 dBFS |
 
-同一片段的恒等 DSP 参考在 12–16 / 16 kHz 以上仅约 -138.98 / -143.72 dBFS。
-向这些频带加入很小的绝对量，就会产生很大的相对变化。数值体现了真实误生成，
-但不证明对应可闻程度。播放增益、设备及掩蔽未被本次测量覆盖。
+The identity DSP reference shows only about -138.98 dBFS / -143.72 dBFS above 12–16 kHz and 16 kHz, respectively.
+Introducing even a tiny absolute energy in these bands produces large relative deviations. These values reflect actual mis-generation, but do not imply perceptible degradation. Playback gain, device masking, and perceptual context were not evaluated in this measurement.
 
-paired 输入下，最大模型对恒等 DSP 的额外改动为 -93.75 / -88.61 dBFS；最终输出
-相对原始无损的总误差约 -58.78 dBFS，二者不可混为“模型新增的失真”。
+In paired input, the largest model introduces additional deviations of -93.75 dBFS / -88.61 dBFS relative to identity DSP. The final output's total error relative to the original lossless is approximately -58.78 dBFS — this is not equivalent to "new distortion introduced by the model."
 
-## 发生在哪一层
+---
 
-- 原音的输入检测平均 cutoff 约 **6,389 Hz**，active 比例与监督区 gate 均为 1；
-  paired 输入约 **5,918 Hz**。自然窄带原音也进入了可增强路径。
-- 最大模型在原音上的同阶段频谱保真误差，raw 为 9.1147 / 18.3991，blended 为
-  9.1145 / 18.3985，OLA 后为 6.8449 / 12.9832。高频误生成在模型输出时已存在；
-  混合保留了它，OLA 在此例降低了相对误差。
-- gated、limited 与 OLA 的分解结果相同；该片段远低于限幅起点，没有触发限幅。
-  原音候选与代理/对应预限幅波形的差异在约 1e-9 RMS 的数值量级。
-- 该例没有出现非有限值、削波或门控切换。短片段的这些证据不代替真实设备连续
-  播放测试，不能据此声明整个实时系统绝无爆音。
+## Where Does It Occur?
 
-源码层面的相关机制：生成头的残差单位为
-`scale * sqrt(local_normalized_power + 1)`，最低仍是当前帧全谱 RMS。
-因此即使某个高频本来极弱，非零预测仍能从全谱尺度生成能量；这也是完全缺失频带
-可被填充的原因。该设计与当前失败相符，但本次没有通过结构消融证明它是唯一原因。
+- Input detection average cutoff: **~6,389 Hz** for original audio; active proportion and supervision gate both at 1.0.
+  For paired input, cutoff is approximately **5,918 Hz**. Even narrowband natural audio enters the enhancement path.
+- At the same stage, the largest model exhibits spectral fidelity error (raw: 9.1147 / 18.3991, blended: 9.1145 / 18.3985, OLA after: 6.8449 / 12.9832).
+  High-frequency mis-generation is already present in the output; blending preserves it, while OLA reduces relative error.
+- Gated, limited, and OLA decomposition results are identical. The segment falls well below the clipping threshold and does not trigger any clipping.
+  Difference between original and proxy/limited-waveform is on the order of ~1e-9 RMS.
+- No non-finite values, clipping, or gate-switching events were observed.
+  Evidence from short clips does not substitute for real-time continuous playback testing.
+  Therefore, we cannot conclude that the entire real-time system is free of burst noise.
 
-## Loss 与素材覆盖
+**Source-level mechanism**: Residual generation in the output header uses the formula
+`scale * sqrt(local_normalized_power + 1)`, with a minimum threshold of the current frame’s full-spectrum RMS.
+Thus, even if a high-frequency component is extremely weak, a non-zero prediction can generate energy from the full-spectrum scale — explaining why truly absent bands can be filled in.
+This design behavior aligns with the observed failure, though structural ablation was not performed to confirm it as the sole cause.
 
-相对 loss 的分母是 `reference_band_power + floor²`，其中
-`floor = max(global_spectral_rms * 1e-4, 1e-7)`。
-它没有除零错误，但每个高频段按同一权重计入风险，极弱参考的分母仍很小。
-主异常 12–16 / 16 kHz 以上均由这个 floor 主导。
-最大模型的 identity 频谱项约 **99.98%** 来自 8 kHz 以上，而这些频带的绝对残差
-处在上表的小幅度范围。数学计算与原公式一致；把这种相对分数单独当成感知严重度
-或跨模型最终排序依据，并不充分。
+---
 
-训练池 2,024 个音乐裁剪中，12–16 / 16 kHz 以上低于相对 floor 的分别有
-**89 / 156** 个；比主异常参考/全谱比例更低的也分别有 **37 / 40** 个。
-这不是完全没有见过弱高频样本，但覆盖不等于充分学会抑制误生成。
-不以频谱窄带直接断言原始素材为有损转码；该来源的历史母带制作不由本次审计证明。
+## Loss and Material Coverage
 
-全体 33 个开发音乐片段上，scaled 模型的 identity 残差 PCM RMS 中位数约
-1.29e-6–1.76e-6，最大约 2.56e-5；anchored 中位数约 5.08e-6–8.00e-6，
-最大约 2.05e-4。该绝对保真尺度下，大模型并非全面更差。
-另一方面，paired 的平均波形相对 RMS 误差：恒等 DSP 为 0.08307205，最大模型
-两个种子为 0.08307298 / 0.08307749，仍未展示整体波形恢复收益。
-因此本轮也不能据绝对残差较小就宣布新权重已达标。
+The denominator of the relative loss is `reference_band_power + floor²`, where
+`floor = max(global_spectral_rms * 1e-4, 1e-7)`.
 
-## 下一步与交付物
+This formulation avoids division-by-zero, but assigns equal weighting to each high-frequency band — even when the reference signal is extremely weak.
+The high-frequency bands above 12–16 kHz in the primary anomaly are dominated by this floor term.
 
-后续应在全部素材上同时保留绝对 PCM/频带误差、全谱相对误差、频谱形状和瞬态指标，
-避免一个接近零参考的相对均值决定整体结论。任何容差都应按统一规则预登记，并用
-新录音与听感校准，不针对本例把阈值抬高。模型改良优先考虑输入驱动的频带能量
-估计/生成置信度，保留补全真正缺失高频的能力；不靠一律禁止高频输出获取低损伤分数。
+The largest model’s identity spectral component is approximately **99.98%** above 8 kHz, and the absolute residual in these bands falls within the small range shown in the table above.
+Mathematical computation and formula remain consistent.
+Treating this relative score as a proxy for perceptual severity or as a basis for cross-model ranking is insufficient.
 
-实现：`training/evaluation/absolute_audio.py`、
-`training/scripts/audit_capacity_outliers.py`。没有修改已冻结 P23 的源码或结果。
-最终本地报告：`data/reports/capacity-p23-absolute-audit-20261016-v2/`。
-`measurements.json` 含全部分解，`reference-coverage.json` 含覆盖扫描，
-`registration.json`/`summary.json` 绑定源码、模型和结果哈希。
+In the training pool of 2,024 music clips, 12–16 kHz and above had relative floor values in **89 out of 156** clips; those with relative values below the primary anomaly reference or full-spectrum average were **37 out of 40**.
+This shows exposure to weak high-frequency content — but exposure does not equate to mastery in suppressing mis-generation.
 
-`audio/case-071-identity/` 与 `audio/case-071-paired/` 提供原始无损、输入、
-恒等 DSP、各候选和未放大的差分 FLOAT WAV，全部保持相同增益与样本对齐。
-这些是约 0.44 秒的定位片段，**没有做主观盲听或 ABX**，不是听感合格证明。
-后续长片段听测与新录音验证仍需单独进行。原始音频及所有这些派生音频保留本地。
+We cannot conclude that the original source material was damaged during encoding.
+Historical master recordings are not proven to have undergone lossy conversion by this audit.
+
+Across all 33 development music clips, the scaled model’s identity residual PCM RMS median is approximately **1.29e-6 to 1.76e-6**, with a maximum of ~2.56e-5.
+The anchored model median is ~5.08e-6 to 8.00e-6, with a maximum of ~2.05e-4.
+Under this absolute fidelity scale, the large models are not universally worse.
+
+On the other hand, average waveform RMS error (relative to identity DSP):
+- Identity DSP: 0.08307205
+- Largest model (two seeds): 0.08307298 / 0.08307749
+
+No overall waveform recovery benefit is demonstrated.
+Therefore, we cannot declare new weights acceptable based solely on smaller absolute residuals.
+
+---
+
+## Next Steps and Deliverables
+
+Future work must retain both absolute PCM and band-level error, full-spectrum relative error, spectral shape, and transient characteristics across all materials.
+Avoiding conclusions based solely on a relative metric near zero is essential.
+Any tolerance thresholds must be pre-registered under a unified rule and validated with new recordings and subjective listening calibration.
+Do not raise thresholds for this case as a basis for acceptance.
+
+Model improvements should prioritize input-driven band energy estimation and confidence in generation — preserving the ability to reconstruct genuinely missing high frequencies.
+Do not achieve low-damage scores through blanket suppression of high-frequency output.
+
+**Implementation**:
+- `training/evaluation/absolute_audio.py`
+- `training/scripts/audit_capacity_outliers.py`
+
+No modifications were made to the frozen P23 source code or results.
+Final local report: `data/reports/capacity-p23-absolute-audit-20261016-v2/`
+
+- `measurements.json` contains full per-band and per-segment breakdowns
+- `reference-coverage.json` includes coverage scan results
+- `registration.json` and `summary.json` link source code, model, and result hashes
+
+Audio files:
+- `audio/case-071-identity/` and `audio/case-071-paired/`
+  Provide original lossless, input, identity DSP, candidate outputs, and differential FLOAT WAVs (unamplified differences).
+  All files are gain-aligned and sample-aligned.
+  These are ~0.44-second localized segments — **no subjective blind listening or ABX testing was conducted**.
+  These results do not constitute proof of perceptual quality.
+
+**Future work**: Independent long-form listening tests and new recording validation are still required.
+All original audio and derived files are preserved locally.
+
+The stage audit replays all 8 models. PCM full scale is 1. The weak reference bands discussed above are 12–16 kHz and above 16 kHz; their small absolute energy must be reported alongside relative errors.

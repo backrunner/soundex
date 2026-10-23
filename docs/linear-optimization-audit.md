@@ -1,111 +1,101 @@
-# P8 优化过程审计与能量尺度对照
+# P8 Optimization Process Audit and Energy Scale Comparison
 
-2026-10-12。承接 [P8 完成结果](linear-reconstruction-study.md)。本轮不放宽 loss、
-不删除弱频带素材，也不改变分组验收标准。所有结果是幅度模型诊断；没有生产权重晋级。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 设计与可复现范围
+2026-10-12. Building upon [P8 Final Results](linear-reconstruction-study.md). This round does not relax the loss function, does not remove weak-band material, and does not alter group acceptance criteria. All results are diagnostic for magnitude models; no production weights were promoted.
 
-第一阶段按 P8 两个种子的原始 draws 重放前 128 步：lr=1e-4、1e-5、1e-6，
-AdamW、weight decay=1e-4、clip=5、原 2048 步余弦衰减时间轴及 80-hop warmup 均不变。
-在第 1/8/32/128 步重评全部既有开发 paired/identity 片段，不读取测试录音。
+## Design and Reproducibility Scope
 
-另取原登记 training_probe_specs 顺序中的前两条音乐、第一条语音，以及第一条音乐的
-恒等版本，共四片段，固定重复拟合 256 步。每组从相同初始化重新开始，固定学习率。
-这刻意提高语音和 identity 占比，只检验固定样本能否学习；不能外推总体采样质量，
-也不是完整过拟合能力或容量上限的证明。
+In the first phase, we replay the first 128 steps of the two original seeds' raw draws, using the same hyperparameters: learning rate = 1e-4, 1e-5, 1e-6; AdamW optimizer with weight decay = 1e-4; gradient clipping = 5; original 2048-step cosine decay schedule and 80-hop warmup remain unchanged.
 
-第一步还记录裁剪前各模块梯度，以及幅度/参考动态梯度夹角。对同一次 Adam 更新，
-分别仅应用能量头、仅应用谱形 decoder、应用全部参数；再缩小到 0.1/0.01/0.001 倍。
-这是更新归因诊断，不用来挑选正式权重。前向在每次插值前恢复初始状态，输入、参考不变。
+At the 1/8/32/128-step intervals, we re-evaluate all existing development paired and identity segments. No test recordings are loaded during this process.
 
-第二阶段根据第一阶段证据只改变能量残差单位，固定另外所有设置，比较 1e-4 与 1e-5。
-这是事后机制干预，不是新的独立泛化试验；没有扫描阈值或挑选某个录音来决定单位。
+Additionally, we select the first two music samples and the first speech sample from the original `training_probe_specs` registration order, along with the identity version of the first music sample—totaling four segments. Each group is fit for exactly 256 steps, starting from identical initializations and using a fixed learning rate. This deliberately increases the proportion of speech and identity data, testing whether fixed samples can be learned under controlled conditions. However, this does not constitute a full overfitting test, nor does it prove capacity limits or generalization performance across the full dataset.
 
-## 第一更新即出现严重过冲
+In the first phase, we also record gradients before cropping for each module, as well as the cosine angle between magnitude and reference dynamic gradients. For each Adam update, we separately apply updates to only the energy head, only the spectral shape decoder, and to all parameters combined. We then scale these updates down to 0.1, 0.01, and 0.001 times their original magnitude. This is for update attribution analysis and is not used to select final weights. Forward passes restore the initial state before each interpolation, with input and reference signals held constant.
 
-初始开发选模误差两种子均为 0.494611。旧能量坐标的第一步结果：
+In the second phase, based solely on evidence from the first phase, we modify only the energy residual unit while keeping all other settings fixed. We compare the 1e-4 and 1e-5 cases. This is a post-hoc mechanism intervention, not a new independent generalization experiment. No threshold scanning or selection of a specific recording is used to determine the unit.
 
-| 指标 | 20261012 | 20261013 |
+## First Update Shows Severe Oscillation
+
+Both initial development seed models started with a development error of 0.494611. Results from the first step of the original energy coordinate:
+
+| Metric | 20261012 | 20261013 |
 | --- | ---: | ---: |
-| 首批初始 loss | 0.339015 | 0.271275 |
-| 首批第一步 loss（lr=1e-4） | 79.370338 | 43.766762 |
-| 只应用能量头更新 | 80.589989 | 44.400188 |
-| 只应用谱形 decoder 更新 | 0.472519 | 0.355488 |
-| 第一步开发总分 | 18.625044 | 15.952812 |
-| 能量头梯度范数（裁剪前） | 26110.893 | 3752.096 |
-| 谱形 decoder 梯度范数（裁剪前） | 264.294 | 113.763 |
-| 幅度与动态项梯度 cosine | 0.9559 | 0.4378 |
+| Initial batch loss | 0.339015 | 0.271275 |
+| First step loss (lr=1e-4) | 79.370338 | 43.766762 |
+| Energy head update only | 80.589989 | 44.400188 |
+| Spectral shape decoder update only | 0.472519 | 0.355488 |
+| First step development score | 18.625044 | 15.952812 |
+| Energy head gradient norm (before clipping) | 26110.893 | 3752.096 |
+| Spectral shape decoder gradient norm (before clipping) | 264.294 | 113.763 |
+| Cosine of magnitude and dynamic gradient | 0.9559 | 0.4378 |
 
-两个头都零初始化，因此第一步 backbone 梯度为零是预期行为，不是断梯度故障。
-两个目标项在本次初始批次的梯度总体同向；没有证据把首步失败归因于它们互相抵消。
-裁剪梯度不等于限制实际输出变化，尤其 Adam 的逐参数归一化会改变更新尺度。
+Both heads were initialized to zero, so a zero backbone gradient at the first step is expected behavior and not indicative of a gradient collapse. The gradients for both objectives were generally aligned in the first batch; there is no evidence that the first-step failure resulted from mutual cancellation. Gradient clipping does not equate to restricting actual output changes—especially in Adam, where per-parameter normalization alters the update scale.
 
-原能量坐标为 `scale * smooth_abs(input_rms / scale + delta)`。
-`delta` 的导数近似全谱 `scale`，弱频带的相对变化可被放大数千倍。
-例如第一种子首批某片段的 16 kHz 以上参考功率相对全谱为 -108.31 dB，
-第一步预测升到 -26.94 dB；这是频谱相对功率，不能冒充输出 dBFS 或可闻结论。
-首批与整个开发集在第一步都退步，说明问题在学习开始时已存在，不能只归因于后期过拟合。
+The original energy coordinate is defined as:
+`scale * smooth_abs(input_rms / scale + delta)`
+The derivative of `delta` is approximately proportional to the full spectrum `scale`, and relative changes in weak bands can be amplified by thousands of times.
+For example, in the first seed, a segment at 16 kHz and above had a reference power relative to the full spectrum of -108.31 dB. After the first step, the predicted power rose to -26.94 dB—this is a relative spectral power, not a dBFS or audible output.
+Since both the first step and the entire development set degraded, the issue arose at the very beginning of training and cannot be attributed solely to later overfitting.
 
-## 输入频带尺度的单因素干预
+## Single-Factor Intervention on Input Band Scale
 
-实验类 `ConditionedEnergyEnvelope` 保持完全相同的初始化张量、807,398 参数、
-特征、谱形头和初始输出。令 `r = input_rms / scale`，修改为：
+In the experiment `ConditionedEnergyEnvelope`, the initialization tensor, 807,398 parameters, features, spectral shape head, and initial output remain unchanged. Let `r = input_rms / scale`, and we modify the expression to:
 
-`scale * smooth_abs(r + sqrt(r² + 1e-8) * delta)`。
+`scale * smooth_abs(r + sqrt(r² + 1e-8) * delta)`.
 
-这里 1e-8 是既有相对幅度地板 1e-4 的平方；只使用压缩输入统计，不读取无损参考。
-弱频带仍有非零生成梯度，输出上限仍为原 `exp(2) * scale`。没有硬性干净判定或旁路门控。
-这会改变学习难度，并不保证缺失强高频能在相同预算内被补齐；实际恢复仍须验证。
+Here, 1e-8 is the square of the existing relative magnitude floor (1e-4); only compressed input statistics are used, and no lossless reference is read.
+Despite this, weak-band gradients remain non-zero, and the output upper bound remains at `exp(2) * scale`. There is no hard clean decision or bypass gating.
+This change alters the learning difficulty and does not guarantee that missing high-frequency content can be recovered within the same budget; actual recovery must still be verified.
 
-能量头初始梯度范数降至 **4.031 / 3.263**，谱形头梯度保持原值。
-第 1 步、lr=1e-4 的开发总分降至 **0.544080 / 0.547443**，显著减少过冲，
-但仍高于初始 0.494611。
+The energy head gradient norm drops to **4.031 / 3.263**, while the spectral shape head gradient remains unchanged.
+At step 1, lr=1e-4, the development score drops to **0.544080 / 0.547443**, a significant reduction in overshoot, though still above the initial 0.494611.
 
-128 步后的共同开发总分（越低越好）：
+After 128 steps, the common development score (lower is better):
 
-| 能量单位 / lr | 20261012 | 20261013 |
+| Energy Unit / lr | 20261012 | 20261013 |
 | --- | ---: | ---: |
-| 全谱 / 1e-4 | 6.351267 | 9.121172 |
-| 全谱 / 1e-5 | 1.685696 | 1.512088 |
-| 全谱 / 1e-6 | 0.641335 | 0.582026 |
-| 输入频带 / 1e-4 | 0.526563 | 0.521826 |
-| 输入频带 / 1e-5 | 0.508017 | 0.507573 |
+| Full spectrum / 1e-4 | 6.351267 | 9.121172 |
+| Full spectrum / 1e-5 | 1.685696 | 1.512088 |
+| Full spectrum / 1e-6 | 0.641335 | 0.582026 |
+| Input band / 1e-4 | 0.526563 | 0.521826 |
+| Input band / 1e-5 | 0.508017 | 0.507573 |
 
-**没有一组超过初始开发总分。** 改善优化稳定性不能被表述为完成反压缩目标。
-单纯降低全局学习率同时压低所有分支的学习速度，仍没解决不同频带的尺度差异。
+**No configuration exceeds the initial development score.** The improved optimization stability cannot be interpreted as successful reverse compression. Simply reducing the global learning rate while slowing all branches does not resolve the scale mismatch across frequency bands.
 
-## 固定小样本能学，但尚未同时满足恢复和恒等保真
+## Fixed Small Sample Can Learn, But Still Fails Identity Fidelity
 
-同一四片段初始平均 loss 为 0.443272；第 256 步如下：
+For the four fixed segments, the average initial loss is 0.443272. After 256 steps:
 
-| 能量单位 / lr | 20261012 | 20261013 |
+| Energy Unit / lr | 20261012 | 20261013 |
 | --- | ---: | ---: |
-| 全谱 / 1e-4 | 0.432235 | 0.574012 |
-| 全谱 / 1e-5 | 0.326860 | 0.359503 |
-| 全谱 / 1e-6 | 0.347671 | 0.344388 |
-| 输入频带 / 1e-4 | 0.272663 | 0.271027 |
-| 输入频带 / 1e-5 | 0.334590 | 0.334214 |
+| Full spectrum / 1e-4 | 0.432235 | 0.574012 |
+| Full spectrum / 1e-5 | 0.326860 | 0.359503 |
+| Full spectrum / 1e-6 | 0.347671 | 0.344388 |
+| Input band / 1e-4 | 0.272663 | 0.271027 |
+| Input band / 1e-5 | 0.334590 | 0.334214 |
 
-输入频带 / 1e-4 相对初始平均误差下降约 38%。三条配对素材的误差都下降，
-但恒等素材从约零变为 **0.03515 / 0.03932**，所以不能称为全项成功。
-本检查证明当前模型具有一定学习能力，不证明能完全拟合、容量充足或泛化合格。
+The input band / 1e-4 case shows a relative error reduction of about 38% compared to the initial average. Errors for all three paired segments decrease, but the identity segment increases from near zero to **0.03515 / 0.03932**. Therefore, this cannot be considered a full success.
+This check confirms that the current model possesses some learning capability, but it does not prove complete fitting, sufficient capacity, or acceptable generalization.
 
-在尺度修正后，单独应用谱形更新仍把首批误差从 0.3390/0.2713 提高到约 0.4725/0.3555；
-该头仍使用全谱单位重写 bin seed，再做带内归一化。后续应单独检验谱形更新尺度、
-缺失频点的可生成范围以及恒等损伤的梯度来源，避免同时改 loss 和扩容后无法归因。
+After the scale adjustment, applying the spectral shape update alone raises the initial error from 0.3390/0.2713 to approximately 0.4725/0.3555. This head continues to use the full-spectrum unit to rewrite bin seeds, followed by per-band normalization. Future work should independently verify the scale of spectral shape updates, the generative range of missing frequency bins, and the gradient source of identity degradation—especially to avoid confusion when both loss and expansion are modified.
 
-## 交付与边界
+## Delivery and Boundaries
 
-本轮 20 次短训/拟合全部完成：旧坐标 12 次，输入频带坐标 8 次。
-本地报告位于 `data/runs/linear-p8-20261012/{optimization-audit,conditioning-audit}`。
-协议保存父配置、抽样、脚本 SHA；第二阶段另保存依赖 Python 源码哈希。
-两阶段运行的原脚本副本连同校验值保留在各自报告目录。
-汇总包含每组结果文件 SHA，可逐条校验。原始音频、诊断报告与实验产物不推送。
+All 20 short training/fittings have been completed: 12 runs in the original coordinate, 8 in the input-band coordinate.
+Local reports are stored in `data/runs/linear-p8-20261012/{optimization-audit,conditioning-audit}`.
+The parent configuration, sampling, and script SHA are preserved. For the second phase, the Python source code hash is also saved.
+Copies of the original scripts used in both phases, along with checksums, are retained in their respective report directories.
+The summary includes SHA hashes for each group's result files, enabling per-item verification. Raw audio, diagnostic reports, and experimental outputs are not pushed.
 
-新增测试覆盖坐标敏感性、缺失频带生成、有限差分、相同初始化和前向函数、静音有限梯度、
-声道独立性，以及更新插值不修改输入。loss 未改变，P8 数学测试继续适用。本地完整 Python 测试 388 项通过，ruff 检查通过。
-本轮未导出新 ONNX、未运行新结构的 Rust DSP、盲听或完整实时 benchmark；参数量相同不能
-代替新增运算的性能验证。没有保存/发布小样本拟合模型或替换默认权重。
+New test coverage includes coordinate sensitivity, missing band generation, finite differences, identical initialization, forward function consistency, silence finite gradient, channel independence, and update interpolation without modifying input.
+Loss remains unchanged; P8 mathematical tests remain applicable. 388 local Python tests passed, and ruff checks passed.
+No new ONNX export, no new Rust DSP with expanded structure, no blind listening, and no full real-time benchmark were conducted.
+Parameter count alone does not substitute for performance validation of new operations.
+No small-sample fitting model was exported, and no default weights were replaced.
 
 ```sh
 PYTHONPATH=training training/.venv/bin/python training/scripts/audit_linear_optimization.py \
@@ -118,5 +108,4 @@ PYTHONPATH=training training/.venv/bin/python training/scripts/audit_linear_opti
   --coordinate input_relative --rates 0.0001 0.00001
 ```
 
-输出目录必须不存在，避免覆盖既有证据。小样本结果与开发数据只用于这次机制诊断，
-下一次正式训练仍需冻结选择规则、做完整分组验证和实际 DSP 对照。
+The output directory must be absent to prevent overwriting prior evidence. Small-sample results and development data are used solely for this mechanism diagnosis. The next formal training will still require frozen selection rules, full group validation, and actual DSP comparison.

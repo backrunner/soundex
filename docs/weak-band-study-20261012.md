@@ -1,111 +1,116 @@
-# P3：弱高频约束、恒等控制与泛化检查
+# P3: Weak High-Frequency Constraint, Identity Control, and Generalization Verification
 
-继 [P2 首种子复核](causal-p2-review-20261012.md)，本轮将基线也作为待验证对象，
-不把追平旧模型作为恢复成功标准。目标仍是贴近无损参考，且相对未处理输入有实际收益。
-源码 `ee06142`，工作在隔离 checkout，未在 P2 运行中修改其训练代码。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## Loss 与结构审核
+Following [P2 Seed Recheck](causal-p2-review-20261012.md), this round treats the baseline as a subject for validation, and does not consider matching the prior model as a sign of recovery success. The goal remains to closely approximate lossless reference material, with actual performance gains over the unprocessed input.
 
-新增 `causal-weak-band-v1`，保留原 `causal-reconstruction-v1` 的全部恢复、瞬态、低频
-及波形项，另加权重 0.25 的输出频带过量能量惩罚。只在训练中使用参考，推理不读取参考。
+Source code: `ee06142`, running in an isolated checkout; no modifications to the training script were made during P2.
 
-- 固定 8/10/12/14/16/18/20 kHz 至 Nyquist 的频带，不按曲目、曲风或反例改阈值。
-- 使用实际合成代理输出，在 FFT256/512/2048 三尺度上计算单边 Parseval 频带功率，
-  补偿 Hann 窗的均方功率，三个尺度取均值。
-- 每频带/帧项为 `log1p(relu(Poutput−Pclean)/(Pclean+floor))`。
-  `floor=max(全频参考功率×1e−6,1e−10)`，归一化项 detach。
-  下限对应相对功率 −60 dB 与绝对 −100 dBFS，不沿用过强的全谱 1% 幅度下限。
-- 正确参考没有这项额外惩罚，且此项梯度为零；少补高频仍由原重建项惩罚。
-  不能把输出变干或直接砍掉高频作为最优目标。此项本身不能判别全部噪声纹理与相位，
-  仍需结合既有谱形、复数、瞬态、实际输出和盲听。
+---
 
-已检查：两采样率的静音/弱频带有限值，零惩罚/零额外梯度，有限差分 gradcheck，
-已知正弦的 Parseval 手算值，正确高频重建优于 dry 与人为过量高频。
-单真实裁剪的 CPU/MPS 总 loss 差 6.68e−6，梯度相对 L2 差 5.25e−5，均有限；
-这是数值探针，不是整个训练轨迹逐位一致的声明。完整 Python 测试 300 项通过。
-MPS FFT 的内部 resize 弃用警告仍存在，未静默启用 CPU fallback。
+## Loss and Architecture Review
 
-GRU/TCN 的复数残差结构均能表达恒等，以及只在指定高频添加能量；因果、声道独立、
-不规则分块及静音反向的已有测试保留。没有添加架构参数、推理算子、状态或音频缓冲。
-TCN 仍为 639,906 参数，短训练 ONNX 2,599,024 bytes，符合既定体积预算。
+A new loss function `causal-weak-band-v1` is introduced, retaining all components of the original `causal-reconstruction-v1`: full reconstruction, transient, low-frequency, and waveform terms, plus a new penalty term with weight 0.25 for excess energy in the output frequency bands. Reference data is used only during training; no reference is read during inference.
 
-不能声称任意无损目标都可精确表达：`2*tanh` 的残差范围受输入谱 RMS 限制。
-256 个训练裁剪探针 / 89 条开发裁剪中，高频实虚分量超出输出头可表达区间的比例
-分别约 0.0863% / 0.0118%；投影到该区间后不可避免的高频平方误差与目标能量之比
-约 0.236% / 0.525%。输入几乎为零时比例上界尤其大。
-这表明少量目标受硬幅度限制，但不支持“增大模型就能解决主要退化”的结论；
-也不保证落在输出区间内的任意映射都能被有限网络学到。
-本次先隔离 loss/数据控制的影响，结构上限保留为后续独立消融，避免混淆原因。
+- Fixed frequency bands at 8/10/12/14/16/18/20 kHz up to Nyquist, with thresholds unchanged across tracks, genres, or counterexamples.
+- Uses actual synthetic proxy outputs, computing single-sided Parseval power per band across three FFT scales: 256, 512, and 2048, with Hann window power normalization applied to compensate for windowing effects; the final value is the average across the three scales.
+- Per-band/frame loss is defined as `log1p(relu(Poutput−Pclean)/(Pclean+floor))`.
+  - `floor = max(1e-10, 1e-6 × total reference power)`; the normalization term is detached to prevent gradient backpropagation.
+  - The lower bound corresponds to −60 dB relative and −100 dBFS absolute power; we do not enforce a strong global 1% amplitude floor.
+- The reference signal has no such penalty, and the gradient of this term is zero. Missing high-frequency content is still penalized by the original reconstruction term.
+- Output cannot be made dry or artificially suppressed in high frequencies as the optimal target. This term alone cannot distinguish noise texture or phase artifacts; it must be combined with existing spectral shape, complex-valued outputs, transients, actual output, and blind listening.
 
-## 固定三组、两个种子
+**Verification performed:**
+- Finite-value checks for silence and weak-band signals at two sample rates.
+- Zero penalty and zero gradient for the extra term.
+- Finite difference gradient check passed.
+- Manual Parseval validation for sine waves confirmed.
+- High-frequency reconstruction in the presence of clean reference outperforms both dry and artificially boosted high-frequency versions.
+- CPU/MPS total loss difference on a single real-cropped test: 6.68e−6; gradient relative L2 difference: 5.25e−5—both negligible.
+- This is a numerical probe, not a claim of exact loss trajectory alignment. Full Python test suite passed 300 cases.
+- MPS internal resize warning remains active; not silenced, and CPU fallback not enabled.
 
-每个种子从该种子的 P2 TCN best 初始化，重新初始化相同 AdamW；不继承旧 optimizer。
-每组 1024 updates × batch 4，lr 1e−4，余弦降至 0.1 倍，梯度范数上限 5。
-每 256 步验证/保存，最多 6 组，不因一组分数不好无限续训。
+All GRU and TCN architectures maintain the ability to express identity, and add energy only in specified high-frequency bands. Causal, channel-independent, irregular chunking, and backward silence handling are preserved. No new architectural parameters, inference operators, state variables, or audio buffers are introduced.
+TCN remains at 639,906 parameters; short training ONNX model size: 2,599,024 bytes—within the pre-defined volume budget.
 
-| 组 | 训练目标 | 抽样 |
+We cannot claim that any lossless target can be exactly expressed: the residual range of `2*tanh` is bounded by the RMS of the input spectrum.
+Among 256 training clips and 89 development clips, the proportion of high-frequency real and imaginary components exceeding the output representable range is approximately 0.0863% and 0.0118%, respectively. After projection into the representable range, the resulting squared error relative to target energy is about 0.236% and 0.525%. This is particularly pronounced when input energy is near zero.
+This indicates that a small subset of targets is constrained by hard amplitude limits, but does not support the conclusion that "increasing model size will solve the main degradation."
+It also does not guarantee that any mapping within the output range can be learned by a finite network.
+This round isolates the influence of loss and data control; structural limits are preserved for independent ablation in future work to avoid confounding causes.
+
+---
+
+## Three Fixed Groups, Two Seeds
+
+Each seed is initialized from the P2 TCN best checkpoint, with identical AdamW optimizer state; no inheritance of prior optimizer state.
+Each group undergoes 1024 updates per batch of 4, learning rate 1e−4, cosine decay reduced to 0.1, gradient norm capped at 5.
+Validation and checkpoint saving occur every 256 steps, up to a maximum of 6 groups; no infinite continuation is allowed due to poor performance in any one group.
+
+| Group | Training Objective | Sampling |
 | --- | --- | --- |
-| control | 原 v1 | 原成对有损→无损 |
-| excess | v1 + 新能量项 | 与 control 完全相同 |
-| excess_identity | 同 excess | 每两步中一个固定槽位改为 clean→clean，共 12.5% |
+| control | Original v1 | Original paired lossy → lossless |
+| excess | v1 + new energy penalty | Identical to control |
+| excess_identity | Same as excess | Every second step, one slot replaced with clean→clean, 12.5% coverage |
 
-共同随机裁剪和 −6 至 +3 dB 成对增益，按录音均衡，音乐/语音来源概率保持 253/254、1/254。
-恒等组不增加更新预算，替换的槽位不依赖内容或评估结果，因此有损样本曝光少 12.5%，
-这是该消融的组成部分。clean→clean 仍重新跑输入检测器，不把原有损 cutoff 伪装成恒等输入。
-没有给运行时模型“这是恒等样本”的额外标签。
+All groups share the same random cropping and gain modulation (−6 dB to +3 dB), with per-recording equalization applied. Music/voice source probabilities remain at 253/254 and 1/254, respectively.
+The identity group does not increase update budget; the replaced slots are independent of content or evaluation results, resulting in 12.5% reduced exposure to lossy samples—this is part of the ablation design.
+Clean→clean transitions are reprocessed through the input detector, and the original lossy cutoff is not disguised as an identity input.
+No runtime label is provided to the model indicating "this is an identity sample."
 
-所有组用**同一个新目标**重新评分：0.875×原成对验证分数 + 0.125×恒等验证分数，
-各自仍按音乐/语音来源权重聚合。保存最低分检查点，保留 `base_total` 与新增项。
-不同训练 loss 的原始总分不得直接作架构结论。原父权重在更新前也按同目标评分。
-所有结果保持实验状态，分数下降不自动晋升。
+All groups are scored using the **same new objective**:
+`0.875 × original paired validation score + 0.125 × identity validation score`,
+with scores aggregated by music/voice source weight. The lowest-scoring checkpoint is preserved, and both `base_total` and the new term are retained.
+Raw total scores from different training objectives should not be used to draw structural conclusions. The original parent weights are also re-scored under the same objective before update.
+All results remain in experimental status; score degradation does not trigger promotion.
 
-## 防止只学到验证反例
+---
 
-- track/source checksum 隔离之外，再检查作品 split_group/work_group 不跨划分。
-- 固定 40 个训练录音探针（32 音乐、8 语音），每次验证按同目标重算；它只监测
-  训练域/开发域差距，不参与检查点选择。训练随机 batch 的 loss 不能替代这一比较。
-- 固定原 89 条开发验证和对应恒等控制；记录音乐/语音、编码、采样率、声道角色、曲风、地区。
-- 另外固定每个 test 录音的一份保留编码完整配对文件，39 个录音；只在 best 冻结后
-  通过实际 Rust 评分，不参与选 checkpoint。这里是历史留出复核，不是全新独立测试。
-- 所有实际评分按 track_id 聚类 bootstrap；修复 P2 自动报告默认按 row 的统计问题。
-- 不将独立角色文件拼成立体声。完整配对文件仍只是 2–4 秒素材段，不冒称完整歌曲、
-  长流、物理声卡或同步立体声验证。
+## Preventing Learning Only from Validation Counterexamples
 
-覆盖仍有明确缺口：音乐训练 253 首，validation 26 首，test 21 首。
-validation 没有 country/pop/hiphop/funk；test 没有中国、country/hiphop/jazz。
-因此当前不能证明全曲风、全地区通用，也不能保证不会过拟合。
-新增控制的用途是检测/减少过量生成和选择偏差；对真正未见来源的独立验证仍需要补齐数据。
+- Beyond track/source checksum isolation, we verify that split_group/work_group does not cross validation boundaries.
+- 40 fixed training audio probes (32 music, 8 speech) are used; each validation is re-computed under the same objective. This monitors only the gap between training and development domains, and is not used in checkpoint selection. The loss of a random training batch cannot substitute this comparison.
+- The original 89 development validation clips and corresponding clean→clean controls are fixed; metadata includes music/voice, encoding, sample rate, channel role, genre, and region.
+- For each test recording, a full, encoded pair is preserved—39 recordings total. These are only evaluated after the best checkpoint is frozen and scored via actual Rust evaluation; they are not used in checkpoint selection. This is a historical held-out recheck, not a new independent test.
+- All actual scoring is clustered by `track_id` using bootstrap; a bug in P2's automatic reporting (which previously aggregated by row) has been fixed.
+- Stereo output is not constructed from independent channels. The full paired files remain short (2–4 seconds), and are not claimed to represent full songs, long streams, physical DACs, or synchronized stereo validation.
 
-## 工程证据与运行
+Gaps remain: 253 music training, 26 validation, 21 test.
+Validation lacks country/pop/hip-hop/funk; test lacks Chinese, country/hip-hop/jazz.
+Therefore, we cannot confirm generalization across all genres or regions, nor can we guarantee absence of overfitting.
+The purpose of the identity group is to detect and reduce over-generation and selection bias; independent validation on truly unseen sources still requires additional data.
 
-CPU 与 MPS 的小预算三组均完成训练、导出、实际 Rust 成对/恒等评分；最新 smoke 也执行了
-完整配对文件的留出复核和同目标训练探针。不是质量提升结论。
-报告在 `data/reports/causal-p3-20261012/`，包含 `capacity-audit.json`、`mps-audit.json`
-和 `smoke-frozen/`。
+---
 
-准备性能工具时，Cargo 重建替换了共享 target 中的流评分/检测二进制，哈希检查拒绝了
-一次 smoke 启动。已从 deps 找回并恢复与 P2 登记 SHA 完全相同的二进制。
-P2 缓存最后生成时间早于该重建，期间也未产生 P2 实际评分报告；原训练未改动。
-P3 现在把二进制复制到自己的 `binaries/` 并验证哈希，后续构建不会改变已登记实验。
+## Engineering Evidence and Execution
 
-正式对照于本地时间 2026-10-12 02:53 启动，六组现已全部完成。输出目录
-`data/runs/causal-p3-20261012/study/`，日志 `train.log`；没有自动晋升权重。
+All three small-scale groups (CPU and MPS) completed training, export, and actual Rust paired/identity scoring. The latest smoke test also executed a held-out recheck on full paired files and the same training probe objective. This is **not** a claim of quality improvement.
+Reports are stored in `data/reports/causal-p3-20261012/`, including `capacity-audit.json`, `mps-audit.json`, and `smoke-frozen/`.
 
-正式入口：`training/scripts/run_weak_band_study.py`，要求 P2 六组全部 complete 才能启动；
-命令使用 `--parent <P2目录> --output <独立输出目录> --detector <登记检测器>`。
-来源代码、父 checkpoint、draws、环境、loss 常量和选择规则全部登记，文件锁阻止重复启动，
-中断可恢复。训练 PCM、缓存、检查点和报告不推送；源码继续 Apache-2.0。
+During performance tooling setup, a Cargo rebuild replaced the shared target binaries for streaming scoring and detection. A hash check rejected one smoke launch. The binary was recovered from dependencies and restored to match the P2-registered SHA exactly.
+The P2 cache timestamp was earlier than the rebuild, and no P2 scoring report was generated during that interval; the original training remained unchanged.
+P3 now copies the binary to its own `binaries/` directory and verifies the hash; future builds will not alter previously registered experiments.
 
-旧模型过拟合及限幅归因见[基线复核](baseline-generalization-20261012.md)。
-现有 DSP 可破坏恒等输入，P3 保持链路冻结，不能单凭本轮 loss 改善宣称已修复应用问题。重新做实时成本测量须使用冻结后的候选 SHA，
-并避免与训练/并行评估混跑后把结果冒称部署资格；本轮无模型晋升。
+Formal run started at local time 2026-10-12 02:53. All six groups are now complete. Output directory: `data/runs/causal-p3-20261012/study/`; log file: `train.log`. No weights were promoted automatically.
 
+Formal entry point: `training/scripts/run_weak_band_study.py`, which requires all six P2 groups to be complete before launch.
+Command usage: `--parent <P2 directory> --output <independent output directory> --detector <registered detector>`.
+All source code, parent checkpoint, draws, environment, loss constants, and selection rules are fully logged. File locks prevent duplicate launches; interruption is recoverable.
+Training PCM, cache, checkpoints, and reports are not pushed; source code remains under Apache-2.0 license.
 
-## 六组完成后的判断
+Overfitting and clipping attribution in the baseline is referenced in [Baseline Generalization Recheck](baseline-generalization-20261012.md).
+Existing DSP can corrupt identity inputs; P3 maintains a frozen pipeline and cannot claim resolution of application issues based solely on this round's loss improvement.
+Real-time cost measurement must use a frozen candidate SHA and must avoid mixing with training or concurrent evaluation—results from such runs cannot be claimed as deployment-ready. No model promotion occurred in this round.
 
-全部使用原部署限幅，以下不包含后续 smooth-knee 实验。
+---
 
-| 种子 | 组 | best step | 共同选择 loss | 成对验证 loss | 恒等验证 loss |
+## Post-Training Judgment
+
+All results use the original deployment clipping limits. The following does not include future smooth-knee experiments.
+
+| Seed | Group | best step | Common Selection Loss | Paired Validation Loss | Identity Validation Loss |
 | --- | --- | ---: | ---: | ---: | ---: |
 | 20261012 | control | 768 | 2.25825 | 2.47907 | 0.71252 |
 | 20261012 | excess | 768 | 2.23960 | 2.46637 | 0.65220 |
@@ -114,14 +119,12 @@ P3 现在把二进制复制到自己的 `binaries/` 并验证哈希，后续构�
 | 20261013 | excess | 256 | 2.26598 | 2.49802 | 0.64171 |
 | 20261013 | excess_identity | 256 | 2.24232 | 2.50031 | 0.43641 |
 
-加入恒等样本降低了共同选择分数，但主要收益来自恒等子集；成对恢复分数并不全面优于
-只加 excess 的组。两个种子的 best 都早于最后一步，没有证据支持直接无限续训。
-训练探针只含成对样本，必须与开发集的 **paired** 分数比较，不能与含 12.5% 恒等权重的
-共同选择总分直接计算泛化差距。
+The inclusion of identity samples reduced the common selection score, but the primary benefit comes from the identity subset. The paired recovery score does not fully surpass the excess-only group. Best steps for both seeds occur early—before the final step—and there is no evidence supporting indefinite continuation.
+Training probes contain only paired samples and must be compared against development set **paired** scores. The common selection score with 12.5% identity weighting cannot be used to compute generalization gaps directly.
 
-历史留出音乐 21 个录音、每录音一份完整配对文件，实际 Rust 的共同稳态区间：
+Historical held-out music: 21 recordings, each with a full paired file. Actual Rust steady-state performance:
 
-| 种子 / 组 | 高频谱形 ↓ | 高频瞬态 ↓ | 高频能量误差 dB ↓ | SI-SDR 相对输入 dB ↑ |
+| Seed / Group | High-Frequency Spectral Shape ↓ | High-Frequency Transient ↓ | High-Frequency Energy Error (dB) ↓ | SI-SDR vs. Input (dB) ↑ |
 | --- | ---: | ---: | ---: | ---: |
 | 20261012 / control | 0.67888 | 0.90480 | 3.15370 | −0.30885 |
 | 20261012 / excess | 0.67014 | 0.89659 | 3.33452 | −0.30683 |
@@ -130,12 +133,11 @@ P3 现在把二进制复制到自己的 `binaries/` 并验证哈希，后续构�
 | 20261013 / excess | 0.66924 | 0.89319 | 3.38091 | −0.30555 |
 | 20261013 / excess_identity | 0.65872 | 0.87940 | 3.66740 | −0.30302 |
 
-输入对应谱形 0.69998、瞬态 0.86321、能量误差 4.48301 dB。
-新约束在两个种子上都降低谱形/瞬态误差，但削弱了能量恢复；相对输入的瞬态和
-波形保真仍未达标。开发音乐的谱形误差也仍高于输入，不能宣布全面提升或通用性。
-原生 clean→clean 的高频谱形误差从 control 的 0.85325/0.81154 降到
-0.60229/0.55983，仍非透明。恒等输入的 baseline SI-SDR 接近数值上限，
-不把其巨大的 dB 差当作一般有损音乐质量排名。
+Reference input values: spectral shape 0.69998, transient 0.86321, energy error 4.48301 dB.
+The new constraint reduces spectral and transient errors in both seeds, but weakens energy recovery. Relative input transient and waveform fidelity still fall short of target.
+Development music exhibits higher spectral distortion than input, and we cannot declare a general performance improvement or universal applicability.
+The clean→clean baseline spectral error dropped from 0.85325/0.81154 in control to 0.60229/0.55983—still not transparent.
+The identity input baseline SI-SDR is near theoretical upper limit; the large dB gap is not indicative of general lossy music quality ranking.
 
-下一步先隔离 DSP，见[平滑限幅对照](limiter-study-20261012.md)。本轮未增加模型体积；
-受限的高频恢复仍需在新的部署代理下重新设计受控目标，而不是只提高过量惩罚权重。
+Next step: isolate DSP effects, see [Smooth Knee Comparison](limiter-study-20261012.md).
+This round did not increase model size; constrained high-frequency recovery must be re-designed under a new deployment proxy, not simply by increasing the penalty weight.

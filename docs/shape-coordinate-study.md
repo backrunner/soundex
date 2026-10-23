@@ -1,107 +1,81 @@
-# P9：谱形更新尺度与精确直通初始化
+# P9: Spectral Shape Update Scale and Accurate Identity Initialization
 
-2026-10-13（新加坡时间），承接 [优化过程审计](linear-optimization-audit.md)。目标仍是高频重建，
-不是以直通代替恢复。本轮不修改 P8 loss、分组容差或素材；不扩容、不替换默认模型。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 训练前的机制诊断
+2026-10-13 (Singapore time), following [Linear Optimization Audit](linear-optimization-audit.md). The goal remains high-frequency reconstruction, not using direct pass-through as a substitute for restoration. This round does not modify the P8 loss, group tolerance, or material inputs; no model expansion or replacement of the default model occurs.
 
-上一轮只修正能量更新尺度后，谱形 decoder 仍以全谱 RMS 改写每个频点，再归一化带内谱形。
-本轮先按原 P8 draws、两个种子和 lr=1e-4，重放 128 步，并重复拟合同一训练四片段 256 步。
-仅把谱形更新单位改成输入频带 RMS（带既有 1e-4 全谱相对地板），结果如下：
+## Pre-training Mechanism Diagnostics
 
-| 共同开发总分 | 20261012 | 20261013 |
+In the previous iteration, after correcting only the energy update scale, the spectral decoder still wrote each frequency bin using the full-spectrum RMS, then normalized the in-band spectral shape. In this round, we replay 128 steps using the original P8 draws, two seeds, and lr=1e-4, and repeat the training of the same four training fragments for 256 steps. We change the spectral update unit from full-spectrum RMS to input band RMS (with an existing 1e-4 full-spectrum relative floor), resulting in the following:
+
+| Shared Development Score | 20261012 | 20261013 |
 | --- | ---: | ---: |
-| 初始 | 0.494611 | 0.494611 |
-| 仅能量单位修正，第 128 步 | 0.526563 | 0.521826 |
-| 同时修正谱形单位，第 128 步 | 0.495014 | 0.493785 |
+| Initial | 0.494611 | 0.494611 |
+| Energy unit corrected only, step 128 | 0.526563 | 0.521826 |
+| Spectral unit corrected too, step 128 | 0.495014 | 0.493785 |
 
-短训退步明显缩小，但差异很小，一种子仍未超过初始，不能称为通用恢复提升。
-固定小样本最终误差 0.289683/0.292236，反而高于仅能量修正的 0.272663/0.271027。
-所以不能单凭开发均值判断新坐标在所有方面更好。
+The short training shows a significant reduction in degradation, though the difference is small. Neither seed surpassed the initial value, so we cannot claim a general restoration improvement. The fixed small-sample final error is 0.289683 / 0.292236, which is actually higher than the 0.272663 / 0.271027 from energy-only correction. Therefore, we cannot judge the new coordinate as better across all dimensions based solely on development mean.
 
-随后用 CPU float64 拆分原首批中的 paired/identity 梯度，并对各组分别执行一次 AdamW：
+Subsequently, we split the paired/identity gradients from the original batch using CPU float64, and applied a single AdamW update to each group:
 
-| 恒等首片段诊断 | 20261012 | 20261013 |
+| Identity First Fragment Diagnostics | 20261012 | 20261013 |
 | --- | ---: | ---: |
-| 初始 loss | 2.974e-8 | 6.206e-8 |
-| 原谱形单位的恒等谱形梯度范数 | 7.097 | 21.355 |
-| 频带单位的恒等谱形梯度范数 | 0.00222 | 0.00588 |
-| 原谱形单位，仅恒等梯度更新后的恒等 loss | 0.41674 | 0.47160 |
-| 频带单位，仅恒等梯度更新后的恒等 loss | 0.04913 | 0.04778 |
+| Initial loss | 2.974e-8 | 6.206e-8 |
+| Spectral gradient norm (original spectral unit) | 7.097 | 21.355 |
+| Spectral gradient norm (band-level unit) | 0.00222 | 0.00588 |
+| Identity loss after updating with original spectral unit gradient | 0.41674 | 0.47160 |
+| Identity loss after updating with band-level unit gradient | 0.04913 | 0.04778 |
 
-这是模型正种子使初始化近似直通而非精确直通，加上 Adam 更新尺度所产生的首步过冲；
-双精度下仍存在，不能仅归因于 float32 舍入。初始恒等梯度占 paired 梯度比例很小，
-不是整个配对训练退步的唯一原因。删除恒等素材不能解决这个问题。
+This indicates that the model's positive seed leads to initialization that approximates direct pass-through rather than exact pass-through, combined with the first-step overshoot introduced by Adam update scaling. The issue persists in double precision, and cannot be attributed solely to float32 rounding. The initial identity gradient is a small fraction of the paired gradient, and is not the sole cause of degradation in the paired training. Removing identity samples does not resolve this issue.
 
-## 两项改动分开比较
+## Separate Evaluation of Two Changes
 
-令 `s` 为当前压缩输入全谱 RMS，`r` 为输入频带 RMS，`d=2*tanh(decoder)`。
+Let `s` be the full-spectrum RMS of the current compressed input, `r` be the RMS of the input band, and `d = 2*tanh(decoder)`.
 
-1. **谱形单位**：将 `magnitude + s*d + s*1e-8` 改为
-   `magnitude + sqrt(r² + (s*1e-4)²)*d + s*1e-8`，随后沿用平滑绝对值与带内 RMS 归一化。
-   同一带所有频点共享单位，空频点仍可生成结构；未使用参考统计或录音 ID。
-2. **精确初始化**：把归一化输出改为
-   `max(0, magnitude + (restored - restored_zero_heads))`。
-   `restored_zero_heads` 是同一输入在零输出头时的解析映射，不增加第二个神经网络前向。
-   两个头为零时相减严格为零，输出严格等于压缩幅度；正种子及其生成梯度保留。
+1. **Spectral Unit Update**: Change `magnitude + s*d + s*1e-8` to
+   `magnitude + sqrt(r² + (s*1e-4)²)*d + s*1e-8`, followed by smooth absolute value and in-band RMS normalization.
+   All frequency bins in a given band share the same unit; empty bins can still generate structured output. Reference statistics or recording ID are not used.
 
-精确初始化后，首批恒等样本的初始 loss、梯度及仅恒等训练一步后的 loss 均为零。
-但 paired 更新仍使恒等误差升至 0.02392/0.03050：该改动只排除自身初始偏差引发的损伤，
-**不保证学习恢复后的恒等保真**。后续仍完整验证 identity，不能用零初始 loss 作合格证明。
+2. **Exact Initialization**: Change the normalized output to
+   `max(0, magnitude + (restored - restored_zero_heads))`.
+   `restored_zero_heads` is the parsed mapping of the same input under zero output heads, without introducing a second neural network forward pass. When both heads are zero, the difference is strictly zero, and the output equals the compressed magnitude. Positive seeds and their generated gradients are preserved.
 
-谱形头沿用有界 tanh，所以更换单位也会改变有限参数下可达的谱形范围；不能预设容量等价。
-正种子允许缺失频点产生非零梯度，合成测试确认能生成有形状的高频；这不证明所有真实缺失
-细节均可表达或恢复。能量分支保留既有界限，但零映射残差修正后的输出 RMS 并非严格等于
-修正前能量头；正式评测仍直接测量最终幅度和 DSP 成品。
+After exact initialization, the initial loss, gradients, and loss after one step of training for the identity samples are all zero. However, paired updates still raise the identity error to 0.02392 / 0.03050: this change only eliminates damage caused by initial bias, and **does not guarantee fidelity preservation in learned restoration**. Subsequent full validation of identity remains necessary, and a zero initial loss cannot serve as a valid proof of qualification.
 
-## 正式对照协议（评分前固定）
+The spectral head retains bounded tanh, so changing the unit also alters the reachable spectral range under finite parameter constraints; capacity equivalence cannot be assumed. Positive seeds allow missing frequency bins to produce non-zero gradients, and synthetic tests confirm the ability to generate structured high-frequency content. This does not prove that all real-world missing details can be expressed or restored. The energy branch retains its existing bounds, but the RMS of the output after zero-mapping residual correction is not strictly equal to the RMS before the energy head correction. Final evaluation still directly measures final magnitude and DSP output.
 
-| 组别 | 能量单位 | 谱形单位 | 精确初始化 |
+## Formal Comparison Protocol (Pre-Scoreing Fixed)
+
+| Group | Energy Unit | Spectral Unit | Exact Initialization |
 | --- | --- | --- | --- |
-| energy_conditioned | 输入频带 | 全谱 | 否 |
-| band_conditioned | 输入频带 | 输入频带 | 否 |
-| anchored_band | 输入频带 | 输入频带 | 是 |
+| energy_conditioned | Input band | Full-spectrum | No |
+| band_conditioned | Input band | Input band | No |
+| anchored_band | Input band | Input band | Yes |
 
-三组各两个种子 20261012/20261013，从头训练，每次 2048 步、batch 4。
-同种子初始化参数张量完全相同，每组 807,398 参数；第三组初始函数的差别就是本次变量。
-统一 P8 linear amplitude + 0.25 signed dynamics loss、80-hop warmup、past-only 特征、
-AdamW lr=1e-4、weight decay=1e-4、clip=5、余弦衰减至 0.1 倍。
+Each group uses two seeds from 20261012 and 20261013, trained from scratch for 2048 steps, batch size 4. Within each seed, the initial parameter tensors match across groups, with 807,398 parameters per group. The only difference in the anchored_band group is the current variable. All share the same P8 linear amplitude + 0.25 signed dynamics loss, 80-hop warmup, past-only features, AdamW lr=1e-4, weight decay=1e-4, clip=5, and cosine decay to 0.1×.
 
-按 `seed+70000` 新生成每种子 8192 draws，1024 为恒等，三组共用相同抽样；音乐/语音比例不变。
-每 512 步验证，初始检查点可被选中。采用同一既定 paired/identity 与音乐/语音加权规则，
-冻结最优检查点后再作录音配对和分组检查。第 0 步胜出仍表示没有得到恢复权重。
+For each seed, 8192 draws are generated using `seed+70000`, with 1024 assigned to identity, and all three groups share the same sampling. The music-to-voice ratio remains unchanged. Validation occurs every 512 steps, and the initial checkpoint can be selected. The same paired/identity and music/voice weighting rules are used, with the optimal checkpoint frozen before paired and grouped checks. A win at step 0 indicates no learned restoration weights were acquired.
 
-固定三个对照：band_conditioned 对 energy_conditioned；anchored_band 对 band_conditioned；
-anchored_band 对 energy_conditioned。候选相对两个控制分别运行既有 13 项分组检查，
-包含相对原压缩输入的高频 SC/能量改善。原始 identity 绝对误差也保留在各组报告中。
-这些是研究检查，不是可闻误差标准或发布准入；均值、分组或某个控制的劣化不能证明恢复成功。
+Three controls are fixed: `band_conditioned` vs. `energy_conditioned`; `anchored_band` vs. `band_conditioned`; `anchored_band` vs. `energy_conditioned`. For each candidate relative to the two controls, 13 group checks are run, including relative improvements in high-frequency SC/energy compared to the original compressed input. The absolute error of the original identity is also preserved in each group report. These are research-level checks, not audible error benchmarks or release criteria. Deterioration in mean, group, or any control cannot prove restoration success.
 
-开发录音已多轮用于诊断，不能冒称独立测试或没有过拟合。默认权重保持原状。
+Development recordings have been used in multiple rounds for diagnostics and cannot be claimed as independent tests or free from overfitting. Default weights remain unchanged.
 
-## DSP、成本与可复现性
+## DSP, Cost, and Reproducibility
 
-正式训练完成后自动执行：
+After formal training, the following is automatically executed:
 
-- 全部分组、原始频谱和上下文消融评估；选模不被后续报告重写。
-- 固定第一种子 anchored_band 导出 ONNX，验证动态单/双声道 ORT 对应、参数量与文件预算；
-  前端+推理逐 hop CPU、独立进程 RSS。benchmark 不与正式训练重叠。
-- 三组配 P3 相位、候选配输入相位、P3 原模型、恒等 DSP，共六条路径。
-  对每个种子 89 个 paired 和对应 89 个 clean identity 片段执行 **2136 次原生 DSP 回放**。
-  paired 与 identity 分开汇总，保留原始/重分析五频带和完整波形指标。
-  clean identity 仍可能被相位和 DSP 改写，不能把精确幅度初始化等同于成品恒等。
-- 代理与原生输出误差要求 <=2e-5，检查有限值和时间对齐。离线预测回放不证明实时设备稳定，
-  仍须正式集成、持续流验证与盲听，不能据此发布。
+- Full group, original spectrum, and context ablation evaluations; the selected model is not rewritten in subsequent reports.
+- Export the ONNX model for the first seed in the anchored_band group, verifying dynamic single/dual-channel ORT correspondence, parameter count, and file budget; per-hop CPU inference and independent process RSS are verified. The benchmark does not overlap with the formal training.
+- Six paths are evaluated: P3 phase, candidate input phase, P3 original model, and identity DSP. For each seed, 89 paired and 89 corresponding clean identity fragments are processed for **2,136 native DSP replays**. Paired and identity results are separately aggregated, preserving raw and re-analyzed five-band and full waveform metrics.
+  Clean identity outputs may still be modified by phase and DSP, so exact magnitude initialization cannot be equated to final product identity.
+- Proxy and native output error requirements are ≤2e-5, with checks for finite values and time alignment. Offline prediction replay does not prove real-time device stability; formal integration, continuous streaming validation, and blind listening are still required before release.
 
-本地完整 Python 测试 **394 项通过**，ruff 检查通过。两步 MPS 冒烟训练已验证三组可运行。
-最佳初始检查点及非零的第 2 步检查点各完成 24 次原生回放（各含 paired/identity 12 次），
-最大代理/原生误差均为 6.71e-7。第 2 步仅用于验证非零路径，没有改写选模结果。候选冒烟选中的第 0 步 ONNX 为 3,284,671 bytes
-（3.13 MiB）；四种 44.1/48 kHz 单/双声道配置的前端+推理最大 P99 为 0.276 ms，观测
-最大值 1.885 ms、超过 hop 预算次数为零。额外峰值 RSS 21.05 MiB。
-这是初始检查点的 CPU 诊断成本，不含 detector、DSP、adapter、设备，不能当作完整延迟。
-正式结果及非零训练检查点仍需重新核验。非零随机输出头的 ONNX 对应已另行测试。
+Local full Python test **394 cases passed**, with ruff checks passing. Two-step MPS smoke training has verified that all three groups can run. The best initial checkpoint and the non-zero step 2 checkpoint each completed 24 native replays (12 paired, 12 identity), with maximum proxy/native error of 6.71e-7. The second step was used only for non-zero path validation and did not alter the final model selection. The candidate smoke-selected step 0 ONNX is 3,284,671 bytes (3.13 MiB); for four configurations (44.1/48 kHz, mono/stereo), the frontend + inference P99 is 0.276 ms, with observed maximum 1.885 ms, and zero exceedances of hop budget. Additional peak RSS is 21.05 MiB.
+This represents the CPU diagnostic cost for the initial checkpoint, excluding detector, DSP, adapter, and device overhead. Full results and non-zero training checkpoints still require revalidation. ONNX for non-zero random output heads has been separately tested.
 
-源代码提交后创建冻结 worktree；阶段状态、日志、配置、抽样和权重保留在
-`data/runs/shape-p9-20261012`。音频和实验权重不推送。流水线在阶段失败时停止并记录原因。
+After code submission, a frozen worktree is created; stage state, logs, configurations, sampling, and weights are preserved in `data/runs/shape-p9-20261012`. Audio and experimental weights are not pushed. The pipeline halts and records the reason upon stage failure.
 
 ```sh
 PYTHONPATH=training training/.venv/bin/python training/scripts/run_shape_study.py \
@@ -110,23 +84,21 @@ PYTHONPATH=training training/.venv/bin/python training/scripts/run_shape_study.p
   --cache data/runs/factor-p6-20261012/study/cache
 ```
 
-本文记录诊断与正式协议；完整训练与质量结果在完成后另行核验。
+This document records the diagnostics and formal protocol; full training and quality results will be verified and reported after completion.
 
+## Final Results
 
-## 正式结果
+All six training runs and 2,136 native DSP replays have been completed. Checkpoint and evaluation file hashes have been verified.
+- Both seeds in the `energy_conditioned` group selected step 0 (0.494611).
+- `band_conditioned` achieved the best shared score of 0.491648 / 0.492389, and `anchored_band` achieved 0.491649 / 0.492390, selecting 2048 and 1536 steps respectively.
+- Relative to the initial mean, improvements are only about 0.45%–0.60%, and exact initialization does not yield discernible final quality gains.
 
-六组训练及 2136 次原生 DSP 回放均完成，检查点和评估文件哈希已核验。
-energy_conditioned 两种子均选择第 0 步（0.494611）；band_conditioned 最佳共同分数为
-0.491648/0.492389，anchored_band 为 0.491649/0.492390，分别选择 2048/1536 步。
-相对初始均值只改善约 0.45%–0.60%，精确初始化没有增加可辨认的最终质量收益。
+Music high-frequency energy error relative to the original compressed input increased by 0.099 / 0.195 dB; the original identity music magnitude error increased by approximately 0.0353 / 0.0357 (mean across recordings). Both control groups failed at least one group check. Actual DSP identity music spectral and transient errors also degraded, and thus **no promotion to default weights** occurred.
+Some five-band energy metrics improved, but this does not equate to overall high-frequency or waveform improvement; the metrics differ in band, window length, and aggregation method. Full results are preserved, and no favorable metrics were selected.
 
-候选相对原压缩输入的音乐高频能量误差增加 0.099/0.195 dB；原始恒等音乐幅度误差
-增加约 0.0353/0.0357（录音均值）。两个控制对应的分组检查均未全部通过。
-实际 DSP 的恒等音乐谱形和瞬态误差也退步，不能晋级默认权重。
-部分输出五频带能量指标改善，不等于整个高频或整体波形改善；指标频带、窗长和汇总口径
-不同，完整报告保留全部结果，没有选择有利口径。
+Post-training, the ONNX model for the first seed is 3,291,199 bytes (3.14 MiB), with 807,398 parameters.
+Frontend + inference peak P99 is 0.318 ms, with observed maximum 1.310 ms; independent RSS increase is 21.25 MiB.
+Maximum proxy/native error across 2,136 replays is 4.54e-6. These performance and consistency metrics do not prove audio quality improvement.
+Next round will be [P10: Final Product Supervision and Identity Fidelity](rendered-restoration-study.md).
 
-训练后第一种子 ONNX 为 3,291,199 bytes（3.14 MiB），807,398 参数。
-前端+推理最高配置 P99 0.318 ms，观测最大值 1.310 ms；独立 RSS 增量 21.25 MiB。
-2136 次回放最大代理/原生误差为 4.54e-6。这些成本和一致性通过不能证明音质改善。
-下一轮见 [P10 成品监督与恒等保真](rendered-restoration-study.md)。
+The bounded decoder coordinate remains `d=2*tanh(decoder)`. The next historical study is [P10 rendered-output supervision](rendered-restoration-study.md).

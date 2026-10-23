@@ -1,36 +1,40 @@
-# 损失设计审计与受控优化（2026-10-10）
+# Loss Design Audit and Controlled Optimization (2026-10-10)
 
-原 200 轮训练已经完成。本次针对验证发现的相位、波形保真不足，修改训练目标并进行独立的短程续训；保留原最佳 epoch168，不能把新版总 loss 与旧版数值直接比较。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 已确认的问题
+Original 200 epochs of training have been completed. This iteration addresses identified deficiencies in phase and waveform fidelity during validation, modifies the training objective, and conducts a separate short-range continuation training. The original best epoch 168 is retained; new versions of the loss cannot be directly compared to prior values.
 
-旧目标把 dB 幅度误差、无量纲相位误差和线性 PCM 的 L1 误差直接加权。尺度差异使波形监督过弱：在原 epoch168、同一组 64 个训练抽样（4 批，每批 16）上，先固定 BatchNorm 为 eval 模式，逐项反向传播全部生成器参数得到：
+## Confirmed Issues
 
-| 加权项 | 旧目标梯度 L2 均值 | 新目标梯度 L2 均值 |
+The original objective directly summed dB amplitude error, dimensionless phase error, and L1 error of linear PCM, without proper scaling. This led to a severely weakened waveform supervision: when evaluating the same 64 training samples (4 batches, 16 per batch) at epoch 168, BatchNorm was fixed in evaluation mode, and gradients for all generator parameters were backpropagated individually to compute:
+
+| Weighted Term | Old Objective Gradient L2 Mean | New Objective Gradient L2 Mean |
 |---|---:|---:|
-| 缺失高频幅度 | 66.2119 | 2.8252 |
-| 相位 | 3.7809 | 4.0069 |
-| 低频恒等正则 | 3.6962 | 0.1780 |
-| 交叉带连续性正则 | 1.6195 | 0.0805 |
-| 波形 | 0.0004574 | 2.9851 |
+| Missing high-frequency amplitude | 66.2119 | 2.8252 |
+| Phase | 3.7809 | 4.0069 |
+| Low-frequency identity regularization | 3.6962 | 0.1780 |
+| Crossover-band continuity regularization | 1.6195 | 0.0805 |
+| Waveform | 0.0004574 | 2.9851 |
 
-这不是 GAN 梯度审计，也不是整个训练分布的保证。它用于发现尺度失衡和校准初始权重；小规模梯度均衡本身不能证明听感改善。实际训练启用 BatchNorm 的批统计，梯度审计也须分别报告 train 模式，不能把 eval 模式的范数当成真实训练的全过程。旧版按整批有效频点归一化，也使带宽不同的样本获得不同训练权重，而验证按每行等权统计。
+This is not a GAN gradient audit, nor does it represent a guarantee over the full training distribution. It serves to identify scale imbalances and calibrate initial weights. Small-scale gradient balancing does not imply perceptual improvement. Actual training uses BatchNorm batch statistics, so gradient audits must also be reported under training mode—eval mode gradients cannot be used as a proxy for real training behavior. The original objective used per-batch effective frequency point normalization, which assigned different training weights to samples with different bandwidths, while validation averaged across rows equally.
 
-同一组训练抽样在 **train 模式**复核后，加权梯度为：
+Rechecking the same training samples under **training mode** yields:
 
-| 加权项 | 旧目标 | 新目标 |
+| Weighted Term | Old Objective | New Objective |
 |---|---:|---:|
-| 缺失高频幅度 | 41.2248 | 2.6464 |
-| 相位 | 7.6588 | 1.6849 |
-| 低频恒等正则 | 4.3980 | 0.2318 |
-| 交叉带连续性正则 | 1.0464 | 0.0523 |
-| 波形 | 0.0005131 | 0.6741 |
+| Missing high-frequency amplitude | 41.2248 | 2.6464 |
+| Phase | 7.6588 | 1.6849 |
+| Low-frequency identity regularization | 4.3980 | 0.2318 |
+| Crossover-band continuity regularization | 1.0464 | 0.0523 |
+| Waveform | 0.0005131 | 0.6741 |
 
-这证实尺度问题也存在于实际训练模式：旧波形项比高频项弱约 8 万倍，新版差距约 4 倍。正则项保持较小，不要求全部项的梯度严格相等。两种模式的审计均使用同一父权重、固定种子和训练数据，没有使用测试集。
+This confirms that scale issues persist in actual training: the waveform term in the old objective was ~80,000 times weaker than the high-frequency amplitude term, while in the new objective, the gap is reduced to ~4×. Regularization terms remain small and do not require strictly equal gradients. Both modes used the same parent weights, fixed seed, and training data—no test set was used.
 
 ## Objective v2
 
-新版先按样本归一化有效频点，再对批次取均值，与抽样概率和逐行验证保持一致。带宽为空的项返回零。当前受控配置为：
+The new objective first normalizes per-sample effective frequency points, then takes the batch mean, aligning with sampling probability and per-row validation. Terms with zero bandwidth return zero. Current controlled configuration is:
 
 ```text
 total = high_dB / 20
@@ -40,115 +44,112 @@ total = high_dB / 20
       + waveform_relative
 ```
 
-20 dB 是明确的参考尺度，不是把幅度项限制在 [0,1]。相位使用周期性的 `1 - cos(delta)`，范围 [0,2]；以目标能量加权，并排除相对峰值低于 -60 dB、绝对低于 -120 dB 的无意义相位。最初候选的相位权重为 1，实测梯度约 20.03，偏强，最终保持 0.2。
+20 dB is a defined reference scale—not restricting amplitude terms to [0,1]. Phase uses a periodic `1 - cos(delta)` with range [0,2]; it is energy-weighted and excludes phase values below -60 dB relative or below -120 dB absolute, which are considered meaningless. The initial candidate phase weight was 1, but empirical gradient measurement was ~20.03, indicating over-weighting; the final value is kept at 0.2.
 
-波形项使用实际部署的频带/相位混合和因果 Hann overlap-add。FFT256/hop128、连续 4 帧，只监督具有完整重叠支持的 384 个样本，排除裁剪造成的两端各 128 个样本。每个样本的归一化为：
+The waveform term uses actual deployment-level band/phase blending and causal Hann overlap-add. FFT256/hop128, 4-frame continuous, supervises only 384 samples with full overlap support, excluding the 128-sample ends due to cropping. Each sample is normalized as:
 
 ```text
 scale = max(L1(degraded_OLA, reference_OLA), 0.01 * RMS(reference_OLA), 1e-4)
 waveform_relative = mean(L1(predicted_blended_OLA, reference_OLA) / detach(scale))
 ```
 
-分母只来自输入和参考，生成器不能通过改变分母减小 loss。在两个下限都未触发时，保持压缩输入的值为 1，完全恢复参考为 0；触发下限时，干声基线可以低于 1。下限限制静音、近乎无失真输入的梯度，也意味着极低电平处不严格满足增益不变性。原始 PCM L1 仍单独记录。
+The denominator derives only from input and reference; generators cannot reduce the loss by modifying the denominator. When neither lower bound is triggered, the compressed input value remains 1 and the reference is fully restored to 0; when either bound is triggered, the dry base can fall below 1. These lower bounds suppress gradients for silence and near-identity inputs, meaning gain invariance is not strictly enforced at very low levels. The original PCM L1 is still recorded separately.
 
-低频恒等和交叉带项是正则：部署会保留有效低频，不能用它们替代部署后的低频能量/残差检查。训练代理没有近似 Rust 的动态响度匹配、限幅和干湿门控，最终质量仍须通过真实 Rust 流处理验证。
+Low-frequency identity and crossover-band terms are regularizers: deployment preserves effective low-frequency content, and these cannot be used to replace post-deployment low-frequency energy or residual checks. The training proxy does not approximate Rust's dynamic loudness matching, clipping, or dry/wet gating. Final quality must still be verified through real Rust stream processing.
 
-旧版 Objective v1 的公式与指标保持兼容。未声明 version 的历史配置仍按 v1 执行，不静默改变旧 checkpoint 的训练定义。
+The original Objective v1 formula and metrics remain compatible. Historical configurations without version tags continue to execute v1 logic and do not silently alter the training definition of prior checkpoints.
 
-相位混合在相反相位、50% 权重处会出现浮点零向量，现显式绕开无定义的 `atan2(0,0)` 分支，再沿部署的回退路径求导。10 万个边界样本前向与旧实现逐位一致，梯度均有限。当前固定 PyTorch 2.12.1 在 CPU/MPS 的旧实现也未复现非有限梯度，因此这是明确边界行为的保护，不能作为旧训练失败的已证实原因；本次 8 轮训练的冻结源码在此保护之前。
+Phase mixing previously encountered floating-point zero vectors at opposite phase, 50% weight. The current implementation explicitly avoids undefined `atan2(0,0)` branches and instead computes gradients along the deployment fallback path. For 100,000 boundary samples, forward pass matches the old implementation bit-for-bit, and all gradients are finite. The current PyTorch 2.12.1 implementation on CPU/MPS does not reproduce non-finite gradients, confirming this is a robust boundary behavior safeguard—not a proven cause of failure in prior training. The 8-epoch continuation training was run before this safeguard was implemented.
 
-## 受控续训与选择
+## Controlled Continuation and Selection
 
-- 配置：[`balanced_continuation.yaml`](../training/configs/balanced_continuation.yaml)，8 轮、每轮 2048 个抽样、batch16、学习率 2e-5、128 步预热。
-- 只继承本次原生数据训练的 epoch168 生成器。优化器、学习率轨迹和判别器重新初始化；关闭 GAN 两项，用于隔离监督目标改动，不能称为 GAN 消融已证明最优。
-- 不改变模型、FFT/hop、配方、数据清单、源比例和 896 行固定验证集。不把已诊断的测试样本加入训练。
-- 新 checkpoint 按新版验证 total 选择，高频幅度为同分排序；策略与配置哈希绑定。保留全部原始指标，并另行判断是否比父权重退步。
-- `--resume` 仍要求配置严格一致。改目标须用 `--initialize-generator-from` 开始新训练轨迹；校验模型、特征协议、数据及验证成员，记录父 checkpoint SHA-256、父源码和初始化链。非有限父参数拒绝加载。
-- 本地运行：`data/runs/balanced-native-continuation-20261010-1935/`；冻结源码为 `b4ed52c`，独立 detached worktree，原 epoch168 完整保留。
+- **Configuration**: [`balanced_continuation.yaml`](../training/configs/balanced_continuation.yaml), 8 epochs, 2048 samples per epoch, batch size 16, learning rate 2e-5, 128-step warmup.
+- Inherits only the generator from original native data training at epoch 168. Optimizer, learning rate trajectory, and discriminator are reinitialized; GAN components are disabled to isolate changes in supervision objectives—this is not a GAN ablation proven optimal.
+- No changes to model architecture, FFT/hop, recipe, data list, source ratio, or 896-row fixed validation set. No diagnosed test samples are included in training.
+- New checkpoint is selected based on the new objective total, with high-frequency amplitude ranked by equal division; selection strategy is bound to configuration hash. All original metrics are preserved, and independent judgment is required to determine if the new checkpoint regresses relative to the parent.
+- `--resume` requires strict configuration consistency. Target modifications must begin with `--initialize-generator-from` to start a new training trajectory; model, feature protocol, data, and validation members are verified, and parent checkpoint SHA-256, parent source code, and initialization chain are recorded. Loading is rejected if parent parameters are non-finite.
+- Local run: `data/runs/balanced-native-continuation-20261010-1935/`; frozen source code is `b4ed52c`, with an independent detached worktree; original epoch 168 is fully preserved.
 
-## 验证范围
+## Validation Scope
 
-测试覆盖旧版公式、新版逐样本权重、基线相对误差、增益缩放、静音/近恒等有限梯度、周期相位、checkpoint 策略和续训兼容性。正式发布还需要持续流、感知与盲听、真实设备及跨平台验证；训练 loss 下降不等于这些门槛完成。
+Testing covers the old objective formula, new per-sample weighting, baseline relative error, gain scaling, silence/identity finite gradients, periodic phase, checkpoint strategy, and continuation compatibility. Formal release requires additional validation: continuous streaming, perceptual and blind listening, real device, and cross-platform testing. A drop in training loss does not imply these thresholds have been met.
 
-梯度明细、原权重对照、新实验日志和权重保存在忽略的本地 `data/`，不推送原始训练音频。新权重沿用父数据的权利来源链，仍需单独完成导出物的发布审查。
+Gradient details, parent weight comparisons, new experiment logs, and weight preservation are stored locally in `data/` and not pushed. Raw training audio is not shared. New weights inherit the parent's data provenance chain and still require separate review before release.
 
-## 已完成的 8 轮对照
+## Completed 8-Epoch Comparison
 
-实验完成 8 轮、1024 次更新；在续训的 8 个候选中，新版验证 total 最低的是第 6 轮。CPU float32 单线程重新评估父权重与候选，896 个 row ID 完全一致，避免混用 CPU/MPS 的微小数值差异：
+8 epochs, 1024 updates completed. Among 8 candidate continuations, the new objective total was minimized at epoch 6. CPU float32 single-threaded reevaluation of parent and candidates was performed; all 896 row IDs matched exactly, avoiding micro-differences between CPU and MPS:
 
-| 指标（越小越好） | 父 epoch168 | 续训 epoch6 |
+| Metric (lower is better) | Parent epoch168 | Continuation epoch6 |
 |---|---:|---:|
-| 新版 total | 1.568438 | 1.571623 |
-| 高频幅度 dB | 10.871966 | 10.970338 |
-| 相位 | 0.812382 | 0.799784 |
-| 原始波形 L1 | 0.006845969 | 0.006844864 |
-| 相对波形误差 | 0.913996 | 0.913265 |
-| 低频恒等正则 | 3.530340 | 3.569211 |
-| 交叉带正则 | 4.781529 | 4.806951 |
+| New objective total | 1.568438 | 1.571623 |
+| High-frequency amplitude (dB) | 10.871966 | 10.970338 |
+| Phase | 0.812382 | 0.799784 |
+| Original waveform L1 | 0.006845969 | 0.006844864 |
+| Relative waveform error | 0.913996 | 0.913265 |
+| Low-frequency identity regularization | 3.530340 | 3.569211 |
+| Crossover-band regularization | 4.781529 | 4.806951 |
 
-相位改善 1.55%，原始波形改善约 0.016%，高频误差回升约 0.905%，新版 total 回升约 0.203%。这不能称为整体改进，也不足以决定长期续训或默认替换。
+Phase improved by 1.55%, waveform improved by ~0.016%, high-frequency error increased by ~0.905%, and new total increased by ~0.203%. This is not a holistic improvement and is insufficient to justify long-term continuation or default replacement.
 
-同一批候选验证音频进一步通过真实 Rust 流处理：按固定哈希选出 89 行、80 个录音，覆盖 896 行固定验证集中的所有录音、音乐品类、角色和 corpus/codec/rate 组合。它是开发验证，不能称为独立测试集或全量发布评测。父权重和续训权重使用同一个 Rust 二进制：
+A further evaluation of the audio from this batch was processed through a real Rust stream: 89 rows, 80 recordings were selected by fixed hash, covering all recordings, music genres, roles, and corpus/codec/rate combinations in the 896-row fixed validation set. This is a development validation and not an independent test set or full-scale release evaluation. Both parent and continuation weights used the same Rust binary:
 
-| 部署指标 | 父权重 | 续训 | 配对变化及录音聚类 95% CI |
+| Deployment Metric | Parent Weight | Continuation | Paired Change & Audio Clustering 95% CI |
 |---|---:|---:|---|
-| SI-SDR dB（越大越好） | 28.2614 | 28.2813 | +0.0199 [0.0085, 0.0353] |
-| 高频 LSD dB（越小越好） | 20.2975 | 20.5187 | +0.2212 [0.1109, 0.3464] |
-| 低频保留 LSD dB（越小越好） | 3.9401 | 3.8501 | -0.0900 [-0.1338, -0.0532] |
+| SI-SDR (dB, higher is better) | 28.2614 | 28.2813 | +0.0199 [0.0085, 0.0353] |
+| High-frequency LSD (dB, lower is better) | 20.2975 | 20.5187 | +0.2212 [0.1109, 0.3464] |
+| Low-frequency retention LSD (dB, lower is better) | 3.9401 | 3.8501 | -0.0900 [-0.1338, -0.0532] |
 
-相对压缩输入，续训 SI-SDR 仍降低约 0.426 dB，不能把对父模型的小幅提升描述成已改善整体波形保真。LSD 对弱能量频点敏感，仍须配合能量/残差度量与盲听。候选所有输出有限，最大峰值不超过 0.95，两种分块模式与离线输出逐样本一致。
+Relative to compressed input, the continuation shows a ~0.426 dB reduction in SI-SDR, so the small gain over the parent cannot be described as improved overall waveform fidelity. LSD is sensitive to weak energy bands and must be paired with energy/residual metrics and blind listening. All candidate outputs are bounded, with peak values not exceeding 0.95. Both chunking modes and offline outputs match sample-by-sample.
 
-此覆盖诊断包含音乐 33 行/26 个录音、语音 56 行/54 个录音；总体均值不是训练抽样比例或预期播放素材比例。音乐和语音分别报告，避免语音占比较高的覆盖集合掩盖音乐问题：
+This coverage includes 33 music rows / 26 recordings and 56 speech rows / 54 recordings. The overall mean does not reflect training sample proportions or expected playback content distribution. Music and speech are reported separately to avoid masking issues in one domain by a high speech proportion:
 
-| 配对变化（续训减父模型） | 音乐 | 语音 |
+| Paired Change (continuation minus parent) | Music | Speech |
 |---|---:|---:|
 | SI-SDR dB | +0.0398 [0.0140, 0.0738] | +0.0082 [0.0024, 0.0160] |
-| 高频 LSD dB | +0.1386 [-0.1282, 0.4406] | +0.2699 [0.1760, 0.3613] |
-| 高频能量误差 dB | +0.2018 [0.0214, 0.3718] | -0.0003 [-0.0641, 0.0509] |
+| High-frequency LSD (dB) | +0.1386 [-0.1282, 0.4406] | +0.2699 [0.1760, 0.3613] |
+| High-frequency energy error (dB) | +0.2018 [0.0214, 0.3718] | -0.0003 [-0.0641, 0.0509] |
 
-音乐的波形收益较小，高频能量误差反而上升，是不提升为默认权重的另一项依据。
+Music shows minimal waveform benefit, with a rise in high-frequency energy error—another reason not to promote this as a default weight.
 
-续训 ONNX 为 3.16 MiB，SHA-256 `55475b40e9a47c1a55c4802c979414fc3a4e7bd147685abd6b27b2cf4ada2fd4`，13 个 PyTorch/ORT/Rust 一致性案例通过。**保留原 epoch168 为基线，续训权重仅作实验候选。** Objective v2 的尺度和样本权重修正有实测依据，具体权重与长期效果尚未证实最优；8 轮也不足以分离 GAN、优化器重置、BatchNorm 状态变化的作用。后续应先做单因素对照及部署相位/带宽误差分析。
+The continuation ONNX is 3.16 MiB, SHA-256 `55475b40e9a47c1a55c4802c979414fc3a4e7bd147685abd6b27b2cf4ada2fd4`, and 13 PyTorch/ORT/Rust consistency cases passed. **The original epoch168 is retained as baseline; the continuation weights are only considered experimental candidates.** The scale and per-sample weighting adjustments in Objective v2 have empirical justification, but specific weights and long-term performance have not been proven optimal. 8 epochs are insufficient to disentangle the effects of GAN components, optimizer resets, and BatchNorm state changes. Future work should first conduct single-factor controls and deployment phase/bandwidth error analysis.
 
-## 输出安全与调度对照
+## Output Safety and Scheduling Comparison
 
-原串行/离线处理的干声旁路未限幅，可能原样输出解码后的过幅 PCM。串行处理器现在对干声与增强路径各限幅一次后再交叉渐变，最终做严格峰值保护，不对已限幅的增强路径新增一次软限幅；异步安全混合器仍保留自身的最终限幅。低于软限幅起点（默认 0.855）的旁路保持逐位一致，较高峰值会被软限幅，即使没有超过 1.0。单/双声道过幅输入及任意分块与离线输出的一致性回归通过，实时回调零分配与故障回退测试通过。
+The original serial/offline dry path had no gain limiting, potentially outputting unclipped PCM after decoding. The current serial processor now applies gain limiting once to both dry and enhancement paths before cross-fading, and enforces strict peak protection—no additional soft limiting is applied to already-limited enhancement paths. The asynchronous safety mixer retains its own final limiting. Paths below the soft limit threshold (default 0.855) remain bit-identical; peak excursions are soft-limited even if they do not exceed 1.0. Single/dual-channel over-amplitude input and consistency with offline output are verified. Real-time callback zero-allocation and fault fallback tests pass.
 
-工作线程试验保留原固定 256 帧延迟，不增加队列或缓冲，不从回调发 OS 唤醒信号。所有计时均在训练/梯度审计结束后串行进行，使用同一哈希绑定的音乐 PCM；生产者是宿主时钟模拟，不使用实际声卡。
+Work thread experiments retained the original fixed 256-frame latency, without adding queue or buffer, and does not trigger OS wake-up signals from callbacks. All timing measurements were performed serially after training and gradient audits, using the same hash-bound music PCM; the producer is a host clock simulation, not actual audio hardware.
 
-- 候选 A：提前 300 微秒唤醒、50 微秒轮询、原生实时线程最多 75 微秒自旋。双声道改善，但单声道及 48 kHz 条件未全部通过，不采用。
-- 采用的候选 B：提前 500 微秒唤醒、50 微秒轮询，原生实时线程继续禁用闲置自旋；普通线程维持最多 200 微秒自旋。两个父权重双声道单独 30 秒对照中，迟到从 17/21 次降至 0/0 次。
-- 再按每种条件 30 秒完整复测父权重，迟到为 13/1/2/2 次（44.1 mono、44.1 stereo、48 mono、48 stereo），分别为 0.126%/0.0097%/0.0178%/0.0178%。**44.1 kHz 单声道仍超过 0.1% 门槛，不能将整组标为合格。** 不能拼接不同试验中较好的条件来制造一次全通过。
-- 续训权重在候选 B 上的完整四条件短测为 9/1/3/0 次，均满足短测门槛，但该权重未通过上述整体质量比较，不能据此替换父权重。
+- **Candidate A**: Wakes 300 microseconds early, 50 microseconds polling, native real-time thread spins up to 75 microseconds. Stereo improvement observed, but mono and 48 kHz conditions not fully passed—rejected.
+- **Candidate B adopted**: Wakes 500 microseconds early, 50 microseconds polling, native real-time thread continues to disable idle spinning; regular thread maintains at most 200 microseconds spin. In 30-second separate tests, the parent weights showed 0/0 late deliveries (stereo and mono), down from 17/21 in prior tests.
+- Repeated 30-second full tests on parent weights: 13/1/2/2 (44.1 mono, 44.1 stereo, 48 mono, 48 stereo), at 0.126%/0.0097%/0.0178%/0.0178% respectively. **44.1 kHz mono still exceeds the 0.1% threshold and cannot be declared acceptable as a whole.** Combining better conditions from different tests to create a single pass is not permitted.
+- The continuation weight passed 9/1/3/0 on the full four conditions in short test, meeting all short-term thresholds, but this weight failed the overall quality comparison and cannot be used to replace the parent.
 
-父权重复测的软件延迟预算（固定延迟加回调最大耗时）为 5.827/5.827/5.424/5.360 ms，callback p99 为 4.458/4.292/5.166/4.291 微秒。原生实时请求均被接受；没有输出数量错误、非有限值、排队溢出或回调超期，峰值保持在限幅范围内。最坏连续迟到为一 hop，干声回退保持时间轴和输出连续。请求被接受不代表 OS 此后从不降级线程。
+Parent weight retested software latency budget (fixed latency plus max callback overhead) was 5.827/5.827/5.424/5.360 ms, callback p99 at 4.458/4.292/5.166/4.291 microseconds. All native real-time requests were accepted; no output errors, non-finite values, queue overflow, or callback overruns occurred, and peak values remained within limits. The worst-case consecutive delay was one hop, and the dry path backfill maintained temporal continuity and output continuity. Request acceptance does not imply the OS will never downgrade the thread.
 
-这些是开发机短诊断，尚未完成 30 分钟墙钟/真实声卡、x86_64、盲听和电源模式核查。保留延迟/连续性与增强可用性的独立门槛；单声道边界及宿主调度波动仍须优化和长期验证。
+These are development machine diagnostics and have not undergone 30-minute wall-clock, real audio card, x86_64, blind listening, or power mode validation. Latency, continuity, and enhancement availability remain independent thresholds; mono edge cases and host scheduler jitter require further optimization and long-term validation.
 
-## 模型资源对照
+## Model Resource Comparison
 
-同一 Apple M5 Max、CPU ORT 单线程、256 hop 预热、每个条件 10 秒墙钟、串行测量，两份模型均为 806,276 参数、3,309,786 字节（3.16 MiB）。下面是同步完整处理耗时，不是异步适配器的新增延迟：
+On the same Apple M5 Max, CPU ORT single-thread, 256 hop pre-warmup, 10-second wall-clock per condition, serial measurement, both models have 806,276 parameters and 3,309,786 bytes (3.16 MiB). Below are synchronized full-processing times, not asynchronous adapter overhead:
 
-| 条件 | 父/续训处理 p99 毫秒 | 父/续训 RTF（单核心时间预算） |
+| Condition | Parent/Continuation p99 (ms) | Parent/Continuation RTF (single-core time budget) |
 |---|---:|---:|
 | 44.1 kHz mono | 0.552 / 0.542 | 0.1766 / 0.1758 |
 | 44.1 kHz stereo | 1.025 / 1.073 | 0.3358 / 0.3364 |
 | 48 kHz mono | 0.541 / 0.541 | 0.1922 / 0.1915 |
 | 48 kHz stereo | 1.020 / 1.018 | 0.3650 / 0.3648 |
 
-两组同步测量均没有处理 deadline miss 或非有限输出；`/usr/bin/time -l` 的峰值 RSS 分别为 40,878,080 / 40,845,312 字节（约 39 MiB）。这不能视为证明资源差异有统计意义，只说明未观察到明显额外成本。父模型的异步四条件完整复测总计 120.16 秒墙钟、58.66 秒 user、1.68 秒 sys，约 0.50 个核心平均 CPU，峰值 RSS 为 38,109,184 字节（36.34 MiB）；该 CPU 包含生产者与宿主测试框架，不能当成纯模型开销。
+No deadline misses or non-finite outputs were observed. `/usr/bin/time -l` peak RSS was 40,878,080 / 40,845,312 bytes (~39 MiB). This does not indicate statistically significant resource differences—only that no additional cost was observed. The parent model's full asynchronous four-condition test took 120.16 seconds wall-clock, 58.66 seconds user, 1.68 seconds system, averaging ~0.50 core CPU, peak RSS 38,109,184 bytes (~36.34 MiB); this CPU includes both producer and host test framework and cannot be considered pure model overhead.
 
-同步 bench 的退出码 2 由明确的 `diagnostic_run`、未记录电源模式和不足发布持续时间引起，未被改写成正式发布通过。原始计时、资源收据、模型哈希和每条件报告保存在本地 `data/reports/objective-audit-20261010/`。
+Synchronization benchmark exit code 2 was due to `diagnostic_run`, unrecorded power mode, and insufficient release duration—this was not rewritten as a formal release pass. Original timing, resource receipts, model hashes, and per-condition reports are preserved locally in `data/reports/objective-audit-20261010/`.
 
-## 来源记录修复
+## Source Receipt Fix
 
-本次审计还发现原训练的 checkpoint 中 `source_git_sha` 为 `dd0d15ab`，实际冻结源码收据为 `abe0e497`：归档目录位于主仓库内部，旧实现调用 Git 时会向上读到随后变化的主仓库 HEAD。逐个比较原归档的 106 个受版本控制的训练文件与 `abe0e497` 的 Git archive，差异为零。
+This audit also uncovered that the original training checkpoint had `source_git_sha` as `dd0d15ab`, while the actual frozen source code receipt was `abe0e497`: the archive directory was nested within the main repository, and the old implementation would read up to a changed main repository HEAD. A point-by-point comparison of 106 version-controlled training files in the original archive against `abe0e497` Git archive showed zero differences.
 
-保留原 checkpoint 和 ONNX 的原始字节、哈希，明确区分旧元数据的声明与实际冻结版本。现在归档运行从其 `source-receipt.json` 读取完整冻结版本并记录收据哈希；没有收据的归档不再声称主仓库版本。独立 Git worktree 则读取自己的 HEAD。本次续训使用后一种方式，checkpoint 已确认绑定 `b4ed52c`。
+The original checkpoint and ONNX are preserved in raw bytes and hashes, with clear distinction between declared metadata and actual frozen versions. Now, archives read the full frozen version from `source-receipt.json` and record the receipt hash; archives without receipts no longer claim the main repository version. Independent Git worktrees read their own HEAD. This continuation uses the latter approach, and the checkpoint has been verified to bind to `b4ed52c`.
 
-## 后续目标与实验
+## Next Steps and Experiments
 
-后续已明确以高频频谱 inpainting 和模型加 DSP 后接近原始无损音频为目标。
-新版 Objective v3 的公式与处理代理边界见[目标设计](inpainting-objective.md)，
-训练、实际 Rust 对照、资源及连续输出的最新结果见[后续实验](optimization-followup-20261010.md)。
-本页旧版 loss 的历史数值保持原口径，不与新版总分直接比较。
+Future work is now focused on high-frequency spectral inpainting and model addition of DSP to approach original lossless audio. The new Objective v3 formula and processing proxy boundaries are detailed in [Objective Design](inpainting-objective.md). Training, actual Rust comparison, resource, and continuous output results are detailed in [Follow-up Experiment](optimization-followup-20261010.md). Historical values of the old loss remain unchanged in this document and are not directly comparable to the new total.

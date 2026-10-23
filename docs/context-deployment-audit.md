@@ -1,141 +1,211 @@
-# P25：真实推理前端、预算路径与训练覆盖审计
+# P25: Realistic Inference Frontend, Budget Pathways, and Training Coverage Audit
 
-本轮接续 [P24 完整验证](generation-budget-study.md)，先定位误差和部署成本，
-不选择中途最好端点、不替换默认权重、不重新解释已失败的历史检查。
+Historical protocol and results. See [research status](research.md) and the
+[failure registry](failed-experiments.md) for current decisions; translation does
+not turn reused validation into an independent test or update old acceptance limits.
 
-## 已确认的训练覆盖限制
+This round builds upon [P24 Full Validation](generation-budget-study.md), focusing first on error localization and deployment cost analysis. No intermediate best endpoints are selected, default weights are not replaced, and historical failure checks are not reinterpreted.
 
-P24 的 2,088 个裁剪不是完整曲库：音乐为 253 个配对行，每行 8 个位置；
-语音为 8 个配对行，每行 8 个位置。每首被选音乐只有一个编码版本、一个声道
-视图、一个约 3 秒的源片段。虽然整个池包含 9 个编码配置，却不意味着每首歌都
-参与了多种编码训练。
+---
 
-按源文件、声道视图、原生采样率合并实际监督区间，去掉 89 hop 预热/边界以及
-重叠后，音乐为 **482.328 秒（8.04 分钟）**，语音为 **15.949 秒**。
-paired 与 identity 共享参考时段，不能把它们算成两份独立音频。该数字是单声道
-监督区间的并集，不是素材库总长，也不等于各轮重复曝光的总时长。
+## Confirmed Limitations in Training Coverage
 
-现有训练清单中实际已有 71,327 条音乐配对行、253 个录音，以及 13,896 条语音
-配对行、193 个录音，均覆盖 9 种编码配置。P24 没有使用全部这些行。
-这说明下一轮必须明确区分有限池拟合与广覆盖训练；当前证据提示泛化风险，
-尚不能单靠覆盖统计证明扩大抽样后一定改善。
+P24’s 2,088 cropped segments do not represent a complete music corpus:
+- Music: 253 paired rows, 8 positions per row
+- Speech: 8 paired rows, 8 positions per row
 
-可复算入口为 `training/scripts/audit_crop_coverage.py`。证据保存在
-`data/runs/context-deployment-p25-20261017-v3/crop-coverage.json`，绑定原登记和脚本哈希。
+Each song has only one encoding version, one channel view, and a source snippet of approximately 3 seconds. Although the full pool includes 9 encoding configurations, this does not imply that every song participated in multiple encoding training scenarios.
 
-## 真实 Rust 输入到输出
+By merging actual supervised intervals by source file, channel view, and native sample rate, and excluding 89-hop warmup/boundary regions and overlap, we obtain:
+- **482.328 seconds (8.04 minutes)** of music supervision
+- **15.949 seconds** of speech supervision
 
-新增 `soundex-context-replay`，显式接受实验性四输入 ONNX，正式模型加载协议不变。
-这条路径连续执行：生产短窗分析/带宽检测、Rust 因果 1024/2048 长窗上下文、单线程
-CPU ORT，以及生产频带融合/相位处理/OLA/限幅/声道共享门控。
-它使用生产 `ChannelProcessor` 和 `GateMixer`，没有复制一个简化版 DSP 来替代。
+Paired and identity reference intervals are shared, so they are not counted as separate audio segments. This total represents the union of mono-channel supervised intervals—not the total length of the media library, nor the sum of all repeated exposures across rounds.
 
-每个物理声道独立保存历史；静音和 bypass 也执行模型并更新状态。长窗每 4 hop
-更新一次并保持，仅读取过去和当前 PCM。首 80 hop 输出对齐的 dry。
-另一个必须保留的历史条件是：P24 输入缓存将前 **64 hop** 的 active 特征置零；
-它与 **80 hop** 模型预热并不相同。最初接入检查因没有复现这一约定停止，修正后
-重新登记完整复核，旧失败目录保留。
+The current training list includes:
+- 71,327 music paired rows, 253 recordings
+- 13,896 speech paired rows, 193 recordings
+All cover 9 encoding configurations. P24 did not utilize all of these rows.
 
-本轮固定复核四配置、两种子的全部 16,192 步最终端点，89 个开发配对的两个角色，
-共 1,424 次完整推理回放。监督区间仍为 `[89*128, 32768-128)`。所有录音已经用于
-开发，仍称开发复核。报告逐项保留检测条件、上下文差异、同输入 ORT/训练实现的
-复频谱差异、同观察谱合成误差、相对原始 clean/恒等 DSP/旧代理的绝对 PCM 误差。
-同观察谱合成一致性继续使用 `2e-5`，不放宽历史阈值。
+This indicates that the next iteration must explicitly distinguish between **limited-pool fitting** and **broad-coverage training**. Current evidence suggests generalization risks, and coverage statistics alone cannot prove that expanded sampling will lead to performance improvement.
 
-1,424 个角色现已全部完成：检测条件最大差 **0**，长窗上下文最大相对 RMS 差
-`2.00472e-7`；同观察谱合成最大 PCM 差 `2.98023e-7`，无失败。
-完整前端切换相对旧训练代理的最大逐片段 RMS 差为 `0.00011284`，保留而不掩盖。
-音乐最终端点两种子平均的原始 clean 波形 RMS 误差，control/balanced/budget/joint
-分别为 `0.01251827 / 0.01262628 / 0.01254735 / 0.01260773`，与 P24 结论一致。
-完整推理路径没有消除原音误增强，也没有让候选整体超越未处理压缩输入。
+Reproducible entry point: `training/scripts/audit_crop_coverage.py`
+Evidence saved in: `data/runs/context-deployment-p25-20261017-v3/crop-coverage.json`, tied to original registration and script hash.
 
-质量复核目录：`data/runs/context-deployment-p25-20261017-v3/audit/`。
-它是完整计算链的离线回放，仍不包括生产实时队列、丢帧回退、设备回调或盲听。
-固定实时缓冲仍是 256 帧；离线合成本身的 128 帧延迟不得冒充适配器总延迟。
+---
 
-## 生成预算没有约束全部残差
+## Realistic Rust Input-to-Output Path
 
-对全部 budget/joint 开发角色做同一消融：冻结模型和其他处理，把生成预算设为零，
-只用它分析结构。该消融读取不到真实音质判断，不能当成可部署的拒绝增强策略。
+A new path, `soundex-context-replay`, is introduced, explicitly accepting experimental four-input ONNX. The formal model loading protocol remains unchanged. This path executes in sequence:
+- Production short-window analysis and bandwidth detection
+- Rust causal 1024/2048-long window context
+- Single-threaded CPU ORT execution
+- Production spectral fusion, phase processing, OLA, clipping, and channel sharing gating
 
-P24 的残差单位为 `scale * sqrt(local_power + budget²)`；预算为零时，
-`scale * sqrt(local_power)` 仍然允许修改已有频点。在主要 identity 反例索引 33：
+It uses the production `ChannelProcessor` and `GateMixer`, without introducing a simplified DSP version as a substitute.
 
-| 种子 | 原完整 Rust 额外扰动 RMS | 预算归零后的代理额外扰动 RMS |
+Each physical channel maintains its own history; silence and bypass paths also execute the model and update state. Long windows update every 4 hops and retain only past and current PCM. The first 80 hops of output are aligned with the dry signal.
+
+A critical historical condition is preserved: P24’s input cache zeroed the active features from the first **64 hops**. This is distinct from the **80-hop model warmup**. The initial access check failed due to failure to reproduce this convention. After correction, a full recheck was performed, and the old failure directory is retained.
+
+In this round, all 16,192 endpoints for four configurations and two seeds were fixed and fully replayed, along with 89 development pairs across two roles, totaling **1,424 full inference replays**. The supervision interval remains `[89*128, 32768-128)`. All recordings were used in development and remain labeled as development rechecks.
+
+Per-item reports retain:
+- Detection conditions
+- Context differences
+- Spectral differences between ORT/training implementation
+- Synthesis error against observed spectra
+- Absolute PCM error relative to clean/original and identity DSP/old proxy
+
+The observed-spectrum consistency threshold remains at `2e-5`, unchanged from historical standards.
+
+All 1,424 roles are now complete:
+- Maximum detection difference: **0**
+- Maximum relative RMS difference in long-window context: `2.00472e-7`
+- Maximum PCM difference in observed-spectrum synthesis: `2.98023e-7`
+- No failures
+
+The full frontend’s maximum per-fragment RMS difference relative to the old training proxy is `0.00011284`, preserved and not masked.
+
+Average RMS error of original clean waveform for music final endpoints across two seeds:
+- **control**: `0.01251827`
+- **balanced**: `0.01262628`
+- **budget**: `0.01254735`
+- **joint**: `0.01260773`
+
+These values are consistent with P24 results.
+
+The full inference pipeline does not eliminate mis-enhancement of the original signal, nor does it cause any candidate to outperform the unprocessed compressed input.
+
+Quality recheck directory: `data/runs/context-deployment-p25-20261017-v3/audit/`
+This is an offline replay of the full computation chain and does not include production real-time queues, frame drop recovery, device callbacks, or blind listening.
+The fixed real-time buffer remains at **256 frames**; the 128-frame delay inherent in offline stitching must not be misrepresented as total adapter latency.
+
+---
+
+## Budget Does Not Constrain All Residuals
+
+For all `budget` and `joint` development roles, we performed a common ablation:
+- Freeze the model and all downstream processing
+- Set the generation budget to zero
+- Analyze only structural behavior
+
+This ablation cannot produce real-world audio quality judgments and cannot be considered a viable deployment-level rejection enhancement strategy.
+
+P24 defined residual magnitude as:
+`scale * sqrt(local_power + budget²)`
+
+When budget is zero, the residual becomes:
+`scale * sqrt(local_power)` — which still allows modification of existing frequency bins.
+
+In key identity counterexamples, index 33:
+
+| Seed | Full Rust Extra Perturbation RMS (original) | After Zero Budget (proxy) |
 | --- | ---: | ---: |
 | 20261012 | 0.00245088 | 0.00035585 |
 | 20261013 | 0.00232160 | 0.00042886 |
 
-原模型在同一案例的完整前端切换误差只有约 `1.62e-6 / 1.27e-6` RMS，明显小于原音
-扰动。前端差异真实存在，但不能用它解释这两项主要误增强。索引 83 的预算归零
-残余也非零。保留所有案例，不针对这些录音添加阈值。
+The original model’s full frontend switch error in this case was only about `1.62e-6 / 1.27e-6` RMS — significantly smaller than the original audio perturbation. The frontend difference is real, but it does not explain the observed residual enhancement in these two cases. Index 83 also shows non-zero residual after zero budget. All cases are retained; no thresholds are added for these recordings.
 
-新增可选 `budget_scope="residual"`，使用
-`scale * sqrt(local_power + 1) * budget`，把完整残差纳入连续预算。
-预算为 1 时与旧结构相同，为 0 时是严格恒等；缺失频带仍能依靠全频 scale 生成。
-没有新增参数，也没有把预算解释成概率或可闻性阈值。旧检查点默认继续使用
-`budget_scope="global"`，既有结果不变。
+A new optional `budget_scope="residual"` is introduced, using:
+`scale * sqrt(local_power + 1) * budget`
 
-该候选已验证零预算、完全缺失频点可表达性、弱能量有限梯度、有限差分以及非零
-ONNX 单步/状态/reset 一致性。P25 时它尚未训练；后续 [P26](broad-budget-study.md)
-已完成训练及复核，仍未取得整体恢复收益。
-预算预测本身仍会在未见干净音频上出错；修正作用范围不能代替广覆盖训练和泛化验证。
+This incorporates the full residual into the continuous budget.
+- When budget = 1, behavior matches the old structure
+- When budget = 0, behavior is strictly identity
+- Missing bands can still be generated via full-band scale
 
-## 成本测试与下一轮训练
+No new parameters are introduced, and the budget is not interpreted as a probability or perceptual threshold. The old checkpoint continues to default to `budget_scope="global"`, preserving prior results.
 
-计时独立于质量审计，等待审计结束后再串行启动，避免两个任务相互争用 CPU。
-八个固定最终端点均测 44.1/48 kHz、mono/stereo，每项 100 个预热 hop + 10,000 个
-测量 hop；48 kHz stereo 再测两轮，改变模型执行顺序。另对 control/budget 两种子
-做固定到达时钟的 paced 测量。合计 52 个独立进程；绑定模型、二进制与执行脚本哈希。
+This candidate has been verified for:
+- Zero budget
+- Full expressiveness under missing frequency bands
+- Finite gradient under weak energy
+- Finite difference behavior
+- ONNX single-step and state/reset consistency
 
-记录前端/ORT/DSP/总计算分布、>=5 ms 次数、逐 hop 超时、虚拟积压、paced 完成
-迟到、进程 CPU 和峰值 RSS。使用与生产相同的 macOS USER_INITIATED QoS 请求，
-明确记录是否成功；不冒充生产 worker 的 time-constraint 调度或设备测试。
-计时输入是固定合成多音及包络变化，只用于成本，不用于音质评价。
-证据目录：`data/runs/context-cost-p25-20261017-v2/`。
+However, this structure was not trained during P25. It was fully trained and rechecked in [P26](broad-budget-study.md), yet still failed to achieve overall recovery gains.
 
-52 项现已全部完成并复核原始计时文件哈希，合计 **520,000 个测量 hop**，另有
-5,200 个预热 hop。所有 QoS 请求成功，输出有限，合成测试最大峰值约 0.27617。
-这些完整性结果不代替真实音乐的爆音、声像或设备连续性验证。
+The budget predictor itself still errs on unseen clean audio; its correction range cannot replace broad coverage training or generalization validation.
 
-48 kHz stereo 的三轮、两个种子（每配置 60,000 测量 hop），完整模型 + DSP 计算结果：
+---
 
-| 配置 | 六次 p99 范围 ms | 最大 ms | >=5 ms 次数 | 单次计算超过 hop | 含虚拟积压的超时 |
+## Cost Testing and Next-Phase Training
+
+Timing is independent of quality auditing and is initiated only after audit completion to avoid CPU contention.
+
+Eight fixed final endpoints were tested at 44.1/48 kHz, mono/stereo. Each test includes:
+- 100 pre-warmup hops + 10,000 measurement hops
+- 48 kHz stereo tested twice, with model execution order varied
+
+Additionally, paced measurements were conducted for control and budget seeds, with fixed arrival clocks. Total: **52 independent processes**, each bound by model, binary, and execution script hash.
+
+Metrics recorded:
+- Frontend / ORT / DSP / total compute distribution
+- Count of ≥5 ms events
+- Per-hop timeout counts
+- Virtual backlog
+- Paced completion lateness
+- Process CPU and peak RSS
+
+All tests used the same macOS `USER_INITIATED` QoS request as production, with explicit success logging. No claims are made about production worker time-constrained scheduling or device-level testing.
+Input is fixed synthetic multi-voice and envelope variation, used solely for cost evaluation, not for quality assessment.
+
+Evidence stored in: `data/runs/context-cost-p25-20261017-v2/`
+
+All 52 entries are now complete and have undergone hash verification of original timing files. Total: **520,000 measurement hops**, plus **5,200 pre-warmup hops**. All QoS requests succeeded. Output is bounded, with peak synthesis amplitude of approximately **0.27617**.
+
+These results do not constitute validation of real music audio—no evidence of burst noise, imaging, or device continuity is provided.
+
+For 48 kHz stereo, three runs (two seeds, 60,000 measurement hops per configuration):
+
+| Configuration | 6x p99 range (ms) | Max (ms) | ≥5 ms count | Single-hop over | Timeout (with virtual backlog) |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | control | 1.834–3.622 | 23.772 | 34 | 1,255 | 2,195 |
 | balanced | 1.903–2.566 | 24.662 | 16 | 248 | 486 |
 | budget | 1.566–3.469 | 9.989 | 25 | 1,180 | 2,020 |
 | joint | 1.901–2.573 | 10.223 | 7 | 216 | 349 |
 
-这组双声道进程峰值 RSS 为 **82.7–84.7 MiB**，含模型加载的进程峰值，不是增量内存。
-不节拍运行时，进程 CPU 时间／进程墙钟时间约为单核的 94–97%（包含加载和预热）。
-这些测量均值/p99 有余量，但观测尖峰和 hop 超时未达连续处理要求，不能宣布稳定
-满足模型 + DSP <5 ms。虚拟积压计数不是声卡 xrun，不能用它代替真实回调可用率。
+Peak RSS for these dual-channel processes: **82.7–84.7 MiB**, including model load overhead—this is not incremental memory.
 
-固定时钟的 48 kHz stereo 测量各 10,000 hop：budget 两种子分别有 **529 / 382**
-次完成迟到，最大迟到 **4.934 / 10.325 ms**；control 为 **610 / 134** 次，最大
-**2.568 / 2.349 ms**。这包含睡眠唤醒及调度，不是单次模型计算时长。budget 的
-对应单次计算 p99 为 **3.178 / 2.996 ms**、最大 **5.945 / 5.400 ms**。
-四次 paced 进程 CPU 占用约为一个核心的 52–58%，峰值 RSS 约 84.0–84.8 MiB。
-该节拍器持续处理所有输入；生产 worker 的过期丢弃、状态重置和对齐 dry 回退尚未
-纳入此项测量，不能把这里的迟到率直接当成播放掉音率或增强可用率。
+Without rhythmic pacing, process CPU time / wall-clock time is approximately **94–97% of single-core** (including load and warmup).
 
-自有质量审计与测试已结束后才计时，但主机并非空闲隔离环境：期间存在其他 GUI
-应用及编译进程，负载快照与各次 load average 保存在本地报告。所有配置都出现
-尾部变化，不能仅据这些最大值断言预算分支固有地更慢；也不能删除尖峰来声称合格。
-后续应测接入真实队列、失败回退和音频线程调度后的 worker，并取得设备连续性证据。
+While mean and p99 values show room for improvement, the observed spikes and hop-level timeouts do not meet continuous processing requirements. They do not justify declaring stable sub-5ms performance for model + DSP. Virtual backlog counts are not equivalent to audio device xruns and cannot be used as a proxy for real callback availability.
 
-下一轮应把“数据覆盖”和“预算作用范围”作为独立因素：保持两个种子、充分且相同
-的训练预算、共同目标与固定最终端点，对照有限池/广覆盖和 global/residual 两种
-结构。广覆盖须按录音抽样多个源位置、编码及声道视图，保留既定 corpus 比例；
-排除留出录音和保护区间，报告实际曝光，不能只增加相同裁剪的重复次数。
-P25 本轮没有启动新训练；后续 [P26](broad-budget-study.md) 已完成新抽样器、隔离测试
-和完整对照登记，并于 2026-10-18 完成训练及验证；结果见 P26 报告，仍无合格新权重。
+For paced 48 kHz stereo, 10,000 hops per run:
+- **Budget** seeds had **529 / 382** late completions, max lateness **4.934 / 10.325 ms**
+- **Control** had **610 / 134** late completions, max **2.568 / 2.349 ms**
 
-新结构、训练前端与真实输出链仍须统一评价。降低 identity 扰动不等于恢复成功，
-高频谱形/能量/瞬态、原始波形、保留频带、立体声、跨录音与盲听仍分别保留。
+These include sleep/wake and scheduling overhead, not per-model computation time.
+Budget’s per-hop p99: **3.178 / 2.996 ms**, max **5.945 / 5.400 ms**
+Four paced runs averaged ~52–58% CPU usage, peak RSS ~84.0–84.8 MiB.
 
-验证：541 项 Python 测试通过；新增计时报告 JSON 序列化回归检查通过；Rust workspace
-127 项测试通过、1 项既有测试忽略，Clippy、无默认 feature 检查、Ruff 与格式检查通过。
-代码提交 `207c23d` 的[远程 CI](https://github.com/backrunner/soundex/actions/runs/39018178680)
-亦已通过；真实设备与听感验收仍未完成。
+The pacing engine continuously processes all inputs. However, production worker timeout drops, state resets, and dry alignment backoffs are not included in this measurement. Thus, the lateness rate cannot be directly interpreted as playback dropout rate or enhancement availability.
+
+Timing was only initiated after quality audit completion, but the host was not in an isolated idle environment: background GUI applications and compilation jobs ran during the test. Load snapshots and per-run `load average` values are preserved in local reports. All configurations show tail behavior, so maximum values cannot be used to claim that the budget branch is inherently slower. Similarly, peak spikes cannot be suppressed to claim compliance.
+
+Next phase should treat **data coverage** and **budget scope** as independent variables:
+- Maintain two seeds
+- Use identical, sufficient, and consistent training budgets
+- Share the same objective and fixed final endpoints
+- Compare limited-pool vs. broad-coverage and `global` vs. `residual` structures
+
+Broad coverage must sample multiple source positions, encodings, and channel views, preserving the established corpus proportions.
+- Exclude held-out recordings and protected intervals
+- Report actual exposure, not just repeated cropping of the same segment
+
+P25 did not initiate new training. [P26](broad-budget-study.md) completed new sampling, isolation testing, and full comparative registration, finishing training and validation on **2026-10-18**. Results are detailed in the P26 report—**no new weights are deemed acceptable**.
+
+The new structure, training frontend, and real-world output chain must be evaluated as a unified system.
+Reducing identity perturbation does not equal success.
+High-frequency spectral shape, energy, transients, original waveform, preserved bands, stereo, cross-recording consistency, and blind listening remain essential and must be preserved.
+
+**Verification**:
+- 541 Python tests passed
+- New timing report JSON serialization regression checks passed
+- Rust workspace: 127 tests passed, 1 existing test skipped
+- Clippy, no-default-feature checks, Ruff, and formatting checks passed
+- CI remote run `207c23d` [passed](https://github.com/backrunner/soundex/actions/runs/39018178680)
+- Real device and perceptual validation remains pending.
+
+The music endpoint means in configuration order are `0.01251827 / 0.01262628 / 0.01254735 / 0.01260773`; these are final-output errors against original clean PCM, not added error against identity DSP.
