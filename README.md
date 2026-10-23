@@ -12,11 +12,11 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-[P40](docs/update-direction-audit.md) confirms that the recorded Adam update can
-lower total loss while worsening complex-spectrum and identity errors on the same
-training batch. Balanced gradient directions improve the local tradeoff but do not
-pass all fidelity checks. These are reversible diagnostics, not new restoration
-weights. The [CPU attribution run](docs/cpu-time-attribution.md) separates calling-
+[P41](docs/guarded-transfer-audit.md) adds simultaneous fidelity/dynamics constraints
+to the update direction. It improves the local tradeoff, but five metrics improve
+together on only 3/32 different-training-recording probes at the smaller radius.
+This does not establish a reliable transfer or restoration gain. These are
+reversible diagnostics, not new weights. The [CPU attribution run](docs/cpu-time-attribution.md) separates calling-
 thread CPU time, enclosing wall time and wakeup delays. Historical real-time failures
 remain open. Consult the [failure registry](docs/failed-experiments.md) before repeating
 a route. All maintained project documentation is in English.

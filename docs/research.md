@@ -1,6 +1,13 @@
 # Research status and experiment history
 
-Latest optimizer diagnosis: [P40 reversible update directions](update-direction-audit.md).
+Latest optimizer diagnosis: [P41 guarded transfer](guarded-transfer-audit.md).
+Simultaneous first-order constraints improve local joint descent from 16/32 to
+19/32 at radius 0.001, but different-training-recording transfer reaches only 3/32.
+Finite steps can violate locally certified guards; no consistent transfer benefit
+or new trained model is established. Multi-batch estimation and finite-step
+preservation remain prerequisites to a new matched small-model proposal.
+
+Previous optimizer diagnosis: [P40 reversible update directions](update-direction-audit.md).
 Actual Adam lowers total loss on every fixed training batch but often raises complex
 and identity errors. A balanced amplitude/complex direction improves the local
 tradeoff without passing all checks. No new training or promotion. The separate

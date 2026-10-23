@@ -7,8 +7,8 @@ seeds, metrics, counterexamples and local evidence paths. Raw local reports and
 frozen checkpoints remain available; they are not public training-data artifacts.
 
 The current default weights are unchanged. The latest completed training is P38;
-both detector-condition output paths failed their registered screen. P39 is a
-balanced-order timing diagnostic, not another training run.
+both detector-condition output paths failed their registered screen. P39–P41 are
+gradient, update-transfer and timing diagnostics, not further training runs.
 
 ## How to use this record
 
@@ -75,6 +75,7 @@ A positive submetric is retained even when the candidate is not qualified.
 | [P40: update directions](update-direction-audit.md) | Diagnostic / not qualified. Stored Adam lowers total loss on 32/32 local probes but worsens complex error on 26/32 and identity MR on 27/32. The full amplitude/complex bisector improves both at radius 0.001 but all five spectrum/fidelity checks on only 16/32; at 0.01, only 15/32. | Add identity/dynamics protection and different-draw transfer controls before a matched small-model training study; a local bisector is not a complete optimizer recipe. |
 | [P40: derivative control](update-direction-audit.md) | The first recomputed-warmup central slopes cannot validate the graph's detached-history derivative. A separate fixed-history check reduces discrepancies and agrees in sign, while retaining float32 cancellation counterexamples. A separate float64 probe reduces the largest mismatch from 32.3% to 0.0122%, without changing any loss. | Keep full warmed-model response distinct from graph finite differences; inspect precision without changing targets or deleting the original evidence. |
 | [P40: CPU attribution](cpu-time-attribution.md) | Diagnostic / not qualified. 160,000 hops have max 2.986 ms and no >=5 ms calls, but two service overruns and 97 paced delays. Among 72 probe-on late hops, 55 start after the deadline; CPU remains <=0.685 ms for those hops. Prior >=5 ms failures remain unexplained. | Measure actual worker/queue scheduling and fallback; do not infer a production fix or erase the historical tail from a passing compute run. |
+| [P41: guarded transfer](guarded-transfer-audit.md) | Diagnostic / not qualified. Simultaneous first-order guards improve local all-five descent to 19/32 at radius 0.001, but recording-disjoint training transfer reaches only 3/32; amplitude improves on 16/32 transfer batches. Fixed-history identity MR still increases on 9/32 finite steps. No new trained weights or architecture ceiling claim. | Test multi-batch gradient estimation and finite-step preservation with separately frozen transfer draws before a matched training proposal. Strict improvement counts are descriptive, not audibility or universal per-step acceptance thresholds. |
 
 ## Earlier routes and operational failures
 
@@ -96,6 +97,7 @@ A positive submetric is retained even when the candidate is not qualified.
 | [P33 coverage registration](broad-spectrum-study.md) | A training-only coverage calculator rejected validation rows before training. | Use role-aware coverage accounting; preserve the first attempt and identify v2 separately. |
 | [P38 sleep assertion](detector-condition-study.md) | Initial `caffeinate` assertion failed without blocking CPU training. After reboot the assertion worked and checkpoint continuity was verified. | Check process and assertion state separately; an assertion failure is neither a model-quality result nor proof training stopped. |
 | [P37 codec environment](fusion-boundary-audit.md) | System FFmpeg lacked x265; a process-local fallback supplied the required encoder. | Record the exact executable and codecs; do not claim the system installation was repaired. |
+| [P41 local regression environment](guarded-transfer-audit.md) | First full suite: 667 passes, two mono/stereo preprocessing failures from default FFmpeg 9.0.1 referencing missing x265 ABI 216. The installed FFmpeg-full 9.0.2 is used for the scoped follow-up; original logs remain. | Verify executable startup and required encoders before preprocessing. A process-local PATH does not repair global Homebrew links or authorize regenerating frozen pairs. |
 
 ## Evidence retention and future entries
 
