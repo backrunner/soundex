@@ -12,10 +12,11 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-[P38](docs/detector-condition-study.md) is training a matched small-model detector-condition
-control on CPU: two seeds, two arms, 16,192 steps each. The full preflight and 653 CPU
-tests passed. All endpoints will freeze before native/current and phase-only review.
-P36 also used CPU; the local Metal failure does not block this training route.
+[P38](docs/detector-condition-study.md) completed all four 16,192-step CPU trajectories
+and native reviews. Fixed detector conditions worsened music MR by 0.19–0.56% versus
+matched controls; removing magnitude fusion did not reverse this. Neither path passed
+the research screen. Across 280,000 timing hops, max compute was 5.411 ms, with two
+≥5 ms calls, 11 service overruns and 27 paced delays. No promotion or new training.
 
 [P37](docs/fusion-boundary-audit.md) completed 2,848 frozen-model native ablations.
 Removing magnitude fusion while retaining phase fusion reduced music MR error by

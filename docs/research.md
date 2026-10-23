@@ -1,10 +1,11 @@
 # Research status and experiment history
 
-Active training: [P38 detector-condition controls](detector-condition-study.md).
-Native versus fixed explicit cutoff/active, same 431,015-parameter model, two seeds,
-16,192 steps each. Full preflight and 653 CPU tests passed. Both output paths are
-fixed before training, and all endpoints freeze before evaluation. P36 was also a
-CPU experiment; the earlier claim that Metal failure blocked this route was incorrect.
+Latest completed training: [P38 detector-condition controls](detector-condition-study.md).
+All four 16,192-step CPU trajectories and native reviews completed. Fixing explicit
+cutoff/active worsened music MR by 0.19–0.56% against matched controls, already present
+in raw predictions; neither output path passed. Timing max was 5.411 ms, with two
+≥5 ms calls, 11 service overruns and 27 paced delays over 280,000 hops. No promotion
+or subsequent training. P36 also used CPU; Metal failure did not block this route.
 
 Latest completed diagnostic: [P37 fusion boundaries](fusion-boundary-audit.md).
 Frozen P36 weights, two seeds, eight interventions and 2,848 native replays on reused
@@ -12,7 +13,7 @@ validation. Removing magnitude fusion improves spectral/dynamics means slightly;
 identity and local-band regressions remain. 120,000 timing hops stayed below 5 ms
 with no hop overruns or paced delays. No promotion; subsequent CPU training is P38.
 
-Latest completed training: [P36 factorial attribution](risk-attribution-study.md),
+Previous completed training: [P36 factorial attribution](risk-attribution-study.md),
 following [P35 broad risk](broad-risk-study.md) and [P34 small risk](risk-balance-study.md).
 Both new P36 arms completed two 16,192-step seeds. Compression alone retains spectral
 gains, but dynamics/identity gates still fail. The subsequent
