@@ -1,6 +1,8 @@
 //! Experimental end-to-end CPU replay; not the realtime callback/device adapter.
 #[cfg(feature = "ort-backend")]
 mod audio_io;
+#[cfg(feature = "ort-backend")]
+mod diagnostic_timing;
 
 /// Diagnostic opt-in matching the worker's scheduling request. Always restore
 /// priority before filesystem writes; accepting a request is not device evidence.
@@ -73,6 +75,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = audio_io::read_audio(Path::new(&args[2]))?;
     let repeats: usize = args.get(5).map(|x| x.parse()).transpose()?.unwrap_or(1);
     let trace = args.get(6).map(String::as_str) == Some("trace");
+    let thread_cpu_requested = std::env::var("SOUNDEX_DIAGNOSTIC_THREAD_CPU").as_deref() == Ok("1");
+    let cpu_clock_calibration = if thread_cpu_requested {
+        diagnostic_timing::calibrate()?
+    } else {
+        Vec::new()
+    };
     let paced = std::env::var("SOUNDEX_DIAGNOSTIC_PACED").as_deref() == Ok("1");
     let qos_requested = std::env::var("SOUNDEX_DIAGNOSTIC_QOS").as_deref() == Ok("1");
     let time_constraint_requested =
@@ -108,6 +116,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut output = vec![0.0; input.samples.len()];
     let hops = input.frames as usize / 128 * repeats;
     let mut times = Vec::with_capacity(hops);
+    let mut cpu_timings = Vec::with_capacity(if thread_cpu_requested { hops } else { 0 });
+    let mut wake_lateness_ms = Vec::with_capacity(if paced && thread_cpu_requested {
+        hops
+    } else {
+        0
+    });
     let mut traces = Vec::new();
     let mut active_hops = 0;
     let period = Duration::from_secs_f64(128.0 / input.sample_rate as f64);
@@ -129,7 +143,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     std::thread::sleep(wait);
                 }
             }
+            if paced && thread_cpu_requested {
+                let arrival = started + period.mul_f64(times.len() as f64);
+                wake_lateness_ms.push(
+                    Instant::now()
+                        .saturating_duration_since(arrival)
+                        .as_secs_f64()
+                        * 1000.0,
+                );
+            }
+            let cpu_sample = thread_cpu_requested
+                .then(diagnostic_timing::Sample::start)
+                .transpose()?;
             times.push(stream.step(pcm, out)?);
+            if let Some(sample) = cpu_sample {
+                cpu_timings.push(sample.finish()?);
+            }
             active_hops += usize::from(stream.enhancing());
             if paced {
                 let deadline = started + period.mul_f64(times.len() as f64);
@@ -148,7 +177,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let wall_seconds = started.elapsed().as_secs_f64();
     drop(scheduling);
     let report = serde_json::json!({
-        "schema_version": 1, "scope": "experimental Rust frontend + CPU ORT + production DSP by default, with explicit optional diagnostic ablations; optional paced scheduling diagnostic; no realtime callback/transport/device qualification",
+        "schema_version": 2, "scope": "experimental Rust frontend + CPU ORT + production DSP by default, with explicit optional diagnostic ablations; optional paced scheduling diagnostic; no realtime callback/transport/device qualification",
         "fusion_ablation": fusion.as_str(), "condition_ablation": condition.as_str(),
         "sample_rate": input.sample_rate, "channels": input.channels,
         "hop_samples": 128, "lookahead_samples": 0, "dsp_delay_samples": 128,
@@ -159,6 +188,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "time_constraint_requested": time_constraint_requested,
         "time_constraint_applied": time_constraint_applied,
         "paced_finish_lateness_ms": paced_finish_lateness_ms,
+        "thread_cpu_requested": thread_cpu_requested,
+        "cpu_timing_columns": ["enclosing_wall_ms", "thread_cpu_ms", "wall_minus_thread_cpu_ms"],
+        "cpu_timings": cpu_timings, "cpu_clock_calibration": cpu_clock_calibration,
+        "wake_lateness_ms": wake_lateness_ms,
+        "cpu_clock_scope": "calling thread only; wall-minus-CPU includes blocking, descheduling and probe/resolution error; no overhead subtraction; no scheduler cause claim",
         "timings": times, "traces": traces, "output_is_last_repeat": true,
         "finite": output.iter().all(|x| x.is_finite()),
         "active_hops": active_hops, "inference_hops": times.len(),

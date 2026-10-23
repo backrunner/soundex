@@ -19,6 +19,8 @@ rtrb = "0.3"
 serde_json.workspace = true
 # Float64 inverse FFT in the standalone parity utility; already a DSP dependency.
 rustfft.workspace = true
+# Thread CPU clock in opt-in diagnostic replay (also used by benchmarks).
+libc.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Safe, thread-local USER_INITIATED QoS; no scheduler FFI in the audio adapter.
@@ -31,7 +33,6 @@ criterion.workspace = true
 approx.workspace = true
 serde.workspace = true
 sha2.workspace = true
-libc.workspace = true
 # WAV output for self-contained demos; already used by the CLI.
 hound.workspace = true
 
