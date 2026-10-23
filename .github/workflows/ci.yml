@@ -36,7 +36,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Install audio preprocessing dependency
-        timeout-minutes: 10
+        # The retained 2026-10-23 run needed 18m23s at 57 kB/s for 62.8 MB.
+        # Bound installation without aborting the observed slow successful path.
+        timeout-minutes: 30
         run: |
           if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
             sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update

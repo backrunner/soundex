@@ -154,6 +154,9 @@ The follow-up passes **669 tests**, using the existing functional FFmpeg 9.0.2 o
 in process-local PATH; existing ONNX/tracing and MPS warnings remain.
 see [environment guidance](../training/scripts/environment.md). Both test logs
 remain in the evidence directory. Ruff and all 119 English-documentation/link
-checks pass. The CI dependency-install step now has a ten-minute timeout and
+checks pass. The CI dependency-install step now has a thirty-minute timeout and
 reuses existing executable tools, then verifies both binaries start. The prior
 head's delayed CI run eventually completed successfully; it was not canceled.
+Its retained log shows 62.8 MB downloaded in 18m23s at 57.0 kB/s, rather than an
+installation deadlock. An initial ten-minute bound was corrected after those logs
+became available, so a slow but successful download is not mislabeled a failure.
