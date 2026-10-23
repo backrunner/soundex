@@ -55,6 +55,8 @@ jobs:
           cargo build --locked -p soundex-core --bin soundex-state-parity
           cargo build --locked -p soundex-core --bin soundex-gain-data --bin soundex-prediction-replay
           cargo build --locked -p soundex-core --bin soundex-context-replay
+      - name: Check English documentation and experiment index
+        run: python training/scripts/check_documentation.py
       - name: Lint Python
         working-directory: training
         run: |
