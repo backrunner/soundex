@@ -12,11 +12,11 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-[P41](docs/guarded-transfer-audit.md) adds simultaneous fidelity/dynamics constraints
-to the update direction. It improves the local tradeoff, but five metrics improve
-together on only 3/32 different-training-recording probes at the smaller radius.
-This does not establish a reliable transfer or restoration gain. These are
-reversible diagnostics, not new weights. The [CPU attribution run](docs/cpu-time-attribution.md) separates calling-
+[P43](docs/spectral-priority-update-audit.md) gives a positive spectrum-priority
+diagnostic: at fixed radius 0.001, amplitude improves on 28/32 reused-training
+transfer batches and MR on 29/32, versus 13/32 and 14/32 in the P42 control.
+Phase/dynamics/identity tradeoffs remain. These reversible probes are not new
+trained weights or quality qualification. The [CPU attribution run](docs/cpu-time-attribution.md) separates calling-
 thread CPU time, enclosing wall time and wakeup delays. Historical real-time failures
 remain open. Consult the [failure registry](docs/failed-experiments.md) before repeating
 a route. All maintained project documentation is in English.

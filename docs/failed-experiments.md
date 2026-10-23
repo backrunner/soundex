@@ -7,7 +7,7 @@ seeds, metrics, counterexamples and local evidence paths. Raw local reports and
 frozen checkpoints remain available; they are not public training-data artifacts.
 
 The current default weights are unchanged. The latest completed training is P38;
-both detector-condition output paths failed their registered screen. P39–P41 are
+both detector-condition output paths failed their registered screen. P39–P43 are
 gradient, update-transfer and timing diagnostics, not further training runs.
 
 ## How to use this record
@@ -76,6 +76,8 @@ A positive submetric is retained even when the candidate is not qualified.
 | [P40: derivative control](update-direction-audit.md) | The first recomputed-warmup central slopes cannot validate the graph's detached-history derivative. A separate fixed-history check reduces discrepancies and agrees in sign, while retaining float32 cancellation counterexamples. A separate float64 probe reduces the largest mismatch from 32.3% to 0.0122%, without changing any loss. | Keep full warmed-model response distinct from graph finite differences; inspect precision without changing targets or deleting the original evidence. |
 | [P40: CPU attribution](cpu-time-attribution.md) | Diagnostic / not qualified. 160,000 hops have max 2.986 ms and no >=5 ms calls, but two service overruns and 97 paced delays. Among 72 probe-on late hops, 55 start after the deadline; CPU remains <=0.685 ms for those hops. Prior >=5 ms failures remain unexplained. | Measure actual worker/queue scheduling and fallback; do not infer a production fix or erase the historical tail from a passing compute run. |
 | [P41: guarded transfer](guarded-transfer-audit.md) | Diagnostic / not qualified. Simultaneous first-order guards improve local all-five descent to 19/32 at radius 0.001, but recording-disjoint training transfer reaches only 3/32; amplitude improves on 16/32 transfer batches. Fixed-history identity MR still increases on 9/32 finite steps. No new trained weights or architecture ceiling claim. | Test multi-batch gradient estimation and finite-step preservation with separately frozen transfer draws before a matched training proposal. Strict improvement counts are descriptive, not audibility or universal per-step acceptance thresholds. |
+| [P42: pooled updates](pooled-update-audit.md) | Diagnostic / not qualified. Strict pooled guards accept only 2/32 updates. The fixed 0.1% policy accepts 17/32, but transfer amplitude improves on 4/17 and MR on 5/17, despite paired HF PCM RMS improving on 14/17. No-ops are reported separately. | Test spectrum-led directions rather than an equally normalized amplitude/complex bisector; retain phase/fidelity checks and all fixed-radius controls. Do not repeat unchanged pooling or shrink steps until a tolerance passes. |
+| [P43: spectrum-led directions](spectral-priority-update-audit.md) | Positive spectrum diagnostic / not qualified. At radius 0.001, transfer amplitude improves on 28/32 and MR on 29/32, but complex/dynamics/identity regressions remain. Strict policy accepts none; 0.1% policy accepts 8/32, with spectrum improvements on 8/8 and raw identity PCM error increases on 8/8. | Calibrate preservation using absolute and relative error before sustained matched small-model training. Do not tune thresholds to these cases, count 24 no-ops as gains, or infer quality/convergence from a reversible step. |
 
 ## Earlier routes and operational failures
 

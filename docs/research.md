@@ -1,6 +1,17 @@
 # Research status and experiment history
 
-Latest optimizer diagnosis: [P41 guarded transfer](guarded-transfer-audit.md).
+Latest optimizer diagnosis: [P43 spectrum-led directions](spectral-priority-update-audit.md).
+Matched to P42's reused training roles, fixed-radius amplitude/MR improvement
+counts rise from 13/32 and 14/32 to 28/32 and 29/32. Fidelity/dynamics tradeoffs
+remain: the 0.1% diagnostic policy accepts 8/32 steps, all improving spectra but
+all increasing raw identity PCM error. No new trained weights or promotion.
+
+[P42 pooling and step protection](pooled-update-audit.md) completes both seeds
+with explicit no-op and calibrated PCM reporting. Its amplitude/complex bisector
+improves high-band PCM on many accepted cases while worsening magnitude spectra;
+this motivates spectrum-led directions, not a claim that waveform recovery is enough.
+
+Previous optimizer diagnosis: [P41 guarded transfer](guarded-transfer-audit.md).
 Simultaneous first-order constraints improve local joint descent from 16/32 to
 19/32 at radius 0.001, but different-training-recording transfer reaches only 3/32.
 Finite steps can violate locally certified guards; no consistent transfer benefit
