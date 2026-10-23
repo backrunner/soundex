@@ -12,6 +12,12 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
+[P44 calibration](docs/pcm-fidelity-calibration.md) shows that existing identity
+damage is much larger than numerical reconstruction noise. The registered
+[P45 small-model pilot](docs/anchored-spectrum-pilot.md) compares stored Adam with
+three fixed-anchor absolute fidelity budgets; it is not a convergence or release
+qualification claim.
+
 [P43](docs/spectral-priority-update-audit.md) gives a positive spectrum-priority
 diagnostic: at fixed radius 0.001, amplitude improves on 28/32 reused-training
 transfer batches and MR on 29/32, versus 13/32 and 14/32 in the P42 control.

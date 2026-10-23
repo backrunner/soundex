@@ -1,6 +1,14 @@
 # Research status and experiment history
 
-Latest optimizer diagnosis: [P43 spectrum-led directions](spectral-priority-update-audit.md).
+Latest measurement: [P44 absolute PCM calibration](pcm-fidelity-calibration.md).
+Both small-model starts have mean identity errors hundreds of times larger than
+clean-feature roundtrip noise; low-band counterexamples remain. The
+[P45 anchored spectrum pilot](anchored-spectrum-pilot.md) tests stored Adam against
+all three fixed precision budgets on matched exposure, with a complete endpoint
+barrier and no automatic weight promotion. Its original execution preflight found
+and fixed a column-rate broadcasting error before any checkpoint was saved.
+
+Previous optimizer diagnosis: [P43 spectrum-led directions](spectral-priority-update-audit.md).
 Matched to P42's reused training roles, fixed-radius amplitude/MR improvement
 counts rise from 13/32 and 14/32 to 28/32 and 29/32. Fidelity/dynamics tradeoffs
 remain: the 0.1% diagnostic policy accepts 8/32 steps, all improving spectra but
