@@ -90,17 +90,91 @@ both flat and column rates and requires identical two-dimensional output. The v2
 run reuses the same scientific policy and schedule, with corrected source hashes.
 All four branches undergo a real-batch execution preflight before the new run.
 
-All four corrected branches completed that preflight, and v2 is now training.
-The original and corrected schedules/groups match exactly. The initial Adam
-trajectory has saved a checkpoint; this is execution evidence, not a quality
-result. Live progress and resumable state remain in the ignored run directory.
+All four corrected branches completed that preflight. V2 subsequently completed
+all eight 128-attempt trajectories and the frozen raw review. The original and
+corrected schedules/groups match exactly. All ten endpoint/review hashes, all
+eight checkpoint histories and 216 bound inputs/sources were verified on
+2026-10-24. Adam counters advanced from 16,192 to 16,320 as expected.
 
-Scheduled fit exposure is 2,560 paired crops from 436 recordings, with 1,122.537
+Per-arm attempted fit exposure is 2,560 paired crops from 436 recordings, with 1,122.537
 seconds of unique MR support; guard exposure is 640 crops from 318 recordings,
 with 290.503 seconds. Counts include speech, and the two role durations must not
-be added without a joint interval union. Scheduled coverage is not completed
-training coverage. All nine codecs and 12 genre labels occur, but 214 fit music
+be added without a joint interval union. All draws were evaluated, but rejected
+attempts did not update weights. Attempted exposure is not accepted-update
+exposure. All nine codecs and 12 genre labels occur, but 214 fit music
 clips are unlabeled and 227 have unknown region. Simultaneous stereo remains open.
 
 Local verification after the correction: **688 tests passed**, 223 existing
 warnings; Ruff checks and 123 English documentation/link/index checks pass.
+
+## Completed pilot results
+
+The new acceptance policy stalls; it is not a qualified training method. Values
+below are changes in mean raw music errors against each frozen starting model,
+on the 128 music clips in the reused P44 TRAIN review. Negative is lower error.
+Seed order is 20261012 / 20261013. All arms completed 128 attempts per seed.
+
+| Arm | Accepted updates | Direct amplitude | MR spectrum | Direct complex | Identity PCM RMS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Stored Adam | 128 / 128 | −1.25788% / −0.66064% | −0.77642% / −0.46282% | +1.36434% / +0.58386% | +25.69522% / −9.14336% |
+| Spectrum, 16-bit ruler | 2 / 3 | −0.00613% / −0.01029% | −0.00403% / −0.00646% | +0.00248% / +0.01114% | +0.31402% / +0.42582% |
+| Spectrum, 20-bit ruler | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 |
+| Spectrum, 24-bit ruler | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 |
+
+The zero-update endpoints are parameter-identical to their starts. Their unchanged
+metrics are no-ops, not successful preservation through restoration. The 16-bit
+arm's mean music identity PCM error increases by only 3.2270e-8 / 6.8850e-8 in
+absolute RMS units; this does not erase its small spectral gains or certify quality.
+Adam's identity changes are +2.6406e-6 / −1.4784e-6, showing seed-dependent tradeoffs.
+Its music MR dynamics worsen 0.15291% / 0.07681%; the 16-bit arm changes them by
+−0.00027% / +0.00184%. No overall fidelity conclusion follows from amplitude alone.
+
+Speech paired MR improves 0.80147% / 0.48549% with Adam, versus 0.00348% / 0.00638%
+with the 16-bit arm. Speech complex error increases in both methods. Music raw MR
+against untreated compressed input is lower by 2.49943% / 2.29901% for Adam and
+1.74045% / 1.85107% for the 16-bit arm; the unchanged starts were already lower by
+1.73649% / 1.84473%. These absolute-reference comparisons prevent crediting the
+new method for gains inherited from its starting model.
+
+## Post-hoc gate attribution
+
+At each attempt's last tested radius, all 128 candidates per seed still lower
+both fit spectrum objectives. In the 16-bit arms, below-4-kHz output displacement
+violates the guard on **125/128 attempts in each seed**. Guard budget-auxiliary
+checks also reject 38 / 44 attempts, and identity PCM checks reject 12 / 16;
+these counts overlap and must not be added.
+
+Across those low-band violations there are 569 / 515 offending example occurrences.
+Every occurrence exceeds the output-displacement **peak** limit, but **none**
+exceeds the registered increase limit for low-band error RMS against original
+clean PCM. Error RMS actually decreases on 325 / 280 of those occurrences. The
+RMS displacement limit is exceeded on only 57 / 27. These are repeated training
+occurrences, not distinct recordings or an independent test.
+
+For example, seed 20261012, attempt 1, fit batch 0/example 0 at radius 0.0003 has
+low-band output displacement peak 5.1582e-5, above the half-step 1.5259e-5, while
+error RMS against the original decreases by 3.2168e-6. The corresponding seed
+20261013 case has peak 4.2245e-5 and error RMS decrease 2.3248e-6. Rejecting these
+solely for changing the prior output confuses preserving a model output with
+approaching the clean reference. Other fidelity checks can still fail: these
+examples do not prove that removing the gate would qualify the proposals.
+
+The fixed-anchor rule successfully prevents rolling allowances, but a PCM
+quantizer's pointwise rounding bound is not a justified ceiling on every useful
+restoration correction. Moreover, the P43 projected direction does not explicitly
+optimize the new absolute low-band constraint. A post-step rejection rule alone
+does not teach that tradeoff. This is an optimizer/policy mismatch, not evidence
+of an architecture capacity ceiling or a reason to repeat more unchanged steps.
+
+Next intervention: distinguish original-reference degradation from output change.
+Keep displacement as telemetry; design paired preservation around original-target
+band/time errors, while clean identity has its own original-target protection.
+Include those constraints in direction construction, test beneficial corrections
+and harmful transients explicitly, then preregister a new matched pilot. Do not
+retrospectively relax P45 thresholds, select a permissive arm or discard any failed
+case. The current candidates remain experimental; no new native/DSP, stereo,
+listening or real-time qualification was performed.
+
+Detailed evidence: `assessment.json`, per-arm `updates.json`, per-example `review/`,
+`gate-attribution.json` and `final-integrity.json` in the v2 run directory. The
+attribution is a post-hoc analysis and did not select or modify any endpoint.

@@ -3,9 +3,12 @@
 Latest measurement: [P44 absolute PCM calibration](pcm-fidelity-calibration.md).
 Both small-model starts have mean identity errors hundreds of times larger than
 clean-feature roundtrip noise; low-band counterexamples remain. The
-[P45 anchored spectrum pilot](anchored-spectrum-pilot.md) tests stored Adam against
-all three fixed precision budgets on matched exposure, with a complete endpoint
-barrier and no automatic weight promotion. Its original execution preflight found
+[P45 anchored spectrum pilot](anchored-spectrum-pilot.md) completed all eight
+trajectories and frozen raw rechecks. The loosest spectrum arm accepts only 2 / 3
+of 128 attempts; both stricter arms are exact no-ops. Low-band displacement peak
+guards reject corrections that can improve original-reference error, exposing a
+preservation-policy mismatch. Stored Adam improves spectra more but retains
+fidelity tradeoffs. No candidate is qualified or promoted. Its original preflight found
 and fixed a column-rate broadcasting error before any checkpoint was saved.
 
 Previous optimizer diagnosis: [P43 spectrum-led directions](spectral-priority-update-audit.md).

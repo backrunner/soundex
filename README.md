@@ -13,10 +13,12 @@ restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
 [P44 calibration](docs/pcm-fidelity-calibration.md) shows that existing identity
-damage is much larger than numerical reconstruction noise. The registered
-[P45 small-model pilot](docs/anchored-spectrum-pilot.md) compares stored Adam with
-three fixed-anchor absolute fidelity budgets; it is not a convergence or release
-qualification claim.
+damage is much larger than numerical reconstruction noise. The completed
+[P45 small-model pilot](docs/anchored-spectrum-pilot.md) stalls under its absolute
+displacement guards: the loosest arm accepts only 2/3 updates across its two seeds,
+and stricter arms accept none. Some rejected low-band corrections reduce error
+against the clean reference; the preservation policy needs revision. No candidate
+is qualified or promoted.
 
 [P43](docs/spectral-priority-update-audit.md) gives a positive spectrum-priority
 diagnostic: at fixed radius 0.001, amplitude improves on 28/32 reused-training
