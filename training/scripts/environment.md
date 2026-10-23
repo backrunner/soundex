@@ -143,6 +143,24 @@ Check `ffmpeg -hide_banner -encoders`; some macOS builds omit `libvorbis`.
 Use a complete FFmpeg build on `PATH`. Preprocessing reports missing encoders
 before generating pairs; do not silently remove codec strata from a recipe.
 
+### Local macOS dependency preflight
+
+Check `ffmpeg -version` and `ffprobe -version`, not only whether the executables
+exist. On 2026-10-23, this workstation's default FFmpeg 9.0.1 failed to load
+`libx265.216.dylib` after the active x265 installation changed to ABI 217.
+`brew linkage --test ffmpeg` identified the missing library. The separately
+installed `/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg` 9.0.2 starts successfully.
+For this workstation, use a process-scoped path for verification:
+
+```bash
+rtk proxy env PATH="/opt/homebrew/opt/ffmpeg-full/bin:$PATH" PYTHONPATH=training \
+  training/.venv/bin/python -m pytest -q training/tests
+```
+
+This does not repair global Homebrew links or regenerate frozen training pairs.
+Recheck the executable and required encoders before preprocessing; these paths
+describe a local observation, not a portable installation requirement.
+
 ## Dependency notes
 
 | Package | Role | 3.12 / torch 2.12 risk |
