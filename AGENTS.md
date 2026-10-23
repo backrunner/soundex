@@ -1,76 +1,135 @@
-# SoundEx 工程约定
+# SoundEx engineering conventions
 
 Use `rtk` or `rtk proxy` for shell commands. Local usage guide: `~/.codex/RTK.md`.
 
-## 项目目标
+## Project goal
 
-SoundEx 的目标是恢复有损压缩音频：模型尽量对被裁减或损伤的高频频谱进行
-inpainting，重建其谱形、细节、能量与瞬态；结合 DSP 的频带融合、响度控制、
-相位处理和伪影抑制，使最终输出尽量接近对应的原始无损音频。
-这不是单纯提高高频音量，也不能以减少增强、保持压缩输入不变作为成功标准。
-缺失信息的估计不等于保证精确逆转有损压缩。
+SoundEx restores lossy compressed audio. The model should inpaint missing or damaged
+high-frequency spectra, reconstructing their shape, detail, energy and transients.
+DSP provides band fusion, loudness control, phase handling and artifact suppression
+so that the final output approaches the paired original lossless recording.
+Raising treble alone is insufficient. Reducing enhancement or leaving compressed
+input unchanged is not success. Estimating missing information does not guarantee
+an exact inverse of lossy compression.
 
-## 训练与验证
+## Training and validation
 
-- 使用原生无损、授权明确的音乐及按既定比例混入的语音，合成有损输入；
-  保持成对音频严格对齐。单声道、立体声、静音及低能量素材均须正确处理。
-- Loss 必须围绕目标无损参考设计：缺失高频的谱形/幅度、能量包络与瞬态细节
-  是主要目标；有效频点的相位和完整重建波形提供保真约束。
-- 按用户确认，监督与候选评估以频谱契合度优先：联合考察多分辨率幅度谱、
-  高频谱形、频带能量与真实时间变化，再检查相位、波形、保留频段和听感。
-  波形误差小幅增加不能单独否定频谱候选；也不能把同频带能量接近等同于
-  谱形、相位或音质恢复。多分辨率训练分析窗不等于部署前瞻，必须分开说明。
-- 基线不是正确答案：以成对无损参考和未处理压缩输入独立判断收益；审计历史基线的
-  训练预算、数据泄漏、开发集选择偏差、DSP策略和跨录音泛化。不同历史训练预算
-  不可用来推断架构优劣；反复复用的留出录音只能称复核，不能证明没有过拟合。
-  加入恒等模型经过真实 DSP 的控制，分离限幅/合成引入的频谱与波形变化；
-  安全限幅目标和原始参考冲突时须明确报告，不能把参考限幅后冒充原始恢复。
-- 新 loss 须验证参考正确时的行为、静音/弱能量梯度、有限差分及部署对应关系；
-  不允许用针对曲目或验证反例的阈值获得改善。结构可表达性和容量上限须与泛化分开报告。
-- 同时约束保留频段、分频接缝和相邻帧的变化误差，避免破坏低频、声像或输出连续性。
-  时间一致性应跟随参考音频的真实变化，不得通过抹平瞬态降低 loss。
-- 模型预测与模型加 DSP 后的重建误差需要分别报告。训练中的可微处理代理
-  必须明确其与 Rust 部署处理链的差异，并通过实际 Rust 流处理验证。
-- 高频恢复的训练须验证直接面向原始无损频谱的监督路径，区分直接谱重建、
-  经过 DSP 的重建及频谱一致性辅助项。DSP 恒等输出只作控制／保真诊断，
-  不能代替 paired 高频的无损目标；直接预测改善也不能代替最终输出验证。
-- 比较 loss 时固定版本、权重、尺度、数据划分及采样比例；不能跨不同目标总分
-  直接宣称改善。增加噪声可能降低弱频点 LSD，必须结合高频谱收敛、能量、瞬态、
-  低频保真、立体声以及盲听判断，而不是只看 loss、SI-SDR 或频谱覆盖率。
-- 极弱参考频带须同时报告相对谱形与校准的绝对 PCM RMS/dBFS 误差；未归一化 FFT
-  功率不是 PCM dBFS。保留所有反例，不以巨大相对分数推断可闻严重程度，也不以
-  很小绝对误差代替恢复收益或盲听证据；不得按已知反例事后设置放行阈值。
-- 模型、DSP、组合路径应做同素材对照；未取得整体音质证据的候选保持实验状态，
-  不替换默认权重，不将开发验证集冒称独立测试或正式发布合格。
-- 在留出评分前固定候选选择规则和模型哈希；已经用于诊断的测试录音再次使用时，
-  明确标为留出复核。按录音/来源核查训练隔离，并报告曲风、地区和声道覆盖缺口；
-  不把不同起点的 left/right 片段拼成立体声，也不以局部均值外推全部音乐。
-- 训练须区分模型历史、DSP状态预热和监督区域；预热不得混入监督或更新冻结统计。
-  不同loss权重的实验必须用统一目标重新评分，并分别观察原始预测与部署后误差。
-- 数据目录的曲目数不等于实际训练覆盖。报告实际抽样的录音、编码、声道视图、
-  源时间区间及去除预热/重叠后的独立监督时长；有限诊断裁剪池不能冒充完整曲库训练。
-- 新时间分支须验证有效学习与历史依赖：固定共同 warmup/裁剪，保留重复当前帧
-  等消融诊断。非零参数和略低的总 loss 不能单独证明利用历史或提升真实音频。
-- 架构调研优先引用论文及官方实现，区分音乐修复、语音增强和理想低通上采样。
-  分别对照表示方式与容量；单种子短期微调不能证明某类结构的性能上限。
-- 512 步校准只诊断早期优化，不能用它否定容量或代替完整训练；完整容量对照
-  应给控制与各规模相同的预登记充分预算，先全部训练并冻结端点，再统一复核。
-  达到预定步数不等于已经收敛；不得凭中途评分选择最好模型或临时缩减对照。
+- Synthesize lossy inputs from native lossless music with documented rights and
+  speech mixed at the agreed sampling ratio. Keep pairs strictly aligned. Handle
+  mono, stereo, silence and low-energy material correctly.
+- Design loss against the original lossless reference. Missing-band spectral
+  shape/magnitude, energy envelopes and transient detail are primary targets;
+  phase at meaningful bins and full reconstructed waveforms constrain fidelity.
+- Supervision and candidate assessment prioritize spectral agreement: jointly
+  inspect multiresolution magnitude, high-band shape, band energy and real temporal
+  variation before phase, waveform, preserved bands and listening. A small waveform
+  regression alone does not reject a spectral candidate. Matching band energy does
+  not establish spectral shape, phase or sound quality. Distinguish training
+  analysis windows from deployment lookahead.
+- The baseline is not ground truth. Judge gains against paired lossless references
+  and untreated compressed input. Audit historical training budgets, data leakage,
+  development-set selection bias, DSP policy and cross-recording generalization.
+  Unequal historical budgets cannot establish architecture superiority. Reused
+  held-out recordings are rechecks, not proof against overfitting. Include an
+  identity model through actual DSP to isolate limiting/synthesis effects. Report
+  conflicts between safe limiting and the original reference; never substitute a
+  limited reference and describe the result as original-audio restoration.
+- New losses require correct-reference behavior, silence/weak-energy gradients,
+  finite differences and deployment correspondence checks. Do not tune thresholds
+  to tracks or validation counterexamples. Separate representational feasibility
+  and capacity ceilings from generalization.
+- Constrain preserved bands, crossover seams and adjacent-frame variation errors
+  to protect low frequencies, stereo imaging and continuity. Temporal consistency
+  must follow the reference's real changes, not smooth away transients.
+- Report model-only and model-plus-DSP reconstruction errors separately. State how
+  differentiable training proxies differ from Rust deployment and verify them
+  through actual Rust streaming.
+- Verify a direct supervision path to original lossless high-band spectra.
+  Distinguish direct reconstruction, reconstruction through DSP and spectral
+  consistency auxiliaries. Identity DSP is a control/fidelity diagnostic, not a
+  substitute for paired high-band targets. Better direct predictions do not
+  replace final-output validation.
+- Compare losses with fixed versions, weights, scales, splits and sampling ratios.
+  Do not claim improvement from totals with different objectives. Added noise can
+  reduce weak-bin LSD; also assess high-band spectral convergence, energy,
+  transients, low-band fidelity, stereo and blind listening. Loss, SI-SDR or
+  spectral coverage alone is insufficient.
+- For very weak reference bands, report relative shape and calibrated absolute PCM
+  RMS/dBFS errors together. Unnormalized FFT power is not PCM dBFS. Retain every
+  counterexample. Large relative scores do not establish audible severity; small
+  absolute errors do not establish restoration gains or listening quality. Never
+  set acceptance thresholds retrospectively around known failures.
+- Compare the model, DSP and combined paths on the same material. Candidates without
+  overall quality evidence remain experimental and do not replace default weights.
+  Development validation is not independent testing or release qualification.
+- Freeze candidate-selection rules and model hashes before held-out scoring. Label
+  reused diagnostic recordings as held-out rechecks. Audit training isolation by
+  recording/source and report genre, region and channel coverage gaps. Do not join
+  left/right excerpts from different source times into stereo. Do not extrapolate
+  local means to all music.
+- Separate model history, DSP-state warmup and supervised regions. Warmup must not
+  enter supervision or update frozen statistics. Rescore experiments with different
+  loss weights under one common objective; inspect raw and deployed errors.
+- Catalog track counts are not actual training coverage. Report sampled recordings,
+  codecs, channel views, source intervals and unique supervised duration after
+  removing warmup/overlap. A finite diagnostic crop bank is not full-library training.
+- New temporal branches need evidence of learning and history dependence. Use
+  common warmup/crops and retain repeated-current-frame ablations. Nonzero parameters
+  and a slightly lower total loss alone do not show history use or audio improvement.
+- Prefer papers and official implementations for architecture research. Distinguish
+  music restoration, speech enhancement and ideal low-pass upsampling. Compare
+  representation and capacity separately. Short single-seed fine-tuning cannot
+  establish an architecture family's ceiling.
+- A 512-step calibration diagnoses early optimization only. It cannot reject
+  capacity or replace full training. Give controls and all capacities the same
+  preregistered adequate budget, finish every trajectory, freeze endpoints, then
+  review together. Reaching the step budget does not prove convergence. Do not
+  select intermediate scores or shorten controls after observing results.
 
-## 实时与交付
+## Real-time behavior and delivery
 
-- 遵循 `docs/realtime-standard.md`：回调不执行推理、不分配、不阻塞；保持固定时间轴，
-  故障回退与恢复平滑。DSP 新增延迟、处理时延、CPU/RSS 和 deadline miss 均需实测。
-- 按用户最新要求，实验模型不再以参数量或文件体积限制扩容，以时延筛选；模型 + DSP 计算
-  <5 ms（用户确认不含固定缓冲） 仍须满足连续流吞吐和逐 hop deadline（48 kHz/hop128 为 2.667 ms）。
-  计算耗时与完整输出延迟分别报告，固定 256 帧缓冲不得隐藏。正式制品当前的
-  <=2M / <8 MiB 协议约束在生产契约迁移前保留，实验仅显式绕过大小门槛。
-  论文整段 RTF 或 GPU 吞吐不能代替逐 hop CPU、前瞻/缓冲和流式可用率验证。
-- 因果上下文只能读取过去/当前帧；每个物理声道独立缓存，静音与 bypass 仍推进历史。
-  训练使用真实 warmup，导出声明输入/输出时间轴；reset、丢帧恢复、换模型必须清空历史。
-  历史不足时维持对齐的 dry 输出，增强预热不得冒充新增输出延迟。
-- 保留真实瞬态和持续稳定输出；有限值、限幅、分块一致性、静音和声道隔离是基本要求，
-  不代替真实设备与听感验证。
-- 源码、文档和正式发布权重按项目 Apache-2.0 路线处理。训练原始音频、配对数据、
-  本地检查点和实验报告保留在忽略目录；提交来源文档，不推送训练原始素材。
-- 提交身份为 `BackRunner <dev@backrunner.top>`，采用 Conventional Commits，按职责分批提交。
+- Follow `docs/realtime-standard.md`: no inference, allocation or blocking in the
+  callback; maintain a fixed timeline and smooth failure fallback/recovery. Measure
+  added output delay, processing time, CPU/RSS and deadline misses.
+- Experimental capacity is screened by latency, without parameter/file-size caps.
+  Model-plus-DSP compute must remain below 5 ms, excluding fixed buffering as
+  confirmed by the user, while sustaining continuous throughput and each hop's
+  deadline (48 kHz/hop 128: 2.667 ms). Report compute and full output delay separately;
+  disclose the fixed 256-frame buffer. Production artifacts retain the current
+  <=2M / <8 MiB contract until an explicit production-contract migration. Experimental
+  exports may explicitly bypass only the size gate. Whole-file RTF or GPU throughput
+  cannot replace per-hop CPU, lookahead/buffering and streaming availability checks.
+- Causal context reads only past/current frames. Each physical channel has independent
+  history; silence and bypass still advance it. Train with real warmup and declare
+  export input/output timelines. Reset, dropped-frame recovery and model changes
+  clear history. Return aligned dry audio when history is insufficient. Enhancement
+  warmup is not additional output delay.
+- Preserve real transients and stable continuous output. Finite values, limiting,
+  block-size consistency, silence and channel isolation are basic checks, not
+  substitutes for real-device validation or listening.
+- Source, documentation and formally released weights follow the project's
+  Apache-2.0 policy. Keep original training audio, pairs, local checkpoints and
+  experiment reports in ignored directories. Commit source documentation, not
+  original training material.
+- Commit as `BackRunner <dev@backrunner.top>` using Conventional Commits, grouped
+  by responsibility.
+
+## Experiment memory, documentation and cleanup
+
+- Before proposing or launching a repeat, consult `docs/failed-experiments.md` and
+  the linked detailed report. Record the changed hypothesis/control and why existing
+  evidence does not already answer it. A larger budget alone requires a documented
+  convergence or exposure rationale, not repeated hope.
+- Every unsuccessful validation must remain recorded: exact endpoint/budget and
+  reference, failed criterion, counterexamples, evidence paths, scope limitations
+  and a concrete condition for revisiting. Distinguish quality failures, runtime
+  failures, invalid measurements and inconclusive diagnostics. Never discard failed
+  runs or retry until a benchmark passes. Update the registry in the same work item.
+- Maintain authored project documentation in English, including this file and
+  `.agents/`. Preserve exact source titles, attribution names, literal paths and
+  immutable historical evidence where translation would alter provenance.
+- Inventory cleanup candidates before deletion. Remove only confirmed regenerable
+  caches or unused build intermediates after checking active users and references.
+  Preserve training sources, manifests/licenses, checkpoint hashes, frozen binaries,
+  source snapshots and failed-validation evidence. Record reclaimed bytes and verify
+  retained input integrity afterward. Ignored does not mean disposable.

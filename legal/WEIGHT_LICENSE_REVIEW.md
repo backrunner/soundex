@@ -1,125 +1,153 @@
-# 权重授权核查（来源链更新于 2026-10-11）
+# Weight provenance review
 
-**目前没有可认定为已完成授权核查的正式恢复模型权重。** 源码与 demo 采用
-Apache-2.0；这不自动授权本地实验权重。正式权重仍以 Apache-2.0 发布为目标，
-支持其他开源项目集成、分发、修改和商用，不设置学术用途限制。
+Historical source-chain audit updated on 2026-10-11; documentation translated and
+status clarified on 2026-10-23. **No restoration model weights have completed formal
+rights and release qualification.** Source and demos use Apache-2.0; this does not
+automatically license local experiments. Official weights are intended for
+Apache-2.0 release, including integration, redistribution, modification and commercial
+use in other open-source projects, with no academic-only restriction.
 
-## 已有实验的实际来源
+## Artifacts covered by the historical audit
 
-本次核查读取了三个实验的实际 checkpoint、配置和五份绑定 manifest，验证它们的
-SHA-256 一致性，并记录 42 个 checkpoint/诊断 ONNX 文件的哈希。训练集、验证集和
-测试集分别记录；配对样本数量不等于独立作品数量。
+The audit read actual checkpoints, configurations and five bound manifests from
+three experiments, verified their SHA-256 consistency, and recorded hashes for
+42 checkpoint/diagnostic ONNX files. Training, validation and test membership were
+recorded separately. Paired-example counts are not counts of independent works.
 
-| 实验 | 核查结果 | 正式发布状态 |
+| Experiment | Reviewed provenance | Release status |
 | --- | --- | --- |
-| `local-mps-20261007-125023` | manifest 为 MUSDB18-HQ | 未发布，排除出可商用正式权重路线 |
-| `local-mps-256-128-20261007-220130` | manifest 为 MUSDB18-HQ；`parity-qualified.onnx` 仅表示数值核查 | 未发布，数值合格不代表授权合格 |
-| `local-mps-diverse-lossless-smoke-20261008` | 音乐为 The Crypts! / Revolution Void；另含 Slakh 和 VCTK；并非已经完成的新大规模训练 | 未发布，Slakh 底层权利及音乐来源完整授权仍待确认 |
-| 新的 300 首区域无损训练 | 300 首音乐与 VCTK 已通过配对清单/文件检查；随机初始化，无旧权重或教师；10 月 10 日 01:00 完成 200 轮；第 168 轮候选已导出并通过 13 项跨运行时一致性检查；见[当前训练](../docs/native-training-20261009.md)及[验证记录](../docs/native-validation-20261010.md) | MUSDB、Slakh 均不参与；最终 artifact 的发布权利及完整质量验收尚未完成 |
-| Objective v2 的 8 轮续训 | 只继承上述原生 epoch168 生成器；父 checkpoint SHA-256 为 `a4fed7e7f4a463c01213d2a0705286c85a63b8e3b34c6681dcd9124cf7530650`；数据配方、清单、验证成员保持一致，初始化链明确，未引入其他旧权重或教师；见[损失审计](../docs/loss-audit-20261010.md) | 未替换原基线；派生关系不省略来源义务或发布核查，不能把数值一致性通过当成正式 Apache-2.0 权重发布 |
+| `local-mps-20261007-125023` | MUSDB18-HQ manifest | Unpublished; excluded from the commercially usable official-weight route |
+| `local-mps-256-128-20261007-220130` | MUSDB18-HQ; `parity-qualified.onnx` denotes numerical verification only | Unpublished; numerical parity does not establish rights clearance |
+| `local-mps-diverse-lossless-smoke-20261008` | The Crypts! / Revolution Void music, Slakh and VCTK; not the completed later large training run | Unpublished; Slakh underlying rights and complete music-source permissions remained unresolved |
+| Native regional lossless run | 300 music works plus VCTK passed paired-manifest/file checks; random initialization, no old weights or teacher; 200 epochs completed at 01:00 on October 10; epoch 168 exported and passed 13 cross-runtime consistency checks | MUSDB and Slakh excluded; final-artifact rights and complete quality acceptance remain unfinished. See [training](../docs/native-training-20261009.md) and [validation](../docs/native-validation-20261010.md). |
+| Objective v2, eight-epoch continuation | Only the native epoch-168 generator was inherited; parent SHA-256 `a4fed7e7f4a463c01213d2a0705286c85a63b8e3b34c6681dcd9124cf7530650`; unchanged recipe, manifests and validation membership; no other old weights or teacher | Baseline unchanged; derivation does not remove attribution or release-review obligations. Numerical consistency is not an official Apache-2.0 release. See [loss audit](../docs/loss-audit-20261010.md). |
 
-后续 V3 → V4 → V5 的初始化链仍只来自这次原生 epoch168；未引入外部教师或
-MUSDB/Slakh 权重。2026-10-11 两组 V5 各完成 8 轮，冻结源码为 `db738344`，
-共同父权重为 V4 epoch4（SHA-256
-`a152f00c6907221a4af80986364f621c1d884e9df0af22ba001ff419a574ccab`）。数据配方、
-清单和署名义务保持不变；精确派生 artifact 哈希见[目标复核记录](../docs/goal-refinement-20261011.md)。
-这次是来源链更新，没有新增许可授权或正式权重发布结论，实验权重继续留在本地。
+Subsequent V3 → V4 → V5 initialization still derives only from native epoch 168,
+without external teachers or MUSDB/Slakh weights. Both V5 arms completed eight epochs
+on 2026-10-11 with frozen source `db738344` and common V4 epoch-4 parent SHA-256
+`a152f00c6907221a4af80986364f621c1d884e9df0af22ba001ff419a574ccab`.
+The recipe, manifests and attribution obligations are unchanged; exact derived hashes
+are in the [goal review](../docs/goal-refinement-20261011.md). This updates provenance,
+not permissions or release clearance. Experimental weights remain local.
 
-V6 部署对齐实验仍从同一 V4 epoch4 父模型启动，未继承外部模型或新增数据。
-冻结源码为 `e6946b2`；8 轮训练选中 epoch4，检查点 SHA-256 为
-`22c39a78baca386c2b30d34641f02dea7cf83a331f00eefd8390d769f0a8a433`，
-ONNX 为 `18ea464cfcc4c978b252f1b6ad04ce5e1fc427dc225b58759b6a8e69d2b57336`。
-数据配方与清单绑定保持一致，见 [V6 记录](../docs/deployment-refinement-20261011.md)。
-此处只更新派生关系，不增加授权结论；未发布正式权重。
+V6 deployment alignment also starts from V4 epoch 4, without external models or new
+data. Frozen source is `e6946b2`; eight-epoch training selected epoch 4, checkpoint
+SHA-256 `22c39a78baca386c2b30d34641f02dea7cf83a331f00eefd8390d769f0a8a433`,
+ONNX `18ea464cfcc4c978b252f1b6ad04ce5e1fc427dc225b58759b6a8e69d2b57336`.
+Recipe and manifest bindings are unchanged. See [V6](../docs/deployment-refinement-20261011.md).
+This adds no release authorization.
 
-本轮[表示与容量实验](../docs/architecture-study-20261011.md)的三个新增分支也从
-同一 V4 epoch4 启动，冻结源码为 `7cfaf784`。各完成 8 轮，数据配方和清单不变；
-按固定 CPU 验证规则选中的 `shape-large` 检查点 SHA-256 为
-`8d5795cfe62a572e2221c657997951f6fb3b843911219087584e006b2218a53c`，
-ONNX 为 `a9a5096d1cc87eaf3c151ce9d25fc4dc1f4abe33db84b7a94076739c66fa78d3`。
-[论文调研](../docs/architecture-research-20261011.md)仅用于方法参考；新增分支为
-原创实现，没有导入所调研模型的代码、权重、训练音频或教师输出。新增结构不改变
-既有来源义务，也不构成权重发布授权结论；全部实验 artifact 仍保留在本地。
+The three new [representation/capacity arms](../docs/architecture-study-20261011.md)
+also start from V4 epoch 4, frozen source `7cfaf784`, with eight epochs and unchanged
+data/manifests. The fixed CPU selection rule selected `shape-large`, checkpoint
+`8d5795cfe62a572e2221c657997951f6fb3b843911219087584e006b2218a53c`, ONNX
+`a9a5096d1cc87eaf3c151ce9d25fc4dc1f4abe33db84b7a94076739c66fa78d3`.
+The [paper survey](../docs/architecture-research-20261011.md) informs methods only:
+these original implementations import no surveyed-model code, weights, training
+audio or teacher outputs. Architecture changes do not remove source obligations
+or grant release clearance. All artifacts remain local.
 
-[有限因果上下文实验](../docs/causal-context-20261011.md)继续从上述 `shape-small`
-父检查点 `a5166a6f56239a31a48986725188aa19c1c199c565904c76aca0f160a19f393a` 启动。
-两组各完成八轮；训练源码 `52ca6b93`，数据配方及清单绑定保持不变，没有导入外部
-代码、教师、权重或音频。精确派生哈希见实验记录；两组权重均为本地诊断产物，
-存在数值/质量验收缺口。随后源码 `9fd534d7` 的两轮时间参数定向实验仍来自同一
-父检查点，只更新新增时间参数，父模型所有张量逐位不变，数据和来源义务未变。
-本段只更新来源链，未新增授权或正式发布结论。
+The [finite causal-context study](../docs/causal-context-20261011.md) starts from the
+`shape-small` parent `a5166a6f56239a31a48986725188aa19c1c199c565904c76aca0f160a19f393a`.
+Both arms completed eight epochs with source `52ca6b93`, unchanged recipe/manifests
+and no external code, teacher, weights or audio. Exact derived hashes are in the
+study report. Both are local diagnostic artifacts with numerical/quality gaps.
+The subsequent two-epoch temporal-parameter probe, source `9fd534d7`, uses the same
+parent, updates only new temporal parameters and preserves every parent tensor
+bit-for-bit. Sources and obligations are unchanged; no new clearance is claimed.
 
-[连续重建与多分辨率实验](../docs/multires-reconstruction-20261011.md)从上述同一
-shape-small父检查点继续，训练源码固定为`a27550ac`。V7修改训练监督和DSP预热，
-沿用同一数据配方及清单集，不加入新音频、外部权重或教师输出。
-派生权重保留为本地实验产物；这些实现改动不改变素材来源义务或自动取得发布资格。
+The [continuous reconstruction/MR study](../docs/multires-reconstruction-20261011.md)
+uses the same `shape-small` parent and source `a27550ac`. V7 changes supervision and
+DSP warmup without adding audio, external weights or teacher outputs. Its local
+artifacts retain the same source obligations and are not automatically release-ready.
 
-[输入条件化增益校准](../docs/gain-calibration-20261011.md)保持上述shape-small神经图不变，
-仅从同一原生无损配方的train录音拟合10个DSP系数。新增校准JSON未发布，
-未引入新数据、外部权重或教师；数据来源义务及正式发布审查要求保持不变。
+[Input-conditioned gain calibration](../docs/gain-calibration-20261011.md) leaves that
+neural graph unchanged and fits 10 DSP coefficients from training recordings in the
+same native-lossless recipe. Its JSON is unpublished. No new data, external weights
+or teacher are introduced; attribution and release review remain necessary.
 
-原生 epoch168 的旧 checkpoint 源码元数据读到了主仓库后续版本 `dd0d15ab`；实际冻结训练收据为 `abe0e497`，其归档内 106 个训练文件与该版本逐个比较无差异。原文件与哈希保持不变，审查须同时使用冻结收据。新的归档运行已修正来源捕获，Objective v2 续训用独立 worktree，绑定版本为 `b4ed52c`。
+The old native epoch-168 checkpoint recorded later main-repository source metadata
+`dd0d15ab`. Its actual frozen training receipt is `abe0e497`; all 106 archived training
+files match that version. Original artifacts/hashes remain unchanged, so review must
+use the frozen receipt as well. Later archived runs correct source capture; Objective
+v2 uses an isolated worktree bound to `b4ed52c`.
 
-两个 MUSDB 实验的最佳 checkpoint SHA-256 分别为
-`167174450fc6591f616a3a5d645623417d06c76d3651623ddf802d573ff52c20`、
-`5134cd9b80c5e36cb674dcad1686b77dc1fc39dbac1595d58d230e33407d9d21`。
-非 MUSDB smoke 的最佳 checkpoint 为
-`df2704704f7c68b1da3218abd25b5fc8153a71d77d94cd6e7838cc9901b83639`。
-本地完整文件清单位于 `data/reports/weight-license-audit-20261008.json`；数据和权重未入库。
+The two MUSDB best-checkpoint hashes are
+`167174450fc6591f616a3a5d645623417d06c76d3651623ddf802d573ff52c20` and
+`5134cd9b80c5e36cb674dcad1686b77dc1fc39dbac1595d58d230e33407d9d21`.
+The non-MUSDB smoke best checkpoint is
+`df2704704f7c68b1da3218abd25b5fc8153a71d77d94cd6e7838cc9901b83639`.
+The complete local inventory is `data/reports/weight-license-audit-20261008.json`;
+audio and weights were not committed. [MUSDB's publisher](https://sigsep.github.io/datasets/musdb.html)
+restricts the dataset to academic use. Deleting MUSDB or changing documentation does
+not change a checkpoint's training provenance.
 
-[MUSDB 发布方](https://sigsep.github.io/datasets/musdb.html)限定数据集用于学术用途。
-删除训练目录中的 MUSDB 或修改许可文档，都不能改变已经训练的 checkpoint 来源。
+Later P-series registrations and hashes are indexed in [research history](../docs/research.md)
+and the [failure registry](../docs/failed-experiments.md). Those technical records do
+not extend the scope of this historical rights audit or imply formal approval.
 
-## Slakh：数据集许可与底层权利分开核查
+## Slakh: distinguish dataset licensing from underlying rights
 
-[Slakh 作者的原始生成仓库](https://github.com/ethman/slakh-generation#license-and-attribution)
-明确将数据集标为 CC BY 4.0，
-[官方存档](https://zenodo.org/records/4599666)说明音频由 Lakh MIDI 和采样乐器合成。
-但 [Lakh 的维护者](https://colinraffel.com/projects/lmd/)同时说明：MIDI 抓取自公开网络，
-并非由他转录，内部版权信息不一致，无法逐首归属作者。这是一个具体的作曲及转录
-权利缺口；不能仅凭数据集的 CC 标记确认所有第三方作品都已授权。
+The [original generation repository](https://github.com/ethman/slakh-generation#license-and-attribution)
+labels Slakh CC BY 4.0. The [official archive](https://zenodo.org/records/4599666)
+describes synthesis from Lakh MIDI and sampled instruments. The [Lakh maintainer](https://colinraffel.com/projects/lmd/)
+explains that the MIDI was scraped from the public web, not transcribed by him, and
+has inconsistent internal copyright information without reliable per-track authorship.
+This is a specific composition/transcription rights gap; a dataset CC label alone
+cannot confirm permission for every third-party work.
 
-作者的[渲染说明](https://github.com/ethman/slakh-generation#step-2-installsetup-kontakt-andor-other-synthesis-vsts)
-确认使用 Kontakt Komplete 12（2018）。还需保留该实际渲染版本的乐器/采样许可依据。
-Native Instruments 的
-[现行 EULA](https://www.native-instruments.com/pages/end-user-license-agreement)
-日期为 2026-07-01，包含对产品及其音视频内容的 AI 训练限制。该条款本身不能证明
-它追溯适用于历史 Slakh 渲染，也不能直接认定完整合成音乐等同于乐器原始采样。
-需要的是 Slakh 所用版本与已发布混音的实际许可范围，而非推测适用关系。
+The authors' [rendering instructions](https://github.com/ethman/slakh-generation#step-2-installsetup-kontakt-andor-other-synthesis-vsts)
+identify Kontakt Komplete 12 (2018). Evidence for the actual instrument/sample
+license version is also needed. The Native Instruments [EULA reviewed in the audit](https://www.native-instruments.com/pages/end-user-license-agreement)
+was dated 2026-07-01 and included AI-training restrictions for products and audiovisual
+content. That text alone does not establish retroactive application to historical
+Slakh renders, or equate complete synthesized music with raw instrument samples.
+The question is the actual version's terms and the scope covering released mixes.
 
-按 2026-10-09 的用户决定，新区域训练配置及队列已移除 Slakh，不再要求其配对文件。
-历史 manifest、hash 和初始化来源记录保留为审计证据；旧实验已与当前任务分开归档。
-本次工作区清理删除了不再使用的 Slakh 原始/配对音频、旧生成音频及重复周期检查点，
-保留独立的历史核查检查点和删除/迁移清单。移除数据不会追溯净化旧权重。
-通用历史导入工具仍保留，没有新增导入白名单或训练许可硬拦截。
-含 Slakh 的具体权重在上述缺口解决前，不能声明已获核准的 Apache 商用发布。
-可补充发布方对底层作品/渲染权利的说明，或逐首建立有授权依据的 Slakh 子集。
-标题识别、MIDI 哈希和公共领域作曲者名字本身，都不足以证明该转录版本已授权。
+Following the user's 2026-10-09 decision, the new regional configuration and queue
+exclude Slakh and do not require its paired files. Historical manifests, hashes and
+initialization records remain audit evidence, separate from the current route.
+Cleanup removed unused Slakh original/paired audio, old generated audio and redundant
+periodic checkpoints, retaining independent audit checkpoints and deletion/migration
+inventories. Removing data does not retroactively clear old weights. Historical
+import tooling was retained at that time and later retired during documented cleanup;
+no dataset allowlist or hard training-license gate was added.
 
-## 已确认的许可路线
+Weights containing Slakh cannot be described as cleared for an Apache commercial
+release until the specific gaps are resolved. Publisher clarification of underlying
+composition/rendering rights or a demonstrably licensed subset could address them.
+Title recognition, MIDI hashes and public-domain composer names alone do not prove
+that a particular transcription is authorized.
 
-- **原创、自有或第一方明确授权的录音**：同时核对作曲、演奏/录音和可识别采样来源，
-  保存实际版本、来源页与音频哈希。
-- **CC0 / CC BY 的录音**：可用于取得其授权范围内的商业训练；CC BY 保留作者、
-  来源、许可及必要的修改说明。[CC BY 4.0 原文](https://creativecommons.org/licenses/by/4.0/legalcode.en)
-  的授权限于许可方拥有的权利，不能补上他人的版权。
-- **VCTK 0.92**：[爱丁堡大学原始记录](https://datashare.ed.ac.uk/items/30e7453c-9ea8-48b4-8e18-f96d0dc62928/full)
-  明确给出 CC BY 4.0，作者为 Junichi Yamagishi、Christophe Veaux、Kirsten MacDonald。
-  数据由 96 kHz / 24-bit 录音降采样至 48 kHz / 16-bit，适用于机器学习；报纸文本有
-  Herald & Times Group 的许可。它不是“公共领域语音”。保留语音录音的署名及来源；
-  本项目处理音频，不发布阅读文本或声纹身份模型。
+## Documented licensing routes
 
-[Creative Commons 的 AI 指引](https://creativecommons.org/using-cc-licensed-works-for-ai-training-2/)
-支持按实际 CC 条件处理训练及后续公开使用，并建议保留可追溯署名。指引不是关于
-所有模型权重版权属性的统一裁决。CC 数据不会自动把新权重指定为 CC 或 Apache；
-应核对具体权重是否保留了上游受保护内容及适用条件。
+- Original, owned or explicitly first-party-authorized recordings: review composition,
+  performance/recording and identifiable sample sources; retain actual versions,
+  source pages and audio hashes.
+- CC0 / CC BY recordings: commercial training is possible within the actual grant.
+  Preserve CC BY authorship, source, license and necessary modification notices.
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode.en) covers rights
+  the licensor owns and cannot supply another party's missing copyright permission.
+- VCTK 0.92: the [University of Edinburgh record](https://datashare.ed.ac.uk/items/30e7453c-9ea8-48b4-8e18-f96d0dc62928/full)
+  specifies CC BY 4.0 and authors Junichi Yamagishi, Christophe Veaux and Kirsten
+  MacDonald. Recordings were downsampled from 96 kHz / 24-bit to 48 kHz / 16-bit for
+  machine-learning use; newspaper text has Herald & Times Group permission. This is
+  not public-domain speech. Retain recording attribution and source. SoundEx processes
+  audio and does not publish reading texts or voice-identity models.
 
-## 正式权重发布时的结论
+[Creative Commons' AI guidance](https://creativecommons.org/using-cc-licensed-works-for-ai-training-2/)
+supports observing actual CC conditions during training and subsequent public use,
+with traceable attribution. It is not a universal ruling on model-weight copyright.
+CC data does not automatically assign CC or Apache licensing to new weights; review
+whether a specific artifact retains protected upstream material and applicable terms.
 
-Apache-2.0 发布路线可行，但需要完成实际数据组合、初始化/父模型来源及最终 artifact
-的核查。本次事实清单标为 `rights_confirmed: false`，不会代替维护者填写已经批准的
-权利声明。发布时附完整 LICENSE、适用 NOTICE、源数据署名、模型卡和精确哈希，
-同时检查模型是否在无关输入或静音输入时重现训练作品。
+## Formal release conclusion
 
-这些是维护者的发布工作，不是给下游 Apache-2.0 用户追加许可限制。
-参见[权重许可](../MODEL_WEIGHTS_LICENSE.md)和[发布清单](MODEL_RELEASE_CHECKLIST.md)。
+The Apache-2.0 route requires review of the actual dataset combination,
+initialization/parent provenance and final artifact. The historical fact inventory
+records `rights_confirmed: false`; it does not supply a maintainer's approval.
+Release requires the full LICENSE, applicable NOTICE, data attribution, model card
+and exact hashes, plus checks for training-work reproduction on unrelated or silent
+inputs. These are maintainer publishing tasks, not additional license restrictions
+for downstream Apache-2.0 users. See the [weight license](../MODEL_WEIGHTS_LICENSE.md)
+and [release checklist](MODEL_RELEASE_CHECKLIST.md).

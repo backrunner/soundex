@@ -1,83 +1,38 @@
-# SoundEx 项目总览
+# SoundEx project overview
 
-## 愿景
+## Goal and current status
 
-SoundEx 是一个用 Rust 编写的实时音频音质增强库，通过轻量化 AI 模型恢复有损压缩音频（MP3、AAC 等）在编码过程中丢失的高频信息，提升实际回放体验。其目标类似于 Sony DSEE（Digital Sound Enhancement Engine），但完全开源、跨平台、可嵌入任意音频管线。
+Restore lossy compressed music by estimating missing/damaged high-frequency spectra
+and combining the neural prediction with DSP. The reference is paired original
+lossless audio. Spectral shape, magnitude, energy envelopes and real transients come
+first; phase, waveform, preserved bands, stereo and continuity constrain fidelity.
+Merely raising treble or reducing enhancement is not success.
 
-## 核心目标
+The Rust library, CLI, streaming adapter and runnable demos exist. Bundled synthetic
+identity graphs exercise inference; qualified restoration weights are not published.
+P38 training is complete and unqualified. P39 provides gradient and timing diagnostics,
+not new production weights. See [research](../docs/research.md) and the mandatory
+[failure registry](../docs/failed-experiments.md) before designing another experiment.
 
-1. **实时性**：实时回放增强，默认128-frame回调；新增软件延迟目标<8ms、红线<10ms，回调不等模型并保持连续输出（完整标准见 `docs/realtime-standard.md`）
-2. **轻量化**：模型参数 1-2M，ONNX 文件 < 8MB，单 forward pass 无迭代
-3. **通用性**：同时支持音乐和语音场景
-4. **流式处理**：支持实时音频流的逐帧低延迟输入输出
-5. **文件处理**：支持对完整音频文件进行离线增强（不集成解码，由调用方提供 PCM）
-6. **智能门禁**：自动检测输入音频是否需要增强（高频是否被裁剪），避免无效处理
-7. **DSP 修复**：确保补偿部分的响度、相位与原始频段一致
+## Technology and repository map
 
-## 技术选型结论
+- Rust workspace: `crates/soundex-core`, `crates/soundex-dsp`, `crates/soundex-cli`.
+- CPU ONNX Runtime through `ort` for deployment; PyTorch for training and export.
+- `training/`: separate data, models, evaluation, configurations, scripts and tests.
+- `models/`: published synthetic fixtures, model metadata and release status.
+- `docs/` and `legal/`: maintained English engineering, research and provenance records.
+- `data/`: ignored local originals, prepared pairs, registrations, frozen execution
+  source, checkpoints, diagnostics and cleanup receipts. It is not disposable merely
+  because it is ignored. See [workspace layout](../docs/workspace.md).
 
-### 模型方案
+## Delivery boundaries
 
-融合 2023-2026 年音频超分辨率领域 SOTA 成果：
+Source and documentation use Apache-2.0. Formal model releases require the documented
+model card and artifact/provenance review; local experiments are not automatically
+released weights. Original training audio is not committed. Submit source/attribution
+documentation instead. Commit as BackRunner <dev@backrunner.top> in logical
+Conventional Commits.
 
-| 来源 | 借鉴内容 |
-|------|----------|
-| AERO (ICASSP 2023) | 频谱域 U-Net 编码器-解码器 + GAN 训练策略 |
-| AP-BWE (TASLP 2024) | 双流（幅度 + 相位）并行预测 |
-| UL-UNAS (2025) | 深度可分离卷积(DWS) + 倒置残差块(MB) 轻量化 |
-| Bridge-SR (ICASSP 2025) | 1.7M 参数验证 + 频域辅助监督 |
-| SFNet (TASLP 2026) | 源滤波器启发的频率分解 |
-| MS-BWE (Interspeech 2024) | STFT 域操作 + iSTFT 重建 |
-
-### 推理引擎
-
-- **主选**：ort 2.0.0-rc.9+（ONNX Runtime Rust 绑定）
-- **备选**：tract（纯 Rust，feature-gated，面向嵌入式）
-
-### 训练框架
-
-- PyTorch 2.x + torchaudio
-- 数据：Slakh2100 整轨 mix + 通用音频目录；扩充各种音频模式，压缩生成训练对
-- 代码许可：Apache-2.0（LICENSE）
-- 正式发布权重：Apache-2.0，可供其他开源项目集成、分发、修改和商用；MODEL_WEIGHTS_LICENSE.md 说明适用范围
-- 第三方数据：legal/TRAINING_DATA.md 与 NOTICE；MUSDB 入口移除，训练不设许可白名单，正式发布时核对实际授权；历史 MUSDB checkpoint 留作研究记录
-- 导出：PyTorch → ONNX
-
-### Rust 核心依赖
-
-| 功能 | Crate |
-|------|-------|
-| 推理 | ort |
-| 解码(CLI) | symphonia |
-| WAV 输出 | hound |
-| FFT | rustfft + realfft |
-| 重采样 | rubato |
-| DSP 辅助 | dasp |
-| CLI | clap |
-
-## 工程结构
-
-```
-soundex/
-├── Cargo.toml              # workspace root
-├── crates/
-│   ├── soundex-core/       # 核心 lib：模型推理 + 流式处理
-│   ├── soundex-dsp/        # DSP：STFT、带宽检测、后处理
-│   └── soundex-cli/        # CLI：文件解码 → 增强 → WAV 输出
-├── training/               # Python 训练工程
-├── models/                 # 预训练 ONNX 模型（git-lfs）
-├── tests/                  # 集成测试 + 测试音频
-├── benches/                # Criterion benchmarks
-└── .agents/                # 项目规划文档（本目录）
-```
-
-## 开源协议
-
-Apache License 2.0
-
-## 交付物
-
-1. `soundex-core`：Rust lib crate，暴露简洁 API 供调用方集成
-2. `soundex-cli`：命令行工具，`soundex input.mp3 -o output.wav`
-3. 训练工程：可本地/AutoDL 运行的完整训练 pipeline
-4. 预训练模型：ONNX 格式，通过 git-lfs 管理
+The root [AGENTS.md](../AGENTS.md) contains the binding engineering instructions.
+These notes are maintained design guidance, not evidence that every proposed feature
+or release gate has passed. Older planning sketches remain in Git history.

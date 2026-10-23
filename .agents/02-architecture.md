@@ -1,268 +1,58 @@
-# SoundEx 架构设计
+# SoundEx architecture
 
-## Workspace 结构
+## Boundaries
 
-```
-soundex/                          # Cargo workspace root
-├── Cargo.toml                    # [workspace] members = ["crates/*"]
-├── crates/
-│   ├── soundex-core/             # 核心推理 lib
-│   │   ├── Cargo.toml
-│   │   └── src/
-│   │       ├── lib.rs            # 公共 API 入口
-│   │       ├── config.rs         # 配置结构
-│   │       ├── processor.rs      # SoundExProcessor 主逻辑
-│   │       ├── inference.rs      # ONNX 推理封装
-│   │       ├── stream.rs         # 流式处理状态机
-│   │       └── error.rs          # 错误类型
-│   ├── soundex-dsp/              # DSP 算法库
-│   │   ├── Cargo.toml
-│   │   └── src/
-│   │       ├── lib.rs
-│   │       ├── stft.rs           # STFT / iSTFT
-│   │       ├── bandwidth.rs      # 带宽检测（门禁）
-│   │       ├── loudness.rs       # 响度分析与匹配
-│   │       ├── phase.rs          # 相位处理与平滑
-│   │       ├── crossover.rs      # 频段平滑过渡
-│   │       ├── limiter.rs        # 限幅保护
-│   │       └── window.rs         # 窗函数
-│   └── soundex-cli/              # CLI 工具
-│       ├── Cargo.toml
-│       └── src/
-│           └── main.rs           # CLI 入口
-├── training/                     # Python 训练工程（独立于 Cargo）
-│   ├── configs/
-│   │   └── default.yaml
-│   ├── data/
-│   │   ├── audio_prep.py         # 共享 MP3 降质 / 切片
-│   │   ├── preprocess_library.py # 音频目录或可选清单，压缩生成训练对
-│   │   └── dataset.py            # PyTorch Dataset
-│   ├── models/
-│   │   ├── generator.py          # 生成器网络
-│   │   ├── discriminator.py      # 判别器网络
-│   │   └── losses.py             # 损失函数
-│   ├── train.py                  # 训练入口
-│   ├── evaluate.py               # 评估脚本
-│   ├── export_onnx.py            # ONNX 导出
-│   ├── requirements.txt
-│   └── Dockerfile                # AutoDL 迁移
-├── models/                       # 预训练模型 (git-lfs)
-│   └── soundex-v1.onnx
-├── tests/                        # 集成测试
-│   ├── fixtures/                 # 测试音频片段
-│   └── integration_test.rs
-├── benches/                      # Benchmark
-│   └── bench.rs
-├── .gitignore
-├── .gitattributes                # git-lfs 配置
-├── LICENSE                       # Apache 2.0
-└── .agents/                      # 项目规划文档
+`soundex-dsp` owns FFT/windowing, spectral analysis, bandwidth estimation, gain,
+phase/fusion, overlap-add and limiting. It must not depend on file codecs or the
+training framework. `soundex-core` owns model contracts, ONNX inference, stream state,
+processing configuration, worker/callback adaptation and error handling. `soundex-cli`
+owns decoding, user options and file output.
+
+Python training separates source preparation, model/loss definitions, evaluation and
+registered execution. Frozen experiment source is independent of later main-branch
+edits. Shared historical modules remain when current imports or reproducible controls
+need them; old filenames alone do not justify deletion.
+
+## Streaming data flow
+
+```text
+host callback -> preallocated input queue -> worker
+worker: causal frontend -> model -> DSP fusion/synthesis -> output queue
+host callback: aligned output or smooth fixed-timeline fallback
 ```
 
-## 模块职责与依赖关系
+The callback does no inference, allocation or blocking. Each physical channel owns
+its causal history; silence and bypass advance state. Reset, dropped-frame recovery
+and model replacement clear history. Enhancement warmup returns aligned dry audio
+without creating a hidden extra output delay. The worker's fixed buffer and compute
+cost are reported separately.
 
-```
-┌─────────────────────────────────────────────────────┐
-│                   soundex-cli                        │
-│  (symphonia 解码 → PCM → soundex-core → WAV 输出)   │
-└──────────────────────┬──────────────────────────────┘
-                       │ 依赖
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│                   soundex-core                       │
-│  (模型加载、推理调度、流式状态管理、API 暴露)         │
-└──────────────────────┬──────────────────────────────┘
-                       │ 依赖
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│                   soundex-dsp                        │
-│  (STFT/iSTFT、带宽检测、响度匹配、相位修复、限幅)    │
-└─────────────────────────────────────────────────────┘
-```
+Offline processing uses the same relevant model/DSP semantics, with explicit startup,
+flush and tail behavior. It does not certify callback scheduling or queue recovery.
 
-- `soundex-core` 依赖 `soundex-dsp` + `ort`
-- `soundex-cli` 依赖 `soundex-core` + `symphonia` + `hound` + `clap`
-- `soundex-dsp` 依赖 `rustfft` + `realfft` + `dasp`（纯计算，无 I/O）
+## Model and experiment contracts
 
-## 数据流
+Production models validate metadata, tensor shape, sample rates and supported
+contracts before processing. Causal experimental models export explicit state and
+input/output timelines. Experimental size exemptions are explicit and do not migrate
+the production contract. Diagnostic fusion/condition options stay in diagnostic
+constructors and tools, not ordinary product controls.
 
-### 流式处理管线
+Native frontend observations and actual Rust synthesis are the deployment reference
+for parity. A differentiable proxy must state its differences and pass the registered
+correspondence checks. Synthesis equality does not establish perceptual restoration.
 
-```
-Input PCM Frame (512 samples, f32)
-        │
-        ▼
-┌─────────────────┐
-│  Ring Buffer    │  ← 累积至完整分析帧 (1024 samples)
-│  (overlap-add)  │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  STFT           │  → 1024-pt FFT, Hann window
-│  Analysis       │  → 输出: log-magnitude + phase
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Bandwidth      │  → 检测高频是否截断
-│  Detector       │  → 若未截断: bypass
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  ONNX Model     │  → 输入: 完整 log-mag + phase
-│  Inference      │  → 输出: 候选完整 log-mag + phase
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  DSP Post-      │  → 响度匹配
-│  Processing     │  → 相位平滑
-│                 │  → 交叉渐变
-│                 │  → 限幅
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  iSTFT          │  → 重建时域信号
-│  Synthesis      │  → overlap-add
-└────────┬────────┘
-         │
-         ▼
-Output PCM Frame (512 samples, f32)
-```
+## Features and errors
 
-### 文件处理管线
+`ort-backend` is the default inference feature; no-ORT configurations remain useful
+for DSP and contract checks. `embedded-model` is an explicit feature, not a claim
+that a qualified restoration model is bundled. See Cargo manifests for exact feature
+and dependency definitions.
 
-```
-Input File (MP3/AAC/FLAC/WAV/OGG)
-        │
-        ▼  [soundex-cli: symphonia 解码]
-PCM Buffer (full length, f32)
-        │
-        ▼  [soundex-core: process_buffer]
-Enhanced PCM Buffer
-        │
-        ▼  [soundex-cli: hound 编码]
-Output WAV File
-```
+Library errors are typed; CLI errors add actionable context. Initialization/contract
+failure happens before callback processing. Runtime failures retain a stable timeline
+and smooth fallback rather than blocking the callback or injecting discontinuities.
 
-## 核心接口设计
-
-### soundex-dsp
-
-```rust
-/// STFT 分析器
-pub struct StftAnalyzer {
-    fft_size: usize,      // 1024
-    hop_size: usize,      // 512
-    window: Vec<f32>,     // Hann
-}
-
-impl StftAnalyzer {
-    pub fn new(fft_size: usize, hop_size: usize) -> Self;
-    /// 分析一帧，返回 (log_magnitude, phase)
-    pub fn analyze(&self, frame: &[f32]) -> (Vec<f32>, Vec<f32>);
-    /// 从幅度+相位重建时域信号
-    pub fn synthesize(&self, magnitude: &[f32], phase: &[f32]) -> Vec<f32>;
-}
-
-/// 带宽检测器
-pub struct BandwidthDetector {
-    threshold_db: f32,
-    smoothing_frames: usize,
-}
-
-impl BandwidthDetector {
-    pub fn new(threshold_db: f32) -> Self;
-    /// 检测当前帧的有效带宽 (Hz)
-    pub fn detect(&mut self, magnitude_spectrum: &[f32], sample_rate: u32) -> f32;
-    /// 判断是否需要增强
-    pub fn needs_enhancement(&self, detected_bandwidth: f32, nyquist: f32) -> bool;
-}
-
-/// 响度匹配器
-pub struct LoudnessMatcher { /* ... */ }
-
-/// 相位平滑器
-pub struct PhaseSmoother { /* ... */ }
-
-/// 频段交叉渐变
-pub struct CrossoverBlend { /* ... */ }
-
-/// 限幅器
-pub struct Limiter { /* ... */ }
-```
-
-### soundex-core
-
-```rust
-/// 推理引擎封装
-pub struct InferenceEngine {
-    session: ort::Session,
-}
-
-impl InferenceEngine {
-    pub fn load(model_path: &Path) -> Result<Self, SoundExError>;
-    /// 执行推理：输入低频频谱特征，输出高频频谱特征
-    pub fn infer(&self, input_features: &[f32]) -> Result<Vec<f32>, SoundExError>;
-}
-
-/// 流式处理器（组合 DSP + 推理）
-pub struct SoundExProcessor {
-    engine: InferenceEngine,
-    stft: StftAnalyzer,
-    detector: BandwidthDetector,
-    loudness: LoudnessMatcher,
-    phase_smoother: PhaseSmoother,
-    crossover: CrossoverBlend,
-    limiter: Limiter,
-    ring_buffer: RingBuffer,
-    state: ProcessorState,
-}
-```
-
-## Feature Flags
-
-```toml
-# soundex-core/Cargo.toml
-[features]
-default = ["ort-backend"]
-ort-backend = ["ort"]           # ONNX Runtime 后端
-tract-backend = ["tract-onnx"]  # 纯 Rust 后端（嵌入式）
-embedded-model = []             # 嵌入默认模型到二进制
-```
-
-## 线程模型
-
-- 实时回调使用 `RealtimeProcessor`：256/128，128 samples STFT + 128 samples
-  worker 交接，固定 256 samples/channel 延迟。音频侧使用预分配的 `rtrb` SPSC
-  有界队列，不调用模型，不等待、不加锁、不分配。迟到结果按时间戳丢弃，退回
-  同样延迟的原始音频；双声道共享 128 samples 渐变及最终限幅。
-- `SoundExProcessor` 是同步 DSP/ORT 管线，供独立推理线程、离线 CLI 和质量评估
-  串行使用。不要用 `Mutex<SoundExProcessor>` 包装后在实时回调中等待推理。
-- 模型加载、线程创建、重建或 shutdown/join 在控制线程执行。worker 失败不停止
-  音频侧输出；恢复增强需要在控制线程更换实时适配层。
-- 主机回调建议 128 frames 并与 hop 对齐，任意块大小仍保证输出长度；更小块
-  完成输入 hop 后的计算时间更短，更大块也会降低增强结果准时率。实际设备
-  延迟、xrun 和长期调度稳定性单独验收。
-
-## 错误处理
-
-```rust
-#[derive(Debug, thiserror::Error)]
-pub enum SoundExError {
-    #[error("Failed to load model: {0}")]
-    ModelLoad(String),
-
-    #[error("Inference failed: {0}")]
-    Inference(String),
-
-    #[error("Invalid input: {0}")]
-    InvalidInput(String),
-
-    #[error("Sample rate mismatch: expected {expected}, got {got}")]
-    SampleRateMismatch { expected: u32, got: u32 },
-}
-```
+See [library integration](../docs/library.md), [real-time standard](../docs/realtime-standard.md),
+[parity](../docs/parity.md) and [model status](../models/README.md). The root
+[AGENTS.md](../AGENTS.md) is authoritative over historical API sketches.
