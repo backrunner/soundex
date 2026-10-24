@@ -5,67 +5,23 @@ Use Python 3.12 and FFmpeg with the encoders required by your recipe. Install
 PyTorch for your hardware first; see [environment setup](scripts/environment.md)
 for CPU, Apple MPS and CUDA constraints. Do not install a CUDA wheel on macOS.
 
-Latest completed experiment: [P33 broad spectrum supervision](../docs/broad-spectrum-study.md).
-Four fresh 431K-parameter trajectories, 16,192 updates each, paired broad schedules
-covering 253 training music recordings and 193 speech recordings. All endpoints
-freeze before recording-isolated reused validation. No new independent-test claim,
-mid-run selection or promotion. All training and native reviews completed: no added
-MR music advantage over control; speech means improved but dynamics regressed.
-Two of 280,000 compute calls exceeded 5 ms. No subsequent training has started.
-Preflight and 632 Python tests passed.
+Current work: [P54 common comparison and spectral training](../docs/spectral-training-p54.md).
+The historical baseline and current small models now share the same raw/native
+comparison. Current models improve speech spectra, music temporal detail and
+clean-input fidelity, but music log-shape still trails historical weights.
 
-Previous experiment: [P32 spectrum-first multi-resolution supervision](../docs/spectrum-priority-study.md).
-Three matched 431K-parameter models, two seeds and 1,024 steps each on fixed training
-crops. Control, added MR and primary MR objectives are scored with the same
-256/1024/2048-point spectrum metrics before auxiliary phase/PCM checks. No samplewise
-waveform loss is optimized. All six endpoints and native reviews completed.
-Added MR reduced native music spectrum error by 2.02–2.35% versus matched control
-on fitted crops; dynamics/PCM and generalization remain unresolved. All 420,000
-timing hops are retained, including 91 >5 ms calls (max 45.00 ms). No promotion.
-P32 preflight and its 620 tests passed; P33 now extends actual training coverage.
+The training environment pins auraloss 0.4.0. Its convergence/log-magnitude
+operators are used with explicit per-example physical-band reductions, smooth
+reference floors and unpadded supervised windows. A separate TRAIN-only
+persistent-Adam calibration precedes matched 4096-update continuation on broader
+source-time crops. No new weights are qualified or promoted. Consult the linked
+report and local receipts for actual calibration/training completion.
 
-Previous experiment: [P31 phase input and residual coordinates](../docs/phase-coordinates-study.md).
-All eight 512-step endpoints, 320 full native roles and 560,000 timing hops completed.
-Relative phase-input models traded amplitude improvement for worse PCM fidelity;
-global Cartesian models learned almost no residual. No promotion or generalization
-claim. Compute p99 stayed below 1 ms per case, but nine hops exceeded 5 ms and
-79 paced completions were late. Independent preflight, 608 tests and code CI passed.
-
-Latest audit: [P30 HF amplitude/phase swaps](../docs/phase-swap-audit.md).
-All eight P29 endpoints, 20 fitted crops and 1,320 native DSP roles completed.
-Reference-assisted diagnostics identify phase and fusion constraints; no new
-training or model promotion in P30; P31 implements the proposed controlled comparison.
-
-Latest diagnostic: [P29 direct spectrum versus deployed supervision](../docs/direct-spectrum-study.md).
-Four matched 431K-parameter configurations, two seeds, 512 updates each on 20 fixed
-training crops. Direct clean amplitude/complex/envelope/dynamics supervision is
-tested separately and jointly with the old deployed objective, plus a fixed-budget
-control. This is early learnability diagnosis, not full training or generalization.
-All eight endpoints and 320 full native roles completed. Direct supervision
-improved HF energy reconstruction, but complex, transient and PCM errors did not
-improve together. No promotion, automatic continuation or generalization claim.
-
-Latest completed run: [P28 small-model mechanism controls](../docs/small-mechanism-study.md).
-Four 96-wide configurations (431K–456K parameters), two seeds, 2,048 updates each.
-Decoder normalization, budget-auxiliary gradient isolation and observed-phase
-inputs were tested separately against a matched control. All eight endpoints,
-1,424 full native roles and 560,000 timing hops completed. No intervention passed
-the two-seed improvement screen; near-identity output persists without GELU collapse
-on the diagnostic crops. All compute stayed below 5 ms, but hop deadlines still missed.
-It is an optimization diagnosis, not full convergence or permission to scale up.
-
-[P27](../docs/head-collapse-audit.md) retired the 640-wide / 11.92M-parameter route.
-Its residual decoder was largely inactive. The new DSP excitation/filter controller
-is still a later experiment; P28 first isolates three mechanisms without changing
-loss values, weights or the deployed DSP chain.
-
-[P26](../docs/broad-budget-study.md) completed all eight full-budget trajectories,
-24 exports, 1,424 full native roles and 560,000 timing hops. Broad arms stayed close
-to identity DSP; no overall recovery was established. Compute was below 5 ms in
-that run, but hop deadlines still missed. The DSP excitation route remains
-unimplemented; P28 addresses the smaller mechanism controls first. Earlier protocols are indexed in
-[research history](../docs/research.md); archived commands in `EXPERIMENTS.md`
-are for reproducing evidence, not recommendations to restart rejected runs.
+Earlier P2-P53 protocols, failed criteria and source snapshots remain in
+[research history](../docs/research.md) and the
+[failure registry](../docs/failed-experiments.md). Archived commands in
+`EXPERIMENTS.md` reproduce historical evidence; they are not recommendations to
+restart rejected runs. Different historical totals are not comparable losses.
 
 The source library has
 300 reviewed native-lossless music works split into 253 train / 26 validation /

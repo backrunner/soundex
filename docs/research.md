@@ -1,6 +1,17 @@
 # Research status and experiment history
 
-Latest completed pilot: [P53 balanced preservation](balanced-preservation-pilot.md).
+Current work: [P54 common comparison and spectral training](spectral-training-p54.md).
+Historical shape-small, both P38 seeds, P52 no-extra-preservation controls and
+both P53 logit endpoints have completed the same raw/native PCM comparison.
+Current models improve speech spectra, music dynamics and clean-input fidelity,
+but music log-shape remains worse than historical weights; there is no universal
+winner. Pinned auraloss operators and genuine Adam updates are implemented.
+Separate TRAIN-only persistent-update calibration completes all twelve trajectories
+and selects 1e-7; matched 4096-step broad-crop continuation is running. No new
+quality, convergence or promotion claim follows
+from the implementation or registration. See the report for live-run evidence.
+
+Previous completed pilot: [P53 balanced preservation](balanced-preservation-pilot.md).
 Six matched 128-update trajectories, twelve raw reports, six exports and 480 new
 native roles finish. Fixed corpus-gradient balancing improves clean-speech HF4k
 MSE by 12.53% / 11.89% versus P52 physical, but loses paired spectral benefit

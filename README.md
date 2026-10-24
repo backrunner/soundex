@@ -12,12 +12,14 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-Latest completed comparison: [P53 balanced preservation](docs/balanced-preservation-pilot.md).
-All six 128-update trajectories, frozen raw reviews and 480 native roles finish.
-Corpus balancing improves clean-speech preservation, but physical penalties still
-lose paired spectral benefit against matched controls; no weight is promoted.
-A fit-only probe confirms that equal initial gradient RMS does not match Adam's
-actual parameter updates. All 740 Python tests and implementation CI pass.
+Latest work: [P54 common comparison and spectral training](docs/spectral-training-p54.md).
+The old baseline and current small models now share a fixed raw/native comparison:
+current models improve speech, music dynamics and clean-input preservation, but
+do not consistently beat historical music spectra. Auraloss operators are pinned
+and tested; all twelve calibration runs finish and select a shared rate of 1e-7.
+Matched 4096-update continuation with broader source-time coverage is running. No new model
+is qualified or promoted. [P53](docs/balanced-preservation-pilot.md) remains a
+completed failed preservation-penalty comparison, not an accumulated quality gain.
 
 Runtime remains unqualified: across 78,000 measured hops, four calls exceed 5 ms
 (maximum 7.403 ms), with six hop service overruns and 14 paced late completions.

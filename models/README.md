@@ -11,6 +11,13 @@ No qualified restoration weights are published yet. The bundled
 [synthetic identity fixtures](../tests/fixtures/README.md) run the demos immediately;
 they use Apache-2.0 and do not restore missing frequencies.
 
+The latest [P54 common comparison and training protocol](../docs/spectral-training-p54.md)
+compares historical shape-small with current small models under the same raw/native
+scoring and DSP. Neither is uniformly better. Auraloss and actual-step calibration
+are experimental training changes; they do not introduce a released weight file.
+Use [research status](../docs/research.md) for current results; the entries below
+describe historical artifact provenance rather than current training status.
+
 The historical MUSDB candidate has 806,276 parameters and an approximately
 3.16 MiB ONNX graph. It passes the [numerical parity audit](../docs/parity.md),
 but is an unpublished research experiment excluded from the application-ready
@@ -23,7 +30,7 @@ on 2026-10-10. Its selected epoch-168 checkpoint is about 12.94 MiB including
 training state; its local diagnostic ONNX is 3.16 MiB and passes 13 cross-runtime
 parity cases. The [deployment diagnostic](../docs/native-validation-20261010.md)
 does not establish restoration/release qualification; see
-[current training](../docs/native-training-20261009.md) and the hash-bound
+[original training](../docs/native-training-20261009.md) and the hash-bound
 [current license review](../legal/WEIGHT_LICENSE_REVIEW.md).
 
 The [objective-v2 continuation](../docs/loss-audit-20261010.md) imports only that
