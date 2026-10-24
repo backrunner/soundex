@@ -1,5 +1,9 @@
 # Research status and experiment history
 
+Current registered comparison: [P53 balanced preservation](balanced-preservation-pilot.md).
+Correct P52 corpus and batch-gradient calibration separately with fixed fit-only
+coefficients. Six 128-update trajectories and reused P52 controls; results pending.
+
 Latest completed pilot: [P52 physical preservation](physical-preservation-pilot.md).
 Six matched 128-update trajectories, twelve raw reports and 480 new native roles
 finish. The physical auxiliary reduces clean-music error but loses paired spectral
