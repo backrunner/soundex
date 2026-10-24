@@ -1,6 +1,21 @@
 # Research status and experiment history
 
-Latest intervention: [P48 isolated spectral adapter](spectral-adapter-pilot.md).
+Latest calibration: [P49 adapter update scale](adapter-scale-calibration.md).
+All 64 reset first-step probes and frozen guard reviews complete. Full Adam
+overshoots in every probe; fixed 0.001 scaling and fit-only backtracking both
+improve all fit totals. Guard total improves/worsens/is near the numerical floor
+in 35/16/13 fixed probes versus 18/42/4 backtracked probes. The largest fit-passing
+step is not a reliable transfer rule. Fixed high-support updates pass the
+16/20-bit reference rulers with tiny spectral gains; 24-bit identity and
+complex/temporal counterexamples remain. Absolute PCM checks prevent weak-band
+relative scores from being mistaken for audible severity. These are independent
+one-step models, not a cumulative training run or generalization evidence.
+A bounded continuous-update pilot is the next proposed test. No new weight,
+long training or runtime qualification is claimed. The receipt-path execution
+failure was repaired and reviewed from unchanged frozen proposals; both original
+and recovery evidence remain. The complete 721-test Python suite and code CI pass.
+
+Previous intervention: [P48 isolated spectral adapter](spectral-adapter-pilot.md).
 All four 128-step runs, six frozen raw reviews and 560 native role replays finish.
 High support reduces low-band preservation failures while retaining small music
 MR gains (raw 0.120-0.214%; native 0.137-0.242% versus the corresponding start).

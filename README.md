@@ -36,9 +36,18 @@ small adapter with isolated output support is tested in the completed
 [P48 pilot](docs/spectral-adapter-pilot.md). All four 128-step runs and raw/native
 reviews finish. High-band isolation preserves low frequencies more effectively,
 but small spectral gains retain identity/phase/dynamics regressions. The first
-Adam step overshoots even on its own fit data; update-scale calibration is needed
-before another run. Final compute stays below 5 ms, but nine paced delays remain.
+Adam step overshoots even on its own fit data. Final compute stays below 5 ms,
+but nine paced delays remain.
 No new restoration weight is qualified.
+
+[P49 update-scale calibration](docs/adapter-scale-calibration.md) completes 64
+independent first-step probes. Scaling fixes fit descent in all 64, but fit-only
+backtracking worsens guard total in 42 probes (18 improve, four are near the
+numerical floor). Fixed 0.001 displacement is more conservative: 35 improve,
+16 worsen and 13 are near. Its high-support probes pass the existing 16/20-bit
+preservation rulers, with retained 24-bit identity counterexamples and tiny
+spectral gains. This supports a bounded cumulative-update check, not a claim
+of convergence or qualified audio. No new training trajectory is launched.
 
 [P43](docs/spectral-priority-update-audit.md) gives a positive spectrum-priority
 diagnostic: at fixed radius 0.001, amplitude improves on 28/32 reused-training
