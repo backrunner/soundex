@@ -88,6 +88,86 @@ not support regional or genre-wide conclusions.
 | Is the loss mathematically valid and useful? | Reference/gradient/isolation checks pass. Training usefulness is a separate empirical question; both objectives retain common scoring and endpoint barriers. |
 | Is real-time delivery solved? | No. This quality comparison is not a timing test. P53's wall-time tail and actual worker/device qualification remain open, independently of spectral gains. |
 
+### Metric sensitivity audit
+
+The follow-up audit at `data/reports/metric-audit-p54-20261024/` reuses the frozen
+native outputs, original references and identical supervised regions. Its retained
+`audit.py` and `audit.json` reproduce all 400 clip/path MR scores exactly (maximum
+difference zero), recover each aggregate from its frequency-band components, and
+retain input-render hashes and source-level paired differences. This is an
+exploratory decomposition, not a new candidate-selection rule or fresh test.
+
+The 32 music clips contain only **14.7525 seconds of scored PCM in total**,
+approximately 0.443-0.482 seconds each after warmup/support removal. They come from
+25 source recordings. Neither recording count nor total rendered duration should
+be mistaken for scored exposure or adequate listening-test excerpts.
+
+| Native paired-music band MR, lower is better | Untreated | Historical | P53 seed 12 | P53 seed 13 |
+| --- | ---: | ---: | ---: | ---: |
+| 0-4 kHz | 0.114690 | 0.120982 | 0.120851 | 0.120851 |
+| 4-8 kHz | 0.297852 | 0.313421 | 0.306535 | 0.306531 |
+| 8-12 kHz | 0.388309 | 0.401833 | 0.393029 | 0.393465 |
+| 12-16 kHz | 0.434373 | 0.413909 | 0.425756 | 0.426636 |
+| 16 kHz-Nyquist | 0.509440 | 0.482817 | 0.486853 | 0.492582 |
+
+Current models improve 8-12 kHz relative to the old weights, but still trail
+untreated input there. Both recover some 12+ kHz spectral agreement versus
+untreated input; the old weights recover more by this measure. The historical
+advantage is therefore not solely a low-band or waveform preference in a total
+score. Conversely, lower music dynamics error than historical weights does not
+mean lower error than untreated input (0.203330 versus current 0.206338/0.206228).
+
+Weighting is material: seed 12 music MR is 0.0098% worse by clip mean but 0.4503%
+better when first averaging within each source and then giving sources equal
+weight. Seed 13 is 0.0315% worse by source mean. A paired source bootstrap
+(2,000 samples, seed 54, sorted source keys) gives exploratory 95% intervals for
+the MR difference of [-0.012233, 0.008756] and [-0.010649, 0.010766], respectively.
+Both cross zero. Log-magnitude difference intervals remain positive and dynamics
+difference intervals remain negative. These reused-TRAIN, post-hoc intervals have
+no multiple-comparison adjustment; they describe sensitivity, not confirmatory
+significance, generalization or permission to choose a favorable weighting.
+
+Metric interpretation has three important limits:
+
+- The metric called `log_shape` is a reference-floored log-magnitude distance,
+  not a gain-independent spectral-shape measure or a perceptual rating. Relative
+  floors and fixed band weights are engineering choices, not calibrated audibility
+  thresholds. More accurate low-level magnitudes can help the score without
+  establishing correct phase, coherent detail or audible benefit.
+- Native music HF8k PCM error RMS is 0.0087215 for historical weights and
+  0.0083731/0.0083760 for current weights, but untreated is lower at 0.0081697.
+  Spectral-magnitude and phase-sensitive waveform rankings disagree. Keep both;
+  neither proves that more generated high-frequency content is correct.
+- The added auraloss-band diagnostic uses different operators but shares the
+  bands, resolutions and reference floors. It is corroborating spectral evidence,
+  not an independent perceptual judge. Equal paired/identity weighting in training
+  and learning-rate calibration is an optimization choice, not a quality verdict.
+
+The old weights inherit an epoch-168 checkpoint and multiple continuations,
+whereas recent P48-P54 work changes a 49,794-parameter adapter on frozen features.
+P38 itself received full matched training; it is inaccurate to call every newer
+model a short run. Unequal histories, repeated development selection and coupling
+to DSP prevent attributing the old result to architecture superiority or proving
+overfitting. See the [baseline audit](baseline-generalization-20261012.md).
+
+The next evaluation should preregister source-balanced spectral outcomes and
+retain clip-weighted sensitivity, frequency-band/codec strata, absolute PCM rulers,
+untreated and identity-DSP controls, and paired recording uncertainty. Use longer
+aligned excerpts from fresh sources and simultaneous stereo for final review.
+Add blinded reference-based listening following
+[ITU-R BS.1534](https://www.itu.int/rec/R-REC-BS.1534-3-201510-I/en), with a method
+appropriate to the impairment level. A secondary
+[ViSQOL audio-mode](https://github.com/google/visqol) diagnostic would require
+48 kHz input and suitable excerpt duration (the official guidance suggests
+8-10 seconds); it downmixes channels and cannot validate stereo imaging. Do not
+apply it to these subsecond crops and treat the result as validated MOS.
+
+[Manocha et al.](https://arxiv.org/abs/2206.13411) demonstrate cases where audio
+similarity metrics disagree with perception. That motivates independent listening;
+it does not prove SoundEx's current music output wins, nor justify abandoning the
+original-reference spectral target. The running P54 objectives, calibration rule,
+learning rate, budgets and freeze-before-review barrier remain unchanged.
+
 ## Auraloss integration
 
 Pin [auraloss 0.4.0](https://pypi.org/project/auraloss/0.4.0/), Apache-2.0, for

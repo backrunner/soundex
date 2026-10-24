@@ -93,6 +93,16 @@ A positive submetric is retained even when the candidate is not qualified.
 
 ## Earlier routes and operational failures
 
+The [P54 metric sensitivity audit](spectral-training-p54.md#metric-sensitivity-audit)
+reproduces all 400 audited scores exactly but limits the common comparison to
+14.75 seconds of scored music. Source weighting reverses seed 12's tiny MR ranking;
+both seeds' exploratory source-bootstrap MR intervals cross zero. Historical
+weights still have lower 12+ kHz band MR on these clips, while current models
+improve other dimensions. Do not turn either ranking into an overall quality
+verdict, select a favorable metric retrospectively, or repeat short-crop evaluation
+as independent evidence. Longer fresh-source spectral and blinded listening
+evidence is needed; this audit changes no running training or promotion rule.
+
 | Evidence | Unresolved or unsuccessful result | Required control before revisiting |
 | --- | --- | --- |
 | [Original run](native-training-20261009.md), [loss audit](loss-audit-20261010.md), [follow-up](optimization-followup-20261010.md), [native review](native-validation-20261010.md) | Completing the original 200 epochs does not settle spectral restoration or deployment qualification. | Compare paired original references, untreated input and identity DSP under common scoring. |
