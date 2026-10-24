@@ -1,10 +1,15 @@
 # Research status and experiment history
 
-Current intervention: [P46 original-reference preservation](reference-preservation-pilot.md).
-It separates a corrected finite-step policy from adding absolute-reference MSE
-gradients to the update direction. All three fixed precision rulers, both small
-starts and the full 128-attempt budget remain registered. Exact P45 Adam controls
-are reused; intermediate acceptance is not a quality result.
+Latest completed intervention: [P46 original-reference preservation](reference-preservation-pilot.md).
+All twelve 128-attempt trajectories and 22 frozen endpoint reviews completed.
+Policy and projected methods both accept 6 / 5 updates at 16 bits, 2 / 2 at
+20 bits and none at 24 bits. Music MR falls about 0.06-0.07% at 16 bits, but
+identity and individual low-band peak regressions persist; added mean-MSE guards
+do not improve acceptance. All eight changed candidates fail their registered
+ruler on some separate reused-TRAIN review examples. Hashes and full histories
+were checked. No candidate is promoted and no follow-up training is launched.
+Next proposed diagnostics separate output-band coupling and the budget surrogate
+from per-example preservation; this pilot does not establish a capacity ceiling.
 
 Latest measurement: [P44 absolute PCM calibration](pcm-fidelity-calibration.md).
 Both small-model starts have mean identity errors hundreds of times larger than

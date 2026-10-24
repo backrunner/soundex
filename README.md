@@ -20,10 +20,13 @@ and stricter arms accept none. Some rejected low-band corrections reduce error
 against the clean reference; the preservation policy needs revision. No candidate
 is qualified or promoted.
 
-[P46](docs/reference-preservation-pilot.md) tests original-reference preservation
-with separate policy-only and additional-gradient controls, retaining all three
-precision rulers and matched small-model exposure. It is an experimental method
-pilot; final assessment waits for every registered trajectory.
+[P46](docs/reference-preservation-pilot.md) completed all twelve trajectories and
+22 frozen endpoint reviews. Correcting preservation improves music MR by about
+0.06-0.07% at the loosest ruler, but only 5-6 of 128 attempts take effect per arm.
+Additional reference gradients do not increase acceptance, and all changed
+candidates retain preservation failures on separate reused-TRAIN review clips.
+No new weights are qualified; further work must address per-example preservation
+and output coupling before repeating longer training.
 
 [P43](docs/spectral-priority-update-audit.md) gives a positive spectrum-priority
 diagnostic: at fixed radius 0.001, amplitude improves on 28/32 reused-training

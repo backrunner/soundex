@@ -106,16 +106,100 @@ Entry point: `training/scripts/run_reference_pilot.py`; local evidence:
 retains executed source snapshots. `complete.json` is written only after the
 raw, method-contrast, untreated and reference-error reviews all finish.
 
-## Status
+## Completed results
 
-All twelve candidate preflight branches completed, and both original Adam first
-updates reproduced exactly. Both seeds' 16-bit policy-only and projected first
-steps passed; tighter first-step policies rejected their proposals. This is
-execution/acceptance evidence, not convergence or quality, and no arm or budget
-was changed based on it.
+All twelve trajectories completed 128 registered attempts each. All 22 endpoints
+(two starts, eight reused P45 controls, twelve new candidates) finished the frozen
+raw and original-reference reviews. Integrity verification checked 243 bound
+inputs, all endpoint and raw-review hashes, final report receipts and all twelve
+checkpoint histories. JSON-normalized checkpoint histories exactly match their
+update logs; all four zero-update endpoints exactly match their initial parameters.
+There were **30 accepted updates across 1,536 attempts**. This is completion of a
+bounded method pilot, not 128 effective updates per arm or convergence.
 
-The fixed training run is now active with checkpointed updates. Completed local
-verification: **700 tests passed**, 223 existing warnings; Ruff checks and all
-124 English documentation/link/index checks pass. The run records all first-step
-preflight results, source hashes and logs. All twelve complete endpoints and their
-frozen reviews are still required before interpreting model quality.
+All changes below are relative to the corresponding frozen start. Negative error
+changes are better. Music means cover 128 paired or identity examples; reference
+violation counts cover 160 examples per role (128 music, 32 speech), at each arm's
+registered ruler. Categories can overlap, and these are reused TRAIN clips.
+
+| Seed | Method / ruler | Accepted / 128 | Music amplitude change | Music MR change | Music complex change | Music identity RMS change | Review violations: identity / low4k |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 20261012 | policy / 16 | 6 | -0.10491% | -0.06319% | +0.06374% | +4.9739% | 12 / 11 |
+| 20261012 | policy / 20 | 2 | -0.01178% | -0.00661% | +0.00576% | +0.4068% | 14 / 11 |
+| 20261012 | policy / 24 | 0 | +0.00000% | +0.00000% | +0.00000% | +0.0000% | 0 / 0 |
+| 20261012 | projected / 16 | 6 | -0.10073% | -0.06161% | +0.06302% | +3.8370% | 12 / 11 |
+| 20261012 | projected / 20 | 2 | -0.01539% | -0.00883% | +0.00957% | +0.4562% | 16 / 15 |
+| 20261012 | projected / 24 | 0 | +0.00000% | +0.00000% | +0.00000% | +0.0000% | 0 / 0 |
+| 20261013 | policy / 16 | 5 | -0.10688% | -0.06801% | +0.10265% | +8.9085% | 16 / 13 |
+| 20261013 | policy / 20 | 2 | -0.00948% | -0.00591% | +0.00781% | +0.4449% | 14 / 14 |
+| 20261013 | policy / 24 | 0 | +0.00000% | +0.00000% | +0.00000% | +0.0000% | 0 / 0 |
+| 20261013 | projected / 16 | 5 | -0.11364% | -0.07304% | +0.11489% | +7.9039% | 15 / 13 |
+| 20261013 | projected / 20 | 2 | -0.01609% | -0.01098% | +0.00360% | +0.4809% | 16 / 13 |
+| 20261013 | projected / 24 | 0 | +0.00000% | +0.00000% | +0.00000% | +0.0000% | 0 / 0 |
+
+The 16-bit policy-only arms reduce music amplitude error by 0.105% / 0.107% and
+MR by 0.063% / 0.068%, compared with P45's 0.004% / 0.006% MR reduction. Correcting
+the displacement policy therefore permitted more useful movement, but adding the
+two reference MSE gradients did not increase acceptance: both methods accept
+6 / 5 updates at 16 bits, 2 / 2 at 20 bits and none at 24 bits. Projection has mixed
+spectral effects across seeds and rulers; it is not a demonstrated overall gain.
+Against untreated compressed input, the 16-bit candidates reduce music MR by
+1.797-1.916%; their frozen starts already reduce it by 1.736% / 1.845%. Most of
+that total benefit is inherited and must not be credited to P46.
+The stronger matched Adam music MR reductions of 0.776% / 0.463% retain their
+previous fidelity tradeoffs and are not a qualified alternative.
+
+At 16 bits, speech paired MR falls 0.046% / 0.060% for policy and 0.044% / 0.067%
+for projection. At 20 bits, projected seed 20261013 instead raises speech MR by
+0.0064%; this counterexample is retained. Music complex error increases on every
+nonzero candidate. These small increases do not alone veto spectrum-first work,
+but neither phase nor reconstructed quality is established by magnitude gains.
+
+Music identity RMS error increases 4.974% / 8.908% for the 16-bit policy arms and
+3.837% / 7.904% for projection. Corresponding absolute PCM RMS increases are
+5.111e-7 / 1.440e-6 and 3.943e-7 / 1.278e-6. Relative percentages are not audible
+severity estimates. All eight changed candidates violate their own registered
+reference ruler on some separate review examples; unchanged 24-bit arms pass
+without restoring anything new.
+
+## Failure attribution and next decision
+
+Post-hoc attribution uses the last tested radius of every attempt; overlapping
+violations must not be summed as disjoint causes. Fit amplitude and MR improve
+on all 128 final proposals in every arm. The dominant obstruction is preservation
+and transfer, not failure to find any spectrum-descending direction:
+
+- At 16 bits, policy low4k peak checks fail on 90 / 103 attempts; identity peak
+  checks fail on 76 / 92. Projection changes these to 88 / 92 and 77 / 82,
+  respectively, without increasing accepted updates.
+- Guard auxiliary-budget checks also fail on 63 / 102 policy attempts and
+  63 / 101 projected attempts. This retained surrogate needs attribution against
+  original-reference quality before another long run; it is not itself a PCM
+  restoration measure, and its failures do not justify deleting the guard.
+- Group-mean MSE gradients constrain local averages, not individual peak errors,
+  finite recomputed-history responses or different recordings. On the separate
+  review, the 16-bit paired-low4k mean RMS error decreases for all four candidates,
+  yet 11 / 13 examples violate the corresponding peak allowance in each method.
+  An improving mean cannot certify individual preservation.
+
+Retained examples include seed 20261012, review draw 8731, paired example 3:
+projected low4k peak error rises from 0.150603934 to 0.150862412 PCM (increase
+2.58478e-4). Seed 20261013, draw 6198, identity example 1: projected peak error
+rises from 0.001702636 to 0.001932651 (increase 2.30014e-4). These absolute error
+statistics refer to the original clean target; no clipping or post-hoc ruler
+relaxation is applied. Neither peak statistics nor this review establish audibility.
+
+Do not simply extend this trajectory, enlarge the model, or loosen rulers until
+it passes. The next bounded diagnostic should isolate output-band coupling and
+the auxiliary-budget surrogate, then test whether update directions aimed at
+per-example preservation failures transfer better than pooled MSE. Any altered
+output support must preserve crossover continuity and be tested against original
+clean spectra before longer training. These are proposed diagnostics, not new
+implemented or launched experiments, and do not establish an architecture limit.
+
+The default weights remain unchanged. Rust DSP, simultaneous stereo, listening,
+independent generalization and real-time scheduling failures remain unqualified.
+Completed code verification: 700 tests passed (223 existing warnings), Ruff and
+124 English documentation/link/index checks passed; code CI 40011938045 passed.
+Local evidence adds `gate-attribution.json` and `completion-integrity.json` to the
+frozen run without modifying its registrations, checkpoints or review reports.
