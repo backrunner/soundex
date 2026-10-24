@@ -112,6 +112,11 @@ A positive submetric is retained even when the candidate is not qualified.
 
 ## Evidence retention and future entries
 
+[P52 physical preservation](physical-preservation-pilot.md) is the pending follow-up
+to P51's proxy mismatch. It compares new reference-aligned training constraints
+against unchanged small-step and logit-suppression controls. No improvement or
+qualification is assumed before all frozen reviews finish.
+
 Each linked report is the authoritative detailed record for its experiment, including
 per-seed and per-recording failures. This index consolidates routes rather than
 inventing missing measurements. Local `data/runs/` registrations, assessments,

@@ -1,5 +1,13 @@
 # Research status and experiment history
 
+Current work: [P52 physical preservation](physical-preservation-pilot.md) compares
+unchanged continuation, clean-logit suppression and original-reference high-band
+PCM supervision on the same small adapter. Auxiliary weights use fit-only initial
+gradient calibration; the common spectral objective stays unchanged. Six matched
+128-update trajectories and frozen raw/native review are registered. All 736 local
+tests pass; execution has started with fit-only calibration. Results are pending;
+no default weight is replaced.
+
 Latest completed diagnostic: [P51 adapter responses](adapter-response-audit.md).
 All eight analytic heads freeze before raw/native review; 640 new native roles
 finish. Selective suppression retains 76-83% of P50 raw music MR gains and reduces

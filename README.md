@@ -66,6 +66,13 @@ delays. The next comparison should align preservation with physical high-band
 residuals and original-reference reconstruction. No new training or promotion
 follows from this analytic diagnostic.
 
+[P52 physical-preservation pilot](docs/physical-preservation-pilot.md) implements
+the next bounded comparison: unchanged small-step continuation versus clean-logit
+and original-reference high-band PCM constraints, with fixed fit-only gradient
+calibration. Two starts and three matched 128-update trajectories per start are
+registered before execution. The run has started; results are pending and default
+weights remain unchanged. All 736 local tests pass.
+
 [P43](docs/spectral-priority-update-audit.md) gives a positive spectrum-priority
 diagnostic: at fixed radius 0.001, amplitude improves on 28/32 reused-training
 transfer batches and MR on 29/32, versus 13/32 and 14/32 in the P42 control.
