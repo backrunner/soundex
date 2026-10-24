@@ -62,3 +62,58 @@ def test_invalid_local_derivative_rejected():
     with pytest.raises(ValueError, match="finite"):
         backtrack([p], original, delta, float("nan"), 1.0, lambda: {})
     assert torch.equal(p, original[0])
+
+
+def test_actual_frozen_guard_review_writes_receipt_and_resumes(tmp_path):
+    from types import SimpleNamespace
+
+    from test_spectral_adapter import CONFIG, fixture
+
+    from evaluation.reporting import sha256_file
+    from models.complex_synthesis import complex_features, synthesize
+    from models.spectral_adapter import from_base
+    from scripts.audit_adapter_scale import recheck
+
+    base, x, context, condition = fixture(frames=120)
+    initial = {"model_config": CONFIG, "model": base.state_dict()}
+    initial_path = tmp_path / "initial.pth"
+    torch.save(initial, initial_path)
+    model = from_base(initial, "high")
+    batch = {
+        "x": x,
+        "y": x.clone(),
+        "clean_wave": synthesize(complex_features(x)).detach(),
+        "identity": torch.tensor([False, True]),
+        "rate": condition[:, :1, 0] * 48000,
+        "cutoff": torch.full((2, 120), 8000.0),
+        "active": torch.ones(2, 120),
+    }
+    item = (SimpleNamespace(batch=batch), context)
+    pool = SimpleNamespace(select=lambda _: item)
+    proposal_path = tmp_path / "proposal.pth"
+    torch.save(
+        {
+            "delta": {n: torch.full_like(p, 1e-6) for n, p in model.adapter.named_parameters()},
+            "report": {"search": {"selected_scale": 0.001}},
+        },
+        proposal_path,
+    )
+    config = {
+        "starts": {"seed": {"path": str(initial_path)}},
+        "groups": [{"index": 1, "draws": [0] * 5}],
+        "cases": [{"index": 1, "samples": {"guard": [{"row": {"corpus": "music_library"}}]}}],
+    }
+    entries = {
+        "probe": {
+            "path": str(proposal_path),
+            "sha256": sha256_file(proposal_path),
+            "seed": "seed",
+            "support": "high",
+            "index": 1,
+        }
+    }
+    first = recheck(config, entries, pool, {"draws": [[0]]}, tmp_path)
+    assert (tmp_path / "review/probe.receipt.json").exists()
+    assert set(first["probe"]["guard"]) == {"start", "adam", "fixed", "backtrack"}
+    pool.select = lambda _: pytest.fail("completed guard must not be rescored")
+    assert recheck(config, entries, pool, {"draws": [[0]]}, tmp_path) == first

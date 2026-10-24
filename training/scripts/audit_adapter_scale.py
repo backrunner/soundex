@@ -210,7 +210,7 @@ def recheck(config, entries, pool, schedule, output):
         if sha256_file(Path(entry["path"])) != entry["sha256"]:
             raise ValueError("frozen proposal drift")
         path = output / "review" / f"{label}.json"
-        receipt = path.with_suffix("receipt.json")
+        receipt = path.with_suffix(".receipt.json")
         if receipt.exists():
             if read(receipt)["sha256"] != sha256_file(path):
                 raise ValueError("guard review drift")
