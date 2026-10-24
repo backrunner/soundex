@@ -1,0 +1,4 @@
+# Optional long-form review / listening preparation dependencies.
+# Keep the running training run's original requirements and constraints immutable.
+-r requirements.txt
+scipy==1.16.3

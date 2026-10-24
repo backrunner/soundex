@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SoundEx blinded listening review</title>
+<style>
+body{font:16px system-ui,sans-serif;max-width:1000px;margin:32px auto;padding:0 20px;color:#17212b;background:#f7f8fa}h1{font-size:26px}label{display:inline-block;margin:8px 16px 8px 0}input,textarea,select,button{font:inherit;padding:8px;border:1px solid #a8b2bf;border-radius:6px}button{cursor:pointer;background:white}button:focus-visible{outline:3px solid #2467cc}table{border-collapse:collapse;width:100%;background:white}td,th{text-align:left;padding:12px;border-bottom:1px solid #dce0e5}input[type=number]{width:68px}textarea{width:95%;min-height:50px}audio{width:100%;margin:12px 0}#notice{color:#4b5563}#status{white-space:pre-wrap}nav{display:flex;gap:12px;align-items:center;margin:18px 0}.table-wrap{overflow-x:auto}.playing{background:#dceaff}small{display:block;color:#536270;margin-top:6px}
+</style>
+<h1>Blinded audio comparison</h1>
+<p>Compare every condition with the shown lossless reference. Rate similarity and high-frequency naturalness separately, from 0 (very poor) to 100 (excellent). Use the same playback volume throughout.</p>
+<label>Listener code <input id="listener" autocomplete="off"></label>
+<label>Headphones / speakers <input id="equipment"></label>
+<label>Environment <input id="environment" placeholder="e.g. quiet room"></label>
+<nav><button id="previous">Previous</button><strong id="trial"></strong><button id="next">Next</button><button id="export">Export ratings</button></nav>
+<button id="reference">Play reference</button>
+<audio id="player" controls preload="none"></audio>
+<p id="notice">Switching conditions keeps the playback position. Replay from the beginning when needed. Conditions are anonymized; no ratings are prefilled. Exports stay on your computer.</p>
+<div class="table-wrap"><table><thead><tr><th>Condition</th><th>Reference similarity</th><th>HF naturalness</th><th>Observation</th></tr></thead><tbody id="rows"></tbody></table></div>
+<p id="status" role="status"></p>
+<script>
+const data=__TRIAL_DATA__;
+let index=0,ratings={},currentFile=null;
+const byId=id=>document.getElementById(id),player=byId('player');
+function key(condition){return `${data.trials[index].id}/${condition}`;}
+function play(file){let position=player.currentTime||0;player.pause();currentFile=file;player.src=file;player.onloadedmetadata=()=>{player.currentTime=Math.min(position,Math.max(0,player.duration-.02));player.play().catch(e=>byId('status').textContent=e.message);};document.querySelectorAll('button[data-file]').forEach(b=>b.classList.toggle('playing',b.dataset.file===file));}
+function show(){player.pause();player.removeAttribute('src');player.load();currentFile=null;const t=data.trials[index];byId('trial').textContent=`${index+1} / ${data.trials.length} · ${t.channels===2?'Stereo':'Mono'} · 10 seconds`;byId('rows').replaceChildren();byId('previous').disabled=index===0;byId('next').disabled=index===data.trials.length-1;for(const c of t.conditions){const row=document.createElement('tr'),k=key(c.id);ratings[k]??={similarity:'',naturalness:'',observation:'',notes:''};const cell=document.createElement('td'),button=document.createElement('button');button.textContent=`Play ${c.id}`;button.dataset.file=c.file;button.onclick=()=>play(c.file);cell.append(button);row.append(cell);for(const field of ['similarity','naturalness']){const td=document.createElement('td'),input=document.createElement('input');input.type='number';input.min=0;input.max=100;input.value=ratings[k][field];input.setAttribute('aria-label',`${c.id} ${field}`);input.oninput=()=>ratings[k][field]=input.value;td.append(input);row.append(td);}const td=document.createElement('td'),select=document.createElement('select');for(const [value,label] of [['','Choose observation'],['no_audible_difference','No audible difference'],['difference','Audible difference'],['skip','Skip / unable to judge']]){const o=document.createElement('option');o.value=value;o.textContent=label;select.append(o);}select.value=ratings[k].observation;select.onchange=()=>ratings[k].observation=select.value;const notes=document.createElement('textarea');notes.placeholder='Artifacts, stereo changes, or reason for skipping';notes.value=ratings[k].notes;notes.oninput=()=>ratings[k].notes=notes.value;td.append(select,notes);row.append(td);byId('rows').append(row);}byId('status').textContent='';}
+byId('reference').onclick=()=>play(data.trials[index].reference);
+byId('previous').onclick=()=>{index--;show();};byId('next').onclick=()=>{index++;show();};
+byId('export').onclick=()=>{const meta=Object.fromEntries(['listener','equipment','environment'].map(k=>[k,byId(k).value.trim()]));if(Object.values(meta).some(v=>!v)){byId('status').textContent='Fill in listener, equipment and environment before export.';return;}const errors=[];for(const t of data.trials)for(const c of t.conditions){const k=`${t.id}/${c.id}`,r=ratings[k];if(!r){errors.push(k);continue;}if(r.observation==='skip'){if(!r.notes.trim())errors.push(k);continue;}if(!r.observation||['similarity','naturalness'].some(f=>r[f]===''||!Number.isFinite(Number(r[f]))||Number(r[f])<0||Number(r[f])>100))errors.push(k);}if(errors.length){byId('status').textContent=`Complete ratings or give a skip reason for ${errors.length} condition(s).`;return;}const result={protocol:data.protocol,created_at:new Date().toISOString(),...meta,user_agent:navigator.userAgent,ratings};const url=URL.createObjectURL(new Blob([JSON.stringify(result,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='soundex-listening-ratings.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);byId('status').textContent='Ratings exported locally. No data was sent.';};
+show();
+</script>
+</html>
