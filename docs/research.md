@@ -1,10 +1,23 @@
 # Research status and experiment history
 
-Current registered comparison: [P53 balanced preservation](balanced-preservation-pilot.md).
-Correct P52 corpus and batch-gradient calibration separately with fixed fit-only
-coefficients. Six 128-update trajectories and reused P52 controls; results pending.
+Latest completed pilot: [P53 balanced preservation](balanced-preservation-pilot.md).
+Six matched 128-update trajectories, twelve raw reports, six exports and 480 new
+native roles finish. Fixed corpus-gradient balancing improves clean-speech HF4k
+MSE by 12.53% / 11.89% versus P52 physical, but loses paired spectral benefit
+against the no-auxiliary controls. Seed-13 physical arms regress on fit and review;
+this is not evidence for an architecture ceiling or isolated overfitting. A
+post-completion first-update probe shows why gradient matching is limited: actual
+Adam displacement differs from control by about 25-26% for physical arms and
+44-49% for balanced logit, despite the registered aggregate calibration.
 
-Latest completed pilot: [P52 physical preservation](physical-preservation-pilot.md).
+All 740 tests and implementation CI pass. Runtime does not: 78,000 measured hops
+include four >=5 ms calls (maximum 7.403 ms), six hop service overruns and 14 paced
+late completions (maximum 5.761 ms). CPU-thread probes were off; retain the failures
+without attributing them to scheduling or model size. Next inspect the adapter's
+post-Adam contributions under fixed fit-only controls and separately instrument
+the production worker/queue. No longer unchanged training or default replacement.
+
+Previous completed pilot: [P52 physical preservation](physical-preservation-pilot.md).
 Six matched 128-update trajectories, twelve raw reports and 480 new native roles
 finish. The physical auxiliary reduces clean-music error but loses paired spectral
 benefit versus both controls; seed 13 also regresses against its P50 parent on fit

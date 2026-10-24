@@ -12,87 +12,21 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-[P44 calibration](docs/pcm-fidelity-calibration.md) shows that existing identity
-damage is much larger than numerical reconstruction noise. The completed
-[P45 small-model pilot](docs/anchored-spectrum-pilot.md) stalls under its absolute
-displacement guards: the loosest arm accepts only 2/3 updates across its two seeds,
-and stricter arms accept none. Some rejected low-band corrections reduce error
-against the clean reference; the preservation policy needs revision. No candidate
-is qualified or promoted.
+Latest completed comparison: [P53 balanced preservation](docs/balanced-preservation-pilot.md).
+All six 128-update trajectories, frozen raw reviews and 480 native roles finish.
+Corpus balancing improves clean-speech preservation, but physical penalties still
+lose paired spectral benefit against matched controls; no weight is promoted.
+A fit-only probe confirms that equal initial gradient RMS does not match Adam's
+actual parameter updates. All 740 Python tests and implementation CI pass.
 
-[P46](docs/reference-preservation-pilot.md) completed all twelve trajectories and
-22 frozen endpoint reviews. Correcting preservation improves music MR by about
-0.06-0.07% at the loosest ruler, but only 5-6 of 128 attempts take effect per arm.
-Additional reference gradients do not increase acceptance, and all changed
-candidates retain preservation failures on separate reused-TRAIN review clips.
-No new weights are qualified; further work must address per-example preservation
-and output coupling before repeating longer training.
+Runtime remains unqualified: across 78,000 measured hops, four calls exceed 5 ms
+(maximum 7.403 ms), with six hop service overruns and 14 paced late completions.
+These elapsed-time outliers remain recorded; their CPU/scheduling cause is not
+established. The fixed 256-frame buffer is separate from the processing target.
 
-[P47 attribution](docs/output-coupling-audit.md) isolates direct low-band updates
-as the main source of current low-band movement. Reverting those updates retains
-almost all of P46's small spectral gains, but does not fix identity or phase
-recovery. Input-band bypass also removes some useful low-band correction. A
-small adapter with isolated output support is tested in the completed
-[P48 pilot](docs/spectral-adapter-pilot.md). All four 128-step runs and raw/native
-reviews finish. High-band isolation preserves low frequencies more effectively,
-but small spectral gains retain identity/phase/dynamics regressions. The first
-Adam step overshoots even on its own fit data. Final compute stays below 5 ms,
-but nine paced delays remain.
-No new restoration weight is qualified.
-
-[P49 update-scale calibration](docs/adapter-scale-calibration.md) completes 64
-independent first-step probes. Scaling fixes fit descent in all 64, but fit-only
-backtracking worsens guard total in 42 probes (18 improve, four are near the
-numerical floor). Fixed 0.001 displacement is more conservative: 35 improve,
-16 worsen and 13 are near. Its high-support probes pass the existing 16/20-bit
-preservation rulers, with retained 24-bit identity counterexamples and tiny
-spectral gains. This supports a bounded cumulative-update check, not a claim
-of convergence or qualified audio. The follow-up
-[P50 cumulative pilot](docs/adapter-continuation-pilot.md) completes all four
-128-step runs and frozen raw/native reviews. Both optimizer-history controls
-improve raw music MR by 0.0030-0.0091% and native music MR by 0.0037-0.0109%
-versus their starts, with lower common loss. Gains remain small; clean-input
-drift accumulates and 20/24-bit identity counterexamples persist. All 52,000
-compute hops stay below 5 ms (max 1.965 ms), but two paced delays remain.
-No candidate is promoted; the follow-up examines clean/compressed adapter responses.
-
-[P51 response audit](docs/adapter-response-audit.md) completes all eight frozen
-derived heads, raw reviews and 640 new native roles. Selective suppression retains
-76-83% of P50's raw music MR gain while reducing 55-79% of its added mean music
-identity RMS error. Gains remain tiny; matching clean logit power does not match
-physical-band response or PCM preservation. Identity/temporal counterexamples
-remain. Across 104,000 measured hops, maximum compute is 2.308 ms, with five paced
-delays. The next comparison should align preservation with physical high-band
-residuals and original-reference reconstruction. No new training or promotion
-follows from this analytic diagnostic.
-
-[P52 physical-preservation pilot](docs/physical-preservation-pilot.md) completes
-six matched 128-update trajectories and 480 new native roles. The physical
-constraint improves clean-music preservation but loses paired spectral benefit
-against both controls; seed 13 regresses against its P50 parent. Fit attribution
-finds corpus imbalance in the absolute error term and unequal batch-gradient
-strength despite matched pooled norms. The next step is a fixed fit-only balancing
-comparison, not longer unchanged training. Maximum compute is 1.699 ms across
-78,000 hops, with one paced delay. All 736 tests and implementation CI pass;
-default weights remain unchanged.
-
-[P43](docs/spectral-priority-update-audit.md) gives a positive spectrum-priority
-diagnostic: at fixed radius 0.001, amplitude improves on 28/32 reused-training
-transfer batches and MR on 29/32, versus 13/32 and 14/32 in the P42 control.
-Phase/dynamics/identity tradeoffs remain. These reversible probes are not new
-trained weights or quality qualification. The [CPU attribution run](docs/cpu-time-attribution.md) separates calling-
-thread CPU time, enclosing wall time and wakeup delays. Historical real-time failures
-remain open. Consult the [failure registry](docs/failed-experiments.md) before repeating
-a route. All maintained project documentation is in English.
-
-[P38](docs/detector-condition-study.md) completed all four 16,192-step CPU trajectories
-and native reviews. Fixed detector conditions worsened music MR by 0.19–0.56% versus
-matched controls; removing magnitude fusion did not reverse this. Neither path passed
-the research screen. Across 280,000 timing hops, max compute was 5.411 ms, with two
-≥5 ms calls, 11 service overruns and 27 paced delays. No promotion or new training.
-
-Earlier protocols, full results and counterexamples are indexed in
+Earlier protocols, positive submetrics and all counterexamples remain in
 [research history](docs/research.md) and the [failure registry](docs/failed-experiments.md).
+Consult those records before repeating a route. Project documentation is in English.
 
 The reviewed library contains 300 native-lossless music works plus VCTK speech;
 raw audio, prepared pairs and experimental checkpoints stay local. See the
