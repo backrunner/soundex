@@ -1,15 +1,28 @@
 # Research status and experiment history
 
-Latest completed diagnosis: [P47 output coupling](output-coupling-audit.md).
+Latest intervention: [P48 isolated spectral adapter](spectral-adapter-pilot.md).
+All four 128-step runs, six frozen raw reviews and 560 native role replays finish.
+High support reduces low-band preservation failures while retaining small music
+MR gains (raw 0.120-0.214%; native 0.137-0.242% versus the corresponding start).
+Identity, complex and dynamics errors still regress, and the common total
+objective worsens. A retained first-step probe finds genuine overshoot: the
+gradient direction is locally descending, but the full Adam displacement raises
+fit loss about 0.027-0.030. A 0.001-scale probe descends on fit data but does not
+consistently improve the disjoint guard. Calibrate update scale before another
+matched run; this is not a capacity ceiling or a selected new optimizer. All
+52,000 final compute hops are below 5 ms (max 2.480 ms), with nine paced delays.
+No production weight is changed or qualified.
+
+Preceding diagnosis: [P47 output coupling](output-coupling-audit.md).
 Low-band coefficient changes explain 99.932-99.983% of the energy-pooled low-band
 update projection on the changed P46 music endpoints. Reverting those updates
 retains 99.50-99.74% of music MR gains while identity and phase failures remain.
 An additional input-band control confirms that preserving compressed low bins
-also loses useful low-band correction. The next proposed matched control is a
-small independent high-band adapter with a frozen shared feature path, not a
-larger full-model continuation. No new training or weight promotion occurred.
+also loses useful low-band correction. This motivates P48's small independent
+high-band adapter with a frozen shared feature path. P47 itself is diagnostic;
+it did not train or promote a new model.
 
-Latest completed intervention: [P46 original-reference preservation](reference-preservation-pilot.md).
+Previous preservation intervention: [P46 original-reference preservation](reference-preservation-pilot.md).
 All twelve 128-attempt trajectories and 22 frozen endpoint reviews completed.
 Policy and projected methods both accept 6 / 5 updates at 16 bits, 2 / 2 at
 20 bits and none at 24 bits. Music MR falls about 0.06-0.07% at 16 bits, but

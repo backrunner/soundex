@@ -32,7 +32,13 @@ and output coupling before repeating longer training.
 as the main source of current low-band movement. Reverting those updates retains
 almost all of P46's small spectral gains, but does not fix identity or phase
 recovery. Input-band bypass also removes some useful low-band correction. A
-small adapter with isolated output support is proposed; it is not yet trained.
+small adapter with isolated output support is tested in the completed
+[P48 pilot](docs/spectral-adapter-pilot.md). All four 128-step runs and raw/native
+reviews finish. High-band isolation preserves low frequencies more effectively,
+but small spectral gains retain identity/phase/dynamics regressions. The first
+Adam step overshoots even on its own fit data; update-scale calibration is needed
+before another run. Final compute stays below 5 ms, but nine paced delays remain.
+No new restoration weight is qualified.
 
 [P43](docs/spectral-priority-update-audit.md) gives a positive spectrum-priority
 diagnostic: at fixed radius 0.001, amplitude improves on 28/32 reused-training
