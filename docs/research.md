@@ -1,11 +1,16 @@
 # Research status and experiment history
 
-Current diagnostic: [P51 adapter responses](adapter-response-audit.md). A fixed
-fit-only affine separation is compared with scalar suppression matched on clean
-fit logit power, across all four P50 endpoints. All eight derived checkpoint
-hashes freeze before raw/native scoring. This isolates selective response from
-reduced enhancement; it is not new full training or a general separability limit.
-The 730-test suite passes. Execution and results are pending.
+Latest completed diagnostic: [P51 adapter responses](adapter-response-audit.md).
+All eight analytic heads freeze before raw/native review; 640 new native roles
+finish. Selective suppression retains 76-83% of P50 raw music MR gains and reduces
+55-79% of added mean music identity RMS error. It beats scalar suppression on
+spectra under the fit-logit matching rule, but actual PCM preservation is not
+matched. Absolute gains remain tiny and identity/temporal counterexamples persist;
+one scalar control also retains a 24-bit fit-low4k peak failure. All 104,000 compute
+hops stay below 5 ms (max 2.308 ms); five paced delays remain. The 730-test suite
+and implementation CI pass. These are analytic edits, not new gradient training
+or qualified weights. Next align the separation constraint with physical high-band
+residuals and original-reference reconstruction before bounded small-model training.
 
 Latest completed pilot: [P50 cumulative adapter updates](adapter-continuation-pilot.md).
 All four 128-update persistent/reset Adam trajectories, six frozen raw reviews
@@ -20,8 +25,8 @@ Fit/review sources are globally disjoint within this pilot but historically reus
 TRAIN: 351 fit recordings and 986.623 unique supervised seconds are not full-library
 training or independent generalization evidence. The 725-test suite and code CI
 pass; inputs, checkpoints and review receipts verify. No weight is promoted.
-Next inspect clean/compressed responses of the frozen high-band adapter; do not
-repeat unchanged long training or infer a capacity ceiling from this short pilot.
+The frozen high-band response audit follows in P51 above; do not repeat unchanged
+long training or infer a capacity ceiling from this short pilot.
 
 Latest completed calibration: [P49 adapter update scale](adapter-scale-calibration.md).
 All 64 reset first-step probes and frozen guard reviews complete. Full Adam

@@ -54,13 +54,17 @@ improve raw music MR by 0.0030-0.0091% and native music MR by 0.0037-0.0109%
 versus their starts, with lower common loss. Gains remain small; clean-input
 drift accumulates and 20/24-bit identity counterexamples persist. All 52,000
 compute hops stay below 5 ms (max 1.965 ms), but two paced delays remain.
-No candidate is promoted; the next diagnostic concerns clean/compressed adapter
-responses, rather than an unchanged longer training run.
+No candidate is promoted; the follow-up examines clean/compressed adapter responses.
 
-[P51 response audit](docs/adapter-response-audit.md) is running. A fit-only affine
-intervention and matched scalar controls test whether clean-input suppression can
-retain more compressed-input restoration than simply reducing enhancement.
-All eight derived heads freeze before raw/native review; results are pending.
+[P51 response audit](docs/adapter-response-audit.md) completes all eight frozen
+derived heads, raw reviews and 640 new native roles. Selective suppression retains
+76-83% of P50's raw music MR gain while reducing 55-79% of its added mean music
+identity RMS error. Gains remain tiny; matching clean logit power does not match
+physical-band response or PCM preservation. Identity/temporal counterexamples
+remain. Across 104,000 measured hops, maximum compute is 2.308 ms, with five paced
+delays. The next comparison should align preservation with physical high-band
+residuals and original-reference reconstruction. No new training or promotion
+follows from this analytic diagnostic.
 
 [P43](docs/spectral-priority-update-audit.md) gives a positive spectrum-priority
 diagnostic: at fixed radius 0.001, amplitude improves on 28/32 reused-training
