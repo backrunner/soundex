@@ -28,6 +28,12 @@ candidates retain preservation failures on separate reused-TRAIN review clips.
 No new weights are qualified; further work must address per-example preservation
 and output coupling before repeating longer training.
 
+[P47 attribution](docs/output-coupling-audit.md) isolates direct low-band updates
+as the main source of current low-band movement. Reverting those updates retains
+almost all of P46's small spectral gains, but does not fix identity or phase
+recovery. Input-band bypass also removes some useful low-band correction. A
+small adapter with isolated output support is proposed; it is not yet trained.
+
 [P43](docs/spectral-priority-update-audit.md) gives a positive spectrum-priority
 diagnostic: at fixed radius 0.001, amplitude improves on 28/32 reused-training
 transfer batches and MR on 29/32, versus 13/32 and 14/32 in the P42 control.
