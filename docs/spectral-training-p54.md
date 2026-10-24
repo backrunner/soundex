@@ -90,6 +90,10 @@ not support regional or genre-wide conclusions.
 
 ### Metric sensitivity audit
 
+The follow-up [P55 long-form protocol](longform-review-p55.md) is now prepared and
+queued after this run's complete training, review and timing barriers. It keeps
+this experiment's objectives, calibration, budgets and frozen comparisons intact.
+
 The follow-up audit at `data/reports/metric-audit-p54-20261024/` reuses the frozen
 native outputs, original references and identical supervised regions. Its retained
 `audit.py` and `audit.json` reproduce all 400 clip/path MR scores exactly (maximum

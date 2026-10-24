@@ -93,6 +93,13 @@ A positive submetric is retained even when the candidate is not qualified.
 
 ## Earlier routes and operational failures
 
+[P55: long-form source-disjoint review](longform-review-p55.md) is prepared and
+queued behind all P54 endpoint reviews and timing. It replaces the short-crop
+diagnostic limitation with 20 reserved sources, 400 unique scored source seconds,
+160 codec/identity cases and real stereo. It has no model-quality result yet.
+Region labels remain unknown and several genres are absent. Do not claim a win
+from preparation, source hashes, transport tests or a listening page without votes.
+
 The [P54 metric sensitivity audit](spectral-training-p54.md#metric-sensitivity-audit)
 reproduces all 400 audited scores exactly but limits the common comparison to
 14.75 seconds of scored music. Source weighting reverses seed 12's tiny MR ranking;

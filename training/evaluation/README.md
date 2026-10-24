@@ -1,5 +1,11 @@
 # Deployment evaluation protocol
 
+The separate [P55 long-form research review](../../docs/longform-review-p55.md)
+uses source-balanced diagnostics and prepares blinded materials. It is not the
+release protocol below. Install its optional dependencies (also used by the full
+test suite) with `python -m pip install -r requirements-evaluation.txt -c constraints-cpu-py312.txt`
+from `training/` after installing PyTorch.
+
 Release evaluation uses immutable `test` manifest rows only. Every row is compared
 as clean reference, degraded baseline, and enhanced output. Enhancement always runs
 through `soundex-stream-eval`, which uses the production Rust gate, causal STFT,

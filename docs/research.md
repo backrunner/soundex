@@ -1,6 +1,7 @@
 # Research status and experiment history
 
-Current work: [P54 common comparison and spectral training](spectral-training-p54.md).
+Current work: [P54 common comparison and spectral training](spectral-training-p54.md)
+and the queued [P55 long-form source-disjoint review](longform-review-p55.md).
 Historical shape-small, both P38 seeds, P52 no-extra-preservation controls and
 both P53 logit endpoints have completed the same raw/native PCM comparison.
 Current models improve speech spectra, music dynamics and clean-input fidelity,

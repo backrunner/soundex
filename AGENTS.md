@@ -67,6 +67,12 @@ an exact inverse of lossy compression.
   recording/source and report genre, region and channel coverage gaps. Do not join
   left/right excerpts from different source times into stereo. Do not extrapolate
   local means to all music.
+- Reserve registered evaluation sources before scoring. Future training and
+  calibration must exclude their file hashes, decoded PCM hashes and connected
+  work aliases, including local `data/runs/*/evaluation-catalog.jsonl` catalogs.
+  A longer crop or different codec from an exposed recording is a recheck, not a
+  new source-disjoint test. Keep per-recording aggregation and declared coverage
+  gaps separate from artist independence and listening evidence.
 - Separate model history, DSP-state warmup and supervised regions. Warmup must not
   enter supervision or update frozen statistics. Rescore experiments with different
   loss weights under one common objective; inspect raw and deployed errors.

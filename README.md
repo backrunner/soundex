@@ -12,7 +12,8 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-Latest work: [P54 common comparison and spectral training](docs/spectral-training-p54.md).
+Latest work: [P54 common comparison and spectral training](docs/spectral-training-p54.md)
+and the queued [P55 long-form review](docs/longform-review-p55.md).
 The old baseline and current small models now share a fixed raw/native comparison:
 current models improve speech, music dynamics and clean-input preservation, but
 do not consistently beat historical music spectra. Auraloss operators are pinned
@@ -20,6 +21,10 @@ and tested; all twelve calibration runs finish and select a shared rate of 1e-7.
 Matched 4096-update continuation with broader source-time coverage is running. No new model
 is qualified or promoted. [P53](docs/balanced-preservation-pilot.md) remains a
 completed failed preservation-penalty comparison, not an accumulated quality gain.
+P55 reserves 20 source-disjoint recordings with 400 unique scored source seconds,
+real stereo and recording-balanced metrics. Its 160 cases are prepared; scoring
+and blinded listening materials wait for all P54 endpoints and timing. Region and
+genre gaps remain explicit, and no listening result is claimed.
 
 Runtime remains unqualified: across 78,000 measured hops, four calls exceed 5 ms
 (maximum 7.403 ms), with six hop service overruns and 14 paced late completions.
