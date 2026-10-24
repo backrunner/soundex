@@ -47,7 +47,11 @@ numerical floor). Fixed 0.001 displacement is more conservative: 35 improve,
 16 worsen and 13 are near. Its high-support probes pass the existing 16/20-bit
 preservation rulers, with retained 24-bit identity counterexamples and tiny
 spectral gains. This supports a bounded cumulative-update check, not a claim
-of convergence or qualified audio. No new training trajectory is launched.
+of convergence or qualified audio. The follow-up
+[P50 cumulative pilot](docs/adapter-continuation-pilot.md) is now running: two
+starts, persistent versus reset Adam, 128 small high-support updates each, and
+globally separated fit/review recordings. All endpoints must finish and freeze
+before common raw/native evaluation; results are pending.
 
 [P43](docs/spectral-priority-update-audit.md) gives a positive spectrum-priority
 diagnostic: at fixed radius 0.001, amplitude improves on 28/32 reused-training

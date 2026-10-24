@@ -1,6 +1,14 @@
 # Research status and experiment history
 
-Latest calibration: [P49 adapter update scale](adapter-scale-calibration.md).
+Current bounded training: [P50 cumulative adapter updates](adapter-continuation-pilot.md).
+Two starts x persistent/reset Adam use fixed 0.001 displacements and high support
+for 128 updates each. All fit and review source/recording identifiers are globally
+disjoint for this pilot; sources remain reused historical TRAIN. The common
+fit schedule covers 351 recordings and 986.623 unique supervised seconds, not
+the full music library. All four endpoints must finish and freeze before common
+raw/native scoring. The 725-test suite passes; training/review results are pending.
+
+Latest completed calibration: [P49 adapter update scale](adapter-scale-calibration.md).
 All 64 reset first-step probes and frozen guard reviews complete. Full Adam
 overshoots in every probe; fixed 0.001 scaling and fit-only backtracking both
 improve all fit totals. Guard total improves/worsens/is near the numerical floor
