@@ -109,6 +109,15 @@ A positive submetric is retained even when the candidate is not qualified.
 | [P41 local regression environment](guarded-transfer-audit.md) | First full suite: 667 passes, two mono/stereo preprocessing failures from default FFmpeg 9.0.1 referencing missing x265 ABI 216. The installed FFmpeg-full 9.0.2 is used for the scoped follow-up; original logs remain. | Verify executable startup and required encoders before preprocessing. A process-local PATH does not repair global Homebrew links or authorize regenerating frozen pairs. |
 | [P45 execution preflight](anchored-spectrum-pilot.md) | Original run stopped before its first saved checkpoint: column sample rates caused an extra batch dimension in the low-band measurement. A separate candidate preflight reproduced it; no trained endpoint resulted. | Retain original source/traceback, reshape rates to `[batch, 1]`, test both rate layouts and preflight every real-data branch. The v2 run keeps the original schedule and budgets. |
 
+## P51 pending diagnostic
+
+[P51 clean/compressed adapter responses](adapter-response-audit.md) fixes one
+fit-only affine separation penalty and compares all four P50 heads with scalar
+controls matched on fit clean logit power. Results are pending. Original-reference
+and actual Rust output must show retained paired spectral gain beyond merely
+reducing enhancement. This is not a repeat of shared-encoder gradient projection,
+new full training or a claim that clean/compressed information is inseparable.
+
 ## Evidence retention and future entries
 
 Each linked report is the authoritative detailed record for its experiment, including

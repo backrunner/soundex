@@ -1,5 +1,12 @@
 # Research status and experiment history
 
+Current diagnostic: [P51 adapter responses](adapter-response-audit.md). A fixed
+fit-only affine separation is compared with scalar suppression matched on clean
+fit logit power, across all four P50 endpoints. All eight derived checkpoint
+hashes freeze before raw/native scoring. This isolates selective response from
+reduced enhancement; it is not new full training or a general separability limit.
+The 730-test suite passes. Execution and results are pending.
+
 Latest completed pilot: [P50 cumulative adapter updates](adapter-continuation-pilot.md).
 All four 128-update persistent/reset Adam trajectories, six frozen raw reviews
 on each fit/review role and seven native model controls finish. Fixed 0.001

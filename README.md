@@ -57,6 +57,11 @@ compute hops stay below 5 ms (max 1.965 ms), but two paced delays remain.
 No candidate is promoted; the next diagnostic concerns clean/compressed adapter
 responses, rather than an unchanged longer training run.
 
+[P51 response audit](docs/adapter-response-audit.md) is running. A fit-only affine
+intervention and matched scalar controls test whether clean-input suppression can
+retain more compressed-input restoration than simply reducing enhancement.
+All eight derived heads freeze before raw/native review; results are pending.
+
 [P43](docs/spectral-priority-update-audit.md) gives a positive spectrum-priority
 diagnostic: at fixed radius 0.001, amplitude improves on 28/32 reused-training
 transfer batches and MR on 29/32, versus 13/32 and 14/32 in the P42 control.
