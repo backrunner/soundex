@@ -11,3 +11,4 @@ PyYAML==6.0.3
 tensorboard==2.21.0
 tqdm==4.70.0
 ruff==0.16.0
+auraloss==0.4.0

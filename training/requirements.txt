@@ -36,3 +36,4 @@ onnxruntime>=1.17.0
 onnxscript>=0.1.0
 ruff>=0.4.0
 pytest>=8.0.0
+auraloss==0.4.0

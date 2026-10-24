@@ -18,6 +18,13 @@ Important Rust runtime components (license declarations from resolved Cargo meta
 | Symphonia | MPL-2.0 | CLI audio decoding |
 | hound | Apache-2.0 | CLI/demo WAV output |
 
+The training-only dependency [auraloss 0.4.0](https://github.com/csteinmetz1/auraloss)
+is Apache-2.0 (Christian J. Steinmetz and contributors). SoundEx imports its
+spectral-convergence and log-magnitude operators without vendoring their source.
+It is not included in the Rust inference graph. See the upstream package's
+license when redistributing a Python environment. Its software license does not
+grant rights to any training audio or establish the quality of learned weights.
+
 ONNX Runtime binaries downloaded by ort retain ONNX Runtime's upstream license
 and bundled third-party notices. Python training dependencies similarly retain
 their upstream terms. This table highlights runtime components and is not an
