@@ -1,12 +1,16 @@
 # Research status and experiment history
 
-Current work: [P52 physical preservation](physical-preservation-pilot.md) compares
-unchanged continuation, clean-logit suppression and original-reference high-band
-PCM supervision on the same small adapter. Auxiliary weights use fit-only initial
-gradient calibration; the common spectral objective stays unchanged. Six matched
-128-update trajectories and frozen raw/native review are registered. All 736 local
-tests pass; execution has started with fit-only calibration. Results are pending;
-no default weight is replaced.
+Latest completed pilot: [P52 physical preservation](physical-preservation-pilot.md).
+Six matched 128-update trajectories, twelve raw reports and 480 new native roles
+finish. The physical auxiliary reduces clean-music error but loses paired spectral
+benefit versus both controls; seed 13 also regresses against its P50 parent on fit
+and review. Raw clean-speech HF4k MSE rises 9.79% versus the seed-13 control. A
+post-completion fit audit shows music supplies 99.985-99.991% of the physical term;
+batch-gradient RMS is 2.19-2.67 times the logit auxiliary despite pooled-norm
+matching. The mathematics is verified; corpus/gradient balancing remains inadequate.
+All 736 tests and implementation CI pass. Maximum compute is 1.699 ms across
+78,000 hops, with one paced delay (0.447 ms). No default weight changes or longer
+unchanged run follows. Next validate a fit-only group/gradient balancing rule.
 
 Latest completed diagnostic: [P51 adapter responses](adapter-response-audit.md).
 All eight analytic heads freeze before raw/native review; 640 new native roles
@@ -20,7 +24,7 @@ and implementation CI pass. These are analytic edits, not new gradient training
 or qualified weights. Next align the separation constraint with physical high-band
 residuals and original-reference reconstruction before bounded small-model training.
 
-Latest completed pilot: [P50 cumulative adapter updates](adapter-continuation-pilot.md).
+Previous continuation pilot: [P50 cumulative adapter updates](adapter-continuation-pilot.md).
 All four 128-update persistent/reset Adam trajectories, six frozen raw reviews
 on each fit/review role and seven native model controls finish. Fixed 0.001
 high-support updates lower common loss and music MR on both starts: raw gains

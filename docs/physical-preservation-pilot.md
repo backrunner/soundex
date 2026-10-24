@@ -111,7 +111,161 @@ calibration, checkpoint/optimizer/history receipts and every raw/native artifact
 remain ignored locally. Resume must reproduce uninterrupted parameters and Adam
 state; completed reviews require receipts and the all-endpoint barrier.
 
-Status: all 736 Python tests, Ruff and 130-document checks pass. The registered
-run binds 5,697 inputs and has started fit-only calibration, followed by all six
-trajectories and frozen reviews. No trained result or restoration qualification
-is claimed yet; remote CI and the complete experiment remain pending.
+Status: **complete / not qualified**. All six 128-update trajectories, twelve raw
+fit/review reports, six exports and 480 new native roles finish. All 736 Python
+tests, Ruff and 130-document checks pass. The registered run binds 5,697 inputs;
+the completion receipt binds 6,936 artifact files and completed-run re-entry
+verifies them. Remote
+[CI 40084756741](https://github.com/backrunner/soundex/actions/runs/40084756741)
+passes. No default weight is replaced.
+
+### Frozen calibration values
+
+| P50 parent seed | Common gradient norm | Logit weight | Physical weight | Logit/common cosine | Physical/common cosine |
+| --- | --- | --- | --- | --- | --- |
+| 20261012 | 0.2089280 | 24.7567271 | 885500.5873 | 0.1556110 | -0.3981256 |
+| 20261013 | 0.1843543 | 25.2927703 | 1129820.8620 | 0.1717176 | -0.0308839 |
+
+The physical auxiliary uses PCM squared units, with initial pooled gradient norms
+2.3594e-8 / 1.6317e-8; its numerically larger coefficient does not imply a larger
+calibrated initial gradient. Both auxiliary gradients have exactly 10% of the
+common gradient norm after weighting. Their different directions motivate the
+comparison but do not establish quality, transfer or future training behavior.
+No coefficient was selected using review scores.
+
+## Completed common-objective and restoration results
+
+Every trajectory performs 128 nonzero updates, with finite displacements and
+unchanged frozen base parameters. The largest combined gradient norm is 2.4633,
+below the fixed clipping limit of five. Endpoints freeze before scoring. Negative
+relative error changes below mean improvement; the reference is each seed's
+**P50 persistent parent**, not another objective's total or an untouched input.
+
+| Seed / arm | Raw music MR change | Native music MR change | Raw speech MR change | Common total change |
+| --- | --- | --- | --- | --- |
+| 12 / control | -0.004355% | -0.004520% | -0.003714% | -7.8832e-6 |
+| 12 / logit | -0.004273% | -0.004428% | -0.003642% | -7.7737e-6 |
+| 12 / physical | -0.000668% | -0.000478% | -0.000951% | -1.6848e-6 |
+| 13 / control | -0.002441% | -0.002593% | -0.002091% | -3.7355e-6 |
+| 13 / logit | -0.002473% | -0.002634% | -0.002135% | -3.8696e-6 |
+| 13 / physical | +0.001550% | +0.001948% | +0.001087% | +1.5423e-6 |
+
+The physical arm loses paired spectral benefit against both matched training
+controls in both seeds. Seed 13 also regresses against its own P50 parent, already
+on fit: music MR +0.000846%, speech MR +0.001744% and common total +8.1700e-7.
+Thus the direction of this failure is not confined to the source-disjoint review
+role. It does not establish overfitting, statistical significance of every tiny
+change, or an architecture ceiling.
+
+Raw music direct-amplitude changes for physical are -0.001976% / +0.003172%
+against the parents; complex changes are +0.002692% / -0.001137%. Music MR dynamics
+still increases +0.000780% / +0.000156%. Control and logit add small spectral gains
+but retain complex, dynamics and identity regressions. No arm is an overall win.
+
+Against the earlier zero-adapter starts, physical still has raw music MR gains
+0.008315% / 0.001495% and native gains 0.009519% / 0.001789%. These include prior
+training; they cannot hide the loss of seed-13 P50 benefit. Against untreated native
+compressed music, MR is 0.976695% / 0.551333% lower, while MR dynamics remains
+1.478931% / 1.425133% worse and HF PCM RMS 2.489620% / 2.525183% worse. Existing
+base-model contributions and DSP conflicts remain part of those comparisons.
+
+## Preservation benefits and retained counterexamples
+
+Relative to the new control, the physical arm reduces raw clean-music HF4k error
+**MSE** by 6.3138% / 4.4921% and mean full PCM RMS by 0.7519% / 0.2879%. This is a
+real preservation tradeoff, not proof of more restoration. Raw clean-speech HF4k
+MSE decreases 8.4366% in seed 12 but **increases 9.7911% in seed 13**. Against
+the logit control, the seed-13 speech HF4k MSE increase is 21.3182%.
+
+| Physical arm | Raw clean-music full RMS | Change from P50 parent | Raw clean-speech full RMS | Change from P50 parent |
+| --- | --- | --- | --- | --- |
+| 12 | 7.57910e-6 | +4.13613e-8 | 8.09867e-7 | +1.85928e-8 |
+| 13 | 8.79255e-6 | -1.00228e-8 | 4.72708e-7 | +6.92692e-9 |
+
+The physical arms' mean raw clean-music full RMS levels are -102.41 / -101.12
+dBFS; speech is -121.83 / -126.51 dBFS. Raw identity HF8k RMS is 2.76048e-6 /
+2.32802e-6 for music and 2.54114e-7 / 1.55196e-7 for speech. These use calibrated
+PCM and `20*log10(mean clip RMS)`, not unnormalized FFT power. Small absolute
+levels neither establish audible restoration nor erase the reference failures.
+
+All six endpoints pass every fit/review 16-bit ruler and every paired-low4k
+16/20/24-bit ruler. Identity failures remain, out of 160 examples per role:
+
+| Seed / arm | Fit identity failures, 20 / 24 bits | Review identity failures, 20 / 24 bits |
+| --- | --- | --- |
+| 12 / control | 71 / 140 | 80 / 136 |
+| 12 / logit | 69 / 140 | 77 / 135 |
+| 12 / physical | 53 / 139 | 56 / 132 |
+| 13 / control | 40 / 115 | 23 / 98 |
+| 13 / logit | 38 / 111 | 25 / 94 |
+| 13 / physical | 14 / 91 | 10 / 86 |
+
+Native physical clean-music full RMS improves by 2.6230e-8 / 3.4131e-8 versus
+the parent, but the absolute mean remains about 0.002865 (-50.86 dBFS), with the
+retained identity-DSP control exposing the existing safety/processing discrepancy.
+Native clean-speech full RMS **increases 11.005% / 20.781%** to 7.7616e-8 /
+7.9425e-8 (about -142.20 / -142.00 dBFS). The absolute increases are 7.6949e-9 /
+1.3666e-8: do not translate those large relative percentages into an audibility
+claim. Raw and native populations differ (128/32 versus 32/8 music/speech clips
+per role); only same-population comparisons support these statements.
+
+## Post-completion attribution: units are correct, balancing is inadequate
+
+A separate, hash-bound fit-only audit replays the **unchanged P50 parents** on
+the same 32 calibration draws. It reproduces the registered pooled gradient
+norms exactly and decomposes the physical auxiliary by corpus. No endpoint,
+weight, tolerance or training budget is changed by this analysis.
+
+- Music contributes **99.98499% / 99.99065%** of the physical auxiliary's scalar
+  value despite speech occupying 20% of clips. This percentage describes the
+  **new physical term**, not the common spectral loss or a gradient percentage.
+  It exposes a strong corpus imbalance in absolute error weighting; the audit
+  alone does not prove a causal loudness effect or identify every harmful clip.
+- Weighted auxiliary batch-gradient RMS relative to common-gradient RMS is
+  **9.0669% / 7.9031%** for physical, versus **3.4006% / 3.6094%** for logit.
+  Physical is therefore approximately **2.67 / 2.19 times** as strong by this
+  measure, even though the pooled initial vector norms both match 10%.
+- On these calibration batches, the physical/common gradient norm ratio ranges
+  **0.2334-38.1536% / 0.3133-32.3824%**; logit ranges **1.3677-7.9358% /
+  1.3412-9.5792%**. Pooled vector cancellation and batch variation prevent the
+  registered matching rule from controlling per-batch strength. These ranges
+  concern the 32 calibration draws at the parents, not every later update.
+
+The mathematics and code checks still support the stated original-reference MSE:
+zero at correct recovery, calibrated units and finite gradients. The failed design
+is the assumption that one unnormalized aggregate error and one pooled-gradient
+scale supply balanced preservation. This experiment does **not** isolate physical
+representation from reference targeting or establish equal regularization strength
+through training. It cannot conclude that reference-aligned constraints are
+intrinsically inferior to logit suppression.
+
+## Runtime, resources and next decision
+
+All six exports pass sequential/state parity and native outputs are finite and
+aligned. Each retains 480,809 parameters and a 1,972,748-byte graph (about 1.88 MiB).
+Across 30 runs and **78,000 measured hops** (81,000 including warmup):
+
+- Maximum compute **1.699375 ms**, largest per-run p99 **1.021122 ms**; zero
+  >=5 ms calls and zero compute service overruns.
+- **One paced late hop**, lateness **0.447249 ms**, in seed-12 physical. No
+  retry-to-pass; previous scheduling failures remain unresolved.
+- Rust peak RSS **29.56-32.03 MiB**. Paced whole-process CPU/wall is
+  **12.5-24.41% of one core**, including load/warmup. Isolated ORT warmed RSS
+  increment is **13.38-15.23 MiB**, measured in a separate process.
+- The fixed 256-frame buffer and absence of real-device/listening certification
+  remain unchanged. This is a passing compute run, not a scheduling fix.
+
+Do not promote the physical candidate or repeat the same penalty for longer.
+The next bounded comparison should first separate music/speech preservation
+contributions and calibrate auxiliary strength using batch-gradient variation,
+with a fixed fit-only rule and unchanged spectral/control objectives. Verify
+weak/silent behavior again before training. Corpus balancing and RMS calibration
+are hypotheses to test, not already implemented remedies or quality guarantees.
+The small gains and short budget still do not justify a capacity-ceiling claim.
+
+All raw/native outputs, per-example rulers and earlier P50/P51 controls remain.
+`interpretation.json` retains common comparisons, calibrated band errors, timing
+and every ruler counterexample; `gradient-variation.json` retains per-batch
+attribution. Their integrity receipts bind the completed run and local analysis
+sources. No execution failure occurred. The quality, balancing and paced-runtime
+failures above remain recorded; no further training is launched by this report.

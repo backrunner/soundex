@@ -66,12 +66,15 @@ delays. The next comparison should align preservation with physical high-band
 residuals and original-reference reconstruction. No new training or promotion
 follows from this analytic diagnostic.
 
-[P52 physical-preservation pilot](docs/physical-preservation-pilot.md) implements
-the next bounded comparison: unchanged small-step continuation versus clean-logit
-and original-reference high-band PCM constraints, with fixed fit-only gradient
-calibration. Two starts and three matched 128-update trajectories per start are
-registered before execution. The run has started; results are pending and default
-weights remain unchanged. All 736 local tests pass.
+[P52 physical-preservation pilot](docs/physical-preservation-pilot.md) completes
+six matched 128-update trajectories and 480 new native roles. The physical
+constraint improves clean-music preservation but loses paired spectral benefit
+against both controls; seed 13 regresses against its P50 parent. Fit attribution
+finds corpus imbalance in the absolute error term and unequal batch-gradient
+strength despite matched pooled norms. The next step is a fixed fit-only balancing
+comparison, not longer unchanged training. Maximum compute is 1.699 ms across
+78,000 hops, with one paced delay. All 736 tests and implementation CI pass;
+default weights remain unchanged.
 
 [P43](docs/spectral-priority-update-audit.md) gives a positive spectrum-priority
 diagnostic: at fixed radius 0.001, amplitude improves on 28/32 reused-training
