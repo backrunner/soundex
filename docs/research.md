@@ -1,12 +1,20 @@
 # Research status and experiment history
 
-Current bounded training: [P50 cumulative adapter updates](adapter-continuation-pilot.md).
-Two starts x persistent/reset Adam use fixed 0.001 displacements and high support
-for 128 updates each. All fit and review source/recording identifiers are globally
-disjoint for this pilot; sources remain reused historical TRAIN. The common
-fit schedule covers 351 recordings and 986.623 unique supervised seconds, not
-the full music library. All four endpoints must finish and freeze before common
-raw/native scoring. The 725-test suite passes; training/review results are pending.
+Latest completed pilot: [P50 cumulative adapter updates](adapter-continuation-pilot.md).
+All four 128-update persistent/reset Adam trajectories, six frozen raw reviews
+on each fit/review role and seven native model controls finish. Fixed 0.001
+high-support updates lower common loss and music MR on both starts: raw gains
+0.0030-0.0091%, native gains 0.0037-0.0109%. Reset gives slightly more spectral
+gain but generally more identity drift. All 16-bit rulers pass; identity failures
+remain at 20/24 bits, with complex/temporal tradeoffs. Calibrated absolute errors
+are reported alongside weak-band relative scores, without changing thresholds.
+All 52,000 compute hops are below 5 ms (max 1.965 ms); two paced delays remain.
+Fit/review sources are globally disjoint within this pilot but historically reused
+TRAIN: 351 fit recordings and 986.623 unique supervised seconds are not full-library
+training or independent generalization evidence. The 725-test suite and code CI
+pass; inputs, checkpoints and review receipts verify. No weight is promoted.
+Next inspect clean/compressed responses of the frozen high-band adapter; do not
+repeat unchanged long training or infer a capacity ceiling from this short pilot.
 
 Latest completed calibration: [P49 adapter update scale](adapter-scale-calibration.md).
 All 64 reset first-step probes and frozen guard reviews complete. Full Adam
@@ -18,8 +26,8 @@ step is not a reliable transfer rule. Fixed high-support updates pass the
 complex/temporal counterexamples remain. Absolute PCM checks prevent weak-band
 relative scores from being mistaken for audible severity. These are independent
 one-step models, not a cumulative training run or generalization evidence.
-A bounded continuous-update pilot is the next proposed test. No new weight,
-long training or runtime qualification is claimed. The receipt-path execution
+A bounded continuous-update pilot follows in P50 above. P49 itself claims no
+new trained weight, long training or runtime qualification. The receipt-path execution
 failure was repaired and reviewed from unchanged frozen proposals; both original
 and recovery evidence remain. The complete 721-test Python suite and code CI pass.
 

@@ -48,10 +48,14 @@ numerical floor). Fixed 0.001 displacement is more conservative: 35 improve,
 preservation rulers, with retained 24-bit identity counterexamples and tiny
 spectral gains. This supports a bounded cumulative-update check, not a claim
 of convergence or qualified audio. The follow-up
-[P50 cumulative pilot](docs/adapter-continuation-pilot.md) is now running: two
-starts, persistent versus reset Adam, 128 small high-support updates each, and
-globally separated fit/review recordings. All endpoints must finish and freeze
-before common raw/native evaluation; results are pending.
+[P50 cumulative pilot](docs/adapter-continuation-pilot.md) completes all four
+128-step runs and frozen raw/native reviews. Both optimizer-history controls
+improve raw music MR by 0.0030-0.0091% and native music MR by 0.0037-0.0109%
+versus their starts, with lower common loss. Gains remain small; clean-input
+drift accumulates and 20/24-bit identity counterexamples persist. All 52,000
+compute hops stay below 5 ms (max 1.965 ms), but two paced delays remain.
+No candidate is promoted; the next diagnostic concerns clean/compressed adapter
+responses, rather than an unchanged longer training run.
 
 [P43](docs/spectral-priority-update-audit.md) gives a positive spectrum-priority
 diagnostic: at fixed radius 0.001, amplitude improves on 28/32 reused-training
