@@ -1,5 +1,21 @@
 # Research status and experiment history
 
+Latest diagnosis: [P58 band/source/stage attribution](joint-attribution-p58.md)
+reuses every frozen P57 long-form case. Above 16 kHz supplies 69.93% / 72.94%
+of the native paired MR gain and 97.36% / 92.17% of added clean MR error. The
+raw model already contains the temporal/fidelity tradeoff; DSP retains 77.54% /
+79.98% of raw spectral gain. These are descriptive score contributions, not
+audibility or a new independent test. The initial rounding-check failure is
+retained separately from the corrected attribution.
+
+The [official implementation review](implementation-review-20261026.md) compares
+AERO, Apollo, AP-BWE and DeepFilterNet and adds an original training-only paired
+spectral-feature prototype. Both frozen P57 generators complete eight critic
+updates and fit/calibration gradient checks; restoration weights remain exact.
+This validates integration, not critic learning, improved music or new trained
+generator weights. Broader critic calibration and a registered matched generator
+comparison remain pending; no unchanged long continuation is launched.
+
 Latest completed work: [P57 matched joint training](joint-training-p57.md), after
 [P56 trainability attribution](trainability-audit-p56.md),
 [P54 spectral training](spectral-training-p54.md) and
@@ -16,9 +32,9 @@ separate from compute feasibility and retain earlier P53 failures below. Fixed
 256-frame buffering, actual-device qualification and human listening remain
 separate. P55 recordings are exposed and all new scoring is labeled a recheck.
 
-Next attribute cumulative joint-training changes by band, source and stage before
-altering preservation/temporal constraints. The result supports investigating
-existing trainability, not automatically scaling capacity or removing identity.
+P58 above attributes cumulative joint-training changes by band, source and output
+stage. It motivates the paired texture-supervision prototype, not automatically
+scaling capacity or removing identity.
 All original-reference, phase and transient targets and source reservations remain.
 
 Previous completed pilot: [P53 balanced preservation](balanced-preservation-pilot.md).

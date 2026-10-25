@@ -21,6 +21,12 @@ Cleaner identity output does not establish better restoration. Blinded audio is
 prepared; human ratings, regional/genre coverage and device evidence remain open.
 No new model is qualified or promoted.
 
+Latest analysis: [P58](docs/joint-attribution-p58.md) locates both most spectral
+gain and added clean-input error above 16 kHz. An
+[official implementation review and paired texture prototype](docs/implementation-review-20261026.md)
+adds training-only learned spectral features; numerical and real-TRAIN integration
+checks pass, but no restoration generator has been trained with this new term.
+
 Latest training: [P57 joint small-model comparison](docs/joint-training-p57.md)
 completed all four 4096-update runs and automated rechecks. Full training reduces
 native paired MR 0.62-0.64% versus matched adapter-only controls, but still trails
