@@ -13,11 +13,14 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
-Current bounded diagnostic: [P61](critic-objectives-p61.md) decomposes the P60
-objectives and independently probes learned/random paired-feature gradients on
-fit PCM. No new training, acceptance-threshold change or promotion. The linked
-[architecture review](architecture-evaluation-p61.md) separates classifier failure
-from restoration evidence and proposes a frequency-token causal comparison.
+Completed bounded diagnostic: [P61](critic-objectives-p61.md) retains 768 gradient
+records and 1,280 PCM probes. Structured-negative critics have prediction-uphill
+saved-Adam directions on 15/16 fit batches in both origins. Every learned arm
+loses to random features in source-equal mean MR probe benefit, with seven music
+MR counterexamples and five feature-step regressions retained. Retire this
+classifier recipe as the next auxiliary; no claim against all GAN/feature methods.
+The [architecture review](architecture-evaluation-p61.md) proposes a matched
+band-token causal comparison. No new generator, threshold change or promotion.
 
 Completed follow-up: [P60](texture-context-p60.md) separates observed-band
 summaries and structured negatives. All eight 1,024-update endpoints finish;

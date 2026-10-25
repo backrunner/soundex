@@ -41,6 +41,13 @@ ranking; all four arms fail the registered prerequisite. Observed-band summaries
 alone do not resolve the failure. Calibration remains a recheck, with no
 restoration generator updates or new quality claims.
 
+[P61](docs/critic-objectives-p61.md) independently confirms local classifier
+objective conflict and no mean raw-PCM spectral-probe advantage from trained
+versus random features. The current tiny-critic recipe is retired as the next
+generator auxiliary. The [architecture review](docs/architecture-evaluation-p61.md)
+documents the actual causal TCN and a proposed band-token comparison; a new
+generator has not yet been implemented or trained.
+
 Latest training: [P57 joint small-model comparison](docs/joint-training-p57.md)
 completed all four 4096-update runs and automated rechecks. Full training reduces
 native paired MR 0.62-0.64% versus matched adapter-only controls, but still trails

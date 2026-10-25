@@ -1,10 +1,17 @@
 # Research status and experiment history
 
-[P61](critic-objectives-p61.md) now audits frozen P60 objective gradients and
-paired-feature versus original-reference spectral directions on fit data only.
+[P61](critic-objectives-p61.md) completes 768 frozen-critic gradient records and
+1,280 raw PCM probes on 72 fit recordings / 37.097 unique supervised seconds.
+Structured-negative arms have prediction-uphill saved-Adam directions on 15/16
+batches in both origins. Learned features also lose to random-feature controls
+in source-equal mean MR probe benefit for every arm/origin/corpus. Retire the
+current classifier recipe as the next generator auxiliary; do not infer that
+all GANs or feature losses fail. These are local probes, not trained audio gains.
 The [architecture/evaluation review](architecture-evaluation-p61.md) documents
 the actual 480,809-parameter causal TCN, refreshed primary-source research and
-why classifier ranking is not restoration qualification. No generator training.
+why classifier ranking is not restoration qualification. Next prioritize matched
+band-token causal architecture prototyping. No new generator training; all 811
+local tests and implementation CI pass.
 
 Latest completed study: [P60 context and negatives](texture-context-p60.md).
 All eight 1,024-update critics freeze before 17,920 review records. Structured
