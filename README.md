@@ -35,6 +35,11 @@ still penalizes these controls; this is not evidence that the generator loss
 rewards noise. Generator training with this term is deferred while conditioning
 and negative-example exposure are investigated. Default weights remain unchanged.
 
+[P60](docs/texture-context-p60.md) now runs a matched four-arm comparison of
+observed-band summaries and structured negative exposure, repeated for both
+frozen generators. All eight critic endpoints freeze before scoring. Calibration
+is a recheck; no restoration generator updates or new quality claims yet.
+
 Latest training: [P57 joint small-model comparison](docs/joint-training-p57.md)
 completed all four 4096-update runs and automated rechecks. Full training reduces
 native paired MR 0.62-0.64% versus matched adapter-only controls, but still trails

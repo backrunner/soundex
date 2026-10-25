@@ -1,5 +1,12 @@
 # Research status and experiment history
 
+Current registered study: [P60 context and negatives](texture-context-p60.md).
+Four matched critic arms per frozen generator separate observed-band summaries
+from structured negative exposure. Eight 1,024-update endpoints must finish
+before scoring; random features and untrained time shifts remain controls.
+The P59 source/work-isolated bank is reused and calibration is explicitly a
+recheck. All 804 local Python tests pass. No restoration generator is trained.
+
 Latest completed calibration: [P59 critic learning](texture-calibration-p59.md).
 Both 1,024-update critics finish before uniform scoring. Fit includes 205
 recordings and 554.812 unique supervised seconds; critic calibration contains

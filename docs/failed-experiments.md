@@ -13,6 +13,12 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+Current registered follow-up: [P60](texture-context-p60.md) separates full-band
+observed summaries from structured negative exposure in a matched 2x2 critic
+study. Eight endpoints are pending; this is not a successful validation yet.
+The source/work-isolated P59 pool and its exposed calibration are reused. No
+restoration generator or deployment weight changes.
+
 1. Find the closest previous route and read its report before changing training.
 2. Name the unresolved hypothesis and the changed control, representation, data
    exposure or deployment mechanism. Do not repeat an unchanged rejected setup.
