@@ -13,6 +13,12 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+Current bounded diagnostic: [P61](critic-objectives-p61.md) decomposes the P60
+objectives and independently probes learned/random paired-feature gradients on
+fit PCM. No new training, acceptance-threshold change or promotion. The linked
+[architecture review](architecture-evaluation-p61.md) separates classifier failure
+from restoration evidence and proposes a frequency-token causal comparison.
+
 Completed follow-up: [P60](texture-context-p60.md) separates observed-band
 summaries and structured negatives. All eight 1,024-update endpoints finish;
 all four arms fail the prerequisite. Structured negatives fix phase/time-control

@@ -62,6 +62,11 @@ an exact inverse of lossy compression.
 - Compare the model, DSP and combined paths on the same material. Candidates without
   overall quality evidence remain experimental and do not replace default weights.
   Development validation is not independent testing or release qualification.
+- Discriminator classification and synthetic-corruption controls diagnose that
+  classifier, not overall restoration or the usefulness of paired feature loss.
+  Preserve registered failures without generalizing them to every GAN/feature
+  architecture. Compare learned and random features independently; unconstrained
+  PCM-gradient probes do not replace matched generator and native-output evidence.
 - Freeze candidate-selection rules and model hashes before held-out scoring. Label
   reused diagnostic recordings as held-out rechecks. Audit training isolation by
   recording/source and report genre, region and channel coverage gaps. Do not join

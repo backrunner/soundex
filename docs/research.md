@@ -1,5 +1,11 @@
 # Research status and experiment history
 
+[P61](critic-objectives-p61.md) now audits frozen P60 objective gradients and
+paired-feature versus original-reference spectral directions on fit data only.
+The [architecture/evaluation review](architecture-evaluation-p61.md) documents
+the actual 480,809-parameter causal TCN, refreshed primary-source research and
+why classifier ranking is not restoration qualification. No generator training.
+
 Latest completed study: [P60 context and negatives](texture-context-p60.md).
 All eight 1,024-update critics freeze before 17,920 review records. Structured
 negatives fix phase-control ranking on every source and recognize most unseen
