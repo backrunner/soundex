@@ -1,16 +1,25 @@
 # Research status and experiment history
 
-Current work: [P54 common comparison and spectral training](spectral-training-p54.md)
-and the queued [P55 long-form source-disjoint review](longform-review-p55.md).
-Historical shape-small, both P38 seeds, P52 no-extra-preservation controls and
-both P53 logit endpoints have completed the same raw/native PCM comparison.
-Current models improve speech spectra, music dynamics and clean-input fidelity,
-but music log-shape remains worse than historical weights; there is no universal
-winner. Pinned auraloss operators and genuine Adam updates are implemented.
-Separate TRAIN-only persistent-update calibration completes all twelve trajectories
-and selects 1e-7; matched 4096-step broad-crop continuation is running. No new
-quality, convergence or promotion claim follows
-from the implementation or registration. See the report for live-run evidence.
+Current work: [P57 matched joint training](joint-training-p57.md), following
+completed [P56 trainability attribution](trainability-audit-p56.md),
+[P54 spectral training](spectral-training-p54.md) and
+[P55 long-form source-disjoint review](longform-review-p55.md). All four 4096-step
+continuations finish, with actual scheduled exposure of 278 recordings and 287.52
+unique supervised minutes per trajectory. P55 scores 20 reserved sources and
+160 cases per path. Native paired MR improves 1.39-1.59% over untreated input but
+remains 2.23-2.44% worse than historical weights; HF8k MR is 3.05-3.32% worse.
+Auraloss does not beat matched common-loss controls. Cleaner identity and lower
+waveform errors remain distinct benefits, not proof of superior restoration.
+
+P54's 52,000-hop diagnostic records maximum compute 1.531375 ms, no >=5 ms calls,
+no hop service overruns and no paced lateness. The fixed 256-frame buffer and
+actual-device qualification remain separate. P53 failures below are retained.
+Blinded P55 audio is prepared, but human ratings are pending. No model is promoted.
+P56 completed all 48 probes: decoder-only changes remain weak, full trainability
+exposes additional directions, but tiny transfer gains and batch counterexamples
+preclude quality claims. P57 tests cumulative adapter/full updates with identical
+loss, fresh moments and 4096-step budgets. It excludes all reserved P55 aliases
+and adds no inference parameters. Training completion and quality remain pending.
 
 Previous completed pilot: [P53 balanced preservation](balanced-preservation-pilot.md).
 Six matched 128-update trajectories, twelve raw reports, six exports and 480 new

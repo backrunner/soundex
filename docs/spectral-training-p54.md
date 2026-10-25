@@ -90,8 +90,8 @@ not support regional or genre-wide conclusions.
 
 ### Metric sensitivity audit
 
-The follow-up [P55 long-form protocol](longform-review-p55.md) is now prepared and
-queued after this run's complete training, review and timing barriers. It keeps
+The follow-up [P55 long-form review](longform-review-p55.md) has completed after
+this run's complete training, review and timing barriers. It keeps
 this experiment's objectives, calibration, budgets and frozen comparisons intact.
 
 The follow-up audit at `data/reports/metric-audit-p54-20261024/` reuses the frozen
@@ -278,13 +278,34 @@ At the selected rate, paired common MR changes on TRAIN calibration are
 auraloss (seeds 12/13). Identity MR still rises; retain these tradeoffs. The
 selection rule is an optimization screen, not a fidelity or release gate.
 
-The four registered 4096-update trajectories have been launched with an idle-sleep
-assertion. Evidence: `data/runs/spectral-training-p54-20261024/`, including
-`supervisor.json`, `progress.json`, `calibration.json` and completion receipts.
-Full training, frozen endpoint quality and final timing are **pending**. The
-supervised completion command runs all raw/native reviews and then 52,000
-diagnostic timing hops only after every endpoint finishes; no concurrent training
-inside that process and no retry-to-pass. A running process is not a quality result.
+All four registered trajectories completed **4096 actual updates each** (16,384
+updates in total), with finite retained update telemetry. All 81,920 scheduled
+paired crops were visited in each trajectory; the recorded exposure is now actual
+scheduled training coverage: 278 recordings and 287.52 unique supervised minutes.
+Repeated crops across trajectories do not multiply independent source duration.
+All endpoint hashes froze before raw/native review, followed by 52,000 diagnostic
+timing hops. Evidence: `data/runs/spectral-training-p54-20261024/`, including
+`complete.json`, `runtime-complete.json` and `cost-summary.json`.
+
+The subsequent source-disjoint [P55 review](longform-review-p55.md#completed-objective-results)
+finds native paired MR improvement against each inherited parent of only
+0.05350% / 0.02160% for common loss and 0.04517% / 0.01641% for auraloss (seeds
+12/13). Auraloss does not improve the common MR or its own rendered diagnostic
+relative to the matched common-loss arm on these sources. All four still trail
+historical native music MR by 2.23-2.44%; this is a failed superiority comparison,
+not evidence that training failed to execute or that small-model capacity is exhausted.
+The fixed budget does not establish convergence. Do not repeat unchanged continuation.
+
+Runtime: maximum compute 1.531375 ms, zero >=5 ms calls, zero hop service overruns
+and zero paced late completions in this 52,000-hop diagnostic. Paced 48 kHz stereo
+p99 ranges 0.834857-0.870763 ms; process peak RSS is 31,522,816 bytes. Compute includes
+causal frontend, ORT and DSP; the fixed 256-frame buffer is excluded (5.333 ms at
+48 kHz). This short synthetic-host run does not erase P53's recorded tail failures,
+establish their cause, or qualify actual callbacks/devices.
+
+The next [P56 trainability attribution](trainability-audit-p56.md) isolates current
+paired/identity contributions and adapter/decoder/full-model training scopes.
+It leaves these completed registrations, scores and defaults unchanged.
 
 Local verification: 751 Python tests pass (228 existing warnings), Ruff passes,
 132 English Markdown documents pass their links/registry checks, and the resolved

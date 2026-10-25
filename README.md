@@ -12,24 +12,25 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-Latest work: [P54 common comparison and spectral training](docs/spectral-training-p54.md)
-and the queued [P55 long-form review](docs/longform-review-p55.md).
-The old baseline and current small models now share a fixed raw/native comparison:
-current models improve speech, music dynamics and clean-input preservation, but
-do not consistently beat historical music spectra. Auraloss operators are pinned
-and tested; all twelve calibration runs finish and select a shared rate of 1e-7.
-Matched 4096-update continuation with broader source-time coverage is running. No new model
-is qualified or promoted. [P53](docs/balanced-preservation-pilot.md) remains a
-completed failed preservation-penalty comparison, not an accumulated quality gain.
-P55 reserves 20 source-disjoint recordings with 400 unique scored source seconds,
-real stereo and recording-balanced metrics. Its 160 cases are prepared; scoring
-and blinded listening materials wait for all P54 endpoints and timing. Region and
-genre gaps remain explicit, and no listening result is claimed.
+Latest completed work: [P54 spectral training](docs/spectral-training-p54.md) and
+[P55 long-form review](docs/longform-review-p55.md). All four 4096-update
+continuations and the 20-source, 160-case stereo evaluation finish. New endpoints
+reduce native paired spectral error by 1.39-1.59% versus untreated input, but
+remain 2.23-2.44% worse than historical weights; auraloss adds no matched benefit.
+Cleaner identity output does not establish better restoration. Blinded audio is
+prepared; human ratings, regional/genre coverage and device evidence remain open.
+No new model is qualified or promoted.
 
-Runtime remains unqualified: across 78,000 measured hops, four calls exceed 5 ms
-(maximum 7.403 ms), with six hop service overruns and 14 paced late completions.
-These elapsed-time outliers remain recorded; their CPU/scheduling cause is not
-established. The fixed 256-frame buffer is separate from the processing target.
+Current work: [P57 joint small-model training](docs/joint-training-p57.md), following
+completed [P56 attribution](docs/trainability-audit-p56.md). It compares adapter-only
+and full-model training with matched fresh Adam, unchanged identity/reference
+loss and equal 4096-update budgets. P55 sources remain reserved; inference parameter
+count is unchanged. No new training quality result is available.
+
+P54 diagnostic runtime records 52,000 hops, maximum compute 1.531 ms and no hop
+service overruns or paced late completions. This does not erase P53's retained
+7.403 ms outlier or establish actual-device reliability. The fixed 256-frame
+buffer remains separate from compute (5.333 ms at 48 kHz).
 
 Earlier protocols, positive submetrics and all counterexamples remain in
 [research history](docs/research.md) and the [failure registry](docs/failed-experiments.md).

@@ -24,13 +24,13 @@ The fixed native model set is historical shape-small, identity DSP, both exact
 P50 parents of P54, and all four final P54 continuations (two seeds, common versus
 auraloss objective). The same frozen P54 Rust diagnostic binary renders every
 model. Its original ModelGain/SmoothKnee pipeline, native detector conditions and
-per-channel state remain unchanged. No new model output has been scored yet.
+per-channel state remain unchanged. All eight native paths and their raw overlap-add controls have now been scored.
 
-The supervisor waits for verified P54 `complete.json` **and**
-`runtime-complete.json`, checks the exact four endpoint labels, and freezes all
+The supervisor waited for verified P54 `complete.json` **and**
+`runtime-complete.json`, checked the exact four endpoint labels, and froze all
 eight graph hashes in `endpoints.json` before opening the new scoring cases.
-This also keeps long-form evaluation out of P54's registered timing run. The
-listening pack is generated only after the complete long-form objective review.
+This kept long-form evaluation out of P54's registered timing run. The
+listening pack was generated after the complete long-form objective review.
 
 Before any model scoring, execution revision 2 added another prepared-audio hash
 check after the waiting barrier. The original registration, exact old runner source
@@ -163,8 +163,8 @@ and cannot replace stereo listening or become a retrospectively chosen winner.
   3.18e-9 raw. This is transport/alignment evidence, not music restoration quality.
 - The listening template passes JavaScript syntax checking. Browser UI validation
   is pending because no browser surface was available; there are no human ratings.
-- The queued supervisor is waiting for P54 training, frozen reviews and timing.
-  No P55 music scores, listening verdict or new weight qualification is claimed.
+- The complete objective review and blinded audio pack are available. No human
+  listening verdict or new weight qualification is claimed.
 
 The bounded coverage and missing listening/device evidence prevent a release
 conclusion. An inconclusive result must remain in the experiment registry; do not
@@ -200,3 +200,60 @@ endorsement is implied. Audio is not committed or publicly redistributed.
 | reaching | raymundo mendoza | [Publisher](https://archive.org/details/unfound53) | [CC BY 3.0](http://creativecommons.org/licenses/by/3.0/) |
 | Under the ground feat. Irmina Lastovskaya | Mesake | [Publisher](https://archive.org/details/wave020) | [CC BY 3.0](http://creativecommons.org/licenses/by/3.0/) |
 | Coereave - Dirty Thief | James Lowery | [Publisher](https://archive.org/details/volumevii_201401) | [CC BY 3.0](http://creativecommons.org/licenses/by/3.0/) |
+
+## Completed objective results
+
+All eight model/control graphs completed 160 cases each, with native and raw
+scores plus untreated controls: 2,720 score records. `complete.json` binds the
+frozen endpoints, summary, strata, outputs and listening materials. The following
+numbers average physical channels and cases within each source before giving
+the 20 sources equal weight. Lower error is better; these are numerical music
+outcomes, not listening scores.
+
+| Native paired path | MR | HF8k MR | Auraloss-band diagnostic |
+| --- | ---: | ---: | ---: |
+| Untreated | 0.51921873 | 0.58049597 | 0.50617539 |
+| Identity DSP | 0.51721536 | 0.57775399 | 0.50547090 |
+| Historical shape-small | 0.49981362 | 0.55207529 | 0.49503353 |
+| Seed 12 common | 0.51197556 | 0.57034170 | 0.50351613 |
+| Seed 12 auraloss | 0.51201827 | 0.57039861 | 0.50352087 |
+| Seed 13 common | 0.51096214 | 0.56891670 | 0.50321660 |
+| Seed 13 auraloss | 0.51098866 | 0.56895465 | 0.50321964 |
+
+All four new endpoints improve MR over untreated by 1.39-1.59%, but remain
+2.23-2.44% worse than historical weights; HF8k MR remains 3.05-3.32% worse.
+Each has lower MR than historical weights on 8/20 sources and higher error on
+12/20. Descriptive paired-source 95% bootstrap intervals for the native MR
+difference versus historical weights are entirely positive: common seed 12
+[0.003927, 0.020078], auraloss seed 12 [0.003966, 0.020125], common seed 13
+[0.003201, 0.018762], auraloss seed 13 [0.003229, 0.018800]. These marginal intervals
+are not multiplicity-adjusted proof of universal superiority or inferiority.
+The new source/work-disjoint evidence does not support the hypothesis that current
+models already surpass the old baseline but only the previous weighting hid it.
+It still cannot establish that the baseline never overfits or wins perceptually.
+
+The newer models retain tradeoffs: native reference dynamics error is 1.57-1.60%
+lower than historical weights, and clean-identity MR error is 76.23-77.84% lower.
+The latter measures reduced damage on already lossless audio, not restored lossy
+content. Native paired HF8k PCM error RMS is 0.008735-0.008737, below historical
+0.008959 but above untreated 0.008725. Side error RMS is 0.012447 versus historical
+0.012502 and untreated 0.012464. Better phase-sensitive PCM error and preservation
+do not override the still worse high-frequency spectral match or prove audibility.
+
+Raw current MR is 0.511324-0.512635 and native MR is 0.510962-0.512018: on these
+sources DSP slightly improves spectral error. This differs from the older short
+TRAIN review, where DSP worsened it. Therefore DSP cannot be designated the sole
+bottleneck. Historical raw MR is 0.744517 before its intended fusion, so comparing
+only raw outputs would misrepresent the delivered historical baseline.
+
+Auraloss provides no extra common-MR benefit over the matched common-loss control
+at either seed, and neither new objective closes the historical gap. Keep all
+per-source, codec, rate, frequency-band and identity counterexamples in `summary.json`
+and `strata.json`. These exposed recordings remain reserved; future reuse is a
+recheck, never an untouched test. The [P56 diagnosis](trainability-audit-p56.md)
+uses only the prior TRAIN roles, excluding these reserved aliases.
+
+The 20-trial local blinded pack is complete under the review's `listening/`
+directory, including lossless reference, hidden reference, anchor and all registered
+conditions. Human ratings and real-device qualification remain pending. No default
+weight was replaced and no subjective improvement is claimed.
