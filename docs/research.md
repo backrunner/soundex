@@ -1,11 +1,15 @@
 # Research status and experiment history
 
-Current registered study: [P60 context and negatives](texture-context-p60.md).
-Four matched critic arms per frozen generator separate observed-band summaries
-from structured negative exposure. Eight 1,024-update endpoints must finish
-before scoring; random features and untrained time shifts remain controls.
-The P59 source/work-isolated bank is reused and calibration is explicitly a
-recheck. All 804 local Python tests pass. No restoration generator is trained.
+Latest completed study: [P60 context and negatives](texture-context-p60.md).
+All eight 1,024-update critics freeze before 17,920 review records. Structured
+negatives fix phase-control ranking on every source and recognize most unseen
+shift controls, but reverse ordinary prediction ranking to only 3-4/45 music
+and 0/16 speech sources preferring the original reference. All four arms fail
+the registered prerequisite. Observed-band summaries alone do not fix phase
+recognition; normalized paired feature distances remain close to random controls.
+Next diagnose separate loss-component gradients on fit data before proposing
+separate task outputs. P59 calibration is an exposed recheck. All 804 local
+tests and implementation CI pass; no restoration generator updates or promotion.
 
 Latest completed calibration: [P59 critic learning](texture-calibration-p59.md).
 Both 1,024-update critics finish before uniform scoring. Fit includes 205
@@ -17,8 +21,8 @@ source receives a higher realism score than its reference; most time shifts also
 escape. All four seed/corpus groups fail the registered prerequisite.
 Paired feature distance still penalizes both controls, so this does not show
 that the proposed generator loss rewards noise. No generator updates follow.
-Next isolate observed-band conditioning and structured negative exposure with
-matched controls, including random features. All 793 local tests pass; no
+The P60 follow-up above isolates observed-band conditioning and structured
+negative exposure. At P59 completion, all 793 local tests passed; no
 restoration-quality, runtime or default-weight promotion is claimed.
 
 Latest diagnosis: [P58 band/source/stage attribution](joint-attribution-p58.md)

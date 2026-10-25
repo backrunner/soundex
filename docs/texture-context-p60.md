@@ -104,9 +104,81 @@ No new inference operator, buffer or runtime qualification is claimed. A later
 generator comparison still needs matched budgets, original spectral/fidelity
 objectives, native streaming and listening evidence.
 
-## Execution status
+## Completed result: all four arms fail the prerequisite
 
-All 804 local Python tests pass (239 warnings, 71.71 seconds); Ruff lint/format
-passes for 361 files. The protocol is registered and the eight-critic run has
-started from its frozen source snapshot. No outcome is inferred from P59 or
-the hypothesis. All eight endpoints and failed controls will remain recorded.
+All eight critics completed 1,024 updates each (8,192 total), froze before
+scoring, and produced 17,920 review records. Generator updates remain zero.
+All four arms fail for both generator origins and both corpora. This is a
+completed mechanism study, not a new restoration-quality result.
+
+Each entry below counts sources where the original reference receives a higher
+classifier logit than the candidate. Music columns list seed 20261012 / 20261013;
+speech counts are identical across both seeds. Roundtrip margins are the
+numerical control; these are classifier rankings, not listening votes.
+
+| Arm | Prediction, music / 45 | Prediction, speech / 16 | Phase control, music / 45 | Phase control, speech / 16 | Quarter-shift, music / 45 | Quarter-shift, speech / 16 |
+| --- | --- | ---: | --- | ---: | --- | ---: |
+| high_prediction | 42 / 41 | 16 | 0 / 0 | 0 | 4 / 4 | 1 |
+| context_prediction | 42 / 41 | 16 | 0 / 0 | 0 | 8 / 8 | 3 |
+| high_structured | 3 / 4 | 0 | 45 / 45 | 16 | 43 / 43 | 15 |
+| context_structured | 3 / 4 | 0 | 45 / 45 | 16 | 45 / 45 | 15 |
+
+The structured-negative intervention reverses the classifier's preference for
+phase controls and substantially improves time-shift recognition. For the 3/8
+shift never used in fitting, high_structured recognizes 41/45 music and 14/16
+speech sources; context_structured recognizes 42/45 and 15/16, in both seeds.
+Prediction-only arms recognize only 7/45 and 2/16 without summaries, or 9/45
+and 4/16 with summaries. This demonstrates transfer across the tested shift
+fractions, not general restoration or independent-source generalization.
+
+However, structured arms reverse the original prediction ranking: only 3/45
+or 4/45 music sources and no speech sources prefer the reference. Ordinary
+prediction logistic loss fails the registered improvement condition. The
+energy-matched prediction control also regresses to 7/45 or 9/45 music sources
+and 2/16 speech sources, versus 36-38/45 and 14/16 for prediction-only arms.
+The context_structured prediction mean margins are -0.0003330 / -0.0003323
+for music and -0.0007484 / -0.0007201 for speech. Correctly recognizing the
+synthetic controls does not offset this retained failure.
+
+Adding observed-band summaries alone improves a minority of time-shift cases
+but never fixes phase ranking. Learned added-weight norms are 0.312-0.327 for
+context arms and exactly zero for off arms. This confirms updates reached the
+new parameters; it does not prove useful musical conditioning or a capacity
+ceiling. Both origins show the same qualitative conflict.
+
+### Paired features and interpretation
+
+Paired feature losses still penalize phase/time controls and remain zero at the
+reference. After each critic's own fit-only feature normalization, the learned
+distances remain close to random-feature controls. For example, seed-12 music
+phase/time distances are 2.5009 / 3.5319 at initialization and 2.4871 / 3.5455
+for context_structured; speech values change from 7.1313 / 10.0424 to
+7.5122 / 10.6574. These are ratios to fit prediction distance, not audio-error
+improvements. They provide no demonstrated restoration advantage over random
+features. Original absolute feature values and PCM band RMS remain in every
+source-level review record; no audibility threshold is introduced.
+
+The matched intervention shows a tradeoff between recognizing synthetic errors
+and distinguishing the actual fixed-generator distribution at this budget.
+It supports investigating the combined classification objective, but does not
+prove that one particular gradient conflict, model capacity or convergence
+limit caused it. Synthetic controls are not a complete substitute for actual
+restoration errors. No failed arm is promoted, and no generator training follows.
+
+A concrete next diagnostic is to separate prediction, phase and time loss
+contributions and their gradients on the registered fit material. If they compete,
+test separate task outputs or paired-reference error features under a fresh
+matched protocol, with random features retained. Do not merely retune negative
+mixture weights on this exposed calibration, repeat unchanged longer training,
+or claim every learned-feature objective is ineffective. That diagnostic and
+any subsequent generator comparison have not been launched.
+
+### Verification and retained evidence
+
+All 804 local Python tests passed (239 warnings, 71.71 seconds); Ruff lint/format
+passed for 361 files. Both jobs in the
+[implementation CI](https://github.com/backrunner/soundex/actions/runs/40220002252)
+passed. After completion, all 4,788 registered input/source bindings, the root
+completion receipt and all 16 initial/final critic checkpoints were reverified.
+The eight endpoints and every failed source/control remain in the registered
+ignored run directory. No original audio, checkpoint or raw report is published.

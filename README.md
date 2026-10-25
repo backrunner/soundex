@@ -35,10 +35,11 @@ still penalizes these controls; this is not evidence that the generator loss
 rewards noise. Generator training with this term is deferred while conditioning
 and negative-example exposure are investigated. Default weights remain unchanged.
 
-[P60](docs/texture-context-p60.md) now runs a matched four-arm comparison of
-observed-band summaries and structured negative exposure, repeated for both
-frozen generators. All eight critic endpoints freeze before scoring. Calibration
-is a recheck; no restoration generator updates or new quality claims yet.
+[P60](docs/texture-context-p60.md) completed all eight critic endpoints. Structured
+negatives fix phase/time-control recognition but reverse actual prediction
+ranking; all four arms fail the registered prerequisite. Observed-band summaries
+alone do not resolve the failure. Calibration remains a recheck, with no
+restoration generator updates or new quality claims.
 
 Latest training: [P57 joint small-model comparison](docs/joint-training-p57.md)
 completed all four 4096-update runs and automated rechecks. Full training reduces

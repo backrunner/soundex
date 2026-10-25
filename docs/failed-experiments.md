@@ -13,11 +13,14 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
-Current registered follow-up: [P60](texture-context-p60.md) separates full-band
-observed summaries from structured negative exposure in a matched 2x2 critic
-study. Eight endpoints are pending; this is not a successful validation yet.
-The source/work-isolated P59 pool and its exposed calibration are reused. No
-restoration generator or deployment weight changes.
+Completed follow-up: [P60](texture-context-p60.md) separates observed-band
+summaries and structured negatives. All eight 1,024-update endpoints finish;
+all four arms fail the prerequisite. Structured negatives fix phase/time-control
+ranking but reverse actual prediction ranking to 3-4/45 music and 0/16 speech
+sources preferring the reference. Context alone does not fix phase recognition.
+Diagnose component gradients before considering separate task outputs; do not
+retune mixture weights on exposed calibration or repeat unchanged training.
+No restoration generator or deployment weight changes.
 
 1. Find the closest previous route and read its report before changing training.
 2. Name the unresolved hypothesis and the changed control, representation, data
