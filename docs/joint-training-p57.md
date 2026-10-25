@@ -88,23 +88,90 @@ the <5 ms model+DSP compute target and the 2.667 ms hop service period. Unchange
 graph size is not measured real-time qualification; actual-device and human
 listening evidence remain separate requirements.
 
-## Status
+## Completed results
 
-Registered and launched on **2026-10-25 at 14:09 SGT**. Supervisor PID 27222 and
-its idle-sleep assertion are recorded in `supervisor.json`. Input checks completed
-before the first actual adapter-control update; its checkpoint receipt verifies,
-parameters changed and optimizer telemetry is finite. All four 4096-update
-trajectories are queued in one serial supervisor. This is a launch/update result,
-not a quality result; full training, raw/native rechecks and timing remain pending.
+All four trajectories completed **4096 actual updates each**, with finite update
+telemetry and verified final checkpoint hashes. All registered raw/native reviews,
+52,000 diagnostic timing hops and the 160-case P55 stereo recheck completed.
+The long-form recheck contains 2,720 score records; the completion receipts and
+summary/endpoints hashes verify. No default weight changed. This is a completed
+experiment, not release qualification or a new independent test.
 
-Registration binds 79,024 input/source hashes, including selected paired PCM and
-all reservation catalogs. Both nonzero P56 full-model preflight exports have
-480,809 parameters and 1,972,748 ONNX bytes. Their 320-hop parity checks include
-reset and silence; maximum Cartesian errors are 1.213e-7 / 9.424e-8, and maximum
-state error is 3.338e-6. These are export checks, not the future trained endpoints'
-latency or quality qualification.
+The following numbers give each of the 20 reused source recordings equal weight.
+Lower error is better. Both seeds remain reported; no winner is selected.
 
-Local validation: **773 tests pass**, with 238 existing/export warnings; Ruff
-passes all 349 Python files, and 135 English Markdown files pass links/index
-checks. Failed P54/P55 quality criteria and the retained P56 operational failure
-are recorded in the registry. Default weights remain unchanged.
+| Native paired metric | Seed 12 adapter | Seed 12 full | Seed 13 adapter | Seed 13 full | Historical |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| MR | 0.51186562 | 0.50867788 | 0.51092117 | 0.50766732 | 0.49981362 |
+| HF8k MR | 0.57018818 | 0.56568336 | 0.56885821 | 0.56425484 | 0.55207529 |
+| Log-magnitude error | 0.34405320 | 0.33922517 | 0.34307263 | 0.33826258 | 0.31940622 |
+| Reference dynamics error | 0.26451699 | 0.26490707 | 0.26460560 | 0.26521475 | 0.26879708 |
+
+Compared with the matched adapter controls, full training reduces native MR by
+**0.6228% / 0.6369%**, HF8k MR by **0.7901% / 0.8092%**, and log-magnitude error
+by 1.4033% / 1.4020%. MR improves on 16/20 and 14/20 sources, leaving four and
+six adverse sources respectively. Compared with the exact P54 parents, full
+training reduces MR by 0.6441% / 0.6448%; continuing only the adapter reduces it
+by about 0.0215% / 0.0080%. This supports cumulative trainability as a useful
+mechanism under this protocol, not a universal architecture or capacity verdict.
+
+Full endpoints still have **1.7735% / 1.5713% higher MR** and **2.4649% / 2.2061%
+higher HF8k MR** than historical weights. Their native MR differences versus
+historical weights have descriptive marginal source-bootstrap 95% intervals
+[0.001509, 0.015729] and [0.000811, 0.014294]. They remain worse on 12/20 and
+13/20 sources. These exposed-source intervals are not multiplicity-adjusted
+confirmatory evidence or a perceptual rating. Against untreated audio, full
+endpoints reduce MR by 2.0301% / 2.2248% and HF8k MR by 2.5517% / 2.7978%.
+
+### Fidelity and counterexamples
+
+Full training increases native reference dynamics error by 0.1475% / 0.2302%
+relative to adapter controls, and paired full-band PCM RMS error by 0.0288% /
+0.0322%. A small waveform increase does not alone reject spectral progress,
+but the temporal and clean-input tradeoffs must remain visible.
+
+On clean identities, native MR rises 5.6649% / 7.2446%. Calibrated full-band PCM
+error RMS changes from 0.000838123 to 0.000841751 for seed 12, and 0.000842899 to
+0.000848820 for seed 13: increases of **3.629e-6 / 5.922e-6 PCM**, or 0.4330% /
+0.7025%. Native HF8k error RMS rises 2.4502% / 3.3705%; below-8-kHz RMS changes
+only 0.0020% / 0.0045%. These are errors against original references, not output
+loudness or audible-severity thresholds. Neither large relative weak-band errors
+nor small absolute changes replace listening evidence.
+
+The historical TRAIN raw recheck also favors joint training on paired spectra:
+music MR falls 0.9694% / 0.7619% and speech MR falls 0.5047% / 0.5863% versus
+adapter controls. Raw music identity error increases, and phase-sensitive high-band
+PCM tradeoffs remain. Full per-case errors are retained in `raw-review/`,
+`native-review/` and `longform-recheck/summary.json`; frequency/codec/rate strata
+remain in `longform-recheck/strata.json`. These are rechecks, not new validation
+recordings. Blinded materials exist; human ratings remain pending.
+
+### Runtime and validation
+
+Across **52,000 measured hops**, maximum frontend + model + DSP compute is
+**2.238792 ms**, with zero >=5 ms calls and zero service durations exceeding the
+hop period. Paced 48 kHz stereo p99 is 0.807682-0.904797 ms across the four models.
+Process peak RSS is **31,490,048 bytes** (about 30.0 MiB).
+
+One paced completion is late by **0.468495 ms**, on seed 13 full. Thus compute
+passes this diagnostic but continuous timing is not failure-free; do not erase
+the event, attribute it to scheduling without evidence, or retry until it passes.
+The fixed 256-frame buffer remains 5.333 ms at 48 kHz and is excluded from compute.
+This host simulation is not actual callback/device certification.
+
+All prelaunch checks passed: 773 tests, Ruff on 349 Python files, 135 English
+Markdown documents, and CI 40168191632. The real-size preflight models retained
+480,809 parameters and 1,972,748 ONNX bytes, with 320-hop state/reset/silence parity.
+No inference-size increase was needed for the observed spectral gain.
+
+### Decision
+
+Joint training makes more progress than unchanged adapter continuation, but has
+not surpassed historical spectral restoration and adds preservation/temporal
+tradeoffs. Do not promote, remove identity protection or expand capacity on this
+result. The next diagnosis should decompose the accumulated joint updates by
+frequency band, source and training stage, separating useful high-band recovery
+from clean-input and transient damage. Use TRAIN-only decisions and a matched
+full-training control before changing constraints or objectives. Inspect the
+paced-lateness event separately from quality. Any further P55 scoring remains
+a recheck; fresh generalization and human/device evidence are still absent.

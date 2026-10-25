@@ -21,16 +21,18 @@ Cleaner identity output does not establish better restoration. Blinded audio is
 prepared; human ratings, regional/genre coverage and device evidence remain open.
 No new model is qualified or promoted.
 
-Current work: [P57 joint small-model training](docs/joint-training-p57.md), following
-completed [P56 attribution](docs/trainability-audit-p56.md). It compares adapter-only
-and full-model training with matched fresh Adam, unchanged identity/reference
-loss and equal 4096-update budgets. P55 sources remain reserved; inference parameter
-count is unchanged. No new training quality result is available.
+Latest training: [P57 joint small-model comparison](docs/joint-training-p57.md)
+completed all four 4096-update runs and automated rechecks. Full training reduces
+native paired MR 0.62-0.64% versus matched adapter-only controls, but still trails
+historical weights by 1.57-1.77% and increases clean-input/temporal errors. Both
+seeds and every adverse source remain reported. P55 is now an exposed-source
+recheck; no human listening result or default promotion is claimed.
 
-P54 diagnostic runtime records 52,000 hops, maximum compute 1.531 ms and no hop
-service overruns or paced late completions. This does not erase P53's retained
-7.403 ms outlier or establish actual-device reliability. The fixed 256-frame
-buffer remains separate from compute (5.333 ms at 48 kHz).
+P57 runtime records 52,000 hops, maximum compute 2.239 ms and no compute service
+overruns, but one paced completion is late by 0.468 ms. Actual-device reliability
+remains unqualified. The fixed 256-frame buffer is separate from compute
+(5.333 ms at 48 kHz). Next isolate the accumulated spectral/fidelity tradeoff;
+inference parameter count remains unchanged.
 
 Earlier protocols, positive submetrics and all counterexamples remain in
 [research history](docs/research.md) and the [failure registry](docs/failed-experiments.md).

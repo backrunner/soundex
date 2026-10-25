@@ -1,25 +1,25 @@
 # Research status and experiment history
 
-Current work: [P57 matched joint training](joint-training-p57.md), following
-completed [P56 trainability attribution](trainability-audit-p56.md),
+Latest completed work: [P57 matched joint training](joint-training-p57.md), after
+[P56 trainability attribution](trainability-audit-p56.md),
 [P54 spectral training](spectral-training-p54.md) and
-[P55 long-form source-disjoint review](longform-review-p55.md). All four 4096-step
-continuations finish, with actual scheduled exposure of 278 recordings and 287.52
-unique supervised minutes per trajectory. P55 scores 20 reserved sources and
-160 cases per path. Native paired MR improves 1.39-1.59% over untreated input but
-remains 2.23-2.44% worse than historical weights; HF8k MR is 3.05-3.32% worse.
-Auraloss does not beat matched common-loss controls. Cleaner identity and lower
-waveform errors remain distinct benefits, not proof of superior restoration.
+[P55 long-form review](longform-review-p55.md). All four P57 trajectories finish
+4096 updates, followed by raw/native reviews, timing and the P55 stereo recheck.
+Full-model training reduces native paired MR 0.6228% / 0.6369% versus matched
+adapter controls and HF8k MR 0.7901% / 0.8092%, without adding parameters.
+It still trails historical MR by 1.7735% / 1.5713%, increases clean-identity error
+and slightly worsens reference dynamics. No weights are promoted.
 
-P54's 52,000-hop diagnostic records maximum compute 1.531375 ms, no >=5 ms calls,
-no hop service overruns and no paced lateness. The fixed 256-frame buffer and
-actual-device qualification remain separate. P53 failures below are retained.
-Blinded P55 audio is prepared, but human ratings are pending. No model is promoted.
-P56 completed all 48 probes: decoder-only changes remain weak, full trainability
-exposes additional directions, but tiny transfer gains and batch counterexamples
-preclude quality claims. P57 tests cumulative adapter/full updates with identical
-loss, fresh moments and 4096-step budgets. It excludes all reserved P55 aliases
-and adds no inference parameters. Training completion and quality remain pending.
+P57 timing covers 52,000 hops: max compute 2.238792 ms, zero >=5 ms calls or hop
+service overruns, but one paced completion is late by 0.468495 ms. Keep this failure
+separate from compute feasibility and retain earlier P53 failures below. Fixed
+256-frame buffering, actual-device qualification and human listening remain
+separate. P55 recordings are exposed and all new scoring is labeled a recheck.
+
+Next attribute cumulative joint-training changes by band, source and stage before
+altering preservation/temporal constraints. The result supports investigating
+existing trainability, not automatically scaling capacity or removing identity.
+All original-reference, phase and transient targets and source reservations remain.
 
 Previous completed pilot: [P53 balanced preservation](balanced-preservation-pilot.md).
 Six matched 128-update trajectories, twelve raw reports, six exports and 480 new
