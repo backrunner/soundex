@@ -27,6 +27,14 @@ gain and added clean-input error above 16 kHz. An
 adds training-only learned spectral features; numerical and real-TRAIN integration
 checks pass, but no restoration generator has been trained with this new term.
 
+[P59 critic calibration](docs/texture-calibration-p59.md) has now completed two
+1,024-update critics on 205 fit recordings. Its source-disjoint critic calibration
+fails the registered false-detail prerequisite: the classifier prefers scrambled
+HF phase on all 61 sources and misses most time shifts. Paired feature distance
+still penalizes these controls; this is not evidence that the generator loss
+rewards noise. Generator training with this term is deferred while conditioning
+and negative-example exposure are investigated. Default weights remain unchanged.
+
 Latest training: [P57 joint small-model comparison](docs/joint-training-p57.md)
 completed all four 4096-update runs and automated rechecks. Full training reduces
 native paired MR 0.62-0.64% versus matched adapter-only controls, but still trails
@@ -37,7 +45,7 @@ recheck; no human listening result or default promotion is claimed.
 P57 runtime records 52,000 hops, maximum compute 2.239 ms and no compute service
 overruns, but one paced completion is late by 0.468 ms. Actual-device reliability
 remains unqualified. The fixed 256-frame buffer is separate from compute
-(5.333 ms at 48 kHz). Next isolate the accumulated spectral/fidelity tradeoff;
+(5.333 ms at 48 kHz). P59 changes no inference graph or runtime qualification;
 inference parameter count remains unchanged.
 
 Earlier protocols, positive submetrics and all counterexamples remain in

@@ -1,5 +1,19 @@
 # Research status and experiment history
 
+Latest completed calibration: [P59 critic learning](texture-calibration-p59.md).
+Both 1,024-update critics finish before uniform scoring. Fit includes 205
+recordings and 554.812 unique supervised seconds; critic calibration contains
+45 music and 16 speech recordings, with connected source/work aliases excluded
+from critic fitting. These remain reused TRAIN recordings for the generators.
+Ordinary prediction classification improves slightly, but every phase-scrambled
+source receives a higher realism score than its reference; most time shifts also
+escape. All four seed/corpus groups fail the registered prerequisite.
+Paired feature distance still penalizes both controls, so this does not show
+that the proposed generator loss rewards noise. No generator updates follow.
+Next isolate observed-band conditioning and structured negative exposure with
+matched controls, including random features. All 793 local tests pass; no
+restoration-quality, runtime or default-weight promotion is claimed.
+
 Latest diagnosis: [P58 band/source/stage attribution](joint-attribution-p58.md)
 reuses every frozen P57 long-form case. Above 16 kHz supplies 69.93% / 72.94%
 of the native paired MR gain and 97.36% / 92.17% of added clean MR error. The
@@ -13,8 +27,9 @@ AERO, Apollo, AP-BWE and DeepFilterNet and adds an original training-only paired
 spectral-feature prototype. Both frozen P57 generators complete eight critic
 updates and fit/calibration gradient checks; restoration weights remain exact.
 This validates integration, not critic learning, improved music or new trained
-generator weights. Broader critic calibration and a registered matched generator
-comparison remain pending; no unchanged long continuation is launched.
+generator weights. The broader P59 calibration above now fails the intended
+false-detail mechanism check; a matched generator comparison remains deferred.
+No unchanged long continuation is launched.
 
 Latest completed work: [P57 matched joint training](joint-training-p57.md), after
 [P56 trainability attribution](trainability-audit-p56.md),

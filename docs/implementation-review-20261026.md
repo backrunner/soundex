@@ -112,6 +112,12 @@ environment failure record. These are local checks, not remote CI or new-device
 evidence. All 789 preflight input/source bindings and both new completion receipts
 were verified after execution.
 
+Follow-up: [P59](texture-calibration-p59.md) completes the broader two-critic
+1,024-update calibration. Its realism classification fails phase/time controls,
+although the paired feature distance still penalizes them. No generator was
+trained with the term. The following prerequisite was the plan at prototype
+completion; P59 now records its failure and the revised research hypothesis.
+
 Before a generator comparison, establish critic learning on broader TRAIN
 coverage, source-disjoint calibration, noise/temporal-order controls and
 music/speech gradient contribution under a fixed training-only scale rule.
