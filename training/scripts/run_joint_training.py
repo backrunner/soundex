@@ -259,7 +259,9 @@ def export_joint(model, path, scope):
 
 
 @torch.no_grad()
-def finalize(config, entries, output):
+def finalize(
+    config, entries, output, *, load_model=load_trainable, export_model=export_joint, study="p57"
+):
     registered(entries, output / "endpoints.json")
     verify({e["path"]: e["sha256"] for e in entries.values()})
     rows, _ = load_sources(list(map(Path, config["manifests"])))
@@ -272,11 +274,11 @@ def finalize(config, entries, output):
     all_entries = {**{k + "-parent": v for k, v in config["parents"].items()}, **entries}
     graphs, summary = {}, {}
     for label, entry in all_entries.items():
-        model = load_trainable(
+        model = load_model(
             torch.load(entry["path"], map_location="cpu", weights_only=False),
             entry.get("scope", "adapter"),
         )
-        graphs[label] = export_joint(
+        graphs[label] = export_model(
             model, output / "exports" / label, entry.get("scope", "p54-parent")
         )
         cases = []
@@ -326,7 +328,7 @@ def finalize(config, entries, output):
     recheck.mkdir(exist_ok=True)
     source = Path(config["p55"])
     review_config = {
-        "format": "soundex-p57-p55-recheck-v1",
+        "format": f"soundex-{study}-p55-recheck-v1",
         "scope": "Previously exposed P55 sources: recheck, NOT independent test or qualification",
         "models": {k: str(v) for k, v in graphs.items()},
         "sources": read(source / "registration.json")["sources"],
