@@ -13,6 +13,16 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P63](band-training-p63.md) starts six registered fresh global/parameter-matched/band
+trajectories, 16,384 updates each; the first global control is running after all
+six preflights, with no completed quality comparison yet. Its
+first launcher rejects an order-only catalog mismatch before training; v2
+preserves byte-identical draws and adds the regression test. A separate fixed
+8,000-hop CPU/wake audit retains 18 band and two global late completions, including
+one band stage wall time above 5 ms (24.131125 ms, 1.108583 ms thread CPU).
+Off-CPU delay remains a real deployment failure, not an exemption or a reason
+to replace the original P62 timing record.
+
 [P62](band-tcn-p62.md) implements the band TCN and passes numerical/native
 parity plus the compute screen (maximum 1.218834 ms). Its paced case still fails
 continuity: 2/1,000 completions late, maximum 3.622951 ms. Retain the state-size
@@ -58,6 +68,7 @@ A positive submetric is retained even when the candidate is not qualified.
 
 | ID and evidence | Outcome / unsuccessful validation | What permits a new experiment |
 | --- | --- | --- |
+| [P63: fresh matched band training](band-training-p63.md) | Training running after six successful preflights, no quality verdict. First frozen launch stopped before updates on an order-only reservation-list mismatch; corrected v2 keeps the schedule unchanged. Fixed CPU/wake follow-up records 18 band / 2 global late completions and one 24.131125 ms wall call, with substantial off-CPU time. | Complete all six 16,384-update endpoints before uniform review. Preserve speaker/work alias isolation, early failures and every timing run; investigate scheduling/fallback separately. CPU time cannot excuse wall-time/deadline failures. |
 | [P62: band TCN feasibility](band-tcn-p62.md) | Diagnostic; no training. 171,137-parameter band graph passes nonzero ONNX/native parity and compute <5 ms across its 13,000 scored hops, but paced completion fails twice, max 3.622951 ms late. First native preflight rejected 6,048 allocated versus 12,096 required state values; corrected diagnostic loader follows validated graph shapes. | Matched fresh training with common source exposure/budgets, separate representation/capacity conclusions and unchanged original-reference scoring. Investigate wake/worker recovery; do not retry timing to hide failures or promote untrained weights. |
 | [P2: matched causal backbones](causal-training-20261012.md), [seed review](causal-p2-review-20261012.md) | Not qualified. Six fresh 4,096-step runs improve on a matched fresh control but do not establish an overall win over the historical checkpoint; weak high bands receive excess generation. Unequal historical budgets are not architecture evidence. | Match budgets and directly constrain reference-relative weak-band generation while measuring recovery. |
 | [P3: weak-band continuation](weak-band-study-20261012.md) | Not qualified. Both seeds reduce excess generation but retain restoration/fidelity tradeoffs. | Show spectral restoration, not merely reduced enhancement, with identity controls. |

@@ -51,6 +51,11 @@ passes numerical/native parity. Its measured maximum full compute is 1.219 ms,
 but two paced completions are late. This is an untrained feasibility prototype;
 no restoration-quality gain or production qualification is claimed.
 
+[P63](docs/band-training-p63.md) starts the registered fresh-training
+comparison after all six preflights, including a parameter-matched global control. Its separate CPU/wake
+audit also records a 24.13 ms wall-time stall with 1.11 ms thread CPU; real-time
+qualification remains unresolved. No new trained endpoint is available yet.
+
 Latest training: [P57 joint small-model comparison](docs/joint-training-p57.md)
 completed all four 4096-update runs and automated rechecks. Full training reduces
 native paired MR 0.62-0.64% versus matched adapter-only controls, but still trails

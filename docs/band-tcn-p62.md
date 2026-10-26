@@ -4,6 +4,11 @@ Date: 2026-10-26. Status: prototype implemented; compute screen passed; paced
 continuity not qualified; **zero training updates and no restoration-quality claim**.
 Default weights remain unchanged.
 
+Follow-up: [P63](band-training-p63.md) registers matched fresh training and adds
+a fixed CPU/wake audit. That audit records an additional 24.131125 ms stage
+wall-time outlier; the original measurements below are retained, not a claim
+that all subsequent runs stay below 5 ms.
+
 ## Why this experiment
 
 The [P61 architecture review](architecture-evaluation-p61.md) proposes delaying

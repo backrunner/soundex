@@ -1,5 +1,17 @@
 # Research status and experiment history
 
+[P63](band-training-p63.md) starts the registered fresh global width-96, global width-46
+and eight-band TCN models, two seeds and 16,384 updates per trajectory. The
+parameter-matched comparison is 170,859 versus 171,137 weights. Source/work
+isolation excludes 96 speech utterances sharing reserved speakers; scheduled
+coverage is 157 music recordings and 25 utterances from three speech speakers.
+All six preflights and 91,236 file hashes pass; the first global control is
+training and the remaining arms are queued. There is no completed quality
+result. The fixed CPU/wake follow-up records a
+24.131125 ms stage wall call using 1.108583 ms thread CPU; real-time acceptance
+remains failed. All timing runs and the corrected order-only launcher failure
+are retained, with details and launch status in the report.
+
 [P62](band-tcn-p62.md) implements an eight-band causal TCN with 171,137
 parameters and 12,096 state floats per physical channel. Nonzero ONNX and actual
 Rust parity pass. A registered 26,000-hop control/prototype comparison measures
