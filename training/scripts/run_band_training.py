@@ -45,6 +45,13 @@ def jsonl(path):
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
+def assert_catalogs_unchanged(actual, expected):
+    # Path component ordering and whole-string ordering differ for a directory
+    # prefix followed by '/' versus '-v2'. Reservation order is not semantic.
+    if sorted(map(str, actual)) != sorted(map(str, expected)):
+        raise ValueError("evaluation reservations changed; audit before resume")
+
+
 def isolated_rows(rows, allowed_tracks, universe, reserved):
     """Exclude connected work/decoded aliases before drawing any training crop."""
     blocked = set().union(*(aliases(row) for row in reserved))
@@ -267,8 +274,7 @@ def run(output):
             str(p)
             for p in (Path(config["repository"]) / "data/runs").glob("*/evaluation-catalog.jsonl")
         )
-        if catalogs != config["evaluation_catalogs"]:
-            raise ValueError("evaluation reservations changed; audit before resume")
+        assert_catalogs_unchanged(catalogs, config["evaluation_catalogs"])
         write_json_report(
             {"stage": "verifying-inputs", "files": len(config["hashes"])}, output / "progress.json"
         )

@@ -18,7 +18,7 @@ from evaluation.band_training import (
     pack,
 )
 from evaluation.reporting import sha256_file
-from scripts.run_band_training import isolated_rows
+from scripts.run_band_training import assert_catalogs_unchanged, isolated_rows
 from scripts.run_joint_training import step
 from tests.test_joint_training import items
 
@@ -77,6 +77,20 @@ def test_reservation_closure_removes_connected_work_before_sampling():
     reserved = [{"audio_sha256": "reserved"}]
     assert set(isolated_rows(rows, {"fit"}, universe, reserved)) == {"b"}
     assert not isolated_rows(rows, {"another"}, universe, reserved)
+
+
+def test_catalog_paths_ignore_order_but_never_added_or_removed_reservations():
+    paths = [
+        Path("/runs/study/evaluation-catalog.jsonl"),
+        Path("/runs/study-v2/evaluation-catalog.jsonl"),
+    ]
+    stored = list(map(str, sorted(paths)))
+    actual = sorted(map(str, paths))
+    assert stored != actual  # reproduce the first frozen launcher rejection
+    assert_catalogs_unchanged(actual, stored)
+    for changed in (actual[:1], [*actual, "/runs/new/evaluation-catalog.jsonl"]):
+        with pytest.raises(ValueError, match="reservations changed"):
+            assert_catalogs_unchanged(changed, stored)
 
 
 def test_review_barrier_rejects_partial_steps_wrong_seed_and_hash(tmp_path):
