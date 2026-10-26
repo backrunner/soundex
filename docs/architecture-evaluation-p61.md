@@ -149,6 +149,7 @@ reset and ONNX/Rust parity before expensive training. Measure latency before
 scaling width. The final choice is a measured quality/latency tradeoff; neither
 the largest model nor a published SOTA label establishes optimality here.
 
-No new band-token generator has been implemented or trained in this review.
-The current implementation work is the bounded P61 audit, which closes the
-critic diagnosis without another unchanged training run.
+No band-token generator was implemented or trained during P61. The subsequent
+[P62 feasibility study](band-tcn-p62.md) now implements the small prototype and
+measures numerical/native parity and actual compute, retaining its paced
+continuity failures. It still contains no training or restoration-quality result.

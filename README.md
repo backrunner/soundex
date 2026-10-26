@@ -45,8 +45,11 @@ restoration generator updates or new quality claims.
 objective conflict and no mean raw-PCM spectral-probe advantage from trained
 versus random features. The current tiny-critic recipe is retired as the next
 generator auxiliary. The [architecture review](docs/architecture-evaluation-p61.md)
-documents the actual causal TCN and a proposed band-token comparison; a new
-generator has not yet been implemented or trained.
+documents the actual causal TCN and the proposed band-token comparison.
+[P62](docs/band-tcn-p62.md) now implements the 171,137-parameter band TCN and
+passes numerical/native parity. Its measured maximum full compute is 1.219 ms,
+but two paced completions are late. This is an untrained feasibility prototype;
+no restoration-quality gain or production qualification is claimed.
 
 Latest training: [P57 joint small-model comparison](docs/joint-training-p57.md)
 completed all four 4096-update runs and automated rechecks. Full training reduces

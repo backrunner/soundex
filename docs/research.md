@@ -1,5 +1,14 @@
 # Research status and experiment history
 
+[P62](band-tcn-p62.md) implements an eight-band causal TCN with 171,137
+parameters and 12,096 state floats per physical channel. Nonzero ONNX and actual
+Rust parity pass. A registered 26,000-hop control/prototype comparison measures
+band maximum frontend/model/DSP compute of 1.218834 ms, but two paced band
+completions are late by up to 3.622951 ms. The original diagnostic state-size
+failure and all timing failures remain retained. Python 821 tests and Rust 132
+tests pass locally. This permits a matched training experiment; it is not a
+trained quality result, production promotion or real-device qualification.
+
 [P61](critic-objectives-p61.md) completes 768 frozen-critic gradient records and
 1,280 raw PCM probes on 72 fit recordings / 37.097 unique supervised seconds.
 Structured-negative arms have prediction-uphill saved-Adam directions on 15/16
@@ -9,9 +18,9 @@ current classifier recipe as the next generator auxiliary; do not infer that
 all GANs or feature losses fail. These are local probes, not trained audio gains.
 The [architecture/evaluation review](architecture-evaluation-p61.md) documents
 the actual 480,809-parameter causal TCN, refreshed primary-source research and
-why classifier ranking is not restoration qualification. Next prioritize matched
-band-token causal architecture prototyping. No new generator training; all 811
-local tests and implementation CI pass.
+why classifier ranking is not restoration qualification. The band-token
+prototype follows in P62 above. No new generator training; at P61 completion all
+811 local tests and implementation CI passed.
 
 Latest completed study: [P60 context and negatives](texture-context-p60.md).
 All eight 1,024-update critics freeze before 17,920 review records. Structured

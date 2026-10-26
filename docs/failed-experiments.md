@@ -13,14 +13,20 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P62](band-tcn-p62.md) implements the band TCN and passes numerical/native
+parity plus the compute screen (maximum 1.218834 ms). Its paced case still fails
+continuity: 2/1,000 completions late, maximum 3.622951 ms. Retain the state-size
+preflight rejection and all measured failures. Zero training updates: this is
+feasibility evidence, not improved audio or a qualified deployment model.
+
 Completed bounded diagnostic: [P61](critic-objectives-p61.md) retains 768 gradient
 records and 1,280 PCM probes. Structured-negative critics have prediction-uphill
 saved-Adam directions on 15/16 fit batches in both origins. Every learned arm
 loses to random features in source-equal mean MR probe benefit, with seven music
 MR counterexamples and five feature-step regressions retained. Retire this
 classifier recipe as the next auxiliary; no claim against all GAN/feature methods.
-The [architecture review](architecture-evaluation-p61.md) proposes a matched
-band-token causal comparison. No new generator, threshold change or promotion.
+The [architecture review](architecture-evaluation-p61.md) proposes the matched
+band-token causal comparison now prototyped in P62. No threshold change or promotion.
 
 Completed follow-up: [P60](texture-context-p60.md) separates observed-band
 summaries and structured negatives. All eight 1,024-update endpoints finish;
@@ -52,6 +58,7 @@ A positive submetric is retained even when the candidate is not qualified.
 
 | ID and evidence | Outcome / unsuccessful validation | What permits a new experiment |
 | --- | --- | --- |
+| [P62: band TCN feasibility](band-tcn-p62.md) | Diagnostic; no training. 171,137-parameter band graph passes nonzero ONNX/native parity and compute <5 ms across its 13,000 scored hops, but paced completion fails twice, max 3.622951 ms late. First native preflight rejected 6,048 allocated versus 12,096 required state values; corrected diagnostic loader follows validated graph shapes. | Matched fresh training with common source exposure/budgets, separate representation/capacity conclusions and unchanged original-reference scoring. Investigate wake/worker recovery; do not retry timing to hide failures or promote untrained weights. |
 | [P2: matched causal backbones](causal-training-20261012.md), [seed review](causal-p2-review-20261012.md) | Not qualified. Six fresh 4,096-step runs improve on a matched fresh control but do not establish an overall win over the historical checkpoint; weak high bands receive excess generation. Unequal historical budgets are not architecture evidence. | Match budgets and directly constrain reference-relative weak-band generation while measuring recovery. |
 | [P3: weak-band continuation](weak-band-study-20261012.md) | Not qualified. Both seeds reduce excess generation but retain restoration/fidelity tradeoffs. | Show spectral restoration, not merely reduced enhancement, with identity controls. |
 | [P4: bidirectional energy](balanced-restoration-study-20261012.md) | Not qualified. Six runs improve energy recovery but regress other fidelity measures. | Separate energy, shape and phase effects under one common evaluation. |
