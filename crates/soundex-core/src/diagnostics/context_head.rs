@@ -9,7 +9,7 @@ use ort::{
     session::{
         builder::GraphOptimizationLevel, HasSelectedOutputs, OutputSelector, RunOptions, Session,
     },
-    value::Tensor,
+    value::{Tensor, TensorElementType, ValueType},
 };
 use soundex_dsp::{
     limiter::Limiter,
@@ -30,6 +30,35 @@ pub const WARMUP: usize = 80;
 // hops. This is distinct from the head's 80-hop state/output warmup.
 pub const CONDITION_WARMUP: usize = 64;
 pub const CONTEXT_BINS: usize = 1538;
+
+/// Band-local history need not equal the global readout width times 63.
+/// Keep the existing diagnostic allocation bound and require matching explicit
+/// float32 [dynamic physical channel, static state] input/output declarations.
+fn state_size(input: &ValueType, output: &ValueType) -> Outcome<usize> {
+    match (input, output) {
+        (
+            ValueType::Tensor {
+                ty: a, shape: x, ..
+            },
+            ValueType::Tensor {
+                ty: b, shape: y, ..
+            },
+        ) if *a == TensorElementType::Float32 && *b == TensorElementType::Float32 => {
+            validate_state_dimensions(x, y)
+        }
+        _ => Err("diagnostic state tensors must be float32".into()),
+    }
+}
+
+fn validate_state_dimensions(input: &[i64], output: &[i64]) -> Outcome<usize> {
+    if input.len() != 2 || input != output || input[0] != -1 || !(1..=8192 * 63).contains(&input[1])
+    {
+        return Err(
+            "diagnostic state must be matching [dynamic channels, bounded static state]".into(),
+        );
+    }
+    Ok(input[1] as usize)
+}
 
 /// Preallocated Rust equivalent of training's StreamingContext("past").
 pub struct PastContext {
@@ -172,14 +201,15 @@ impl ContextHeadStream {
         }
         let count = config.channels as usize;
         let shape = [count, 2, 1, 129];
-        let mut state = Tensor::<f32>::new(session.allocator(), [count, width * 63])?;
+        let state_values = state_size(session.inputs()[3].dtype(), session.outputs()[1].dtype())?;
+        let mut state = Tensor::<f32>::new(session.allocator(), [count, state_values])?;
         state.extract_tensor_mut().1.fill(0.0);
         let options = RunOptions::new()?.with_outputs(
             OutputSelector::default()
                 .preallocate("output", Tensor::<f32>::new(session.allocator(), shape)?)
                 .preallocate(
                     "next_state",
-                    Tensor::<f32>::new(session.allocator(), [count, width * 63])?,
+                    Tensor::<f32>::new(session.allocator(), [count, state_values])?,
                 ),
         );
         Ok(Self {
@@ -350,6 +380,26 @@ impl ContextHeadStream {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn diagnostic_state_accepts_band_history_and_rejects_malformed_geometry() {
+        for size in [6048, 12096] {
+            assert_eq!(
+                validate_state_dimensions(&[-1, size], &[-1, size]).unwrap(),
+                size as usize
+            );
+        }
+        for shape in [
+            vec![],
+            vec![-1],
+            vec![1, 12096],
+            vec![-1, -1],
+            vec![-1, 0],
+            vec![-1, 8192 * 63 + 1],
+        ] {
+            assert!(validate_state_dimensions(&shape, &shape).is_err());
+        }
+        assert!(validate_state_dimensions(&[-1, 12096], &[-1, 6048]).is_err());
+    }
     #[test]
     fn context_is_past_only_held_channel_isolated_and_resettable() {
         let mut mono = PastContext::new(1);
