@@ -1,9 +1,11 @@
 # P63: matched fresh band-TCN training and deadline attribution
 
-Date: 2026-10-26. Status: training running; no completed endpoint or quality
-comparison yet. Default weights remain unchanged. This follows
-[P62 feasibility](band-tcn-p62.md), whose numerical/native checks and remote CI
-completed successfully while paced continuity remained unqualified.
+Date: 2026-10-26; final automated review checked 2026-10-31. All six training
+endpoints, short reviews, the original cost grid and the complete long-form
+recheck are finished and receipt-verified. Storage-only recovery completed on
+2026-10-30 at 05:07:59 UTC. Band TCN meets the registered spectral criterion for
+further study, with fidelity tradeoffs and failed real-time criteria. Default
+weights remain unchanged. This follows [P62 feasibility](band-tcn-p62.md).
 
 ## Question and fixed comparison
 
@@ -110,6 +112,207 @@ absolute PCM errors and every adverse source alongside that criterion. A mean
 MR improvement alone cannot promote weights, and failure cannot establish the
 best possible result for every band/TCN architecture.
 
+
+## Completed long-form recheck (verified 2026-10-31)
+
+The recovered review completed all **160 case groups / 1,600 model renders**:
+20 music sources, two excerpts, three compressed codecs and clean identity. There
+are 120 paired and 40 identity cases per path, and 3,360 records including raw,
+native and untreated paths. These are previously exposed P55 recordings, not new
+independent tests. All original-reference comparisons below average within each
+source before equally averaging the 20 sources; they do not count codecs or
+excerpts as independent recordings.
+
+| Relative reduction in native paired error | Seed 20261012 | Seed 20261013 |
+| --- | ---: | ---: |
+| MR versus fresh global width 96 | 1.76% | 1.88% |
+| MR versus fresh global width 46 | 2.86% | 2.84% |
+| MR versus historical legacy | 2.67% | 2.93% |
+| MR versus untreated compressed input | 6.31% | 6.55% |
+| HF above 8 kHz MR versus matched global | 3.64% | 3.62% |
+| HF above 8 kHz MR versus untreated | 7.94% | 8.25% |
+
+Native paired MR is 0.48645490 / 0.48518625 for band, 0.49515721 /
+0.49446078 for wide global, and 0.50079350 / 0.49938264 for matched global.
+Legacy is 0.49981362, identity-through-DSP 0.51721536 and untreated 0.51921873.
+Band also improves HF log-shape and envelope against matched global by
+7.84% / 7.72% and 5.69% / 6.13%, respectively. Raw model-output MR improves
+3.50% / 3.54% against the matched raw controls; the native table confirms that
+part of this spectral gain survives actual DSP. Raw and native values remain
+separate; neither alone establishes listening quality.
+
+The registered native music MR criterion for **further study** is met against
+both fresh controls in both seeds. Source-level MR improves on 20/20 recordings
+against wide global in each seed, and 20/20 and 19/20 against matched global.
+It improves on 19/20 and 18/20 against legacy. This is evidence for the current
+band representation under the registered budget, not an architecture-family
+ceiling, convergence proof or automatic promotion.
+
+Fidelity tradeoffs remain. Against matched global, native HF PCM error RMS
+increases 1.31% / 1.58%, full PCM error RMS increases 0.24% / 0.29%, and temporal
+error increases 0.30% / 0.39%. HF PCM error RMS is 0.00888867 / 0.00891259 versus
+0.00877412 / 0.00877418 for matched controls. Against untreated input, HF PCM
+error RMS increases 1.88% / 2.16%, despite better HF spectral shape. Low-band
+PCM RMS changes versus matched controls are +0.0016% / +0.0019%; stereo side
+error RMS changes are +0.11% / +0.13%. These calibrated absolute PCM errors and
+all individual cases are retained; neither small relative changes nor magnitude
+improvement prove inaudibility or phase restoration.
+
+Clean identity MR is 0.01503561 / 0.01499772, better than matched controls
+(0.01580121 / 0.01608939) and legacy (0.06663333), but worse than identity DSP
+(0.01416304). The shared limiter's reference conflict is not removed from scores.
+The original lossless reference remains the target.
+
+Codec-stratified native MR versus matched controls is -5.57% / -5.50% for MP3,
+-1.41% / -1.18% for Vorbis, and **+0.142% / -0.085% for AAC**. The pooled gain
+must not be described as uniform codec superiority. Retained source MR exceptions:
+
+- `Gurdonark - Cave` (`08a1849f...`): seed 20261013 versus matched global,
+  delta +0.00051835.
+- `reaching` (`f18318fa...`): both seeds versus legacy,
+  deltas +0.00462181 / +0.00124583.
+- `Dust Time Gravity` (`1f4ac506...`): seed 20261013 versus legacy,
+  delta +0.00003411.
+- Source `d2c0b7d6...`: seed 20261013 versus untreated,
+  delta +0.00013069 (versus identity DSP +0.00013087).
+
+All metric/source deltas, including absolute PCM and clean identity, are retained
+in `assessment-20261031.json`; its inputs are SHA-bound to the immutable summary,
+strata, completion and cost reports. Full per-case values remain in
+`longform-recheck/summary.json`. Existing paired-source bootstrap legacy MR delta
+intervals are [-0.01823017, -0.00908916] / [-0.01959489, -0.01034899], descriptive
+marginal 95% intervals without multiplicity adjustment. Do not infer universal
+superiority from them or retrofit acceptance thresholds to the counterexamples.
+
+Coverage is folk 1, metal 2, pop 2, rock 3, ambient 4, electronic 4 and unlabeled 4;
+all 20 region labels are unknown. This recheck cannot establish China/Japan/Korea
+coverage, broad speech generalization or artist independence. Twenty blinded
+listening trials were generated at `longform-recheck/listening/index.html`;
+no listener ratings or actual-device evidence were obtained.
+
+Runtime results were **not rerun**: all 78,000 original measured hops and their
+failures remain intact, including the 12.734208 ms band call and 26 / 17 paced
+late completions. The 5 ms compute and per-hop deadline criteria remain failed.
+The earlier separate 24.131125 ms audit outlier also remains retained. Completion
+of this review is not real-time or release qualification.
+
+Both root and recovery completion receipts verify; the long-form receipt binds
+1,889 reports/receipts/listening files. Recovery reverified all 91,236 original
+inputs and all 3,387 protected files before writing completion. The original
+StorageFull failure and external backup remain. No new recovery failures occurred.
+The next work should isolate the measured codec/fidelity tradeoff and scheduling
+failures, with fixed controls and preserved endpoints, rather than repeat the
+same training or scale parameters without a changed hypothesis.
+
+## Completed training and partial review (2026-10-29)
+
+All six trajectories completed 16,384 updates (98,304 total). All six endpoint
+files match `endpoints.json`. The supervisor exited; the old
+`reviewing-frozen-endpoints` progress marker does not mean a live evaluation.
+No whole-run completion receipt exists.
+
+The completed short native review contains 32 paired music clips from 25 source
+IDs. Averaging within source, then equally across sources, gives original-reference
+multiresolution magnitude error (lower is better):
+
+| Path | Seed 20261012 | Seed 20261013 |
+| --- | ---: | ---: |
+| Band TCN | 0.35402546 | 0.35261912 |
+| Global width 96 | 0.35968938 | 0.35841440 |
+| Global width 46 | 0.36032694 | 0.35983993 |
+| Historical `legacy` control | 0.36693787 | same frozen control |
+| Identity through DSP | 0.37029337 | same frozen control |
+| Untreated compressed input | 0.36731059 | same input |
+
+Band MR decreases by 1.57% / 1.62% against the wide controls and 1.75% / 2.01%
+against the parameter-matched controls. Against legacy it decreases by 3.52% /
+3.90%. This is a positive short-review result, not the complete registered review
+or independent testing. Raw paired-music MR clip means are 0.39457177 /
+0.39489323 for band, versus 0.40094266 / 0.40144154 for wide global and
+0.40329260 / 0.40269174 for matched global; those raw means are clip-weighted,
+not the source-equal native table above.
+
+Relative to matched global, band's native HF PCM error RMS increases by 0.62% /
+0.84%, temporal MR error by 0.96% / 0.92%, and full PCM error RMS by 0.16% /
+0.21%. Preserved-band RMS is effectively unchanged. MR improves on 19 / 18
+of 25 sources against matched global, worsens on 5 / 6, and ties on one in each
+seed. Worst matched-control MR deltas are +0.00798944 / +0.00180644 on
+`music_library:kcc-original-13300270-59099f52e73fb106`. Against legacy, 21 / 22
+sources improve, 3 / 2 worsen and one ties. All individual scores remain in the
+native reports; these percentages do not establish audibility or overall quality.
+
+All 30 fixed cost runs completed, totaling 78,000 measured hops. On 48 kHz stereo
+paced band runs, p99 stage wall time is 1.68246 / 1.59030 ms, maximum 12.73421 /
+1.78775 ms, calls above 5 ms number 3 / 0, and late completions number 26 / 17
+out of 1,000 scored hops per seed. Peak process RSS is 28.94 MiB for each paced
+band run. Global controls also have late completions and >5 ms outliers. The
+compute and deadline criteria remain failed; low typical latency cannot erase
+these failures. Fixed buffering remains 256 frames (5.333 ms at 48 kHz), excluded
+from compute. These are synthetic host measurements, not real-device evidence.
+
+The long-form P55 recheck completed nine of 160 case groups before native rendering
+of `20261013-band/01-0-aac-lc-cbr-96` failed with `StorageFull` at
+2026-10-28 19:09:55 UTC. At inspection the external volume has only 32 MiB free.
+This is an infrastructure failure, not a model-quality rejection. Preserve
+`failure-1793214595230516000.json`, the failed render, all successful render receipts,
+source snapshots, training inputs, endpoints and existing timing evidence. The
+run occupies about 2.2 GiB, including 1.7 GiB of partial long-form evidence; it
+alone does not explain the full 1.8 TiB volume.
+
+Recovery requires sufficient storage, verified preservation of existing artifacts,
+and an explicit continuation of only the incomplete long-form review. Do not
+rerun training or replace the completed cost grid with fresh timings. The failed
+render must be archived rather than silently overwritten; the renderer deliberately
+rejects incomplete populated directories. Do not extrapolate nine case groups to
+the complete 20-source P55 recheck. No cleanup or recovery was performed during
+this status inspection.
+
+Evidence below the corrected run root: `endpoints.json`, `raw-summary.json`,
+`native-review/summary.json` and each hash-bound `report.json`, `cost-summary.json`,
+`longform-recheck/progress.json`, and the retained failure JSON/log. No default
+weights were replaced, no new training was launched, and listening is unverified.
+
+## Storage-only recovery (2026-10-30)
+
+This is a continuation of the same frozen review, not a new quality experiment.
+No model, loss, case, scoring, selection or timing protocol changed. The external
+volume had recovered to about 12 GiB free but remained too small for a conservative
+remaining-output allowance; the internal volume had about 373 GiB free.
+
+Before relocation, the exclusive experiment lock confirmed no active owner.
+The 671-file long-form tree (1,780,034,756 logical bytes) was inventoried and copied
+to the internal volume. Every relative path, byte size and SHA-256 matched before
+the logical path was switched. The original external tree remains at
+`longform-recheck-before-recovery-20261030/`. The original `longform-recheck/` path
+is now a symlink to
+`/Users/orchiliao/Library/Application Support/SoundEx/experiments/band-training-p63-20261026-v2/longform-recheck`.
+This preserves absolute paths embedded in the existing scoring receipts. No
+training data, failed evidence or cache was deleted; **reclaimed bytes: zero**.
+
+All 95 successful model/case renders are retained. The incomplete render (empty
+`trace.json` and its StorageFull stderr) was moved to
+`longform-recheck/failed-renders/storagefull-1793214595230516000/20261013-band/01-0-aac-lc-cbr-96/`,
+and is also intact in the external backup. Only that infrastructure-failed render
+and subsequent missing renders may execute; successful renders are receipt-checked
+and reused. The completed 78,000-hop timing grid must not be repeated or replaced.
+
+`recovery-20261030/` contains the migration inventory, protected-file manifest,
+registered continuation script and hash, supervisor, progress and retained errors.
+The manifest pins 3,387 existing checkpoint/export/raw/native/timing/log files.
+The continuation uses the original frozen Python implementation, verifies all
+91,236 original input/source/resource hashes, registered package versions, catalog
+reservations, all six full-budget endpoint signatures and the existing render
+receipts before scoring. It rechecks original inputs and protected evidence before
+writing completion receipts. At least 64 GiB free on the destination is required
+at review entry. It resumes scoring in the original case order, then generates
+all-endpoint blinded materials; listening ratings remain pending.
+
+Launch PID 71250 and caffeinate PID 71251 are recorded in
+`recovery-20261030/supervisor.json`; consult that file and current process state
+rather than assuming a recorded PID is still live. Progress during rendering is
+in `longform-recheck/progress.json`; startup integrity verification is in
+`recovery-20261030/progress.json`. Completion still requires the final receipts.
+
 ## Fixed deadline-attribution follow-up
 
 Before training, `audit_band_deadlines.py` completed eight registered 1,000-hop
@@ -169,14 +372,15 @@ including real-device runs. Fixed 256-frame buffering remains separate.
   checkpointing, not completion or generalization. All six preflight receipts
   were independently verified after launch.
 
-To resume the corrected experiment, use its frozen source and interpreter:
+The original training launcher also reruns finalization and timing, so do not use
+it to resume this partially completed review. After checking the recovery supervisor
+and retained failures, the storage-only continuation is:
 
 ```sh
-cd data/runs/band-training-p63-20261026-v2/source/training
 rtk proxy /Volumes/BRData/projects/soundex/training/.venv/bin/python -u \
-  -m scripts.run_band_training run \
-  --output /Volumes/BRData/projects/soundex/data/runs/band-training-p63-20261026-v2
+  /Volumes/BRData/projects/soundex/data/runs/band-training-p63-20261026-v2/recovery-20261030/resume.py
 ```
 
-The exclusive run lock rejects duplicate execution. Check the saved supervisor
-process and progress first; do not launch a second copy of an active job.
+The exclusive experiment lock rejects duplicate execution. New failures stop with
+a retained traceback; investigate them before another launch. Do not automatically
+retry incomplete populated render directories or incomplete blinded bundles.
