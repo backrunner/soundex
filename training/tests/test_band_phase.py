@@ -1,10 +1,52 @@
 """P65 phase-only causality, preservation and reference/gradient gates."""
 
+import pytest
 import torch
 
 from models.band_phase import BandPhaseCorrection
 from models.band_tcn import make_prototype
 from models.direct_spectrum_objective import direct_spectrum_loss
+from models.losses import build_missing_band_mask
+
+
+@pytest.mark.parametrize("rate", [44100, 48000])
+def test_native_support_removes_only_unavailable_outputs_and_preserves_inputs(rate):
+    base, broad, x, ctx, cond = fixture()
+    cond[..., 0] = rate / 48000
+    cond[:, 3, 2] = 0
+    with torch.no_grad():
+        broad.phase_head[-1].weight.normal_(0, 0.05)
+    native = BandPhaseCorrection(base, phase_support="native").eval()
+    native.load_state_dict(broad.state_dict())
+    expected, old_state = broad(x, ctx, cond, broad.initial_state(2))
+    parent, _ = base(x, ctx, cond, base.initial_state(2))
+    actual, state = native(x, ctx, cond, native.initial_state(2))
+    mask = native.native_support(cond).bool()
+    weights = build_missing_band_mask(
+        cond[..., 1] * rate / 2,
+        torch.full_like(cond[..., 0], rate),
+        fft_size=256,
+        crossover_width_hz=1000,
+    ).reshape(2, -1, 129)
+    assert torch.equal(mask, (weights > 0) & (cond[..., 2:3] > 0))
+    assert torch.equal(actual[:, 1][~mask], parent[:, 1][~mask])
+    assert torch.equal(actual[:, 1][mask], expected[:, 1][mask])
+    assert torch.equal(actual[:, 0], parent[:, 0])
+    assert torch.equal(state, old_state)
+    actual[:, 1][~mask].square().mean().backward()
+    assert all(p.grad is not None and not p.grad.any() for p in native.phase_head.parameters())
+    native.zero_grad()
+    observed = x.clone().requires_grad_(True)
+    actual, _ = native(observed, ctx, cond, native.initial_state(2))
+    actual[:, 1][mask].square().mean().backward()
+    # Retained frequencies still inform generated frequencies via the readout.
+    assert observed.grad[:, 0, :, :20].abs().sum() > 0
+    assert all(p.grad is None for p in base.parameters())
+
+
+def test_native_support_rejects_unknown_mode():
+    with pytest.raises(ValueError, match="phase_support"):
+        BandPhaseCorrection(make_prototype("band"), phase_support="unknown")
 
 
 def fixture(frames=14):

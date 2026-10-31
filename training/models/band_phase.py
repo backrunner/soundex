@@ -16,9 +16,14 @@ class BandPhaseCorrection(nn.Module):
     can change overlap-add interference and must be reviewed after native DSP.
     """
 
-    def __init__(self, base, *, seed=65, hidden=32):
+    def __init__(self, base, *, seed=65, hidden=32, phase_support="broad"):
         super().__init__()
+        if phase_support not in ("broad", "native"):
+            raise ValueError("phase_support must be broad or native")
+        self.phase_support = phase_support
         self.study = "p65-frozen-band-phase-calibration"
+        if phase_support == "native":
+            self.study = "p66-native-phase-support-feasibility"
         self.base = base.eval().requires_grad_(False)
         for name in (
             "arm",
@@ -45,6 +50,25 @@ class BandPhaseCorrection(nn.Module):
 
     def initial_state(self, batch, *, device=None):
         return self.phase_head[0].weight.new_zeros(batch, self.state_size, device=device)
+
+    @staticmethod
+    def native_support(condition):
+        """Input-only availability for the diagnostic runtime's 1 kHz crossover.
+
+        Binary support avoids applying the native blend weight twice. All bins
+        remain available as model inputs. The condition's activity is masked
+        during the first 64 hops; native enhancement starts only after 80 hops.
+        This is not a substitute for an actual fused reconstruction objective.
+        """
+        rate = condition[..., :1] * 48000
+        cutoff = condition[..., 1:2] * (rate / 2)
+        hz = torch.arange(129, device=condition.device, dtype=condition.dtype) * (rate / 256)
+        start = (cutoff - 500).clamp_min(0)
+        end = torch.maximum(cutoff + 500, start)
+        position = ((hz - start) / (end - start).clamp_min(1)).clamp(0, 1)
+        weight = 0.5 * (1 - torch.cos(math.pi * position))
+        weight = torch.where(hz <= start, 0.0, torch.where(hz >= end, 1.0, weight))
+        return ((weight > 0) & (condition[..., 2:3] > 0)).to(condition.dtype)
 
     def forward_details(
         self, original, context, condition, state, *, detach_budget_auxiliary=False
@@ -81,6 +105,8 @@ class BandPhaseCorrection(nn.Module):
         active = (carrier.sum(-1, keepdim=True) > 0).to(carrier.dtype)
         rotation = math.pi * torch.tanh(self.phase_head(features) / 64)
         rotation = rotation * self.base.support_mask(condition) * self.base.interior * active
+        if self.phase_support == "native":
+            rotation = rotation * self.native_support(condition)
         result = torch.stack((prediction[:, 0], prediction[:, 1] + rotation), 1)
         next_state = torch.cat((updated, real[:, -1], imag[:, -1]), -1)
         return result, next_state, budget

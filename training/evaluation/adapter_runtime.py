@@ -24,6 +24,10 @@ def export(model, directory: Path) -> dict:
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / "diagnostic.onnx"
     digest = hashlib.sha256(getattr(model, "support", "base_control").encode())
+    # Preserve historical broad signatures; distinguish the tensor-identical
+    # native-support graph so cached exports cannot silently reuse another route.
+    if getattr(model, "phase_support", "broad") != "broad":
+        digest.update(("phase_support:" + model.phase_support).encode())
     for key, value in model.state_dict().items():
         digest.update(key.encode())
         digest.update(value.detach().cpu().numpy().tobytes())
@@ -49,6 +53,8 @@ def export(model, directory: Path) -> dict:
             "soundex.state_clock": "past-and-current-per-physical-channel",
         }
     )
+    if hasattr(model, "phase_support"):
+        properties["soundex.phase_support"] = model.phase_support
     onnx.helper.set_model_props(graph, properties)
     onnx.checker.check_model(graph, full_check=True)
     onnx.save(graph, path)
