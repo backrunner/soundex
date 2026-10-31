@@ -60,6 +60,11 @@ cost grid includes a 12.73 ms paced band call and late completions. Blinded
 materials are ready; listening ratings and real-device evidence remain pending.
 Default weights are unchanged.
 
+[P64 attribution](docs/band-attribution-p64.md) locates the remaining tradeoff:
+MP3 magnitude gains increase phase-interaction cost, while AAC behaves differently.
+DSP reduces some PCM regression. Existing late-hop accounting also shows substantial
+outside-stage delay. These are diagnostics, with no new trained model or timing pass.
+
 Latest training: [P57 joint small-model comparison](docs/joint-training-p57.md)
 completed all four 4096-update runs and automated rechecks. Full training reduces
 native paired MR 0.62-0.64% versus matched adapter-only controls, but still trails

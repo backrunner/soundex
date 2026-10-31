@@ -1,5 +1,14 @@
 # Research status and experiment history
 
+[P64](band-attribution-p64.md) completes frozen-output codec, PCM error and
+existing-deadline attribution. MP3's closer magnitudes interact with imperfect
+phase; symmetric factorization attributes 96.19% / 96.52% of the native
+interaction increase to magnitude changes. AAC has a different tradeoff. DSP
+attenuates the MP3 PCM regression. All sources and invalid audit attempts remain
+retained. No new training or timing benchmark ran. The next bounded hypothesis
+is magnitude-preserving phase correction on frozen band endpoints, with native
+correspondence and separate worker wake/queue validation before any qualification.
+
 [P63](band-training-p63.md) completed fresh global width-96, global width-46
 and eight-band TCN models, two seeds and 16,384 updates per trajectory. The
 parameter-matched comparison is 170,859 versus 171,137 weights. All endpoints
