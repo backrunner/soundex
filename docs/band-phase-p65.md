@@ -27,6 +27,13 @@ preserved. There is no future context. Each physical channel has independent
 state, growing from 12,096 to 12,354 floats. This remains a diagnostic export;
 production ABI and default weights are unchanged.
 
+The head observes temporal phase advance and the base model's relative phase
+correction; it does not encode absolute cross-bin phase relationships. A feature-
+level constant rotation of each bin leaves its correction unchanged. A numerical
+property test records that representation boundary, not a real-music impossibility
+proof. This is a deliberately narrow correction hypothesis, not an unrestricted
+missing-phase synthesis architecture; failure cannot reject all phase models.
+
 Zero-initialized heads reproduce the parent output. A deterministic nonzero
 stress head must pass sequential ONNX and real Rust frontend/DSP parity on mono
 and silent-left stereo at both sample rates, and have a finite nonzero native

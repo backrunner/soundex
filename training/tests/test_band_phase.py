@@ -134,3 +134,26 @@ def test_phase_carrier_ablation_preserves_other_features_and_source_aggregation(
     assert result["metrics"]["mr"]["before"] == 4.0
     assert result["metrics"]["mr"]["after"] == 3.0
     assert len(result["metrics"]["mr"]["worse_cases"]) == 1
+
+
+def test_carrier_head_does_not_encode_static_cross_bin_phase_offsets():
+    # A representational boundary, not an assertion about realizable music PCM.
+    # Rotating each input bin by its own constant angle leaves the correction
+    # unchanged: only relative-to-base phase and temporal advance are observed.
+    base, model, x, ctx, cond = fixture()
+    model.double()
+    x, ctx, cond = x.double(), ctx.double(), cond.double()
+    with torch.no_grad():
+        model.phase_head[-1].weight.normal_(0, 0.05)
+    shifted = x.clone()
+    shifted[:, 1] += torch.linspace(-0.7, 0.9, 129, dtype=x.dtype)
+    predicted, _ = model(x, ctx, cond, model.initial_state(2))
+    predicted_shifted, _ = model(shifted, ctx, cond, model.initial_state(2))
+    parent, _ = base(x, ctx, cond, base.initial_state(2))
+    parent_shifted, _ = base(shifted, ctx, cond, base.initial_state(2))
+    torch.testing.assert_close(
+        predicted[:, 1] - parent[:, 1],
+        predicted_shifted[:, 1] - parent_shifted[:, 1],
+        atol=1e-12,
+        rtol=1e-10,
+    )
