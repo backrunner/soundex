@@ -33,7 +33,7 @@ from scripts.assess_band_phase import compare, records
 from scripts.audit_fused_spectrum import snapshot
 from scripts.bench_band_tcn import native_parity
 from scripts.run_anchored_pilot import verify
-from scripts.run_band_phase_pilot import SEEDS, model_for, raw_review
+from scripts.run_band_phase_pilot import SEEDS, canonical_runtime_alias, model_for, raw_review
 from scripts.run_band_training import assert_catalogs_unchanged, jsonl
 from scripts.run_causal_study import atomic_save
 from scripts.run_consistency_followup import read, registered
@@ -75,6 +75,7 @@ def prepare(prior, audit, output):
     output.mkdir(parents=True)
     snapshot(output)
     hashes = dict(old["hashes"])
+    aliases = canonical_runtime_alias(hashes, old["repository"], old["binary"])
     hashes.update(read(audit / "complete.json")["files"])
     hashes.update({str(p): sha256_file(p) for p in (output / "source").rglob("*") if p.is_file()})
     for path in (
@@ -118,6 +119,7 @@ def prepare(prior, audit, output):
         "review": "First eight inherited TRAIN draws: 32 music/eight speech paired+identity raw/common/fused scores; same two native batches: eight music/two speech, both roles, all eight endpoints, zero controls, legacy and identity DSP. Record all per-source counterexamples; no promotion.",
         "scope": "Early optimization calibration of one 196162-parameter architecture with frozen magnitude backbones, not full training, convergence, capacity ceiling, independent generalization or release qualification.",
         "hashes": hashes,
+        "inherited_runtime_aliases": aliases,
     }
     registered(config, output / "registration.json")
     print("registered eight matched 512-update phase trajectories", flush=True)
