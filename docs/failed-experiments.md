@@ -13,6 +13,11 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P65](band-phase-p65.md) registers a 512-update-per-origin phase-only TRAIN
+calibration with frozen P63 magnitudes and zero-correction controls. This is not
+full training or a quality result. The import-time snapshot failure is retained;
+worker wake observations are added without reclassifying historical timing failures.
+
 [P64](band-attribution-p64.md) completes codec decomposition, 2,720 PCM-path
 identities and 640 magnitude/angular-factor comparisons using frozen P63 outputs.
 MP3 gains carry most HF PCM cost; native interaction growth is mainly a magnitude
@@ -76,6 +81,7 @@ A positive submetric is retained even when the candidate is not qualified.
 
 | ID and evidence | Outcome / unsuccessful validation | What permits a new experiment |
 | --- | --- | --- |
+| [P65: frozen-band phase calibration](band-phase-p65.md) | Registered early-trainability diagnostic, 512 updates per origin; results pending. Initial snapshot missed root policy JSON and failed before training; retained. | Finish both endpoints before reviewing; inspect raw/native fidelity and history use before any adequately budgeted generalization study. No promotion or timing claim. |
 | [P64: codec and complex-error attribution](band-attribution-p64.md) | Completed diagnostic, no training. Native MP3 magnitude gets closer but phase-interaction cost increases; 96.19% / 96.52% of that increase is the symmetric magnitude factor. AAC differs. Original 43 band late hops retained; 37 have stage service below the hop period. Two invalid execution/numerical attempts retained. | Test a magnitude-preserving phase correction on TRAIN-role data with zero-correction control and native correspondence; separately instrument actual worker wake/queue behavior. Do not repeat unchanged training, infer phase-only causation, remove DSP wholesale or retry timing to pass. |
 | [P63: fresh matched band training](band-training-p63.md) | All six endpoints and full 160-case exposed-source recheck complete. Native MR improves over both fresh controls in both seeds; further-study criterion met. HF PCM/dynamics, source and AAC regressions remain. Original timing fails: 12.734208 ms band call, 26 / 17 late completions. StorageFull recovered with all failed evidence retained. | Diagnose codec/fidelity tradeoffs and scheduling/fallback under fixed controls. No unchanged retraining, retrospective thresholds, timing retries to pass, or promotion without independent/listening/device evidence. |
 | [P62: band TCN feasibility](band-tcn-p62.md) | Diagnostic; no training. 171,137-parameter band graph passes nonzero ONNX/native parity and compute <5 ms across its 13,000 scored hops, but paced completion fails twice, max 3.622951 ms late. First native preflight rejected 6,048 allocated versus 12,096 required state values; corrected diagnostic loader follows validated graph shapes. | Matched fresh training with common source exposure/budgets, separate representation/capacity conclusions and unchanged original-reference scoring. Investigate wake/worker recovery; do not retry timing to hide failures or promote untrained weights. |

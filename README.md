@@ -12,80 +12,22 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-Latest completed work: [P54 spectral training](docs/spectral-training-p54.md) and
-[P55 long-form review](docs/longform-review-p55.md). All four 4096-update
-continuations and the 20-source, 160-case stereo evaluation finish. New endpoints
-reduce native paired spectral error by 1.39-1.59% versus untreated input, but
-remain 2.23-2.44% worse than historical weights; auraloss adds no matched benefit.
-Cleaner identity output does not establish better restoration. Blinded audio is
-prepared; human ratings, regional/genre coverage and device evidence remain open.
-No new model is qualified or promoted.
-
-Latest analysis: [P58](docs/joint-attribution-p58.md) locates both most spectral
-gain and added clean-input error above 16 kHz. An
-[official implementation review and paired texture prototype](docs/implementation-review-20261026.md)
-adds training-only learned spectral features; numerical and real-TRAIN integration
-checks pass, but no restoration generator has been trained with this new term.
-
-[P59 critic calibration](docs/texture-calibration-p59.md) has now completed two
-1,024-update critics on 205 fit recordings. Its source-disjoint critic calibration
-fails the registered false-detail prerequisite: the classifier prefers scrambled
-HF phase on all 61 sources and misses most time shifts. Paired feature distance
-still penalizes these controls; this is not evidence that the generator loss
-rewards noise. Generator training with this term is deferred while conditioning
-and negative-example exposure are investigated. Default weights remain unchanged.
-
-[P60](docs/texture-context-p60.md) completed all eight critic endpoints. Structured
-negatives fix phase/time-control recognition but reverse actual prediction
-ranking; all four arms fail the registered prerequisite. Observed-band summaries
-alone do not resolve the failure. Calibration remains a recheck, with no
-restoration generator updates or new quality claims.
-
-[P61](docs/critic-objectives-p61.md) independently confirms local classifier
-objective conflict and no mean raw-PCM spectral-probe advantage from trained
-versus random features. The current tiny-critic recipe is retired as the next
-generator auxiliary. The [architecture review](docs/architecture-evaluation-p61.md)
-documents the actual causal TCN and the proposed band-token comparison.
-[P62](docs/band-tcn-p62.md) now implements the 171,137-parameter band TCN and
-passes numerical/native parity. Its measured maximum full compute is 1.219 ms,
-but two paced completions are late. This is an untrained feasibility prototype;
-no restoration-quality gain or production qualification is claimed.
-
 [P63](docs/band-training-p63.md) completed all six fresh 16,384-update endpoints
-and the recovered 160-case long-form recheck. Band-TCN native music MR improves
-2.84–2.86% versus parameter-matched controls and 2.67–2.93% versus legacy across
-both seeds, with HF PCM/dynamics and codec-specific regressions. These are reused
-P55 sources, not independent tests. Runtime remains unqualified: the original
-cost grid includes a 12.73 ms paced band call and late completions. Blinded
-materials are ready; listening ratings and real-device evidence remain pending.
-Default weights are unchanged.
+and a 160-case long-form recheck. Band-TCN native music MR improves 2.84–2.86%
+versus parameter-matched controls and 2.67–2.93% versus legacy across both seeds,
+with HF PCM/dynamics and codec-specific regressions. These are reused sources,
+not independent tests. The original timing grid includes a 12.73 ms paced band
+call and late completions; listening ratings and device evidence remain pending.
 
 [P64 attribution](docs/band-attribution-p64.md) locates the remaining tradeoff:
 MP3 magnitude gains increase phase-interaction cost, while AAC behaves differently.
-DSP reduces some PCM regression. Existing late-hop accounting also shows substantial
-outside-stage delay. These are diagnostics, with no new trained model or timing pass.
-
-Latest training: [P57 joint small-model comparison](docs/joint-training-p57.md)
-completed all four 4096-update runs and automated rechecks. Full training reduces
-native paired MR 0.62-0.64% versus matched adapter-only controls, but still trails
-historical weights by 1.57-1.77% and increases clean-input/temporal errors. Both
-seeds and every adverse source remain reported. P55 is now an exposed-source
-recheck; no human listening result or default promotion is claimed.
-
-P57 runtime records 52,000 hops, maximum compute 2.239 ms and no compute service
-overruns, but one paced completion is late by 0.468 ms. Actual-device reliability
-remains unqualified. The fixed 256-frame buffer is separate from compute
-(5.333 ms at 48 kHz). P59 changes no inference graph or runtime qualification;
-inference parameter count remains unchanged.
-
-Earlier protocols, positive submetrics and all counterexamples remain in
-[research history](docs/research.md) and the [failure registry](docs/failed-experiments.md).
-Consult those records before repeating a route. Project documentation is in English.
-
-The reviewed library contains 300 native-lossless music works plus VCTK speech;
-raw audio, prepared pairs and experimental checkpoints stay local. See the
-[training guide](training/README.md), [source documentation](docs/datasets.md)
-and [research history](docs/research.md) for protocols, evidence and limitations.
+DSP reduces some PCM regression. [P65](docs/band-phase-p65.md) now tests a small
+phase-only head with frozen magnitudes and actual Rust correspondence, initially
+at 512 updates per origin to diagnose trainability. Worker wake/queue observations
+are extended separately. No new quality or timing qualification is claimed.
+See the [research history](docs/research.md) and
+[failed/unqualified experiment registry](docs/failed-experiments.md) for retained
+controls, counterexamples and earlier work.
 
 ## Quick start
 

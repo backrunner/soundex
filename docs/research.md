@@ -1,5 +1,11 @@
 # Research status and experiment history
 
+[P65](band-phase-p65.md) implements a 25,025-parameter phase-only head on each
+frozen P63 band model, with zero-correction controls and native correspondence.
+Two 512-update TRAIN calibrations are registered; these are early trainability
+diagnostics, not full training. Worker idle-sleep and paced-start telemetry are
+also extended. Results are pending and default weights remain unchanged.
+
 [P64](band-attribution-p64.md) completes frozen-output codec, PCM error and
 existing-deadline attribution. MP3's closer magnitudes interact with imperfect
 phase; symmetric factorization attributes 96.19% / 96.52% of the native

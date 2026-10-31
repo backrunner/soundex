@@ -42,7 +42,7 @@ def export(model, directory: Path) -> dict:
     properties = {p.key: p.value for p in graph.metadata_props}
     properties.update(
         {
-            "soundex.study": "p48-frozen-feature-adapter",
+            "soundex.study": getattr(model, "study", "p48-frozen-feature-adapter"),
             "soundex.adapter_support": getattr(model, "support", "base_control"),
             "soundex.lookahead_samples": "0",
             "soundex.hop_samples": "128",
