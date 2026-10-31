@@ -1,10 +1,15 @@
 # Research status and experiment history
 
-[P65](band-phase-p65.md) implements a 25,025-parameter phase-only head on each
-frozen P63 band model, with zero-correction controls and native correspondence.
-Two 512-update TRAIN calibrations are registered; these are early trainability
-diagnostics, not full training. Worker idle-sleep and paced-start telemetry are
-also extended. Results are pending and default weights remain unchanged.
+[P65](band-phase-p65.md) completed both 512-update frozen-magnitude phase
+calibrations and all fixed reviews. Common fit loss and history dependence improve
+slightly; matched raw music gains do not become native gains (native MR
++0.000661% / +0.000735%). This is early trainability evidence, not convergence or
+a phase-model ceiling. The 52,000-hop cost grid remains below 5 ms but includes
+one 3.026458 ms service overrun of a 44.1 kHz hop. Worker wake telemetry and both
+execution failures are documented; completion recovery verified unchanged consumed
+inputs and frozen binaries without retraining or quality rerenders. Default
+weights remain unchanged. Investigate correction support/phase representation
+before enlarging this branch's training budget.
 
 [P64](band-attribution-p64.md) completes frozen-output codec, PCM error and
 existing-deadline attribution. MP3's closer magnitudes interact with imperfect

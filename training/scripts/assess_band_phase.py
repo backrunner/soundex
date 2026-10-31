@@ -127,6 +127,16 @@ def assess(root):
             result[path] = compare(
                 records(read(filename("zero")), key), records(read(filename("phase")), key)
             )
+        native_indices = {r["case"] for r in result["native-after"]["cases"]}
+        matched = [
+            [
+                r
+                for r in records(read(root / "raw-review" / f"{seed}-{arm}.json"), "scores")
+                if r["case"] in native_indices
+            ]
+            for arm in ("zero", "phase")
+        ]
+        result["raw-native-matched"] = compare(*matched)
         zero = model_for(config["parents"][str(seed)], seed)
         model = model_for(config["parents"][str(seed)], seed)
         endpoint = torch.load(endpoints[str(seed)]["path"], map_location="cpu", weights_only=False)

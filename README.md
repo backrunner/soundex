@@ -21,10 +21,12 @@ call and late completions; listening ratings and device evidence remain pending.
 
 [P64 attribution](docs/band-attribution-p64.md) locates the remaining tradeoff:
 MP3 magnitude gains increase phase-interaction cost, while AAC behaves differently.
-DSP reduces some PCM regression. [P65](docs/band-phase-p65.md) now tests a small
-phase-only head with frozen magnitudes and actual Rust correspondence, initially
-at 512 updates per origin to diagnose trainability. Worker wake/queue observations
-are extended separately. No new quality or timing qualification is claimed.
+DSP reduces some PCM regression. [P65](docs/band-phase-p65.md) tested a small
+phase-only head with frozen magnitudes and actual Rust correspondence. Both
+512-update calibrations finish: small raw fit gains do not improve native music
+output. Its 52,000-hop compute screen stays below 5 ms, but one call exceeds the
+hop period. Worker wake observations are extended; overall quality and real-device
+qualification remain open.
 See the [research history](docs/research.md) and
 [failed/unqualified experiment registry](docs/failed-experiments.md) for retained
 controls, counterexamples and earlier work.
