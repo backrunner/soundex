@@ -157,3 +157,23 @@ def test_carrier_head_does_not_encode_static_cross_bin_phase_offsets():
         atol=1e-12,
         rtol=1e-10,
     )
+
+
+def test_only_identical_unused_runtime_alias_is_canonicalized(tmp_path):
+    import pytest
+
+    from evaluation.reporting import sha256_file
+    from scripts.run_band_phase_pilot import canonical_runtime_alias
+
+    frozen = tmp_path / "frozen-binary"
+    frozen.write_bytes(b"frozen executable fixture")
+    alias = str(tmp_path / "target/release/soundex-context-replay")
+    expected = sha256_file(frozen)
+    hashes = {alias: expected, str(frozen): expected, "unrelated-input": "retained"}
+    provenance = canonical_runtime_alias(hashes, tmp_path, frozen)
+    assert alias not in hashes and hashes["unrelated-input"] == "retained"
+    assert provenance[0]["sha256"] == hashes[str(frozen)]
+    bad = {alias: "different", str(frozen): expected}
+    with pytest.raises(ValueError, match="non-equivalent"):
+        canonical_runtime_alias(bad, tmp_path, frozen)
+    assert alias in bad

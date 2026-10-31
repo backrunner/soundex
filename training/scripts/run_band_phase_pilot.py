@@ -37,6 +37,23 @@ STEPS = 512
 SEEDS = (20261012, 20261013)
 
 
+def canonical_runtime_alias(hashes, repository, binary):
+    """Bind an inherited build alias to identical frozen bytes, never live target/.
+
+    Native calls consume the explicit binary argument. Only this known duplicate
+    can be removed from the inherited verification set; retain its provenance.
+    """
+    alias = str(Path(repository) / "target/release/soundex-context-replay")
+    binary = str(Path(binary))
+    if alias == binary or alias not in hashes:
+        return []
+    expected = hashes[alias]
+    if hashes.get(binary) != expected or sha256_file(binary) != expected:
+        raise ValueError("non-equivalent inherited runtime alias")
+    del hashes[alias]
+    return [{"historical_build_path": alias, "consumed_frozen_path": binary, "sha256": expected}]
+
+
 def prepare(prior, output):
     if output.exists():
         raise ValueError("fresh directory required; preserve every attempt")
@@ -62,6 +79,7 @@ def prepare(prior, output):
             shutil.copy2(path, output / "source/training" / path.name)
     parents = {str(seed): read(prior / "endpoints.json")[f"{seed}-band"] for seed in SEEDS}
     hashes = dict(old["hashes"])
+    aliases = canonical_runtime_alias(hashes, old["repository"], old["binary"])
     for e in parents.values():
         hashes[e["path"]] = e["sha256"]
     hashes.update(
@@ -88,6 +106,7 @@ def prepare(prior, output):
         "exposure": coverage([{"samples": {"registered": samples}}], "registered"),
         "paired_crops_per_seed": 20 * STEPS,
         "hashes": hashes,
+        "inherited_runtime_aliases": aliases,
         "scope": "512-step TRAIN-only learnability calibration, not full training, convergence, architecture ceiling, held-out score or promotion. P63 magnitude branch and all base state tensors frozen. First eight TRAIN draws used for shared before/after fit diagnostics. Same 80-hop history and frame-89 supervision; no DSP teacher.",
         "barrier": "Both origins finish the fixed budget and freeze endpoint hashes before all post-training native/raw fit reviews. No intermediate winner or budget adjustment.",
         "native_preflight": "zero-correction export parity plus deterministic nonzero phase stress on both rates/physical channels, before optimizer updates; retain raw versus actual Rust DSP differences",
