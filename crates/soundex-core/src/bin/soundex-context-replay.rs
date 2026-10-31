@@ -70,11 +70,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let args: Vec<_> = std::env::args().collect();
     if args.len() < 5 || args.len() > 7 {
-        return Err("usage: soundex-context-replay MODEL INPUT.sxa OUTPUT.sxa REPORT.json [REPEATS] [trace]".into());
+        return Err("usage: soundex-context-replay MODEL INPUT.sxa OUTPUT.sxa REPORT.json [REPEATS] [trace|stages]".into());
     }
     let input = audio_io::read_audio(Path::new(&args[2]))?;
     let repeats: usize = args.get(5).map(|x| x.parse()).transpose()?.unwrap_or(1);
-    let trace = args.get(6).map(String::as_str) == Some("trace");
+    let stages = args.get(6).map(String::as_str) == Some("stages");
+    let trace = stages || args.get(6).map(String::as_str) == Some("trace");
     let thread_cpu_requested = std::env::var("SOUNDEX_DIAGNOSTIC_THREAD_CPU").as_deref() == Ok("1");
     let cpu_clock_calibration = if thread_cpu_requested {
         diagnostic_timing::calibrate()?
@@ -166,7 +167,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 );
             }
             if trace {
-                traces.push(stream.trace());
+                traces.push(if stages {
+                    stream.trace_stages()?
+                } else {
+                    stream.trace()
+                });
             }
         }
     }

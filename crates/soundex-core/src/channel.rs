@@ -344,6 +344,17 @@ impl ChannelProcessor {
         &self.original
     }
 
+    /// Borrow actual synthesis and weights for offline diagnostics only.
+    /// Weight storage can be stale during bypass; callers must report zeros then.
+    #[cfg(feature = "ort-backend")]
+    pub(crate) fn synthesis_trace(&self) -> (&SpectralFrame, &[f32], &[f32]) {
+        (
+            &self.synthesis,
+            &self.crossover_weights,
+            &self.phase_weights,
+        )
+    }
+
     pub(crate) fn needs_enhancement(&self) -> bool {
         self.needs_enhancement
     }

@@ -140,6 +140,7 @@ pub struct ContextHeadStream {
     failed: bool,
     fusion_ablation: FusionAblation,
     condition_ablation: ConditionAblation,
+    stage_trace: Option<super::stage_trace::StageTrace>,
 }
 
 impl ContextHeadStream {
@@ -213,6 +214,7 @@ impl ContextHeadStream {
                 ),
         );
         Ok(Self {
+            stage_trace: None,
             fusion_ablation,
             condition_ablation,
             channels: (0..count)
@@ -356,6 +358,26 @@ impl ContextHeadStream {
             "prediction": self.prediction.as_slice().unwrap()})
     }
 
+    /// Exact native spectra and shadow PCM stages, outside measured processing.
+    /// Must be requested after every hop from reset; partial shadow state is invalid.
+    pub fn trace_stages(&mut self) -> Outcome<serde_json::Value> {
+        if self.fusion_ablation != FusionAblation::Current
+            || self.condition_ablation != ConditionAblation::Native
+            || self.stage_trace.as_ref().map_or(0, |trace| trace.hops) + 1 != self.hops
+        {
+            return Err(
+                "stage tracing requires consecutive hops and unmodified native fusion/condition"
+                    .into(),
+            );
+        }
+        let mut value = self.trace();
+        let trace = self
+            .stage_trace
+            .get_or_insert_with(|| super::stage_trace::StageTrace::new(self.channels.len()));
+        value["dsp"] = trace.observe(&self.channels, &self.prediction);
+        Ok(value)
+    }
+
     pub fn enhancing(&self) -> bool {
         self.channels
             .iter()
@@ -371,6 +393,7 @@ impl ContextHeadStream {
         self.gate.reset();
         self.hops = 0;
         self.failed = false;
+        self.stage_trace = None;
         self.dry.fill(0.0);
         self.wet.fill(0.0);
         self.prediction.fill(0.0);

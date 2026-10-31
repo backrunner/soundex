@@ -5,6 +5,8 @@
 pub mod ablation;
 #[cfg(feature = "ort-backend")]
 pub mod context_head;
+#[cfg(feature = "ort-backend")]
+mod stage_trace;
 
 use crate::{
     processor::validate_config,
