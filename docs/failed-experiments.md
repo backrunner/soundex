@@ -13,6 +13,16 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P66](phase-transport-p66.md) is a completed diagnostic, not improved weights.
+Its 100 stage traces locate most P65 correction power in input-retained bins;
+the new optional output-support constraint passes 2,270,400 native bin checks and
+40 bit-identical final-output counterfactuals. Zero updates, no timing claim.
+Above-16 kHz corrections largely survive fusion and still need better prediction;
+identity DSP retains a separate limiting/reference conflict. The initial two-ULP
+Parseval fixture failure is documented without changing audio gates. Further
+training needs a verified fusion-aware objective and matched registered controls,
+not an unchanged larger P65 budget.
+
 [P65](band-phase-p65.md) completed both 512-update phase calibrations. Learning
 and small history dependence are measurable, but native music MR slightly rises
 in both origins; raw gains do not survive the matched native subset. The 52,000-hop
@@ -84,6 +94,7 @@ A positive submetric is retained even when the candidate is not qualified.
 
 | ID and evidence | Outcome / unsuccessful validation | What permits a new experiment |
 | --- | --- | --- |
+| [P66: phase transport and support](phase-transport-p66.md) | Completed diagnostic, zero updates. 95.92–96.98% of pooled HF correction power lies in retained bins; native music regressions from P65 remain. Native-support constraint passes 2,270,400 bin memberships and 40 exact-output controls, proving interface feasibility rather than improvement. Limiting causes a separate identity-reference floor. Parseval fixture rounding failure retained in the report. | Verify the actual-fusion reconstruction objective for this branch, then register equal broad/support training controls with original-reference direct targets. Address passed-band prediction and representation separately. Do not call masked raw changes a native gain, remove DSP wholesale, or erase timing failures. |
 | [P65: frozen-band phase calibration](band-phase-p65.md) | Both 512-update endpoints complete. Small common-loss/history gains; native music MR +0.000661% / +0.000735%, with 7/8 and 4/8 adverse sources. Native HF changes are tiny in absolute PCM units. Cost maximum 3.026458 ms is below 5 ms but exceeds one 44.1 kHz hop. Invalid import and unused-build-alias completion failure retained and audited. | Diagnose native phase-transfer support and the head's missing static cross-bin phase information before another training study. Do not enlarge budget unchanged, reject all phase models from 512 updates, or claim quality/runtime qualification. |
 | [P64: codec and complex-error attribution](band-attribution-p64.md) | Completed diagnostic, no training. Native MP3 magnitude gets closer but phase-interaction cost increases; 96.19% / 96.52% of that increase is the symmetric magnitude factor. AAC differs. Original 43 band late hops retained; 37 have stage service below the hop period. Two invalid execution/numerical attempts retained. | Test a magnitude-preserving phase correction on TRAIN-role data with zero-correction control and native correspondence; separately instrument actual worker wake/queue behavior. Do not repeat unchanged training, infer phase-only causation, remove DSP wholesale or retry timing to pass. |
 | [P63: fresh matched band training](band-training-p63.md) | All six endpoints and full 160-case exposed-source recheck complete. Native MR improves over both fresh controls in both seeds; further-study criterion met. HF PCM/dynamics, source and AAC regressions remain. Original timing fails: 12.734208 ms band call, 26 / 17 late completions. StorageFull recovered with all failed evidence retained. | Diagnose codec/fidelity tradeoffs and scheduling/fallback under fixed controls. No unchanged retraining, retrospective thresholds, timing retries to pass, or promotion without independent/listening/device evidence. |

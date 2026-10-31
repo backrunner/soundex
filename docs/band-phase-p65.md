@@ -224,7 +224,9 @@ Early learning and native influence are demonstrated, but native music restorati
 has not improved. Do not promote this branch or simply increase its budget.
 Before further training, isolate where its correction lies relative to native
 fusion/phase handling, and whether the restricted carrier features can represent
-the required correction. Keep the frozen magnitude and zero controls. Changing
+the required correction. [P66](phase-transport-p66.md) now completes the native
+stage/support audit and a frozen-weight support constraint, without new training
+or native quality gains. Keep the frozen magnitude and zero controls. Changing
 phase representation or adding a verified deployment-aware objective requires a
 new registered hypothesis; the original lossless reference must remain the target.
 This calibration cannot reject a phase architecture family or establish a capacity

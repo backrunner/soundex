@@ -1,5 +1,17 @@
 # Research status and experiment history
 
+[P66](phase-transport-p66.md) completes 100 native stage traces, five trace-off
+controls and 40 frozen-weight support counterfactuals. Most pooled P65 HF phase
+correction power (95.92–96.98%) lies in input-retained bins; magnitude fusion
+changes the spectral tradeoff and phase fusion removes the small raw HF PCM gain.
+Nearly all correction power above 16 kHz survives, so the passed-band predictor
+remains an open issue. Limiting creates a separate identity-reference floor.
+The new optional native-support phase head matches 2,270,400 observed bin
+memberships and leaves all 40 native outputs bit-identical, with no optimizer
+updates or quality improvement claimed. Before retraining, verify the fused
+reconstruction objective on this branch and register matched broad/support
+controls. Default weights and previous timing failures remain unchanged.
+
 [P65](band-phase-p65.md) completed both 512-update frozen-magnitude phase
 calibrations and all fixed reviews. Common fit loss and history dependence improve
 slightly; matched raw music gains do not become native gains (native MR

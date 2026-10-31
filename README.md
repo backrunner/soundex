@@ -27,6 +27,12 @@ phase-only head with frozen magnitudes and actual Rust correspondence. Both
 output. Its 52,000-hop compute screen stays below 5 ms, but one call exceeds the
 hop period. Worker wake observations are extended; overall quality and real-device
 qualification remain open.
+
+[P66](docs/phase-transport-p66.md) locates a concrete mismatch: about 96–97% of
+P65's pooled HF phase-correction power lies in bins where DSP retains input phase.
+An experimental output-support constraint matches native support and preserves all
+40 frozen-endpoint outputs exactly. It has not been retrained and is not a quality
+gain. Stage/identity controls also separate fusion effects from limiter distortion.
 See the [research history](docs/research.md) and
 [failed/unqualified experiment registry](docs/failed-experiments.md) for retained
 controls, counterexamples and earlier work.
