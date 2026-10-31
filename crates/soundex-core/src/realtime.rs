@@ -63,6 +63,13 @@ pub struct RealtimeWorkerStats {
     pub max_queue_wait_ns: u64,
     /// Maximum worker processing wall time, in nanoseconds.
     pub max_processing_ns: u64,
+    /// All worker idle sleeps, including periods without pending audio input.
+    pub idle_sleeps: u64,
+    /// Excess wall time around idle sleep versus requested duration. Includes
+    /// clock/call overhead; not a per-hop queue wait or a scheduler-cause diagnosis.
+    pub max_idle_sleep_overshoot_ns: u64,
+    /// Approximate idle-sleep overshoot p99 upper bound, with 25us resolution.
+    pub idle_sleep_overshoot_p99_upper_bound_ns: u64,
     /// Approximate queue-wait p99 upper bound, with 25us histogram resolution.
     pub queue_wait_p99_upper_bound_ns: u64,
     /// Approximate processing p99 upper bound, with 25us histogram resolution.
@@ -169,6 +176,15 @@ impl RealtimeProcessor {
             discarded_output_hops: self.control.discarded_outputs.load(Ordering::Relaxed),
             max_queue_wait_ns: self.control.max_queue_wait_ns.load(Ordering::Relaxed),
             max_processing_ns: self.control.max_processing_ns.load(Ordering::Relaxed),
+            idle_sleeps: self.control.idle_sleeps.load(Ordering::Relaxed),
+            max_idle_sleep_overshoot_ns: self
+                .control
+                .max_idle_sleep_overshoot_ns
+                .load(Ordering::Relaxed),
+            idle_sleep_overshoot_p99_upper_bound_ns: self
+                .control
+                .idle_sleep_overshoot
+                .p99_upper_bound_ns(),
             queue_wait_p99_upper_bound_ns: self.control.queue_wait.p99_upper_bound_ns(),
             processing_p99_upper_bound_ns: self.control.processing.p99_upper_bound_ns(),
             processing_period_overruns: self.control.processing_overruns.load(Ordering::Relaxed),

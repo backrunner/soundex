@@ -69,6 +69,19 @@ availability requirement. Synchronous `core_bench` schema 4 retains its model
 compute certification and uses the 8/10 ms component budget; schema 3 used a
 historical 5 ms preference and must not be silently relabeled.
 
+Worker diagnostics separately expose submission-to-start queue wait, processing
+wall time and idle-sleep overshoot. The latter measures elapsed sleep-call wall
+time minus the requested duration, saturated at zero; its count, maximum and p99
+include idle periods with no pending input. Clock/call overhead is not subtracted.
+It is neither per-hop queue delay nor proof of a specific OS scheduling cause.
+All added collection stays on the worker; callback behavior and budgets are unchanged.
+
+The context replay diagnostic records arrival-to-start lateness on every paced
+hop, even when thread-CPU probing is disabled. This includes accumulated backlog,
+sleep overshoot and loop overhead. New instrumentation changes the measured binary;
+record its hash and retain earlier timing failures. These observations diagnose
+availability but do not turn a missed deadline into a pass.
+
 Release requires the same model hash, real music plus silence/transients,
 mono/stereo at both rates, at least 30 wall-clock minutes per case, and named
 Apple Silicon and x86_64 reference machines. Include CPU, peak RSS, callback raw

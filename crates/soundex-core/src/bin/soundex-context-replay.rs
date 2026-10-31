@@ -117,11 +117,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let hops = input.frames as usize / 128 * repeats;
     let mut times = Vec::with_capacity(hops);
     let mut cpu_timings = Vec::with_capacity(if thread_cpu_requested { hops } else { 0 });
-    let mut wake_lateness_ms = Vec::with_capacity(if paced && thread_cpu_requested {
-        hops
-    } else {
-        0
-    });
+    let mut wake_lateness_ms = Vec::with_capacity(if paced { hops } else { 0 });
     let mut traces = Vec::new();
     let mut active_hops = 0;
     let period = Duration::from_secs_f64(128.0 / input.sample_rate as f64);
@@ -143,7 +139,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     std::thread::sleep(wait);
                 }
             }
-            if paced && thread_cpu_requested {
+            if paced {
                 let arrival = started + period.mul_f64(times.len() as f64);
                 wake_lateness_ms.push(
                     Instant::now()
@@ -192,6 +188,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "cpu_timing_columns": ["enclosing_wall_ms", "thread_cpu_ms", "wall_minus_thread_cpu_ms"],
         "cpu_timings": cpu_timings, "cpu_clock_calibration": cpu_clock_calibration,
         "wake_lateness_ms": wake_lateness_ms,
+        "wake_lateness_scope": "all paced hops, independent of CPU probe; start delay versus scheduled arrival includes previous-hop backlog, sleep overshoot and loop overhead; no overhead subtraction or scheduler cause claim",
         "cpu_clock_scope": "calling thread only; wall-minus-CPU includes blocking, descheduling and probe/resolution error; no overhead subtraction; no scheduler cause claim",
         "timings": times, "traces": traces, "output_is_last_repeat": true,
         "finite": output.iter().all(|x| x.is_finite()),

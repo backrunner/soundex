@@ -39,10 +39,19 @@ impl Wait {
         self.arrival = at.and_then(|at| at.checked_add(self.period));
     }
 
-    pub fn idle(&self) {
+    /// Excess wall time around an idle sleep, including call/clock overhead.
+    /// All idle sleeps count, even with no input pending; not per-hop wake latency.
+    pub fn idle(&self) -> Option<Duration> {
         match self.action(Instant::now()) {
-            Idle::Sleep(duration) => thread::sleep(duration),
-            Idle::Spin => hint::spin_loop(),
+            Idle::Sleep(duration) => {
+                let started = Instant::now();
+                thread::sleep(duration);
+                Some(sleep_overshoot(duration, started.elapsed()))
+            }
+            Idle::Spin => {
+                hint::spin_loop();
+                None
+            }
         }
     }
 
@@ -61,6 +70,10 @@ impl Wait {
             _ => Idle::Sleep(POLL),
         }
     }
+}
+
+fn sleep_overshoot(requested: Duration, elapsed: Duration) -> Duration {
+    elapsed.saturating_sub(requested)
 }
 
 pub(super) fn apply_qos() -> bool {
@@ -127,6 +140,17 @@ impl Drop for Scheduling {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sleep_accounting_excludes_requested_wait_and_saturates() {
+        let requested = Duration::from_micros(50);
+        assert_eq!(sleep_overshoot(requested, requested), Duration::ZERO);
+        assert_eq!(sleep_overshoot(requested, Duration::ZERO), Duration::ZERO);
+        assert_eq!(
+            sleep_overshoot(requested, Duration::from_micros(125)),
+            Duration::from_micros(75)
+        );
+    }
 
     #[test]
     fn native_wait_preserves_quota_and_idle_backoff() {

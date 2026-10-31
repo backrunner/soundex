@@ -46,7 +46,14 @@ pub(super) fn spawn(
                 let _ = ready_tx.send(());
                 while !control.stop.load(Ordering::Acquire) {
                     let Ok(mut packet) = queues.input.pop() else {
-                        wait.idle();
+                        if let Some(overshoot) = wait.idle() {
+                            let elapsed = overshoot.as_nanos() as u64;
+                            control.idle_sleep_overshoot.record(elapsed);
+                            control
+                                .max_idle_sleep_overshoot_ns
+                                .fetch_max(elapsed, Ordering::Relaxed);
+                            control.idle_sleeps.fetch_add(1, Ordering::Relaxed);
+                        }
                         continue;
                     };
                     // Bounded backlog: process the latest hop, not accumulated delay.
@@ -157,6 +164,13 @@ mod tests {
             true,
         )
         .unwrap();
+        // Observe one idle sleep before any input; it must not count as audio work.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while control.idle_sleeps.load(Ordering::Relaxed) == 0 {
+            assert!(Instant::now() < deadline, "worker idle observation missing");
+            thread::yield_now();
+        }
+        assert_eq!(control.processed.load(Ordering::Relaxed), 0);
         for index in 0..140 {
             let sequence = if index < 70 { index } else { index + 10 };
             let mut packet = Packet {
@@ -187,6 +201,11 @@ mod tests {
         control.stop.store(true, Ordering::Release);
         handle.join().unwrap();
         assert_eq!(control.state_warmup.load(Ordering::Relaxed), 128);
+        assert!(control.idle_sleeps.load(Ordering::Relaxed) > 0);
+        assert!(
+            control.idle_sleep_overshoot.p99_upper_bound_ns()
+                <= control.max_idle_sleep_overshoot_ns.load(Ordering::Relaxed)
+        );
         assert!(!control.failed.load(Ordering::Relaxed));
     }
 
