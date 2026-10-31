@@ -1,5 +1,14 @@
 # Research status and experiment history
 
+[P67](fused-phase-p67.md) passes all 100 native DSP correspondence checks:
+maximum final PCM difference `3.57628e-7`, without changing original-reference
+targets. A 2 x 2 support/fused-MR calibration registers four arms and two seeds
+at 512 updates each; all endpoints must finish before comparison. Nonzero native
+preflights pass and training has started; quality review is pending. The original
+launch rejected an unused inherited
+build alias before any update; corrected preparation uses the existing proven
+frozen-runtime binding. No quality or runtime qualification is claimed.
+
 [P66](phase-transport-p66.md) completes 100 native stage traces, five trace-off
 controls and 40 frozen-weight support counterfactuals. Most pooled P65 HF phase
 correction power (95.92–96.98%) lies in input-retained bins; magnitude fusion

@@ -33,6 +33,12 @@ P65's pooled HF phase-correction power lies in bins where DSP retains input phas
 An experimental output-support constraint matches native support and preserves all
 40 frozen-endpoint outputs exactly. It has not been retrained and is not a quality
 gain. Stage/identity controls also separate fusion effects from limiter distortion.
+
+[P67](docs/fused-phase-p67.md) verifies the differentiable DSP path against all
+100 frozen native cases and starts a matched support-by-objective phase-head
+calibration. The eight-trajectory study is underway, with 512 updates per trajectory
+and endpoint reviews still pending. The initial pre-training runtime-alias
+rejection remains documented.
 See the [research history](docs/research.md) and
 [failed/unqualified experiment registry](docs/failed-experiments.md) for retained
 controls, counterexamples and earlier work.
