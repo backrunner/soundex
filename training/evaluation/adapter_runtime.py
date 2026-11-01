@@ -28,6 +28,8 @@ def export(model, directory: Path) -> dict:
     # native-support graph so cached exports cannot silently reuse another route.
     if getattr(model, "phase_support", "broad") != "broad":
         digest.update(("phase_support:" + model.phase_support).encode())
+    if getattr(model, "phase_observation", "temporal") != "temporal":
+        digest.update(("phase_observation:" + model.phase_observation).encode())
     for key, value in model.state_dict().items():
         digest.update(key.encode())
         digest.update(value.detach().cpu().numpy().tobytes())
@@ -55,6 +57,8 @@ def export(model, directory: Path) -> dict:
     )
     if hasattr(model, "phase_support"):
         properties["soundex.phase_support"] = model.phase_support
+    if hasattr(model, "phase_observation"):
+        properties["soundex.phase_observation"] = model.phase_observation
     onnx.helper.set_model_props(graph, properties)
     onnx.checker.check_model(graph, full_check=True)
     onnx.save(graph, path)

@@ -16,14 +16,21 @@ class BandPhaseCorrection(nn.Module):
     can change overlap-add interference and must be reviewed after native DSP.
     """
 
-    def __init__(self, base, *, seed=65, hidden=32, phase_support="broad"):
+    def __init__(
+        self, base, *, seed=65, hidden=32, phase_support="broad", phase_observation="temporal"
+    ):
         super().__init__()
         if phase_support not in ("broad", "native"):
             raise ValueError("phase_support must be broad or native")
         self.phase_support = phase_support
+        if phase_observation not in ("temporal", "temporal_repeat", "adjacent"):
+            raise ValueError("unknown phase observation")
+        self.phase_observation = phase_observation
         self.study = "p65-frozen-band-phase-calibration"
         if phase_support == "native":
             self.study = "p66-native-phase-support-feasibility"
+        if phase_observation != "temporal":
+            self.study = "p68-cross-frequency-phase-feasibility"
         self.base = base.eval().requires_grad_(False)
         for name in (
             "arm",
@@ -43,7 +50,9 @@ class BandPhaseCorrection(nn.Module):
         with torch.random.fork_rng(devices=[]):
             torch.manual_seed(seed)
             self.phase_head = nn.Sequential(
-                nn.Linear(5 * 129 + 3, hidden), nn.Tanh(), nn.Linear(hidden, 129)
+                nn.Linear((5 if phase_observation == "temporal" else 7) * 129 + 3, hidden),
+                nn.Tanh(),
+                nn.Linear(hidden, 129),
             )
         nn.init.zeros_(self.phase_head[-1].weight)
         nn.init.zeros_(self.phase_head[-1].bias)
@@ -98,10 +107,25 @@ class BandPhaseCorrection(nn.Module):
         cosine = (real * previous_real + imag * previous_imag) / product_scale
         sine = (imag * previous_real - real * previous_imag) / product_scale
         relative = original[:, 1] - prediction[:, 1]
-        features = torch.cat(
-            (carrier, carrier * relative.cos(), carrier * relative.sin(), cosine, sine, condition),
-            -1,
-        )
+        observations = [carrier, carrier * relative.cos(), carrier * relative.sin(), cosine, sine]
+        if self.phase_observation == "temporal_repeat":
+            # Equal-width control, no new information. Repeating observations can
+            # still change optimization conditioning; it is not a trained no-op.
+            observations.extend((cosine, sine))
+        elif self.phase_observation == "adjacent":
+            # Current-frame adjacent-bin coherence, not future time context.
+            # Cartesian products avoid unwrapping or dividing by weak magnitudes.
+            left_real = torch.cat((torch.zeros_like(real[..., :1]), real[..., :-1]), -1)
+            left_imag = torch.cat((torch.zeros_like(imag[..., :1]), imag[..., :-1]), -1)
+            left_carrier = torch.cat((torch.zeros_like(carrier[..., :1]), carrier[..., :-1]), -1)
+            denominator = 1 + carrier * left_carrier
+            observations.extend(
+                (
+                    (real * left_real + imag * left_imag) / denominator,
+                    (imag * left_real - real * left_imag) / denominator,
+                )
+            )
+        features = torch.cat((*observations, condition), -1)
         active = (carrier.sum(-1, keepdim=True) > 0).to(carrier.dtype)
         rotation = math.pi * torch.tanh(self.phase_head(features) / 64)
         rotation = rotation * self.base.support_mask(condition) * self.base.interior * active
