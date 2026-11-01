@@ -48,6 +48,11 @@ compute screen (max 1.465 ms, no measured service overruns or paced lateness).
 This enables a matched training comparison; it is not improved restoration weights
 or real-device qualification. Earlier timing failures remain recorded.
 
+[P69](docs/cross-phase-training-p69.md) is running that comparison: two observations,
+two seeds and 16,384 updates per trajectory on the full registered crop schedule.
+All input checks and four actual-update/native preflights pass. All endpoints must
+finish before review; no trained-quality result is available yet.
+
 See the [research history](docs/research.md) and
 [failed/unqualified experiment registry](docs/failed-experiments.md) for retained
 controls, counterexamples and earlier work.

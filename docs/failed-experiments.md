@@ -13,6 +13,15 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P69](cross-phase-training-p69.md) is running the matched training follow-up:
+adjacent-frequency observations versus equal-width repeated-temporal observations,
+two origins, 16,384 updates each on the complete P63 crop schedule. P68 feasibility
+does not imply learned quality. All four endpoints must freeze before source-isolated
+review, P55 exposed-source rechecks and trained-endpoint timing. Input checks and
+all four actual-update/native preflights pass; the first checkpoint is verified.
+Status and receipts
+must be verified before reporting results; no default promotion or capacity claim.
+
 [P68](phase-gradients-p68.md) is a completed diagnostic and untrained feasibility
 screen. All 64 frozen gradient probes and sixteen native parity replays pass;
 native support improves objective agreement but paired/identity conflicts remain.

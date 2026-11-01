@@ -1,5 +1,14 @@
 # Research status and experiment history
 
+[P69](cross-phase-training-p69.md) has started the matched training follow-up to
+P68: two observations times two seeds, 16,384 updates each, frozen magnitude bases
+and the same original-reference fused objective. Full scheduled exposure is
+327,680 paired crops / 460.457 unique supervised minutes per trajectory. All final
+endpoints must finish before source-isolated and long-form rechecks plus timing.
+All 93,288 input/source checks and four actual-update/native preflights pass;
+the first full-training checkpoint is finite and preserves the backbone exactly.
+This is ongoing training, not an additional restoration result.
+
 [P68](phase-gradients-p68.md) completes 64 frozen P67 phase-gradient probes.
 Native support raises median common/fused parameter-gradient agreement from
 0.321–0.372 to 0.826–0.880; paired/identity conflicts remain, with no activation
