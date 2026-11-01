@@ -39,6 +39,15 @@ and 240 native-role reviews. Native-support/fused-loss heads reduce mean native
 music spectral error by 0.002671% / 0.001439% versus their zero-phase parents,
 with source, dynamics and HF PCM exceptions. These are tiny TRAIN-fit gains,
 not overall quality or convergence. The initial launch rejection remains documented.
+
+[P68](docs/phase-gradients-p68.md) completes 64 frozen phase-gradient probes and
+adds an optional cross-frequency phase observation with an equal-width control.
+Native support improves gradient agreement; saturation does not explain the tiny
+P67 gains. Four untrained nonzero fixtures pass native parity and a 52,000-hop
+compute screen (max 1.465 ms, no measured service overruns or paced lateness).
+This enables a matched training comparison; it is not improved restoration weights
+or real-device qualification. Earlier timing failures remain recorded.
+
 See the [research history](docs/research.md) and
 [failed/unqualified experiment registry](docs/failed-experiments.md) for retained
 controls, counterexamples and earlier work.

@@ -13,6 +13,19 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P68](phase-gradients-p68.md) is a completed diagnostic and untrained feasibility
+screen. All 64 frozen gradient probes and sixteen native parity replays pass;
+native support improves objective agreement but paired/identity conflicts remain.
+New cross-frequency phase observations and an equal-width control have no quality
+score yet. All 52,000 measured hops stay below 5 ms (max 1.464625 ms), without
+service overruns or paced lateness in this grid; prior timing failures remain.
+The first causality test incorrectly demanded bitwise float32 equality despite
+the same `1.192e-7` discrepancy in its frozen parent. Existing chunk tolerance plus
+exact future/channel derivative checks resolves the measurement error. An initial
+package-root launch failure produced no experiment. Both are retained in the
+report. Next require matched fixed-budget training and final native spectral,
+identity and continuity evidence; no default promotion or saturation-based retune.
+
 [P67](fused-phase-p67.md) completes all eight 512-update calibrations and 240 native
 roles. Native support improves mean spectral error in both seeds, but combined-arm
 native MR gains are only 0.002671% / 0.001439%, with 5/8 and 2/8 adverse recordings

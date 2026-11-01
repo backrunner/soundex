@@ -1,5 +1,17 @@
 # Research status and experiment history
 
+[P68](phase-gradients-p68.md) completes 64 frozen P67 phase-gradient probes.
+Native support raises median common/fused parameter-gradient agreement from
+0.321–0.372 to 0.826–0.880; paired/identity conflicts remain, with no activation
+saturation. New optional adjacent-bin phase features remove a demonstrated
+observation invariance, with a same-width repeated-temporal control. All four
+204,418-parameter nonzero fixtures pass native parity and 52,000 measured compute
+hops (max 1.464625 ms, no service overruns or paced lateness). This is zero-update
+feasibility, not a quality gain, convergence result or real-device qualification.
+The initial numerical causality-test failure and package-launch failure are
+documented. Register adequate matched training before judging the new observation;
+keep original-reference spectra, all controls and prior timing failures.
+
 [P67](fused-phase-p67.md) completes all eight 512-update endpoints and 240 native
 roles after passing 100 DSP correspondence checks. Native support improves mean
 native music MR under both objectives; the combined arm improves 0.002671% /
