@@ -34,11 +34,11 @@ An experimental output-support constraint matches native support and preserves a
 40 frozen-endpoint outputs exactly. It has not been retrained and is not a quality
 gain. Stage/identity controls also separate fusion effects from limiter distortion.
 
-[P67](docs/fused-phase-p67.md) verifies the differentiable DSP path against all
-100 frozen native cases and starts a matched support-by-objective phase-head
-calibration. The eight-trajectory study is underway, with 512 updates per trajectory
-and endpoint reviews still pending. The initial pre-training runtime-alias
-rejection remains documented.
+[P67](docs/fused-phase-p67.md) completes all eight 512-update phase calibrations
+and 240 native-role reviews. Native-support/fused-loss heads reduce mean native
+music spectral error by 0.002671% / 0.001439% versus their zero-phase parents,
+with source, dynamics and HF PCM exceptions. These are tiny TRAIN-fit gains,
+not overall quality or convergence. The initial launch rejection remains documented.
 See the [research history](docs/research.md) and
 [failed/unqualified experiment registry](docs/failed-experiments.md) for retained
 controls, counterexamples and earlier work.

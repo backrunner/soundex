@@ -1,9 +1,9 @@
 # P67: verified fused spectral supervision and matched phase calibration
 
-Date: 2026-11-01. Status: numerical/native correspondence and nonzero native
-preflights pass; the first registered trajectory is training. Endpoint reviews
-are pending. Default weights are unchanged. No new restoration or runtime qualification
-is claimed.
+Date: 2026-11-01. Status: all eight 512-update trajectories and fixed endpoint
+reviews complete. Native-support arms slightly reduce mean native music spectral
+error in both seeds, with source, HF PCM and dynamics exceptions. Default weights
+are unchanged; no overall restoration or runtime qualification is claimed.
 
 ## Changed hypothesis
 
@@ -133,18 +133,81 @@ initialization and frozen runtime. No checkpoint or quality score was discarded.
 
 ## Review and operational state
 
-The version-2 `launch.json`, `run.log` and `progress.json` identify the live process
-and stage. Local training runs in the background with idle-sleep prevention tied
-to its process. Check live state before claiming completion. Input/source hashes,
-package versions and evaluation reservations are checked before/after execution.
+The version-2 process has exited successfully and `progress.json` reports complete.
+All eight endpoint hashes, 512-update histories, finite tensors and frozen backbone
+tensors verify. Both `broad-common` controls reproduce every P65 endpoint tensor
+exactly. The completion receipt and all 240 native-role artifact hashes verify;
+the corrected run has no failure record. Input/source hashes, package versions
+and evaluation reservations were checked before/after execution.
 
 Before optimization, deterministic nonzero exports passed sequential ONNX and
 16 Rust checks at 44.1/48 kHz, mono/silent-left stereo, both support modes and origins.
-The pipeline then finishes all eight endpoints and automatically reviews the first
+The pipeline finished all eight endpoints and reviewed the first
 eight inherited TRAIN draws (32 music/eight speech recordings) under raw MR, direct
 loss and fused MR. Native review covers the same two-batch subset (eight music/two
 speech), with both zero heads, all eight endpoints, legacy and identity DSP.
-Every per-recording regression remains in the assessment.
+Every per-recording regression remains in the assessment. The supplemental
+`endpoint-summary-v2.json` derives the matched raw subset and fixed-objective
+means from saved reports without rerendering or training. Its receipt freezes the
+summary script. The initial summary/receipt and executed source remain retained;
+version 2 fixes loop-binding lint and a mutable source reference, and its summary
+payload is byte-identical. No quality criterion or result changed.
+
+## Completed endpoint results
+
+Source-equal native error changes versus each frozen P63 backbone with zero phase
+correction, on the same eight paired music recordings. Lower is better:
+
+| Arm | MR, seed 20261012 | MR, seed 20261013 | HF PCM RMS, seed 20261012 | HF PCM RMS, seed 20261013 |
+| --- | --- | --- | --- | --- |
+| `broad-common` | +0.000661% | +0.000735% | +0.001220% | +0.001460% |
+| `native-common` | -0.001512% | -0.001302% | +0.001891% | +0.001440% |
+| `broad-fused` | -0.000247% | +0.000758% | +0.001643% | +0.001513% |
+| `native-fused` | -0.002671% | -0.001439% | +0.002583% | +0.001611% |
+
+Native support improves mean native MR relative to broad support under either
+fixed objective in both seeds. Adding the fused term to native support improves
+native MR by a further 0.001159% / 0.000137%. Adding it to broad support does not
+give a consistent two-seed native MR improvement. This isolates a small support
+benefit; it is not evidence that fusion-aware training alone solves the problem.
+
+For `native-fused`, native music MR changes `0.3006278826 -> 0.3006198532` and
+`0.2978579337 -> 0.2978536482`. The improvements are very small. MR still worsens
+on **5/8 and 2/8** sources; a lower mean is not a uniform win. Its worst MR cases
+are case 0 / role 3, `music_library:kcc-original-13300245-feff81af48fff34d`, MP3
+VBR q2 (delta `+2.48849e-6`), and case 0 / role 0, Chris Zabriskie's
+*What Does Anybody Know About Anything*, AAC 192 kbps (delta `+7.74860e-7`).
+
+Native dynamics error rises 0.002672% / 0.003076%, with 7/8 and 4/8 adverse sources.
+The largest dynamics exception in both origins remains *Crunch Me Beautiful*,
+MP3 64 kbps, case 4 / role 1: deltas `+2.52724e-5` / `+3.18289e-5`.
+Native HF PCM RMS increases by `1.11533e-7` / `6.96624e-8` absolute PCM units;
+these tiny increments do not establish audible harm. Nor does a tiny mean spectral
+gain establish audible improvement. Preserved-band and every other recorded
+metric remain in the assessment; no exception is dropped.
+
+On the wider 32-recording raw music panel, `native-fused` MR improves 0.002035% /
+0.002031%. Raw clean-music HF RMS rises `3.17679e-6 -> 3.24549e-6` and
+`3.73504e-6 -> 3.76328e-6`: +2.1625% / +0.7561%, but very small absolute changes.
+Native clean-music MR instead improves 0.004357% / 0.004058%. Speech native MR
+improves 0.001820% / 0.001325% on only two recordings; its second-origin dynamics
+and HF PCM regressions remain. Native speech identity is unchanged.
+
+Both common and augmented risks are rescored for every endpoint in `loss-review/`
+and the supplemental summary. They must not be ranked by unlike training totals.
+For example, the second origin's `native-fused` augmented risk is
+`0.3666905165`, slightly above `native-common` at `0.3666904569`, despite its
+lower native music MR. These mixed, tiny changes do not establish convergence.
+
+## Decision
+
+Retain native output availability as a supported design correction, while keeping
+both fixed controls. The fused auxiliary yields only marginal additional benefit
+and does not remove source/dynamics tradeoffs. Do not promote these weights or
+repeat a larger unchanged budget on the strength of the mean alone. Before another
+training design, inspect gradient allocation in the passed band and the phase
+head's missing cross-bin information, separately from a convergence/exposure audit.
+The completed 512-update calibration cannot reject the phase architecture family.
 
 Any fitted gains still need broader source-isolated review, listening and timing
 evidence. No compute/deadline qualification runs concurrently with training.

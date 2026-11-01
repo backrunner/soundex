@@ -1,13 +1,14 @@
 # Research status and experiment history
 
-[P67](fused-phase-p67.md) passes all 100 native DSP correspondence checks:
-maximum final PCM difference `3.57628e-7`, without changing original-reference
-targets. A 2 x 2 support/fused-MR calibration registers four arms and two seeds
-at 512 updates each; all endpoints must finish before comparison. Nonzero native
-preflights pass and training has started; quality review is pending. The original
-launch rejected an unused inherited
-build alias before any update; corrected preparation uses the existing proven
-frozen-runtime binding. No quality or runtime qualification is claimed.
+[P67](fused-phase-p67.md) completes all eight 512-update endpoints and 240 native
+roles after passing 100 DSP correspondence checks. Native support improves mean
+native music MR under both objectives; the combined arm improves 0.002671% /
+0.001439% versus zero-phase parents. MR still worsens on 5/8 and 2/8 sources,
+and dynamics/HF PCM regress slightly. Both broad/common controls reproduce P65
+tensors exactly. Results are tiny TRAIN-fit changes, not convergence or overall
+quality. All receipts verify; the original zero-update build-alias failure remains.
+Inspect passed-band gradients and phase representation before further training;
+no new runtime or release qualification is claimed.
 
 [P66](phase-transport-p66.md) completes 100 native stage traces, five trace-off
 controls and 40 frozen-weight support counterfactuals. Most pooled P65 HF phase
