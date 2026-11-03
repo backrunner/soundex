@@ -13,14 +13,17 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
-[P69](cross-phase-training-p69.md) is running the matched training follow-up:
-adjacent-frequency observations versus equal-width repeated-temporal observations,
-two origins, 16,384 updates each on the complete P63 crop schedule. P68 feasibility
-does not imply learned quality. All four endpoints must freeze before source-isolated
-review, P55 exposed-source rechecks and trained-endpoint timing. Input checks and
-all four actual-update/native preflights pass; the first checkpoint is verified.
-Status and receipts
-must be verified before reporting results; no default promotion or capacity claim.
+[P69](cross-phase-training-p69.md) completes four matched 16,384-update endpoints,
+640 native roles and the P55 160-case recheck. Adjacent input fails its registered
+two-seed matched-control criterion: native music MR is 0.003600% / 0.000632% worse
+on the reserved review, and 0.004151% / 0.000784% worse on the exposed long-form
+panel (19/20 and 16/20 adverse source means). Both arms slightly improve over zero
+parents while retaining HF PCM/dynamics/source tradeoffs. All hashes, finite
+endpoints and frozen backbones verify; no execution failure. The 52,000-hop trained
+compute grid passes locally (max 1.419083 ms, no service overrun or paced lateness).
+Retain all per-source records and prior runtime failures. Revisit only with a
+changed, frozen-endpoint-supported feature-use/output mechanism; do not repeat
+this recipe longer, promote it or infer a phase-model ceiling.
 
 [P68](phase-gradients-p68.md) is a completed diagnostic and untrained feasibility
 screen. All 64 frozen gradient probes and sixteen native parity replays pass;

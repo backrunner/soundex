@@ -1,13 +1,15 @@
 # Research status and experiment history
 
-[P69](cross-phase-training-p69.md) has started the matched training follow-up to
-P68: two observations times two seeds, 16,384 updates each, frozen magnitude bases
-and the same original-reference fused objective. Full scheduled exposure is
-327,680 paired crops / 460.457 unique supervised minutes per trajectory. All final
-endpoints must finish before source-isolated and long-form rechecks plus timing.
-All 93,288 input/source checks and four actual-update/native preflights pass;
-the first full-training checkpoint is finite and preserves the backbone exactly.
-This is ongoing training, not an additional restoration result.
+[P69](cross-phase-training-p69.md) completes all four 16,384-update trajectories
+and fixed reviews. Adjacent native music MR improves 0.105384% / 0.076662% over
+zero parents on the source-isolated panel, but trails matched repeated-input
+controls by 0.003600% / 0.000632%. The exposed P55 long-form recheck agrees:
+parent-relative gains 0.156115% / 0.132448%, matched-control regressions
+0.004151% / 0.000784%, with HF PCM/dynamics tradeoffs. All four endpoints and
+completion receipts verify, with no execution failure. The trained 52,000-hop
+grid peaks at 1.419083 ms without service overruns or paced lateness. The new
+observation fails its registered criterion; inspect frozen feature use/output
+expressiveness before any changed recipe, without promotion or convergence claim.
 
 [P68](phase-gradients-p68.md) completes 64 frozen P67 phase-gradient probes.
 Native support raises median common/fused parameter-gradient agreement from

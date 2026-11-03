@@ -1,5 +1,11 @@
 # P69: matched cross-frequency phase training
 
+Status checked on 2026-11-04: all four 16,384-update endpoints and automatic
+reviews completed on 2026-11-03 at 12:25 Singapore time. Phase training yields
+small spectral gains over the zero-phase parents, but adjacent-bin observations
+fail the registered requirement to beat the matched repeated-input control in
+both seeds. No default promotion or convergence claim.
+
 ## Protocol and reason to proceed
 
 [P68](phase-gradients-p68.md) found a concrete observation limitation in the old
@@ -125,9 +131,8 @@ Launch verified on 2026-11-01: PID 77959 runs the frozen source from commit
 input/source bindings verify, and all four two-update preflights finish with
 sixteen native replays. Maximum native complex discrepancy is `7.689e-6`; the
 preflight receipt verifies. The first full-training checkpoint is hash-valid,
-finite and exactly preserves every P63 backbone tensor. Full training is active;
-no endpoint or quality comparison has completed. The current step belongs to
-`progress.json`, not a promise that this launch snapshot stays current.
+finite and exactly preserves every P63 backbone tensor. These are historical
+launch observations; completion and endpoint results are recorded below.
 
 `registration.json` and its receipt fix the protocol. `source/training/` contains
 the executed snapshot. `launch.json`, `run.log` and `progress.json` describe the
@@ -140,3 +145,93 @@ Failures create timestamped records and stop execution. Incomplete native render
 are retained rather than overwritten. Training sources, checkpoints, local
 reports and original audio remain ignored; only source and documentation are
 committed. No default-weight promotion is part of this run.
+
+## Completed endpoints and review
+
+The process exited and `progress.json` reports complete. All four endpoint hashes,
+16,384-step histories, finite model tensors and exact frozen-backbone equality
+verify. The P69, shared completion, preflight and long-form completion receipts
+verify. There is no timestamped execution failure. Recorded optimization time
+totals 42.70 hours; wall time includes preparation and the subsequent reviews.
+
+| Endpoint | SHA-256 |
+| --- | --- |
+| 20261012 / repeated | `db40de5fc43b75109e5afe691c197998eb5643eb9cb9eeee38f0d75586c47a14` |
+| 20261012 / adjacent | `0ca505aad3a4c7755ba5e51f5d777253d3d0553634b47e1295050e1ef80c9d1c` |
+| 20261013 / repeated | `8b866b055f8dde4e39aeb39d66382889fddaca8e3477d2da9c9912fb3dc02dcd` |
+| 20261013 / adjacent | `09d5d45dd0b258014fa11a5a2298af25b748bd7987ff5bca25d6baa1facde99e` |
+
+The source-isolated native panel covers 25 distinct paired music sources across
+32 music cases per model. All eight models/controls complete 640 native roles.
+The following are source-equal MR error changes relative to each origin's zero
+phase parent; negative is better:
+
+| Arm | Seed 20261012 | Seed 20261013 |
+| --- | --- | --- |
+| Repeated temporal input | -0.108981% | -0.077293% |
+| Adjacent-frequency input | -0.105384% | -0.076662% |
+
+Adjacent MR is therefore **0.003600% / 0.000632% worse than the matched control**.
+This fails the preregistered two-seed comparison, despite both arms improving over
+their parents. Adjacent still has 9/32 and 10/32 native music case regressions
+against its parent. Its native HF PCM RMS rises 0.018245% / 0.081321% and dynamics
+error rises 0.051852% / 0.019985%. The absolute HF PCM RMS increases are
+`1.504e-6` / `6.724e-6`; small changes do not prove audible harm. Low-band and
+identity exceptions remain in `assessment.json`, including seed-12 native speech
+identity MR +1.671945% and seed-13 -7.625055%. Neither percentage alone measures
+audibility. Wider raw music MR also improves versus parents (-0.104953% /
+-0.100617%), while adjacent trails its same-budget control (+0.002950% /
++0.000162%).
+
+The P55 physical-stereo long-form recheck completes all 160 cases for all eight
+paths: 2,720 score records including untreated input and both raw/native results.
+On its 20 paired music sources, native MR changes versus zero parents are:
+
+| Arm | Seed 20261012 | Seed 20261013 |
+| --- | --- | --- |
+| Repeated temporal input | -0.160259% | -0.133231% |
+| Adjacent-frequency input | -0.156115% | -0.132448% |
+
+Adjacent is again worse than its matched control: +0.004151% / +0.000784%, with
+19/20 and 16/20 adverse source means. HF spectral MR, log-shape and energy-envelope
+means also trail the control in both seeds. Adjacent improves HF spectral MR over
+its parent by 0.201310% / 0.170876%, but HF PCM RMS rises 0.118664% / 0.119158%
+(`1.055e-5` / `1.062e-5` absolute PCM RMS), and dynamics error rises 0.013528% /
+0.014507%. Two/three source means regress in MR versus the parent. These are
+exposed-source rechecks, not independent generalization or listening evidence.
+
+All source/case counterexamples are retained in `assessment.json` and
+`longform-recheck/summary.json` (`records`, `groups/*/per_source`). The worst
+long-form matched-control MR deltas are `+6.21825e-5` at source
+`01738cac4c14094718ff320b0ebf76b8a2c874091ca98b1e25f22c176b388eb8`
+for seed 12, and `+1.23084e-5` at source
+`ae91fd8f81604314454c5d2739239b4419547333d4658f162d0fbe7859fe3295`
+for seed 13. Parent-MR adverse sources are
+`907a529dcea9466b5ce584c540b72de7a80cedfc98585f4aa01c9a1cef464da5`
+and `7d7d51d147d7867001ec639e2755c7abc083a354b16cf4b31627c99ac8db9701`
+in both origins, plus
+`1f4ac5064fd720077fbde48c93dba4f2fc6dfe1e50ce69d768de2f0352566b3c`
+in seed 13. No counterexample or earlier timing failure is removed.
+
+Relative to legacy on this same long-form recheck, adjacent native MR improves
+2.824682% / 3.055135%, HF PCM RMS improves 0.669379% / 0.401650%, and dynamics
+improves 0.891124% / 0.801389%, with per-source exceptions. Most of that advantage
+belongs to the inherited P63 backbone. It cannot be attributed to the new phase
+observation or extrapolated to all music.
+
+## Trained runtime and decision
+
+All twenty trained-endpoint timing cases complete: 52,000 measured hops, maximum
+frontend/model/DSP computation **1.419083 ms**, no >=5 ms compute calls, no hop
+service overruns and no paced late completion in this grid. Process peak RSS
+ranges from 31,178,752 to 32,292,864 bytes. Fixed 256-frame buffering remains
+separate (5.333 ms at 48 kHz). This is a successful local synthetic screen, not
+physical-device qualification or a cancellation of earlier failures.
+
+Do not promote the adjacent feature or extend this identical recipe solely because
+it beats the zero parent. Its matched comparison fails in both review panels.
+Before revisiting, distinguish learned feature use and output-phase expressiveness
+with frozen endpoint interventions, retaining original-reference spectra and the
+matched control. A changed mechanism needs a new registered test. This result
+does not reject all cross-frequency representations, phase learning or larger
+architectures, and reaching the fixed budget does not establish convergence.

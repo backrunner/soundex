@@ -48,10 +48,12 @@ compute screen (max 1.465 ms, no measured service overruns or paced lateness).
 This enables a matched training comparison; it is not improved restoration weights
 or real-device qualification. Earlier timing failures remain recorded.
 
-[P69](docs/cross-phase-training-p69.md) is running that comparison: two observations,
-two seeds and 16,384 updates per trajectory on the full registered crop schedule.
-All input checks and four actual-update/native preflights pass. All endpoints must
-finish before review; no trained-quality result is available yet.
+[P69](docs/cross-phase-training-p69.md) completes all four 16,384-update trajectories,
+source-isolated reviews and the P55 long-form recheck. Phase training slightly
+improves spectra over zero-phase parents, but adjacent-frequency observations trail
+the matched repeated-input control in both seeds. Trained compute peaks at 1.419 ms
+over 52,000 measured hops, with no service overrun or paced lateness in this grid.
+Source/HF PCM/dynamics tradeoffs remain; no default weights are promoted.
 
 See the [research history](docs/research.md) and
 [failed/unqualified experiment registry](docs/failed-experiments.md) for retained
