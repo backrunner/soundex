@@ -13,6 +13,22 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P70](baseline-metric-audit-p70.md) is a completed diagnostic, not new training.
+All 160 native scores reproduce exactly and independent HF convergence retains
+P69's legacy-relative gain and matched-control failure. The premise that all new
+models lose to legacy is unsupported. Pure log distance improves on 18/20
+energy-matched scrambled-HF controls while HF PCM worsens on all twenty; composite
+MR and independent SC also retain two and one exceptions respectively. All
+counterexamples remain in `data/runs/baseline-metric-audit-p70-20261104/metrics/`.
+Thirty-two frozen endpoint probes show weak added-feature use, no output
+saturation and remaining reference-informed magnitude/phase headroom. They are
+TRAIN-fit/proxy diagnostics, not native intervention quality or achievable
+ceilings. No runtime failure or new timing result; defaults unchanged. Revisit
+the failed feature route only with a concrete representation/optimization change
+and matched joint-decoder controls, not a longer unchanged phase-only run or a
+metric selected to obtain a win. Perceptual and independent-test evidence remain
+missing; full scope, exact endpoints and preserved records are in the report.
+
 [P69](cross-phase-training-p69.md) completes four matched 16,384-update endpoints,
 640 native roles and the P55 160-case recheck. Adjacent input fails its registered
 two-seed matched-control criterion: native music MR is 0.003600% / 0.000632% worse

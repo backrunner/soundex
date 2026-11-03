@@ -55,6 +55,13 @@ the matched repeated-input control in both seeds. Trained compute peaks at 1.419
 over 52,000 measured hops, with no service overrun or paced lateness in this grid.
 Source/HF PCM/dynamics tradeoffs remain; no default weights are promoted.
 
+[P70](docs/baseline-metric-audit-p70.md) separates the historical legacy model from
+matched controls: P69 already reduces long-form native spectral MR by 2.82–3.06%
+versus legacy. Independent rulers confirm the spectral progress and the small
+matched-control failure. Analytical controls expose energy/log-distance blind
+spots; frozen-head probes find weak use of the added observation and remaining
+magnitude/phase headroom. No new training, perceptual qualification or promotion.
+
 See the [research history](docs/research.md) and
 [failed/unqualified experiment registry](docs/failed-experiments.md) for retained
 controls, counterexamples and earlier work.

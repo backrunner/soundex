@@ -34,6 +34,10 @@ an exact inverse of lossy compression.
   identity model through actual DSP to isolate limiting/synthesis effects. Report
   conflicts between safe limiting and the original reference; never substitute a
   limited reference and describe the result as original-audio restoration.
+- Name comparators explicitly: historical legacy, frozen parent, matched trained
+  control, untreated input and identity DSP are different references. Report
+  legacy-relative progress separately from a new branch's incremental effect;
+  a matched-control failure must not be described as every model losing to legacy.
 - New losses require correct-reference behavior, silence/weak-energy gradients,
   finite differences and deployment correspondence checks. Do not tune thresholds
   to tracks or validation counterexamples. Separate representational feasibility

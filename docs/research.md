@@ -1,5 +1,18 @@
 # Research status and experiment history
 
+[P70](baseline-metric-audit-p70.md) completes comparator, metric and frozen-feature
+audits. Legacy shape-small has 905,734 parameters versus P69's 204,418; it is not
+the matched repeated-input control. P69 already improves long-form native MR
+2.82–3.06% over legacy. All 160 saved native scores reproduce exactly; independent
+HF spectral convergence retains the legacy gain and matched-control failure.
+Energy-matched phase scrambling improves pure log distance on 18/20 excerpts
+despite worse HF PCM on all twenty. Added-feature removal changes phase RMS by
+only 0.85–1.02% of the original rotation RMS on fit probes. Reference substitutions
+show remaining magnitude/phase headroom, not achievable optima. The audited alias
+check passes, without eliminating historical selection bias. Next inspect small
+joint amplitude/phase trainability and a frozen perceptual protocol; do not extend
+unchanged phase-only training or promote defaults.
+
 [P69](cross-phase-training-p69.md) completes all four 16,384-update trajectories
 and fixed reviews. Adjacent native music MR improves 0.105384% / 0.076662% over
 zero parents on the source-isolated panel, but trails matched repeated-input
