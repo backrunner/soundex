@@ -1,23 +1,33 @@
-"""P65 frozen band magnitude with a causal phase-only readout.
+"""P65 band magnitude with a causal phase readout; optional P71 joint training.
 
 SPDX-License-Identifier: Apache-2.0
 """
 
 import math
+from contextlib import nullcontext
 
 import torch
 from torch import nn
 
 
 class BandPhaseCorrection(nn.Module):
-    """Keep every base tensor frozen; append one physical-channel phase history hop.
+    """Default to a frozen base; append one physical-channel phase history hop.
 
     Exact base dB output is preserved, not the reanalyzed OLA magnitude. Rotation
     can change overlap-add interference and must be reviewed after native DSP.
+    Explicit train_base=True connects magnitude/backbone gradients without
+    changing forward arithmetic, state geometry or the historical default.
     """
 
     def __init__(
-        self, base, *, seed=65, hidden=32, phase_support="broad", phase_observation="temporal"
+        self,
+        base,
+        *,
+        seed=65,
+        hidden=32,
+        phase_support="broad",
+        phase_observation="temporal",
+        train_base=False,
     ):
         super().__init__()
         if phase_support not in ("broad", "native"):
@@ -31,7 +41,8 @@ class BandPhaseCorrection(nn.Module):
             self.study = "p66-native-phase-support-feasibility"
         if phase_observation != "temporal":
             self.study = "p68-cross-frequency-phase-feasibility"
-        self.base = base.eval().requires_grad_(False)
+        self.train_base = train_base
+        self.base = base.eval().requires_grad_(train_base)
         for name in (
             "arm",
             "width",
@@ -82,7 +93,7 @@ class BandPhaseCorrection(nn.Module):
     def forward_details(
         self, original, context, condition, state, *, detach_budget_auxiliary=False
     ):
-        with torch.no_grad():
+        with nullcontext() if self.train_base else torch.no_grad():
             prediction, updated, budget = self.base.forward_details(
                 original, context, condition, state[:, : self.base_state_size]
             )
