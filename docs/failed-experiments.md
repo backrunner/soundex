@@ -13,6 +13,20 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P71](evaluation-capacity-p71.md) completes 280 fixed-path evaluation calibrations
+and a 26,000-hop small/double feasibility screen. Spectrum-only blind spots remain:
+energy-matched phase scrambling improves shape on 17/20 cases while complex
+distance worsens on all twenty. All exceptions are retained, no new perceptual
+score or retroactive P69 acceptance. Fresh 204,418/408,023-parameter fixtures pass
+native parity, <5 ms compute and hop/paced deadlines (max 0.558/2.243 ms); this is
+not trained quality or device qualification. [P72](band-capacity-training-p72.md)
+starts four fresh matched full-training trajectories at 16,384 updates each;
+all four preflights and the first formal checkpoint verify, with quality pending.
+Its initial missing-cutoff test-fixture failures are retained and corrected before
+launch; no quality gate changed. Complete all endpoints before capacity claims,
+retain the original-reference panel and every adverse recording, and do not
+equate a passing untrained timing screen with trained/release qualification.
+
 [P70](baseline-metric-audit-p70.md) is a completed diagnostic, not new training.
 All 160 native scores reproduce exactly and independent HF convergence retains
 P69's legacy-relative gain and matched-control failure. The premise that all new

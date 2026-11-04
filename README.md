@@ -12,6 +12,12 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
+[P71](docs/evaluation-capacity-p71.md) adds a calibrated spectral/fidelity panel
+and recording-paired uncertainty. A same-depth twofold parameter fixture passes
+native parity and local compute/deadline checks (double maximum 2.243 ms).
+[P72](docs/band-capacity-training-p72.md) has started fresh full-training small and
+double models after all four preflights passed; trained quality remains pending.
+
 [P63](docs/band-training-p63.md) completed all six fresh 16,384-update endpoints
 and a 160-case long-form recheck. Band-TCN native music MR improves 2.84–2.86%
 versus parameter-matched controls and 2.67–2.93% versus legacy across both seeds,

@@ -1,5 +1,16 @@
 # Research status and experiment history
 
+[P71](evaluation-capacity-p71.md) implements and calibrates a fixed multiresolution
+panel with separate shape, energy, dynamics, complex/absolute/stereo rulers and
+paired recording-bootstrap intervals. All 280 paths retain historical scores and
+counterexamples. Same-depth joint small/double capacity fixtures (204,418/408,023
+parameters) pass native parity and 26,000 measured hops, max 0.558/2.243 ms with no
+service overruns or paced lateness. These are untrained feasibility results.
+[P72](band-capacity-training-p72.md) has started fresh full magnitude/phase training:
+two capacities, two seeds, 16,384 updates each, identical exposure/objective and
+complete-endpoint review. All four real-data preflights and the first finite
+checkpoint verify. Quality is pending; default weights remain unchanged.
+
 [P70](baseline-metric-audit-p70.md) completes comparator, metric and frozen-feature
 audits. Legacy shape-small has 905,734 parameters versus P69's 204,418; it is not
 the matched repeated-input control. P69 already improves long-form native MR

@@ -58,6 +58,10 @@ an exact inverse of lossy compression.
   reduce weak-bin LSD; also assess high-band spectral convergence, energy,
   transients, low-band fidelity, stereo and blind listening. Loss, SI-SDR or
   spectral coverage alone is insufficient.
+- Use `docs/evaluation-protocol.md` for prospective capacity comparisons. Keep
+  shape, energy, temporal, coherent and absolute-error rulers visible; aggregate
+  paired cases by recording before uncertainty estimates. Missing perceptual
+  evidence and undefined relative scores must not silently become passing scores.
 - For very weak reference bands, report relative shape and calibrated absolute PCM
   RMS/dBFS errors together. Unnormalized FFT power is not PCM dBFS. Retain every
   counterexample. Large relative scores do not establish audible severity; small
