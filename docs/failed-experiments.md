@@ -13,6 +13,23 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P73](capacity-tradeoff-p73.md) completes a frozen P72 attribution: 2,080 exact
+PCM decompositions and 640 matched-capacity factors, all 160 cases retained.
+Native HF magnitude-error power decreases, but phase-interaction power increases;
+94.45% / 93.60% of that increase is the symmetric magnitude factor, not a causal
+phase-only percentage. Raw outputs already have the tradeoff. Most MR benefit is
+above 12 kHz; existing MR dynamics worsens despite the independent panel's gain.
+The other development panel retains 11/25 and 8/25 adverse recording means,
+including raw regressions and seed-dependent native transfer. The one paced
+failure is reproduced from saved traces: previous hop on time, delayed start,
+next hop recovers. This direct replay is not the production worker or a device.
+No new training, timing retry, runtime fix or promotion. All inputs/identities
+verify; no registered execution failure. Revisit with phase observations inside
+the small temporal representation and separately controlled realized-spectrum
+supervision, after TRAIN gradient/native tests; do not repeat a wider magnitude
+backbone or unchanged phase-only run. Detailed counters and evidence are in the
+report; do not reduce enhancement or tune known-case thresholds to obtain a pass.
+
 [P72](band-capacity-training-p72.md) completes all four 16,384-update trajectories,
 480 native development roles, 160 long-form cases and 2,080 panel records. All
 endpoint/optimizer/receipt checks pass; no registered execution failure. Double

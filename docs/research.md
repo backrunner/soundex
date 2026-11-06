@@ -1,5 +1,17 @@
 # Research status and experiment history
 
+[P73](capacity-tradeoff-p73.md) completes all frozen P72 magnitude/phase and
+source-stage accounting. High-band magnitude gains coexist with increased
+phase-interaction power; its symmetric magnitude factor accounts for 94.45% /
+93.60% of the increase. This is descriptive algebra, not a causal fraction.
+DSP reduces the raw coherent regression, while the other development panel has
+mixed source/codec and stage changes. No new weights, timing retry or default
+promotion. The retained late replay is distinct from production-worker/device
+evidence. Next investigate phase observations inside the small temporal backbone
+and realized-spectrum supervision with separate controls, rather than unchanged
+scaling or phase-only continuation. Full records and next-stage prerequisites
+are in the report.
+
 [P72](band-capacity-training-p72.md) completes four 16,384-update trajectories and
 all fixed reviews. Doubling parameters improves long-form native MR 0.919099% /
 0.690461% and HF SC 0.789985% / 0.362459% versus matched small controls, with both

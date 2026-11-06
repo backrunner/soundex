@@ -20,6 +20,10 @@ Double models reduce long-form native MR 0.69–0.92% versus matched small model
 and 4.06–4.10% versus legacy, with mixed shape/source-panel and HF PCM tradeoffs.
 Trained compute stays below 5 ms but one paced completion is late. These are
 development rechecks; no overall quality qualification or default promotion.
+[P73 attribution](docs/capacity-tradeoff-p73.md) confirms that magnitude recovery
+amplifies remaining phase mismatch, already before DSP. All frozen cases and the
+paced failure remain recorded; it proposes a small temporal phase-information
+experiment, not another unchanged capacity increase or a qualified new weight.
 
 [P63](docs/band-training-p63.md) completed all six fresh 16,384-update endpoints
 and a 160-case long-form recheck. Band-TCN native music MR improves 2.84–2.86%

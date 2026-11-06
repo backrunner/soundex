@@ -235,6 +235,11 @@ failures and the passing P71 fixture screen remain separate evidence.
 
 ## Decision
 
+The subsequent [P73 frozen attribution](capacity-tradeoff-p73.md) completes the
+band/phase, matched source-stage and retained deadline diagnosis without changing
+these endpoints, scores or qualification. It identifies amplitude-weighted phase
+interaction as the dominant coherent tradeoff and retains the mixed-panel result.
+
 Retain both small and double endpoints and all counterexamples. The double model
 has a modest reproducible long-form spectral benefit, but shape, coherent
 reconstruction, identity and cross-panel behavior remain mixed, and pacing fails
