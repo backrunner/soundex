@@ -1,15 +1,24 @@
 # Research status and experiment history
 
+[P72](band-capacity-training-p72.md) completes four 16,384-update trajectories and
+all fixed reviews. Doubling parameters improves long-form native MR 0.919099% /
+0.690461% and HF SC 0.789985% / 0.362459% versus matched small controls, with both
+paired source-bootstrap intervals below zero. HF shape is mixed and HF PCM
+worsens 0.980238% / 0.662302%. The other fixed native music panel has MR +0.002340% /
+-0.290006%, so the benefit is not uniform across panels. Legacy-relative long-form
+MR improves 4.064560% / 4.103731%. Trained compute peaks at 1.663041 ms across 52,000
+hops, but one paced completion is 0.217405 ms late. All integrity checks pass;
+no execution failure, rerun or promotion. Inspect frozen phase/shape/source
+counterexamples and worker wake behavior before another recipe. Listening,
+independent testing, convergence and device qualification remain unestablished.
+
 [P71](evaluation-capacity-p71.md) implements and calibrates a fixed multiresolution
 panel with separate shape, energy, dynamics, complex/absolute/stereo rulers and
 paired recording-bootstrap intervals. All 280 paths retain historical scores and
 counterexamples. Same-depth joint small/double capacity fixtures (204,418/408,023
 parameters) pass native parity and 26,000 measured hops, max 0.558/2.243 ms with no
 service overruns or paced lateness. These are untrained feasibility results.
-[P72](band-capacity-training-p72.md) has started fresh full magnitude/phase training:
-two capacities, two seeds, 16,384 updates each, identical exposure/objective and
-complete-endpoint review. All four real-data preflights and the first finite
-checkpoint verify. Quality is pending; default weights remain unchanged.
+The subsequent P72 trained results are above; default weights remain unchanged.
 
 [P70](baseline-metric-audit-p70.md) completes comparator, metric and frozen-feature
 audits. Legacy shape-small has 905,734 parameters versus P69's 204,418; it is not

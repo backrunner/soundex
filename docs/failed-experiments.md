@@ -13,19 +13,32 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P72](band-capacity-training-p72.md) completes all four 16,384-update trajectories,
+480 native development roles, 160 long-form cases and 2,080 panel records. All
+endpoint/optimizer/receipt checks pass; no registered execution failure. Double
+versus small long-form native MR improves 0.919099% / 0.690461% and HF SC improves
+0.789985% / 0.362459%, but shape is mixed, HF PCM worsens 0.980238% / 0.662302%,
+and identity/cross-panel exceptions remain. The other native music panel has
+MR +0.002340% / -0.290006%; do not select only the favorable panel. All 52,000 compute
+hops stay below 5 ms with no service overrun, but seed 13 double has one paced
+completion late by 0.217405 ms (wake 2.185114 ms, compute 0.698375 ms). This fails
+continuous-deadline qualification; no timing retry or default promotion.
+`completion-review-20261107/` preserves integrity, matched populations, every
+counterexample and the exact late-hop trace alongside the original reports.
+Revisit with a frozen-endpoint-supported phase/shape or source-transfer mechanism
+and a separately measured wake/worker change; do not scale or extend unchanged
+training. Convergence, listening and independent-test/device evidence remain open.
+
 [P71](evaluation-capacity-p71.md) completes 280 fixed-path evaluation calibrations
 and a 26,000-hop small/double feasibility screen. Spectrum-only blind spots remain:
 energy-matched phase scrambling improves shape on 17/20 cases while complex
 distance worsens on all twenty. All exceptions are retained, no new perceptual
 score or retroactive P69 acceptance. Fresh 204,418/408,023-parameter fixtures pass
 native parity, <5 ms compute and hop/paced deadlines (max 0.558/2.243 ms); this is
-not trained quality or device qualification. [P72](band-capacity-training-p72.md)
-starts four fresh matched full-training trajectories at 16,384 updates each;
-all four preflights and the first formal checkpoint verify, with quality pending.
-Its initial missing-cutoff test-fixture failures are retained and corrected before
-launch; no quality gate changed. Complete all endpoints before capacity claims,
-retain the original-reference panel and every adverse recording, and do not
-equate a passing untrained timing screen with trained/release qualification.
+not trained quality or device qualification. P72's completed results above
+supersede its launch status and include a trained paced failure. Its initial
+missing-cutoff test-fixture failures are retained; no quality gate changed.
+Do not equate a passing untrained screen with trained/release qualification.
 
 [P70](baseline-metric-audit-p70.md) is a completed diagnostic, not new training.
 All 160 native scores reproduce exactly and independent HF convergence retains

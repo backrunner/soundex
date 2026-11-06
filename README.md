@@ -15,8 +15,11 @@ exercise inference but do not improve audio quality. See [model status](models/R
 [P71](docs/evaluation-capacity-p71.md) adds a calibrated spectral/fidelity panel
 and recording-paired uncertainty. A same-depth twofold parameter fixture passes
 native parity and local compute/deadline checks (double maximum 2.243 ms).
-[P72](docs/band-capacity-training-p72.md) has started fresh full-training small and
-double models after all four preflights passed; trained quality remains pending.
+[P72](docs/band-capacity-training-p72.md) completes all four 16,384-update trajectories.
+Double models reduce long-form native MR 0.69–0.92% versus matched small models
+and 4.06–4.10% versus legacy, with mixed shape/source-panel and HF PCM tradeoffs.
+Trained compute stays below 5 ms but one paced completion is late. These are
+development rechecks; no overall quality qualification or default promotion.
 
 [P63](docs/band-training-p63.md) completed all six fresh 16,384-update endpoints
 and a 160-case long-form recheck. Band-TCN native music MR improves 2.84–2.86%
