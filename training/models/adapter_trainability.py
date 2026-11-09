@@ -31,11 +31,16 @@ class TrainableAdapter(SpectralAdapter):
                 or (scope == "decoder" and name.startswith("backbone.decoder."))
             )
 
+    def encode_observations(self, original, magnitude, context, condition, state):
+        return self.backbone.encode(magnitude, context, condition, state)
+
     def forward_details(
         self, original, context, condition, state, *, detach_budget_auxiliary=False
     ):
         magnitude = torch.pow(10.0, original[:, 0] / 20)
-        latent, scale, state = self.backbone.encode(magnitude, context, condition, state)
+        latent, scale, state = self.encode_observations(
+            original, magnitude, context, condition, state
+        )
         logits = self.backbone.decoder(latent)
         delta = 2 * torch.tanh(self.residual_slope * logits)
         normalized = magnitude / scale

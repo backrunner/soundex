@@ -70,7 +70,7 @@ class BandBackbone(nn.Module):
     def initial_state(self, batch, *, device=None):
         return self.readout.weight.new_zeros(batch, self.state_size, device=device)
 
-    def encode(self, magnitude, context, condition, state):
+    def encode(self, magnitude, context, condition, state, *, token_residual=None):
         scale = magnitude.square().mean(-1, keepdim=True).clamp_min(1e-20).sqrt()
         observations = (
             torch.log1p(magnitude / scale),
@@ -85,6 +85,8 @@ class BandBackbone(nn.Module):
             ]
             tokens.append(encoder(torch.cat((*local, scale.log10() / 10, condition), -1)))
         encoded = torch.stack(tokens, dim=2)  # [physical channel, time, band, feature]
+        if token_residual is not None:
+            encoded = encoded + token_residual
         temporal, states, offset = encoded, [], 0
         batch, frames = magnitude.shape[:2]
         for norm, mixer, block, dilation in zip(
