@@ -13,6 +13,21 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P74](phase-temporal-p74.md) implements small phase observations before the joint
+band TCN, with a same-parameter magnitude-only control (216,802 parameters each).
+This changes observation location rather than repeating P69's final phase head
+or P72's wider magnitude backbone. Untrained native parity and the fixed
+52,000-hop opposite-order grid pass: maxima 1.905166 / 1.730666 ms, no >=5 ms call,
+hop-service overrun or paced late completion. Earlier runtime failures remain.
+All four two-update real-data preflights pass, including changed observation
+projections and candidate-only magnitude dependence on past phase. Fresh formal
+training starts with finite model/Adam state: four 16,384-update trajectories,
+unchanged P67 loss and complete existing exposure. Execution status is in the
+linked report/local progress. There is no trained quality result yet. Do not treat this feasibility
+pass, early learning or history connectivity as restoration improvement, compare
+unfinished trajectories, or promote defaults. Retain every forthcoming failure
+and the fixed source/role/codec panels; realized-complex loss remains separate.
+
 [P73](capacity-tradeoff-p73.md) completes a frozen P72 attribution: 2,080 exact
 PCM decompositions and 640 matched-capacity factors, all 160 cases retained.
 Native HF magnitude-error power decreases, but phase-interaction power increases;

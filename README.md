@@ -12,6 +12,12 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
+[P74](docs/phase-temporal-p74.md) adds phase relations inside the small temporal
+backbone, with a matched 216,802-parameter magnitude-only control. Native
+correspondence and 52,000 untrained compute/deadline hops pass. All four real-data
+preflights pass and full matched training has started; no trained quality result
+is available yet.
+
 [P71](docs/evaluation-capacity-p71.md) adds a calibrated spectral/fidelity panel
 and recording-paired uncertainty. A same-depth twofold parameter fixture passes
 native parity and local compute/deadline checks (double maximum 2.243 ms).

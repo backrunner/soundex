@@ -1,5 +1,15 @@
 # Research status and experiment history
 
+[P74](phase-temporal-p74.md) implements phase relations inside the small joint
+temporal backbone with a same-parameter magnitude-only control. Both have 216,802
+parameters and no additional lookahead/output buffer. Causal/gradient/Adam tests,
+native correspondence and a 52,000-hop feasibility grid pass (max 1.905166 /
+1.730666 ms, no service or paced deadline miss). All four real-data preflights
+pass and formal training starts with finite model/Adam state. Four fresh
+16,384-update trajectories use the unchanged objective and fixed exposure; see
+the report for verified launch status. No trained quality conclusion or default
+promotion. The P72 runtime failure and P73 tradeoffs remain retained.
+
 [P73](capacity-tradeoff-p73.md) completes all frozen P72 magnitude/phase and
 source-stage accounting. High-band magnitude gains coexist with increased
 phase-interaction power; its symmetric magnitude factor accounts for 94.45% /

@@ -144,6 +144,10 @@ diagnostic's zero-late screen.
 
 ## Consequence for the next change
 
+[P74](phase-temporal-p74.md) now implements the small temporal observation
+comparison below and registers fresh matched training. Its feasibility result
+does not change P73's frozen reconstruction findings or qualification.
+
 Source review shows that P72's band TCN encodes magnitude/context/conditions;
 the appended phase readout sees current and one previous input phase frame.
 The magnitude/complex-residual backbone does not consume those phase observations,
