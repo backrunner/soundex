@@ -174,7 +174,7 @@ def prepare(prior, feasibility, panel_root, output):
     )
 
 
-def preflight(config, pool, draws, output):
+def preflight(config, pool, draws, output, *, make_model=fresh, pack_model=pack, inspect=None):
     receipt = output / "preflight-complete.json"
     if receipt.exists():
         checked_receipt(receipt)
@@ -186,7 +186,7 @@ def preflight(config, pool, draws, output):
     items = [pool.select(d) for d in draws[:8]]
     for seed in config["seeds"]:
         for kind in config["arms"]:
-            model = fresh(kind, seed)
+            model = make_model(kind, seed)
             optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
             before = {k: v.clone() for k, v in model.state_dict().items()}
             updates = [update(model, items[i : i + 4], optimizer) for i in (0, 4)]
@@ -195,6 +195,7 @@ def preflight(config, pool, draws, output):
             }
             if not any(v for k, v in changed.items() if k.startswith("base.backbone.encoders.")):
                 raise ValueError("full magnitude encoder did not update")
+            diagnostics = inspect(model, items, changed) if inspect else {}
             directory = root / f"{seed}-{kind}"
             export(model, directory / "export")
             parity = [
@@ -208,18 +209,23 @@ def preflight(config, pool, draws, output):
                 for rate in (44100, 48000)
             ]
             atomic_save(
-                pack(model, kind, seed, optimizer, updates, "preflight-only"),
+                pack_model(model, kind, seed, optimizer, updates, "preflight-only"),
                 directory / "diagnostic.pth",
             )
             registered(
-                {"updates": updates, "changed_tensors": changed, "native": parity},
+                {
+                    "updates": updates,
+                    "changed_tensors": changed,
+                    "native": parity,
+                    "diagnostics": diagnostics,
+                },
                 directory / "result.json",
             )
             print("joint preflight", seed, kind, flush=True)
     registered({"files": {str(p): sha256_file(p) for p in root.rglob("*") if p.is_file()}}, receipt)
 
 
-def trajectory(config, pool, draws, kind, seed, output):
+def trajectory(config, pool, draws, kind, seed, output, *, make_model=fresh, pack_model=pack):
     directory = output / "training" / f"{seed}-{kind}"
     directory.mkdir(parents=True, exist_ok=True)
     signature = digest({"config": config, "kind": kind, "seed": seed})
@@ -231,7 +237,7 @@ def trajectory(config, pool, draws, kind, seed, output):
         if info["signature"] != signature or sha256_file(endpoint) != info["sha256"]:
             raise ValueError("completed trajectory drift")
         return {"path": str(endpoint), "sha256": info["sha256"], "scope": kind}
-    model = fresh(kind, seed)
+    model = make_model(kind, seed)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
     history = []
     if latest.exists():
@@ -256,7 +262,7 @@ def trajectory(config, pool, draws, kind, seed, output):
         )
         history.append({"step": index + 1, **result, "seconds": time.monotonic() - begin})
         if index == 0 or (index + 1) % 32 == 0 or index + 1 == config["steps"]:
-            atomic_save(pack(model, kind, seed, optimizer, history, signature), latest)
+            atomic_save(pack_model(model, kind, seed, optimizer, history, signature), latest)
             write_json_report({"sha256": sha256_file(latest)}, directory / "latest.json")
             progress = {
                 "stage": "training",
@@ -268,12 +274,12 @@ def trajectory(config, pool, draws, kind, seed, output):
             }
             write_json_report(progress, output / "progress.json")
             print(progress, flush=True)
-    atomic_save(pack(model, kind, seed, optimizer, history, signature), endpoint)
+    atomic_save(pack_model(model, kind, seed, optimizer, history, signature), endpoint)
     registered({"signature": signature, "sha256": sha256_file(endpoint)}, done)
     return {"path": str(endpoint), "sha256": sha256_file(endpoint), "scope": kind}
 
 
-def panel_review(config, output):
+def panel_review(config, output, *, candidate="double", control="small"):
     root = output / "longform-recheck"
     checked_receipt(root / "complete.json")
     saved = read(root / "summary.json")["records"]
@@ -307,14 +313,14 @@ def panel_review(config, output):
             )
         registered(records, output / "panel-records" / (case["id"] + ".json"))
         rows.extend(records)
-    comparisons = panel_comparisons(rows, config["seeds"])
+    comparisons = panel_comparisons(rows, config["seeds"], candidate=candidate, control=control)
     registered(
         {"comparisons": comparisons, "scope": config["scope"], "selection": config["selection"]},
         output / "panel-assessment.json",
     )
 
 
-def panel_comparisons(rows, seeds):
+def panel_comparisons(rows, seeds, *, candidate="double", control="small"):
     comparisons = {}
     for role in ("paired", "identity"):
         for codec in ("all", *sorted({r["codec"] for r in rows})):
@@ -325,9 +331,9 @@ def panel_comparisons(rows, seeds):
                 continue
             for seed in seeds:
                 for mode in ("raw", "native"):
-                    a = f"{mode}/{seed}-double"
+                    a = f"{mode}/{seed}-{candidate}"
                     for b in (
-                        f"{mode}/{seed}-small",
+                        f"{mode}/{seed}-{control}",
                         f"{mode}/legacy",
                         "untreated",
                         f"{mode}/identity_dsp",
@@ -336,7 +342,17 @@ def panel_comparisons(rows, seeds):
     return comparisons
 
 
-def run(output):
+def run(
+    output,
+    *,
+    make_model=fresh,
+    load_model=load,
+    pack_model=pack,
+    inspect=None,
+    study="p72",
+    candidate="double",
+    control="small",
+):
     with (output / "run.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         if (
@@ -357,8 +373,8 @@ def run(output):
 
         write_json_report({"stage": "verifying-inputs"}, output / "progress.json")
         check_inputs()
-        if (output / "p72-complete.json").exists():
-            checked_receipt(output / "p72-complete.json")
+        if (output / f"{study}-complete.json").exists():
+            checked_receipt(output / f"{study}-complete.json")
             return
         rows, _ = load_sources(list(map(Path, config["manifests"])))
         schedule = read(Path(config["schedule"]))["optimization"]
@@ -369,9 +385,26 @@ def run(output):
             BoundedEnvelopeClips(rows, Path(config["detector"]), output / "cache", capacity=100),
         )
         write_json_report({"stage": "preflight"}, output / "progress.json")
-        preflight(config, pool, schedule["draws"], output)
+        preflight(
+            config,
+            pool,
+            schedule["draws"],
+            output,
+            make_model=make_model,
+            pack_model=pack_model,
+            inspect=inspect,
+        )
         entries = {
-            f"{seed}-{kind}": trajectory(config, pool, schedule["draws"], kind, seed, output)
+            f"{seed}-{kind}": trajectory(
+                config,
+                pool,
+                schedule["draws"],
+                kind,
+                seed,
+                output,
+                make_model=make_model,
+                pack_model=pack_model,
+            )
             for seed in config["seeds"]
             for kind in config["arms"]
         }
@@ -379,10 +412,16 @@ def run(output):
         check_inputs()
         items = [pool.select(d) for d in schedule["draws"][:8]]
         for label, entry in entries.items():
-            model = load(torch.load(entry["path"], map_location="cpu", weights_only=False))
+            model = load_model(torch.load(entry["path"], map_location="cpu", weights_only=False))
             registered(loss_review(model, items), output / "fit-loss-review" / (label + ".json"))
-        finalize(config, entries, output, load_model=load, export_model=export_model, study="p72")
-        panel_review(config, output)
+            if inspect:
+                registered(
+                    inspect(model, items, None), output / "fit-history-review" / (label + ".json")
+                )
+        finalize(
+            config, entries, output, load_model=load_model, export_model=export_model, study=study
+        )
+        panel_review(config, output, candidate=candidate, control=control)
         check_inputs()
         registered(
             {
@@ -396,7 +435,7 @@ def run(output):
                     )
                 }
             },
-            output / "p72-complete.json",
+            output / f"{study}-complete.json",
         )
         write_json_report({"stage": "complete", "qualified": False}, output / "progress.json")
 
