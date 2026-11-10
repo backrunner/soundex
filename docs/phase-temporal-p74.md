@@ -160,3 +160,26 @@ completion receipt also verifies. No execution failure is present at launch.
 Live status is `progress.json`; `launch.json`, `run.log`, per-trajectory
 checkpoints and completion receipts are authoritative. No new restoration
 result is available yet; default weights remain unchanged.
+
+## Progress check: 2026-11-11
+
+At 03:01 Singapore time, the first `20261012-magnitude` endpoint has completed
+all 16,384 updates. Its endpoint SHA-256 is
+`fa97d99b3a451c94ff258095377932d84b7383b9d535e09295f88b646acb2468`.
+The second `20261012-phase` trajectory is at a verified 12,288-update checkpoint
+(75% of that trajectory). Both seed 20261013 trajectories are still pending.
+Total recorded optimization is 28,672 / 65,536 updates (43.75%).
+
+The completed endpoint and current checkpoint hashes verify; both contain finite
+model/Adam tensors, finite loss histories and matching step/history lengths.
+The training process and its sleep-prevention helper remain live; no execution
+failure file is present. Recorded optimization time is 15.097 hours for the
+finished control and 10.933 hours so far for the phase arm. These are progress
+measurements, not a partial model ranking or convergence result.
+
+No final raw/native comparison has started: the registered runner waits for all
+four trajectories and freezes their endpoints before scoring. Default weights
+remain unchanged. The status snapshot is retained in
+`data/maintenance/cleanup-20261111/training-status.json`; later live progress
+continues in the run directory. Workspace maintenance excludes the active run,
+its source snapshot, cache, detector, checkpoint and evaluation dependencies.
