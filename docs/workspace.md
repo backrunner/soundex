@@ -281,3 +281,59 @@ reviewed translations, verification scripts and receipts remain under
 `data/maintenance/english-docs-20261023/`; `temporary-cleanup.json` records deletion,
 and `final-review.json` binds the applied historical reports. No translation model
 is used to initialize SoundEx or included in its weights.
+
+## 2026-11-11: maintenance during P74 training
+
+Removed **1,891 confirmed regenerable files**, totaling **282,906,381 logical
+bytes (269.80 MiB)** and **286,846,976 allocated bytes (273.56 MiB)**.
+
+| Removed material | Files | Logical bytes |
+| --- | ---: | ---: |
+| Rust `target/debug/incremental` contents | 1,450 | 214,362,835 |
+| Current training-tree Python bytecode | 367 | 5,000,143 |
+| Current training-tree pytest/Ruff caches | 14 | 113,323 |
+| Old P4/P5/P6 smoke feature caches | 60 | 63,430,080 |
+
+The NPZ files came only from `p4-smoke-20261012/cache`,
+`envelope-p5-smoke-20261012/cache` and `factor-p6-smoke-20261012/cache`, relative
+to `data/runs/`. All sixty were reconstructed without disk-cache writes from
+retained crop specifications, hash-verified paired PCM/manifests and their exact
+detector binaries. Every generated tensor was bit-identical to the cached tensor
+before deletion; no numerical tolerance was introduced for cleanup.
+
+The inventory recorded each file's size, allocated blocks, inode, modification
+time and SHA-256. A reference scan covered 6,269 registration/configuration/source/
+completion records and found no individual candidate references. Active P74
+bindings were checked separately. Immediately before removal, all candidate
+metadata/hashes still matched and the open-file check found no candidate in use.
+Named cache roots remain available for regeneration.
+
+An initial broad process guard stopped before deleting anything because tools
+were building an unrelated checkout. The retained follow-up checks establish
+working-directory ownership and absence of SoundEx references; the scoped guard
+then passes with no active SoundEx build or candidate open handle. No process
+was stopped. Both versions of the audit and the initial stopped attempt remain
+in the local maintenance directory.
+
+The active P74 run, its frozen source, cache, checkpoints, detector and evaluation
+dependencies were excluded. Frozen sources/binaries and bytecode inside historical
+runs, original audio, prepared pairs, rights evidence, all model weights/exports
+and failed-validation records remain intact. Historical source modules were not
+classified as garbage merely because a newer experiment exists: current imports
+and reproducible comparisons still use them. The virtual environment and remaining
+mixed Cargo build tree were retained.
+
+Local evidence is under `data/maintenance/cleanup-20261111/`: `inventory.json`,
+`regeneration.json`, `initial-delete-guard.json`, `pre-delete.json`, `deletion.json`
+and `post-check.json`. `training-status.json` records the separately verified P74
+endpoint/current-checkpoint state. Post-cleanup verification passed for all
+**6,269 retained record hashes and 95,649 registered P74 input hashes**; all
+deleted paths are absent. The training process continued to 12,352 updates in
+its second trajectory, with no failure file. Documentation checks pass for all
+155 maintained Markdown files. No training, model-selection or runtime policy
+was changed by maintenance.
+
+The shared volume's observed free-space increase during deletion was 229,449,728
+bytes. Concurrent activity can affect this counter; it is not interchangeable
+with logical or allocated bytes removed. `receipt.json` binds the local audit
+sources and completed maintenance evidence. No training data is included in Git.
