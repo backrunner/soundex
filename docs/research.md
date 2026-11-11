@@ -9,9 +9,10 @@ pass and formal training starts with finite model/Adam state. Four fresh
 16,384-update trajectories use the unchanged objective and fixed exposure; see
 the report for verified launch status. No trained quality conclusion or default
 promotion. The P72 runtime failure and P73 tradeoffs remain retained.
-At the 2026-11-11 03:01 Singapore check, the first trajectory is complete and the
-second is at 12,288 / 16,384 updates (43.75% of the total four-run budget).
-Checkpoint/model/Adam checks pass; final comparison still awaits all endpoints.
+At the 2026-11-12 02:48 Singapore check, three trajectories are complete and the
+final phase arm is at 6,592 / 16,384 updates (85.06% of the total four-run budget).
+All checkpoint hashes, registration signatures and model/Adam/history checks
+pass; final comparison still awaits all endpoints. No execution failure is present.
 
 [P73](capacity-tradeoff-p73.md) completes all frozen P72 magnitude/phase and
 source-stage accounting. High-band magnitude gains coexist with increased

@@ -183,3 +183,24 @@ remain unchanged. The status snapshot is retained in
 `data/maintenance/cleanup-20261111/training-status.json`; later live progress
 continues in the run directory. Workspace maintenance excludes the active run,
 its source snapshot, cache, detector, checkpoint and evaluation dependencies.
+
+## Progress check: 2026-11-12
+
+At 02:48 Singapore time, three trajectories have completed all 16,384 updates:
+both seed 20261012 arms and the seed 20261013 magnitude control. The final
+`20261013-phase` trajectory is at a verified 6,592-update checkpoint. Total
+recorded progress is **55,744 / 65,536 updates (85.06%)**.
+
+All four endpoint/current-checkpoint hashes, registration signatures and
+step/history lengths verify. Model/Adam tensors and recorded loss histories are
+finite; no execution failure is present. The training process and its
+sleep-prevention helper are live. All original budgets remain unchanged.
+
+The final arm's recent 256/1,024-update mean durations are 3.014 / 3.042 seconds
+per step. At those rates, its remaining training would take approximately
+8.20 / 8.27 hours; this is a load-dependent estimate and excludes subsequent
+evaluation time. No final comparison or trained runtime grid has started, and
+partial trajectories are not used for model selection or quality claims.
+
+The detailed hashes and status snapshot are retained in
+`data/maintenance/p74-status-20261112/024808.json`. Default weights remain unchanged.
