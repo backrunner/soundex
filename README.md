@@ -13,10 +13,14 @@ restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
 [P74](docs/phase-temporal-p74.md) adds phase relations inside the small temporal
-backbone, with a matched 216,802-parameter magnitude-only control. Native
-correspondence and 52,000 untrained compute/deadline hops pass. All four real-data
-preflights pass and full matched training has started; no trained quality result
-is available yet.
+backbone, with a matched 216,802-parameter magnitude-only control. All four
+16,384-update trajectories and fixed reviews are complete. Native spectral MR
+changes -0.040630% / +0.165277% versus the matched controls; independent HF SC does
+not improve in either seed. The added observation fails its registered criterion,
+despite learned phase-history use and 3.24–3.45% MR gains versus historical legacy.
+Trained compute peaks at 2.449333 ms over 52,000 hops, but four paced completions
+are late. Both quality and continuous-deadline qualification remain open; no
+default promotion, independent test or listening acceptance is claimed.
 
 [P71](docs/evaluation-capacity-p71.md) adds a calibrated spectral/fidelity panel
 and recording-paired uncertainty. A same-depth twofold parameter fixture passes

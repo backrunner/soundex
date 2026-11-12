@@ -1,9 +1,12 @@
 # P74: phase observations inside the small temporal backbone
 
-Registered 2026-11-10 after [P73](capacity-tradeoff-p73.md). The new model and
-matched control are implemented. The fixed untrained feasibility grid passes;
-full training uses four fresh trajectories under the unchanged P67 objective.
-No trained quality improvement or default promotion is claimed.
+Registered 2026-11-10 after [P73](capacity-tradeoff-p73.md); all four full training
+trajectories and fixed reviews are complete as verified on 2026-11-12. The phase
+observation fails the registered two-seed matched-control criterion. Both arms
+remain experimental: legacy-relative spectral progress is distinct from this
+branch's unsuccessful incremental effect. Trained compute stays below 5 ms, but
+four paced completions are late. Default weights remain unchanged. Earlier launch
+and progress sections below are historical; the completion review supersedes them.
 
 ## Changed mechanism and matched control
 
@@ -204,3 +207,179 @@ partial trajectories are not used for model selection or quality claims.
 
 The detailed hashes and status snapshot are retained in
 `data/maintenance/p74-status-20261112/024808.json`. Default weights remain unchanged.
+
+## Completed review: 2026-11-12
+
+All **65,536 updates** finished: four endpoints at exactly 16,384 updates each,
+with 58.587 aggregate optimizer hours. No registered execution failure is present.
+Endpoint hashes, registration signatures, finite model/Adam/history values,
+completion receipts, native review artifacts and all 20 timing-trace hashes
+verify. The training and sleep-prevention processes have exited. No endpoint was
+selected early, training extended, score rerendered or timing retried for this audit.
+
+The reusable `training/scripts/summarize_band_capacity.py` now accepts explicit
+study/control/candidate names while retaining its P72 defaults. It also uses the
+existing deadline accountant's **100-hop timing exclusion**, rather than confusing
+it with the model's 80-hop history warmup. Fifteen attribution tests and Ruff pass.
+The frozen completion audit is
+`data/runs/phase-temporal-training-p74-20261110/completion-review-20261112/`.
+Its `receipt.json` binds the audit source, consumed inputs and `summary.json`.
+Fit/history diagnostics are bound at audit time; they were not in the original
+completion receipt. All original reports and failures remain retained.
+
+| Endpoint | SHA-256 | Final 256-update mean objective |
+| --- | --- | ---: |
+| 20261012 magnitude | `fa97d99b3a451c94ff258095377932d84b7383b9d535e09295f88b646acb2468` | 0.408713027 |
+| 20261012 phase | `18b037221885f8bc9956de8a977c08dc628443b2c9249e24351986590303941c` | 0.408795722 |
+| 20261013 magnitude | `5f9683887c26efef36fc7f3b6c7945b87974dff58cb1353e4919fb514c02be20` | 0.407862058 |
+| 20261013 phase | `6195df3e0ec8fb5108f808fa51d0bdc8647fe0eb08414d63e3c7b54486d8ae45` | 0.408308324 |
+
+These are unchanged-objective training averages, not validation or convergence
+proof. The eight common TRAIN probes also have mixed final objective differences:
+0.367931399 to 0.367674507 in seed 12, and 0.367038209 to 0.367426187 in seed 13.
+There is no consistent optimization advantage supporting an unchanged extension.
+
+### Registered spectral comparison
+
+All 480 native development roles, 160 long-form cases and 2,080 independent-panel
+path records are complete. The long-form panel contains 20 reused recordings,
+two excerpts each, three codecs and identity. Aggregate cases by recording;
+the table reports percent change in source-equal error, **negative is better**.
+Both models have 216,802 parameters and the same training budget.
+
+| Phase versus matched magnitude, long-form paired music | Seed 20261012 | Seed 20261013 |
+| --- | ---: | ---: |
+| Native multiresolution spectral error (MR) | -0.040630% | +0.165277% |
+| Native independent HF spectral convergence (SC) | +0.005631% | +0.034812% |
+| Native HF shape | -0.151056% | +0.015127% |
+| Native HF envelope | +0.158140% | +0.039396% |
+| Native HF dynamics | -0.116998% | +0.023712% |
+| Native HF complex error | +0.025417% | -0.060405% |
+| Native >=8 kHz PCM RMS error | +0.041574% | -0.133771% |
+| Native <8 kHz PCM RMS error | +0.000067% | -0.000131% |
+| Native full PCM RMS error | +0.009110% | -0.026894% |
+| Independent auraloss MR | -0.051253% | +0.177754% |
+| Raw model MR, same long-form recordings | -0.050053% | +0.175866% |
+| Raw model HF SC, same long-form recordings | +0.009406% | +0.047969% |
+
+The registered requirement was lower native MR **and** independent HF SC in both
+seeds. It fails. Source-paired 95% bootstrap intervals for native MR absolute
+deltas are [-0.000435947, +0.000039074] and [+0.000226268, +0.001517775]. HF SC
+intervals are [-0.000324364, +0.000467405] and [-0.000361141, +0.000800771]. Thus
+the tiny HF SC increases do not establish a confidently positive harm, but neither
+provide the preregistered improvement. MR worsens on 6/20 and 10/20 recording means;
+HF SC worsens on 7/20 and 11/20. Every source delta and interval remains in
+`panel-assessment.json` and the audit summary, including all identity/stereo rulers.
+
+The largest adverse MR recording in both seeds is
+`5b0e30010265a782cd18bb1f13250b1d6eaa063073bd10492a9b34a072db11a2`,
+with deltas +0.001368801 / +0.006046544. Seed 12's largest adverse HF SC recording
+is `7d7d51d147d7867001ec639e2755c7abc083a354b16cf4b31627c99ac8db9701`
+(+0.002558174); seed 13's is the preceding `5b0e...` source (+0.004078903).
+These are retained counterexamples, not tracks for threshold tuning.
+
+Codec-specific native MR changes are MP3 -0.135452% / +0.085010%,
+AAC +0.057731% / +0.375179%, and Vorbis +0.008921% / +0.039719%.
+No codec has a two-seed MR win. Identity native MR changes are +0.092308% /
+-0.001187%, with their source-bootstrap intervals crossing zero. Favorable
+dynamics or coherent-error cells do not override the failed spectral criterion.
+
+### Other development panel and named controls
+
+The other fixed native population contains 25 music and eight speech recordings.
+Raw-full review contains 51 music and 32 speech recordings. Keep those populations
+distinct; a raw/native stage comparison uses the matched subset explicitly.
+
+| Phase versus matched magnitude, paired MR | Seed 20261012 | Seed 20261013 |
+| --- | ---: | ---: |
+| Raw full music panel | +0.061589% | +0.242776% |
+| Raw matched native music population | -0.134790% | +0.249217% |
+| Actual Rust native music | -0.148400% | +0.206354% |
+| Raw full speech panel | +0.120904% | +0.036345% |
+| Raw matched native speech population | +0.151114% | -0.114981% |
+| Actual Rust native speech | +0.158238% | +0.008810% |
+
+The native music result agrees with the long-form seed split. Mixed raw effects
+exist before DSP; this does not support blaming fusion alone. Speech transfer also
+has a stage-dependent counterexample in seed 13. Native music identity MR changes
+-0.755471% / +0.964164%; native speech identity MR changes -3.017527% / +0.796502%.
+Relative weak-signal scores need absolute context: speech identity full PCM RMS
+is 2.409888e-7 to 2.545635e-7 and 2.502003e-7 to 2.476165e-7. These very small
+absolute errors do not establish audible regression or overall restoration.
+
+P74 phase still reduces long-form native MR **3.241320% / 3.448509% versus
+historical legacy** and HF SC 4.734931% / 5.023267%. This accumulated spectral
+progress is separate from the failed matched-control increment. Against untreated
+compressed input, MR improves 6.857547% / 7.056993%, but HF complex error worsens
+1.980972% / 2.240707% and HF PCM error worsens 2.313542% / 2.635973% (all 20 recording
+means adverse for the latter two). Against actual identity DSP, MR improves
+6.496771% / 6.696989%, while HF PCM worsens 2.365285% / 2.687879%.
+Reference fidelity and listening therefore remain unresolved. Original lossless
+references remain unchanged; there is no limited-reference substitution.
+
+### History is used, without a consistent restoration benefit
+
+All eight registered TRAIN probes show zero magnitude response to phase history
+for the magnitude controls, as required. The trained phase candidates now have
+nonzero phase-history derivatives on all probes. Median derivative L1 is
+1.624886 / 1.033511. Repeating the final phase across history changes final-frame
+magnitude by median 0.570284 / 0.429834 dB RMS; ranges are 0.352495–1.046837 /
+0.174156–1.286130 dB RMS. These are substantially nonzero learned dependencies,
+not evidence that the model ignores the new observation.
+
+This feature intervention holds magnitude/context/targets fixed and is not a
+physical-waveform manipulation. It demonstrates use, not useful recovery or a
+capacity ceiling. The remaining question is whether the objective and realized
+output representation turn that dependence into reference-aligned spectra.
+Neither more parameters nor a longer unchanged run is justified by these results.
+
+### Trained compute and continuous deadlines
+
+All **52,000** scored hops finish their compute below 5 ms, with zero service
+times reaching a hop period. The measured chain includes frontend, ONNX Runtime
+and DSP. Each endpoint has 13,000 scored hops; the paced case has 1,000.
+
+| Endpoint | Maximum compute | Paced mean / p99 | Process peak RSS | Paced late hops |
+| --- | ---: | ---: | ---: | ---: |
+| 20261012 magnitude | 1.802584 ms | 1.065746 / 1.530376 ms | 32,587,776 bytes | 0 |
+| 20261012 phase | 1.762875 ms | 1.051520 / 1.545163 ms | 32,686,080 bytes | 2 |
+| 20261013 magnitude | 2.449333 ms | 1.068471 / 1.544560 ms | 32,636,928 bytes | 2 |
+| 20261013 phase | 1.727666 ms | 1.059368 / 1.520684 ms | 32,882,688 bytes | 0 |
+
+Paced process CPU including startup/warmup is 1.16–1.17 seconds over 2.98–2.99
+seconds wall time. This is local replay resource use, not production-device CPU.
+Fixed buffering is still 256 frames: 5.333 ms at 48 kHz / 5.805 ms at 44.1 kHz,
+separate from compute and unmeasured device/driver delay.
+
+All four late completions are retained, with zero-based raw hop indices:
+
+| Endpoint / hop | Wake lateness | Compute | Completion lateness |
+| --- | ---: | ---: | ---: |
+| 20261012 phase / 367 | 3.880961 ms | 1.047334 ms | 2.263961 ms |
+| 20261012 phase / 368 | 2.264086 ms | 0.644167 ms | 0.242502 ms |
+| 20261013 magnitude / 264 | 0.501287 ms | 2.173125 ms | 0.009536 ms |
+| 20261013 magnitude / 356 | 0.770714 ms | 2.449333 ms | 0.554589 ms |
+
+Seed 12 phase has an on-time preceding hop and a two-hop late sequence; hop 369
+recovers. Both seed 13 control exceptions recover on the next hop. Late wake and
+compute consume the deadline together; stage wall time can include scheduling.
+No OS root cause is established. These traces fail continuous-deadline qualification
+even though all computation fits a hop. They are not observed device xruns, and
+no inference about audible clicks is made. No retry replaces this result.
+
+### Disposition and condition for revisiting
+
+P74 is **complete and unqualified**, with separate quality and paced-runtime
+failures. Its changed mechanism is learned but fails the registered restoration
+comparison. The evidence does not reject every phase-conditioned architecture.
+Twenty blinded listening trials are prepared; no listening ratings, new
+source-disjoint test or actual worker/device qualification have been obtained.
+
+The next justified diagnostic is the separately proposed realized-spectrum
+supervision path: inspect original-reference high-band magnitude/complex errors
+after synthesis and reanalysis, verify correct-reference/silence/weak-energy
+gradients and native correspondence, then freeze a changed loss/control before
+another full comparison. This is a hypothesis, not an implemented fix or a reason
+to weaken spectral priorities. Independently inspect worker wake/headroom and
+continuous output behavior. Revisit P74 only with such a demonstrated mechanism,
+not unchanged scaling, more steps, favorable seeds/codecs or adjusted thresholds.

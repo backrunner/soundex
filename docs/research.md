@@ -2,17 +2,20 @@
 
 [P74](phase-temporal-p74.md) implements phase relations inside the small joint
 temporal backbone with a same-parameter magnitude-only control. Both have 216,802
-parameters and no additional lookahead/output buffer. Causal/gradient/Adam tests,
-native correspondence and a 52,000-hop feasibility grid pass (max 1.905166 /
-1.730666 ms, no service or paced deadline miss). All four real-data preflights
-pass and formal training starts with finite model/Adam state. Four fresh
-16,384-update trajectories use the unchanged objective and fixed exposure; see
-the report for verified launch status. No trained quality conclusion or default
-promotion. The P72 runtime failure and P73 tradeoffs remain retained.
-At the 2026-11-12 02:48 Singapore check, three trajectories are complete and the
-final phase arm is at 6,592 / 16,384 updates (85.06% of the total four-run budget).
-All checkpoint hashes, registration signatures and model/Adam/history checks
-pass; final comparison still awaits all endpoints. No execution failure is present.
+parameters and no additional lookahead/output buffer. All four 16,384-update
+trajectories and fixed reviews are complete. Endpoint/receipt/native-artifact
+and timing-trace checks pass, with finite model/Adam/history and no execution
+failure. The phase observation fails the registered matched-control criterion:
+long-form native MR -0.040630% / +0.165277%, HF SC +0.005631% / +0.034812%.
+The other native music panel also has mixed MR -0.148400% / +0.206354%; speech
+MR worsens +0.158238% / +0.008810%. Legacy-relative MR still improves 3.24–3.45%.
+All phase TRAIN probes show learned history dependence, so an unused observation
+does not explain the lack of consistent improvement. All 52,000 compute hops
+stay below 5 ms (max 2.449333 ms), with no service overrun, but four paced
+completions are late (maximum 2.263961 ms). No retry or promotion; all counters
+are retained. Inspect realized-spectrum supervision with a separate control and
+worker wake/headroom before any changed training. Listening, independent-test,
+convergence and device evidence remain unestablished.
 
 [P73](capacity-tradeoff-p73.md) completes all frozen P72 magnitude/phase and
 source-stage accounting. High-band magnitude gains coexist with increased

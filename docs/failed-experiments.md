@@ -16,17 +16,26 @@ see the latest status in the table and [research index](research.md).
 [P74](phase-temporal-p74.md) implements small phase observations before the joint
 band TCN, with a same-parameter magnitude-only control (216,802 parameters each).
 This changes observation location rather than repeating P69's final phase head
-or P72's wider magnitude backbone. Untrained native parity and the fixed
-52,000-hop opposite-order grid pass: maxima 1.905166 / 1.730666 ms, no >=5 ms call,
-hop-service overrun or paced late completion. Earlier runtime failures remain.
-All four two-update real-data preflights pass, including changed observation
-projections and candidate-only magnitude dependence on past phase. Fresh formal
-training starts with finite model/Adam state: four 16,384-update trajectories,
-unchanged P67 loss and complete existing exposure. Execution status is in the
-linked report/local progress. There is no trained quality result yet. Do not treat this feasibility
-pass, early learning or history connectivity as restoration improvement, compare
-unfinished trajectories, or promote defaults. Retain every forthcoming failure
-and the fixed source/role/codec panels; realized-complex loss remains separate.
+or P72's wider magnitude backbone. All four 16,384-update endpoints and fixed
+reviews complete with valid hashes/finite model and Adam states; no execution
+failure. The registered two-seed native MR/HF SC criterion fails: MR -0.040630% /
++0.165277%, HF SC +0.005631% / +0.034812% against matched magnitude controls.
+MR has 6/20 and 10/20 adverse source means; HF SC has 7/20 and 11/20. The other
+native music panel is also mixed (-0.148400% / +0.206354%); native speech MR
+worsens in both seeds. Legacy-relative spectral progress remains distinct
+(MR -3.241320% / -3.448509%). TRAIN interventions show learned phase-history use
+on every probe; this is not an unused-branch result or architecture ceiling.
+All 52,000 trained compute hops fit 5 ms and their hop periods (maximum
+2.449333 ms), but seed 12 phase has two late completions (2.263961 / 0.242502 ms)
+and seed 13 magnitude has two (0.009536 / 0.554589 ms). No timing retry or
+default promotion. All counterexamples, exact endpoint hashes, original timing
+traces and audit bindings remain in the linked report and
+`data/runs/phase-temporal-training-p74-20261110/completion-review-20261112/`.
+Revisit only after a changed realized-spectrum supervision/representation
+mechanism passes gradient/native checks, with separate fixed controls; inspect
+worker wake/headroom separately. Do not repeat unchanged scaling or training,
+select a favorable seed/codec, or generalize this failure to every phase model.
+Listening, independent tests, convergence and real-device evidence remain open.
 
 [P73](capacity-tradeoff-p73.md) completes a frozen P72 attribution: 2,080 exact
 PCM decompositions and 640 matched-capacity factors, all 160 cases retained.
