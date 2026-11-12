@@ -1,5 +1,21 @@
 # Research status and experiment history
 
+[P75](realized-supervision-p75.md) completes literature/code research and 32 frozen
+P74 TRAIN gradient probes, with zero optimizer updates. Current training already
+supervises raw/fused realized magnitudes and direct pre-OLA complex spectra.
+Existing direct and realized complex whole-model gradients align closely (median
+cosine 0.990040); missing loss placement alone is not the demonstrated cause.
+Fused magnitude MR conflicts with realized complex error in 19/32 probes.
+A fixed 0.1 full-model auxiliary leaves nine total/complex conflicts and adds one
+adverse HF-magnitude direction. Do not launch that recipe as an established fix.
+Phase-head-only routing is the next untested diagnostic, with native transfer and
+matched finite Adam checks required; the backbone keeps its old joint objective.
+An initial FP32 gradient-summation rejection is preserved; the separate FP64 audit
+passes the same tolerances (maximum 5.552e-15). All hashes and frozen weights verify.
+No new quality, runtime or listening result. The report distinguishes AP-BWE,
+DeepFilterNet, AERO and 2026 PAQM research from causal music CPU requirements and
+separates P74's paced replay from production worker/device acceptance.
+
 [P74](phase-temporal-p74.md) implements phase relations inside the small joint
 temporal backbone with a same-parameter magnitude-only control. Both have 216,802
 parameters and no additional lookahead/output buffer. All four 16,384-update

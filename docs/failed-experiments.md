@@ -13,6 +13,26 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P75](realized-supervision-p75.md) is a completed frozen diagnostic, not training
+or a quality failure. All four P74 16,384-update endpoints remain unchanged;
+32 endpoint/draw probes use the first eight TRAIN draws and zero optimizer steps.
+The initial FP32 attempt retains 19 completed probes and its decomposition failure
+at seed 20261013 magnitude / draw 3 (one entry differs by 9.173527e-7). A separately
+registered FP64 audit passes the unchanged tolerances, maximum 5.552e-15.
+All original failures/source and corrected receipts remain under
+`data/runs/realized-supervision-audit-p75-20261113{,-fp64}/`.
+The simple missing-synthesis-supervision hypothesis is unsupported: direct versus
+realized complex whole-model gradient cosine has median 0.990040, positive 32/32.
+Magnitude MR versus realized complex conflicts in 19/32. A fixed 0.1 full-model
+auxiliary leaves nine old/complex conflicts; HF-magnitude adverse directions
+increase from three to four (new counterexample: seed 13 magnitude / draw 3).
+These are local derivative observations, not finite Adam, audible effects or
+architecture ceilings. No thresholds/coefficients were tuned, no timing retry or
+default promotion. Revisit with phase-head auxiliary routing while the backbone
+retains its old joint objective, and require native/finite-step transfer on fixed
+TRAIN controls. Keep direct-complex reweighting distinct from a loss-location
+claim, and reject coherent gains obtained only by reducing recovered high bands.
+
 [P74](phase-temporal-p74.md) implements small phase observations before the joint
 band TCN, with a same-parameter magnitude-only control (216,802 parameters each).
 This changes observation location rather than repeating P69's final phase head

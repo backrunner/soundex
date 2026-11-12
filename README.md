@@ -12,6 +12,13 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
+[P75 research](docs/realized-supervision-p75.md) audits the objective and relevant
+official implementations. Thirty-two frozen gradient probes find conflicts
+between realized magnitude and complex fidelity; adding a global complex term
+does not resolve them. The next diagnostic targets phase-head gradient routing,
+with native/finite-step verification before training. No weights or inference
+behavior changed; the initial numerical failure and corrected audit are retained.
+
 [P74](docs/phase-temporal-p74.md) adds phase relations inside the small temporal
 backbone, with a matched 216,802-parameter magnitude-only control. All four
 16,384-update trajectories and fixed reviews are complete. Native spectral MR

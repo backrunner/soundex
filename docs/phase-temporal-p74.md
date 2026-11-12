@@ -383,3 +383,8 @@ another full comparison. This is a hypothesis, not an implemented fix or a reaso
 to weaken spectral priorities. Independently inspect worker wake/headroom and
 continuous output behavior. Revisit P74 only with such a demonstrated mechanism,
 not unchanged scaling, more steps, favorable seeds/codecs or adjusted thresholds.
+
+[P75](realized-supervision-p75.md) subsequently completes that research and frozen
+gradient audit. Existing direct complex gradients already align with realized
+ones in the full model; simple loss addition does not resolve the magnitude versus
+complex conflict. Its phase-head routing proposal remains untested in training.
