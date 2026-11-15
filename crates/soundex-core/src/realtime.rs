@@ -10,6 +10,8 @@ use std::thread::JoinHandle;
 
 use crate::{Result, SoundExConfig, SoundExError, SoundExProcessor};
 
+#[cfg(feature = "diagnostic-worker")]
+mod diagnostic;
 mod latency;
 mod safety;
 mod state;
@@ -111,6 +113,10 @@ impl RealtimeProcessor {
             ));
         }
         let processor = SoundExProcessor::new(config.clone())?;
+        Self::from_worker(config, processor)
+    }
+
+    fn from_worker<P: worker::Processor>(config: SoundExConfig, processor: P) -> Result<Self> {
         let (queues, worker_queues) = transport::queues();
         let control = Arc::clone(&queues.control);
         let worker = worker::spawn(

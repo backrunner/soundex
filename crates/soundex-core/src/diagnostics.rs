@@ -8,6 +8,17 @@ pub mod context_head;
 #[cfg(feature = "ort-backend")]
 mod stage_trace;
 
+/// Experimental four-input model through the actual bounded callback/worker path.
+/// Construct/shutdown outside callbacks. This does not make an experimental
+/// artifact production-deployable or establish device continuity.
+#[cfg(feature = "diagnostic-worker")]
+pub fn realtime_context_head(
+    path: &std::path::Path,
+    config: crate::SoundExConfig,
+) -> crate::Result<crate::RealtimeProcessor> {
+    crate::RealtimeProcessor::context_diagnostic(path, config)
+}
+
 use crate::{
     processor::validate_config,
     stream::{CausalHopIter, StreamBuffer},

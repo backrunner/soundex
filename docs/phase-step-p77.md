@@ -57,14 +57,25 @@ replace an adequate matched training and listening evaluation.
 
 ## Runtime boundary
 
-A separate diagnostics-only adapter will reuse the actual callback transport,
+A separate diagnostics-only adapter reuses the actual callback transport,
 worker scheduling, gap resets and fixed-timeline fallback with the experimental
 four-input model. Production loading must continue to reject experimental ABI
 markers. Worker preparation and inference stay outside callbacks; 80-hop
 experimental history warmup remains distinct from the fixed 256-frame delay.
-Functional adapter checks are not device continuity or a new timing qualification.
-Scheduling measurements must run after the optimizer work, under a frozen budget,
-retaining every deadline miss rather than retrying to pass.
+Functional checks cover direct-stream correspondence at both rates/channels,
+silent-channel isolation, a real worker sequence-gap reset and rejection by the
+production loader. Existing callback allocation/failure tests remain applicable
+because the callback transport is shared. These checks are not device continuity.
+
+The once-only host screen freezes four P74 parent graphs (not P77 candidates),
+two rates, synthetic mono/stereo and two real mono music views. QoS and requested
+time-constraint scheduling alternate in order: 48 cases, 1,100 callbacks each,
+the first 100 excluded from the 1,000-callback steady-window report. Availability
+must pass both that window and the normal whole sequence excluding only two
+padding hops. Keep the existing <5 ms compute, zero hop compute overruns,
+callback p99<100 us/max<500 us, miss ratio<=0.1% and burst<=20 ms rules. Freeze
+source, binary, input and graph hashes before running after optimizer/build work;
+retain every case without retries. Process CPU/RSS includes load/IO/teardown.
 
 ## Status
 

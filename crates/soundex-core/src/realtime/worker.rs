@@ -9,8 +9,31 @@ use super::transport::{Control, Packet, WorkerQueues, CAPACITY};
 use super::worker_wait::{apply_qos, Scheduling, Wait};
 use crate::{Result, SoundExError, SoundExProcessor};
 
-pub(super) fn spawn(
-    mut processor: SoundExProcessor,
+/// Sealed worker-side interface; never called from the audio callback.
+pub(super) trait Processor: Send + 'static {
+    fn warm_up_inference(&mut self) -> Result<u64>;
+    fn reset(&mut self);
+    fn state_history_warming(&self) -> bool;
+    fn process_frame(&mut self, input: &[f32], output: &mut [f32]) -> Result<()>;
+}
+
+impl Processor for SoundExProcessor {
+    fn warm_up_inference(&mut self) -> Result<u64> {
+        SoundExProcessor::warm_up_inference(self)
+    }
+    fn reset(&mut self) {
+        SoundExProcessor::reset(self);
+    }
+    fn state_history_warming(&self) -> bool {
+        SoundExProcessor::state_history_warming(self)
+    }
+    fn process_frame(&mut self, input: &[f32], output: &mut [f32]) -> Result<()> {
+        SoundExProcessor::process_frame(self, input, output).map(|_| ())
+    }
+}
+
+pub(super) fn spawn<P: Processor>(
+    mut processor: P,
     mut queues: WorkerQueues,
     control: Arc<Control>,
     samples: usize,

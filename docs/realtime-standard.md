@@ -155,6 +155,30 @@ presentation misses are distinct metrics; maxima alone cannot identify the
 cause of every miss. Benchmark schema 2 includes these optional worker fields.
 
 
+## Experimental context-model worker
+
+The opt-in `diagnostic-worker` Cargo feature exposes
+`diagnostics::realtime_context_head` for the four-input context graph. It uses
+the same callback, bounded queues, worker scheduling, gap resets and fallback
+as `RealtimeProcessor`. A private processor trait changes worker implementation
+dispatch; it does not create a second callback transport. Production loading
+continues to reject experimental graph markers. The adapter fixes FFT256/hop128,
+44.1/48 kHz, model high-band gain and smooth-knee protection. Its one-call
+prewarm/reset runs before playback; its 80-hop history warmup does not change
+the fixed 256-frame output delay.
+
+`soundex-worker-replay` and `training/scripts/bench_context_worker.py` retain raw
+callback presentation bits, producer lateness, cumulative worker counters,
+process CPU/RSS and output audio. Worker drain after the final callback includes
+the last processing call without extending output. The P77 registered screen
+uses four frozen P74 graphs, both rates, synthetic mono/stereo and reused mono
+music views, with alternating QoS/time-constraint request order. Each of the
+48 cases runs once for 1,100 callbacks. Report the 1,000 callbacks after warmup
+separately; availability must also pass over the entire normal sequence with
+only two startup padding hops excluded. This is a short host simulation, not
+30-minute device qualification, per-thread CPU attribution or listening evidence.
+See [P77](phase-step-p77.md) for retained results and limitations.
+
 ## Experimental smooth output protection
 
 `SoundExConfig.limiter_mode = LimiterMode::SmoothKnee` selects a memoryless

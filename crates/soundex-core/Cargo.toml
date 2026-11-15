@@ -40,6 +40,12 @@ hound.workspace = true
 default = ["ort-backend"]
 ort-backend = ["ort"]
 embedded-model = []
+# Explicitly experimental ABI bridge; production model loading is unchanged.
+diagnostic-worker = ["ort-backend"]
+
+[[bin]]
+name = "soundex-worker-replay"
+required-features = ["diagnostic-worker"]
 
 [[example]]
 name = "offline_demo"

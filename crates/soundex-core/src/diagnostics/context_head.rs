@@ -384,6 +384,21 @@ impl ContextHeadStream {
             .any(ChannelProcessor::needs_enhancement)
     }
 
+    #[cfg(feature = "diagnostic-worker")]
+    pub(crate) fn state_history_warming(&self) -> bool {
+        self.hops < WARMUP
+    }
+
+    /// Control-thread/worker initialization only. Reset discards this synthetic history.
+    #[cfg(feature = "diagnostic-worker")]
+    pub(crate) fn prewarm(&mut self) -> Outcome<u64> {
+        let input = vec![0.0; self.dry.len()];
+        let mut output = vec![0.0; self.dry.len()];
+        self.step(&input, &mut output)?;
+        self.reset();
+        Ok(1)
+    }
+
     pub fn reset(&mut self) {
         for channel in &mut self.channels {
             channel.reset();
