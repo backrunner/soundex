@@ -1,4 +1,4 @@
-"""P78 once-only event attribution grid on reused P77 assets, not qualification.
+"""P78 event attribution / P79 late-producer grids on reused assets, not qualification.
 
 SPDX-License-Identifier: Apache-2.0
 """
@@ -12,7 +12,7 @@ import traceback
 from pathlib import Path
 
 from evaluation.reporting import sha256_file, write_json_report
-from evaluation.worker_events import analyze
+from evaluation.worker_events import analyze, late_recovery
 from scripts.audit_fused_spectrum import snapshot
 from scripts.bench_context_worker import summarize
 from scripts.run_anchored_pilot import verify
@@ -20,11 +20,11 @@ from scripts.run_consistency_followup import read, registered
 from scripts.run_longform_review import checked_receipt
 
 
-def prepare(prior, binary, output):
+def prepare(prior, binary, output, *, late=False):
     if output.exists():
         raise ValueError("fresh event audit required")
     output.mkdir(parents=True)
-    receipt = prior / "review-20261116/complete.json"
+    receipt = prior / ("complete.json" if late else "review-20261116/complete.json")
     checked_receipt(receipt)
     old = read(prior / "registration.json")
     snapshot(output)
@@ -42,7 +42,8 @@ def prepare(prior, binary, output):
     inputs = {name: old["inputs"][name] for name in ("synthetic-44100-2", "music-48000-1")}
     schedule = []
     for index, (name, model) in enumerate(itertools.product(inputs, old["graphs"])):
-        for policy in ("QOS", "RT") if index % 2 == 0 else ("RT", "QOS"):
+        policies = ("RT",) if late else (("QOS", "RT") if index % 2 == 0 else ("RT", "QOS"))
+        for policy in policies:
             schedule.append({"input": name, "model": model, "policy": policy})
     assets = [
         receipt,
@@ -53,13 +54,18 @@ def prepare(prior, binary, output):
     ]
     registered(
         {
-            "format": "soundex-worker-events-p78-v1",
+            "format": "soundex-worker-late-p79-v1" if late else "soundex-worker-events-p78-v1",
+            "late_producer": late,
             "binary": str(frozen),
             "inputs": inputs,
             "graphs": old["graphs"],
             "schedule": schedule,
             "hashes": {str(p): sha256_file(p) for p in assets},
-            "protocol": "16 once-only traced cases: all4 frozen P74 parents, synthetic44.1k stereo and stored48k mono mid music view from P77; QOS/RT order alternates. 1100 callbacks each, retain every startup/miss/reset event and original thresholds. No concurrent build/training, no retries. New instrumentation can perturb timings; this cannot erase or rescore the P77 failure.",
+            "protocol": (
+                "Eight once-only fault cases: all four P74 parents, inherited synthetic44.1k stereo and stored48k mono mid music, RT requested. Each1100 callbacks, delay callback256 by2 periods and640 by4 periods; retain original nominal clock and all following catch-up windows. Require observed faults/misses/resets and subsequent fully warmed acceptance, finite complete output at fixed256-frame delay, and protected dry alignment after two accepted warmup outputs within existing2e-6 functional tolerance. Keep every normal software-screen failure separately. No timing retries or concurrent training/build. This is fault handling, not normal availability or device qualification."
+                if late
+                else "16 once-only traced cases: all4 frozen P74 parents, synthetic44.1k stereo and stored48k mono mid music view from P77; QOS/RT order alternates. 1100 callbacks each, retain every startup/miss/reset event and original thresholds. No concurrent build/training, no retries. New instrumentation can perturb timings; this cannot erase or rescore the P77 failure."
+            ),
             "analysis": "Reconcile per-input enqueue/reject, take/start/finish/terminal, history reset/warmup, callback consume/decision with final post-join counters. Attribute every missed presentation using explicit input sequence and wall-time intervals; preserve publication/consumer ambiguity. No thread-CPU or OS-cause claim. Retain CPU/RSS including process startup/IO and all raw audio.",
             "scope": "Reused diagnostic assets, narrower rate/channel coverage than P77, no physical stereo music/device/listening or policy superiority. No qualification or model change.",
         },
@@ -85,7 +91,7 @@ def run(output):
                 str(directory / "output.sxa"),
                 str(directory / "raw.json"),
                 case["policy"],
-                "TRACE",
+                "TRACE-LATE" if config.get("late_producer") else "TRACE",
             ],
             capture_output=True,
             text=True,
@@ -110,6 +116,8 @@ def run(output):
             "rt_accepted": report["time_constraint_accepted"],
             "attribution": attribution,
         }
+        if config.get("late_producer"):
+            result["fault_recovery"] = late_recovery(report)
         resources = (directory / "time.txt").read_text()
         memory = re.search(r"(\d+)\s+maximum resident set size", resources)
         cpu = re.search(r"([\d.]+) real\s+([\d.]+) user\s+([\d.]+) sys", resources)
@@ -143,11 +151,21 @@ if __name__ == "__main__":
     parser.add_argument("--prior", type=Path)
     parser.add_argument("--binary", type=Path)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--late-producer",
+        action="store_true",
+        help="prepare P79 fixed producer stalls from a completed P78 event audit",
+    )
     args = parser.parse_args()
     fresh = not args.output.exists()
     try:
         if args.mode == "prepare":
-            prepare(args.prior.resolve(), args.binary.resolve(), args.output.resolve())
+            prepare(
+                args.prior.resolve(),
+                args.binary.resolve(),
+                args.output.resolve(),
+                late=args.late_producer,
+            )
         else:
             run(args.output.resolve())
     except BaseException:

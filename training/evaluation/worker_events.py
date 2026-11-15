@@ -90,3 +90,62 @@ def analyze(report):
         "history_reset_inputs": [e["sequence"] for e in processed if e["history_reset"] == 1],
         "scope": "Actual input/presentation sequence correspondence. Wall events do not isolate thread CPU or OS root cause. Terminal timestamp follows publication/expiry; overlapping consumer windows remain explicitly unresolved. Warmup dry output is distinct from missed presentation and fixed delay.",
     }
+
+
+def late_recovery(report):
+    """Fault coverage/recovery is separate from normal availability and audio quality."""
+    events, callbacks = report["worker_trace"]["events"], report["events"]
+    injections = {
+        e["hop"]: e.get("injected_stall_hops", 0)
+        for e in callbacks
+        if e.get("injected_stall_hops", 0)
+    }
+    if not report["late_producer_faults"] or injections != {256: 2, 640: 4}:
+        raise ValueError("late-producer schedule changed")
+    results = []
+    for start, end in ((256, 640), (640, len(events))):
+        resets = [e["sequence"] for e in events[start : end - 1] if e["history_reset"] == 1]
+        misses = [h for h in range(start, end) if callbacks[h]["worker_presentation_missed"]]
+        boundary = max([start, *misses, *(r + 1 for r in resets)])
+        recovered = next(
+            (
+                h
+                for h in range(boundary + 1, end)
+                if events[h]["callback_ready"] == 1
+                and events[h]["wet_enabled"] == 1
+                and events[h - 1]["history_warming"] == 2
+            ),
+            None,
+        )
+        dry = [r for r in report["warmup_dry_audit"]["hops"] if start <= r["hop"] < end]
+        injection_observed = (
+            events[start]["callback_begin_ns"] >= callbacks[start]["requested_arrival_trace_ns"]
+        )
+        results.append(
+            {
+                "fault_hop": start,
+                "end_exclusive": end,
+                "reset_inputs": resets,
+                "missed_presentations": misses,
+                "fully_warmed_accepted_hop": recovered,
+                "dry_comparison_hops": len(dry),
+                "maximum_dry_error": max((r["peak"] for r in dry), default=None),
+                "injection_observed": injection_observed,
+                "recovery_observed": bool(
+                    injection_observed and resets and misses and recovered is not None and dry
+                ),
+            }
+        )
+    return {
+        "segments": results,
+        "fault_handling_pass": bool(
+            report["finite"]
+            and report["worker_drain_complete"]
+            and not report["worker_failed"]
+            and report["fixed_delay_frames"] == 256
+            and report["output_frames"] == len(events) * 128
+            and report["warmup_dry_audit"]["passed"]
+            and all(r["recovery_observed"] for r in results)
+        ),
+        "scope": "Fixed late-producer fault handling. Fully warmed acceptance is not proof of active enhancement or listening quality. Misses/normal thresholds stay visible; no device continuity qualification.",
+    }

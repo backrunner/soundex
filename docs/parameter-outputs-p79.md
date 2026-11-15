@@ -54,6 +54,22 @@ must retain missed presentations and distinguish those misses from finite output
 dry-timeline fidelity and recovery. Allocation and audit serialization remain
 outside callbacks. This is fault handling, not normal availability qualification.
 
+Freeze eight once-only RT-requested cases: all four P74 parents, inherited 44.1 kHz
+synthetic stereo and 48 kHz stored mono mid music, 1,100 callbacks each. Use
+`trace_context_worker.py prepare --late-producer` with the completed P78 event
+audit and the rebuilt `soundex-worker-replay` binary. Evidence will be retained in
+`data/runs/late-producer-p79-20261116/`. No concurrent training, build, hashing or
+other benchmark is permitted during the timed grid; there are no timing retries.
+
+Require each injected delay to be observed, with missed presentations, a history
+reset and a later accepted fully warmed result before the next fault/end. Retain
+finite complete output and the unchanged 256-frame timeline. After two accepted
+history-warmup outputs, compare every eligible PCM sample against input delayed by
+256 frames through the actual protective limiter. Apply the existing `2e-6`
+functional tolerance. This protected dry control is not the lossless restoration
+reference or an audibility threshold. Keep all normal availability failures,
+processing time, CPU/RSS, resets and warmup duration visible independently.
+
 ## Status
 
 The complete factorial partition and interaction controls pass. Output attribution

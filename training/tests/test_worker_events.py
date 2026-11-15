@@ -4,7 +4,7 @@ import copy
 
 import pytest
 
-from evaluation.worker_events import analyze
+from evaluation.worker_events import analyze, late_recovery
 
 
 def report():
@@ -90,3 +90,73 @@ def test_completed_compute_does_not_prove_result_was_visible_to_consumer():
     packet.update(terminal_ns=2012, consumed_outcome=2)
     result = analyze(data)
     assert result["misses"][0]["category"].endswith("unresolved")
+
+
+def fault_report():
+    """Minimal independent fault/recovery evidence, not trace reconciliation."""
+    events = [
+        dict(
+            sequence=i,
+            callback_begin_ns=i * 1000 + 1,
+            callback_ready=1,
+            wet_enabled=1,
+            history_warming=2,
+            history_reset=2,
+        )
+        for i in range(1100)
+    ]
+    callbacks = [dict(hop=i, worker_presentation_missed=False) for i in range(1100)]
+    dry = []
+    for start, periods in ((256, 2), (640, 4)):
+        callbacks[start].update(
+            injected_stall_hops=periods, requested_arrival_trace_ns=start * 1000
+        )
+        for i in range(start + 1, start + periods + 1):
+            callbacks[i]["worker_presentation_missed"] = True
+            events[i]["callback_ready"] = 2
+        reset = start + periods
+        events[reset]["history_reset"] = 1
+        for i in range(reset, reset + 80):
+            events[i]["history_warming"] = 1
+        dry.append(dict(hop=reset + 3, peak=0.0))
+    return dict(
+        worker_trace=dict(events=events),
+        events=callbacks,
+        late_producer_faults=True,
+        warmup_dry_audit=dict(passed=True, hops=dry),
+        finite=True,
+        worker_drain_complete=True,
+        worker_failed=False,
+        fixed_delay_frames=256,
+        output_frames=128 * 1100,
+    )
+
+
+def test_late_recovery_requires_observed_fault_and_fully_warmed_acceptance():
+    data = fault_report()
+    result = late_recovery(data)
+    assert result["fault_handling_pass"]
+    assert [s["fully_warmed_accepted_hop"] for s in result["segments"]] == [339, 725]
+    # Accepted dry output alone cannot count as recovered enhancement availability.
+    for event in data["worker_trace"]["events"][640:]:
+        event["history_warming"] = 1
+    assert not late_recovery(data)["fault_handling_pass"]
+
+
+@pytest.mark.parametrize("missing", ["alignment", "schedule", "reset", "observed", "frames"])
+def test_late_recovery_does_not_silently_pass_missing_evidence(missing):
+    data = fault_report()
+    if missing == "alignment":
+        data["warmup_dry_audit"]["passed"] = False
+    elif missing == "schedule":
+        data["events"][640]["injected_stall_hops"] = 3
+        with pytest.raises(ValueError, match="schedule"):
+            late_recovery(data)
+        return
+    elif missing == "reset":
+        data["worker_trace"]["events"][644]["history_reset"] = 2
+    elif missing == "observed":
+        data["events"][640]["requested_arrival_trace_ns"] = 640002
+    else:
+        data["output_frames"] -= 128
+    assert not late_recovery(data)["fault_handling_pass"]
