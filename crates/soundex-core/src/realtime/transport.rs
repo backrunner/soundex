@@ -33,6 +33,8 @@ impl Default for Packet {
 
 #[derive(Default)]
 pub(super) struct Control {
+    #[cfg(feature = "diagnostic-worker")]
+    pub trace: Option<super::trace::Trace>,
     pub stop: AtomicBool,
     pub failed: AtomicBool,
     pub presentation_sequence: AtomicU64,
@@ -66,11 +68,15 @@ pub(super) struct WorkerQueues {
 }
 
 pub(super) fn queues() -> (AudioQueues, WorkerQueues) {
+    with_control(Control::default())
+}
+
+pub(super) fn with_control(control: Control) -> (AudioQueues, WorkerQueues) {
     let (input_tx, input_rx) = RingBuffer::new(CAPACITY);
     let (output_tx, output_rx) = RingBuffer::new(CAPACITY);
     (
         AudioQueues {
-            control: Arc::new(Control::default()),
+            control: Arc::new(control),
             input: input_tx,
             output: output_rx,
         },

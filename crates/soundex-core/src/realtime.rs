@@ -15,6 +15,8 @@ mod diagnostic;
 mod latency;
 mod safety;
 mod state;
+#[cfg(feature = "diagnostic-worker")]
+mod trace;
 mod transport;
 mod worker;
 mod worker_wait;
@@ -118,6 +120,15 @@ impl RealtimeProcessor {
 
     fn from_worker<P: worker::Processor>(config: SoundExConfig, processor: P) -> Result<Self> {
         let (queues, worker_queues) = transport::queues();
+        Self::from_transport(config, processor, queues, worker_queues)
+    }
+
+    fn from_transport<P: worker::Processor>(
+        config: SoundExConfig,
+        processor: P,
+        queues: AudioQueues,
+        worker_queues: transport::WorkerQueues,
+    ) -> Result<Self> {
         let control = Arc::clone(&queues.control);
         let worker = worker::spawn(
             processor,
@@ -211,6 +222,21 @@ impl RealtimeProcessor {
     pub fn shutdown_with_stats(mut self) -> (RealtimeStats, RealtimeWorkerStats) {
         self.stop_worker();
         (self.stats(), self.worker_stats())
+    }
+
+    /// Join before allocating/serializing opt-in trace events on the control thread.
+    #[cfg(feature = "diagnostic-worker")]
+    pub fn shutdown_with_trace(
+        mut self,
+    ) -> (RealtimeStats, RealtimeWorkerStats, serde_json::Value) {
+        self.stop_worker();
+        let trace = self
+            .control
+            .trace
+            .as_ref()
+            .map(|t| t.snapshot())
+            .unwrap_or(serde_json::Value::Null);
+        (self.stats(), self.worker_stats(), trace)
     }
 
     fn stop_worker(&mut self) {

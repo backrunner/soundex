@@ -19,6 +19,16 @@ pub fn realtime_context_head(
     crate::RealtimeProcessor::context_diagnostic(path, config)
 }
 
+/// Enable bounded event slots before playback; instrumentation may perturb timings.
+#[cfg(feature = "diagnostic-worker")]
+pub fn realtime_context_head_traced(
+    path: &std::path::Path,
+    config: crate::SoundExConfig,
+    hops: usize,
+) -> crate::Result<(crate::RealtimeProcessor, std::time::Instant)> {
+    crate::RealtimeProcessor::context_diagnostic_traced(path, config, hops)
+}
+
 use crate::{
     processor::validate_config,
     stream::{CausalHopIter, StreamBuffer},

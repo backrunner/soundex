@@ -179,6 +179,14 @@ only two startup padding hops excluded. This is a short host simulation, not
 30-minute device qualification, per-thread CPU attribution or listening evidence.
 See [P77](phase-step-p77.md) for retained results and limitations.
 
+An explicit `TRACE` argument enables the [P78 event audit](adam-worker-attribution-p78.md).
+It allocates a bounded set of per-sequence atomic slots before playback, never
+grows them in the callback, and serializes after worker join. Trace overflow is
+reported and invalidates event completeness. Publication timestamps follow queue
+operations; overlapping consumer windows are not assigned a fictitious exact
+cause. This instrumentation changes the measured workload and does not qualify
+the uninstrumented binary or replace earlier failures.
+
 ## Experimental smooth output protection
 
 `SoundExConfig.limiter_mode = LimiterMode::SmoothKnee` selects a memoryless

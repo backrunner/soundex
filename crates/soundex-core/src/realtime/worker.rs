@@ -5,6 +5,8 @@ use std::sync::{atomic::Ordering, Arc};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
+#[cfg(feature = "diagnostic-worker")]
+use super::trace;
 use super::transport::{Control, Packet, WorkerQueues, CAPACITY};
 use super::worker_wait::{apply_qos, Scheduling, Wait};
 use crate::{Result, SoundExError, SoundExProcessor};
@@ -79,19 +81,38 @@ pub(super) fn spawn<P: Processor>(
                         }
                         continue;
                     };
+                    #[cfg(feature = "diagnostic-worker")]
+                    if let Some(t) = &control.trace {
+                        t.stamp(packet.sequence, trace::TAKEN);
+                    }
                     // Bounded backlog: process the latest hop, not accumulated delay.
                     for _ in 1..CAPACITY {
                         if let Ok(newer) = queues.input.pop() {
+                            #[cfg(feature = "diagnostic-worker")]
+                            if let Some(t) = &control.trace {
+                                t.set(packet.sequence, trace::WORKER_OUTCOME, 2);
+                                t.stamp(packet.sequence, trace::PUBLICATION);
+                                t.stamp(newer.sequence, trace::TAKEN);
+                            }
                             control.discarded_inputs.fetch_add(1, Ordering::Relaxed);
                             packet = newer;
                         }
                     }
                     wait.submitted(packet.submitted_at);
                     if expired(packet.sequence, &control) {
+                        #[cfg(feature = "diagnostic-worker")]
+                        if let Some(t) = &control.trace {
+                            t.set(packet.sequence, trace::WORKER_OUTCOME, 3);
+                            t.stamp(packet.sequence, trace::PUBLICATION);
+                        }
                         control.discarded_inputs.fetch_add(1, Ordering::Relaxed);
                         continue;
                     }
                     let started = Instant::now();
+                    #[cfg(feature = "diagnostic-worker")]
+                    if let Some(t) = &control.trace {
+                        t.set(packet.sequence, trace::STARTED, t.offset(started));
+                    }
                     if let Some(at) = packet.submitted_at {
                         let elapsed = started.saturating_duration_since(at).as_nanos() as u64;
                         control.queue_wait.record(elapsed);
@@ -104,6 +125,19 @@ pub(super) fn spawn<P: Processor>(
                         processor.reset();
                     }
                     let state_warming = processor.state_history_warming();
+                    #[cfg(feature = "diagnostic-worker")]
+                    if let Some(t) = &control.trace {
+                        t.set(
+                            packet.sequence,
+                            trace::HISTORY_RESET,
+                            if contiguous { 2 } else { 1 },
+                        );
+                        t.set(
+                            packet.sequence,
+                            trace::HISTORY_WARMING,
+                            if state_warming { 1 } else { 2 },
+                        );
+                    }
                     let mut output = Packet {
                         sequence: packet.sequence,
                         valid: contiguous && packet.sequence != 0,
@@ -113,7 +147,17 @@ pub(super) fn spawn<P: Processor>(
                         &packet.samples[..samples],
                         &mut output.samples[..samples],
                     )?;
-                    let elapsed = started.elapsed();
+                    let finished = Instant::now();
+                    let elapsed = finished.duration_since(started);
+                    #[cfg(feature = "diagnostic-worker")]
+                    if let Some(t) = &control.trace {
+                        t.set(packet.sequence, trace::FINISHED, t.offset(finished));
+                        t.set(
+                            packet.sequence,
+                            trace::PRESENTATION_AT_FINISH,
+                            control.presentation_sequence.load(Ordering::Acquire),
+                        );
+                    }
                     control.processing.record(elapsed.as_nanos() as u64);
                     control.processed.fetch_add(1, Ordering::Relaxed);
                     if state_warming {
@@ -128,8 +172,20 @@ pub(super) fn spawn<P: Processor>(
                     expected = packet.sequence.checked_add(1);
                     // Full result queue means the audio thread has already moved on.
                     // Never wait for it, and never grow the queue.
-                    if expired(packet.sequence, &control) || queues.output.push(output).is_err() {
+                    let outcome = if expired(packet.sequence, &control) {
+                        4
+                    } else if queues.output.push(output).is_err() {
+                        5
+                    } else {
+                        1
+                    };
+                    if outcome != 1 {
                         control.discarded_outputs.fetch_add(1, Ordering::Relaxed);
+                    }
+                    #[cfg(feature = "diagnostic-worker")]
+                    if let Some(t) = &control.trace {
+                        t.set(packet.sequence, trace::WORKER_OUTCOME, outcome);
+                        t.stamp(packet.sequence, trace::PUBLICATION);
                     }
                 }
                 Ok::<(), SoundExError>(())

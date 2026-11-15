@@ -214,3 +214,28 @@ fn smooth_protection_allocates_nothing_in_worker_or_callback() {
     assert!(output.iter().all(|s| s.is_finite() && s.abs() <= 0.95));
     realtime.shutdown();
 }
+
+#[cfg(feature = "diagnostic-worker")]
+#[test]
+fn bounded_worker_trace_never_allocates_or_grows_in_callback() {
+    let (mut processor, _) = soundex_core::diagnostics::realtime_context_head_traced(
+        &model_path("context-worker-probe.onnx"),
+        SoundExConfig::default().channels(2),
+        8,
+    )
+    .unwrap();
+    let mut output = [0.0; 256];
+    let input = [0.125; 256];
+    let (result, allocations) = count_allocations(|| {
+        for _ in 0..1000 {
+            processor.process(&input, &mut output)?;
+        }
+        Ok::<_, soundex_core::SoundExError>(())
+    });
+    result.unwrap();
+    assert_eq!(allocations, 0);
+    assert!(output.iter().all(|s| s.is_finite()));
+    let (_, _, trace) = processor.shutdown_with_trace();
+    assert_eq!(trace["events"].as_array().unwrap().len(), 8);
+    assert!(trace["ignored_writes"].as_u64().unwrap() > 0);
+}

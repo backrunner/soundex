@@ -1,6 +1,8 @@
 //! Fixed-delay callback state, timeline matching, and arbitrary block assembly.
 
 use super::safety::SafetyMixer;
+#[cfg(feature = "diagnostic-worker")]
+use super::trace;
 use super::transport::{AudioQueues, Packet, CAPACITY, HOP, MAX_SAMPLES};
 use super::RealtimeStats;
 use std::{sync::atomic::Ordering, time::Instant};
@@ -72,7 +74,17 @@ impl AudioState {
             if self.position == HOP {
                 self.input.sequence = self.sequence;
                 self.input.submitted_at = Some(Instant::now());
-                if queues.input.push(self.input).is_err() {
+                let enqueued = queues.input.push(self.input).is_ok();
+                #[cfg(feature = "diagnostic-worker")]
+                if let Some(t) = &queues.control.trace {
+                    t.set(
+                        self.sequence,
+                        trace::SUBMITTED,
+                        t.offset(self.input.submitted_at.unwrap()),
+                    );
+                    t.set(self.sequence, trace::ENQUEUED, if enqueued { 1 } else { 2 });
+                }
+                if !enqueued {
                     self.stats.queue_overflows += 1;
                 }
                 self.position = 0;
@@ -82,6 +94,10 @@ impl AudioState {
     }
 
     fn begin_hop(&mut self, queues: &mut AudioQueues) {
+        #[cfg(feature = "diagnostic-worker")]
+        if let Some(t) = &queues.control.trace {
+            t.stamp(self.sequence, trace::CALLBACK_BEGIN);
+        }
         queues
             .control
             .presentation_sequence
@@ -92,11 +108,24 @@ impl AudioState {
             let Ok(packet) = queues.output.pop() else {
                 break;
             };
+            #[cfg(feature = "diagnostic-worker")]
+            if let Some(t) = &queues.control.trace {
+                t.stamp(packet.sequence, trace::CONSUMED);
+                t.set(packet.sequence, trace::CONSUMED_OUTCOME, 1);
+            }
             if self.sequence.checked_sub(1) != Some(packet.sequence) {
+                #[cfg(feature = "diagnostic-worker")]
+                if let Some(t) = &queues.control.trace {
+                    t.set(packet.sequence, trace::CONSUMED_OUTCOME, 2);
+                }
                 self.stats.stale_results += 1;
                 continue;
             }
             if !packet.valid {
+                #[cfg(feature = "diagnostic-worker")]
+                if let Some(t) = &queues.control.trace {
+                    t.set(packet.sequence, trace::CONSUMED_OUTCOME, 3);
+                }
                 continue;
             }
             let values = &packet.samples[..HOP * self.channels];
@@ -104,6 +133,10 @@ impl AudioState {
                 .iter()
                 .any(|value| !value.is_finite() || value.abs() > 1.000_001)
             {
+                #[cfg(feature = "diagnostic-worker")]
+                if let Some(t) = &queues.control.trace {
+                    t.set(packet.sequence, trace::CONSUMED_OUTCOME, 4);
+                }
                 self.stats.rejected_results += 1;
                 continue;
             }
@@ -129,5 +162,23 @@ impl AudioState {
         let silent = dry_hop.iter().all(|value| value.abs() <= 1e-10);
         self.mixer
             .begin_hop(ready && self.healthy_hops >= 2 && !silent);
+        #[cfg(feature = "diagnostic-worker")]
+        if let Some(t) = &queues.control.trace {
+            t.set(
+                self.sequence,
+                trace::CALLBACK_READY,
+                if ready { 1 } else { 2 },
+            );
+            t.set(
+                self.sequence,
+                trace::WET_ENABLED,
+                if ready && self.healthy_hops >= 2 && !silent {
+                    1
+                } else {
+                    2
+                },
+            );
+            t.stamp(self.sequence, trace::CALLBACK_DECISION);
+        }
     }
 }

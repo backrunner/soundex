@@ -1,7 +1,10 @@
 //! Fixed-clock host simulation through the actual worker, never device qualification.
 mod audio_io;
 
-use soundex_core::{diagnostics::realtime_context_head, SoundExConfig};
+use soundex_core::{
+    diagnostics::{realtime_context_head, realtime_context_head_traced},
+    SoundExConfig,
+};
 use std::{
     path::Path,
     time::{Duration, Instant},
@@ -24,9 +27,10 @@ fn input_accounting_complete(
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().collect();
-    if args.len() != 6 {
+    if args.len() != 6 && args.len() != 7 {
         return Err(
-            "usage: soundex-worker-replay MODEL INPUT.sxa OUTPUT.sxa REPORT.json QOS|RT".into(),
+            "usage: soundex-worker-replay MODEL INPUT.sxa OUTPUT.sxa REPORT.json QOS|RT [TRACE]"
+                .into(),
         );
     }
     let input = audio_io::read_audio(Path::new(&args[2]))?;
@@ -42,7 +46,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .sample_rate(input.sample_rate)
         .channels(input.channels);
     config.worker_time_constraint = rt;
-    let mut stream = realtime_context_head(Path::new(&args[1]), config)?;
+    let (mut stream, epoch) = if args.len() == 7 {
+        if args[6] != "TRACE" {
+            return Err("optional mode must be TRACE".into());
+        }
+        let (stream, epoch) =
+            realtime_context_head_traced(Path::new(&args[1]), config, input.frames / 128)?;
+        (stream, Some(epoch))
+    } else {
+        (realtime_context_head(Path::new(&args[1]), config)?, None)
+    };
     let samples = 128 * input.channels as usize;
     let mut output = vec![0.0; input.samples.len()];
     let mut events = Vec::with_capacity(input.frames / 128);
@@ -65,6 +78,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Everything below is host instrumentation, outside the measured callback.
         let worker = stream.worker_stats();
         events.push(serde_json::json!({"hop": hop, "callback_start_late_ns": began.saturating_duration_since(arrival).as_nanos() as u64,
+            "nominal_arrival_trace_ns": epoch.map(|e| arrival.saturating_duration_since(e).as_nanos() as u64 + 1),
             "callback_ns": elapsed.as_nanos() as u64, "startup_padding": hop < 2,
             "worker_presentation_missed": callback.deadline_misses > previous_misses,
             "accepted_hops": callback.accepted_hops,
@@ -97,7 +111,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let latency = stream.latency_samples_per_channel();
     // Join first: the processed counter can precede the worker's final metric stores.
-    let (stats, worker) = stream.shutdown_with_stats();
+    let (stats, worker, trace) = stream.shutdown_with_trace();
     let finite = output.iter().all(|x| x.is_finite() && x.abs() <= 0.95);
     audio_io::write_audio(
         Path::new(&args[3]),
@@ -121,7 +135,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "max_processing_ns": worker.max_processing_ns, "max_queue_wait_ns": worker.max_queue_wait_ns,
         "processing_p99_upper_bound_ns": worker.processing_p99_upper_bound_ns,
         "queue_wait_p99_upper_bound_ns": worker.queue_wait_p99_upper_bound_ns,
-        "events": events});
+        "events": events, "worker_trace": trace});
     std::fs::write(&args[4], serde_json::to_vec_pretty(&report)?)?;
     if !finite || stats.worker_failed || !drained {
         return Err("callback output/worker failure retained".into());

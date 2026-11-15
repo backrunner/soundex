@@ -25,20 +25,38 @@ impl Processor for ContextHeadStream {
 
 impl RealtimeProcessor {
     pub(crate) fn context_diagnostic(path: &Path, mut config: SoundExConfig) -> Result<Self> {
-        if config.fft_size != 256
-            || config.hop_size != 128
-            || !matches!(config.sample_rate, 44100 | 48000)
-        {
-            return Err(SoundExError::InvalidInput(
-                "diagnostic worker requires FFT256/hop128 at 44100 or 48000 Hz".into(),
-            ));
-        }
-        config.high_band_gain = crate::HighBandGain::Model;
-        config.limiter_mode = crate::LimiterMode::SmoothKnee;
-        let stream = ContextHeadStream::new(path, config.clone())
-            .map_err(|e| SoundExError::ModelLoad(e.to_string()))?;
+        let stream = context_stream(path, &mut config)?;
         Self::from_worker(config, stream)
     }
+
+    pub(crate) fn context_diagnostic_traced(
+        path: &Path,
+        mut config: SoundExConfig,
+        hops: usize,
+    ) -> Result<(Self, std::time::Instant)> {
+        let stream = context_stream(path, &mut config)?;
+        let epoch = std::time::Instant::now();
+        let control = super::transport::Control {
+            trace: Some(super::trace::Trace::new(hops, epoch)?),
+            ..super::transport::Control::default()
+        };
+        let (queues, worker) = super::transport::with_control(control);
+        Ok((Self::from_transport(config, stream, queues, worker)?, epoch))
+    }
+}
+
+fn context_stream(path: &Path, config: &mut SoundExConfig) -> Result<ContextHeadStream> {
+    if config.fft_size != 256
+        || config.hop_size != 128
+        || !matches!(config.sample_rate, 44100 | 48000)
+    {
+        return Err(SoundExError::InvalidInput(
+            "diagnostic worker requires FFT256/hop128 at 44100 or 48000 Hz".into(),
+        ));
+    }
+    config.high_band_gain = crate::HighBandGain::Model;
+    config.limiter_mode = crate::LimiterMode::SmoothKnee;
+    ContextHeadStream::new(path, config.clone()).map_err(|e| SoundExError::ModelLoad(e.to_string()))
 }
 
 #[cfg(test)]
@@ -164,5 +182,44 @@ mod tests {
             SoundExConfig::default().sample_rate(96000)
         )
         .is_err());
+    }
+
+    #[test]
+    fn bounded_trace_preserves_audio_and_accounts_for_every_hop() {
+        let config = SoundExConfig::default().channels(1);
+        let (mut callback, _) =
+            RealtimeProcessor::context_diagnostic_traced(&fixture(), config.clone(), 90).unwrap();
+        let mut direct = ContextHeadStream::new(&fixture(), config).unwrap();
+        let mut previous = [0.0; 128];
+        for hop in 0..90 {
+            let input =
+                std::array::from_fn::<_, 128, _>(|n| 0.1 * ((hop * 128 + n) as f32 * 0.13).sin());
+            let mut expected = [0.0; 128];
+            let mut actual = [0.0; 128];
+            direct.step(&input, &mut expected).unwrap();
+            callback.process(&input, &mut actual).unwrap();
+            wait_until(|| callback.worker_stats().processed_hops > hop as u64);
+            assert!(actual
+                .iter()
+                .zip(previous)
+                .all(|(a, b)| (a - b).abs() < 2e-6));
+            previous = expected;
+        }
+        let (stats, worker, trace) = callback.shutdown_with_trace();
+        assert_eq!(stats.deadline_misses, 0);
+        assert_eq!(worker.processed_hops, 90);
+        assert_eq!(trace["ignored_writes"], 0);
+        let events = trace["events"].as_array().unwrap();
+        for (i, e) in events.iter().enumerate() {
+            assert_eq!(e["enqueued"], 1);
+            assert_eq!(e["worker_outcome"], 1);
+            assert_eq!(e["history_warming"], if i < 80 { 1 } else { 2 });
+            let ns = |k: &str| e[k].as_u64().unwrap();
+            assert!(ns("callback_begin_ns") <= ns("callback_decision_ns"));
+            assert!(ns("callback_decision_ns") <= ns("submitted_ns"));
+            assert!(ns("submitted_ns") <= ns("started_ns"));
+            assert!(ns("started_ns") <= ns("finished_ns"));
+            assert!(ns("finished_ns") <= ns("terminal_ns"));
+        }
     }
 }
