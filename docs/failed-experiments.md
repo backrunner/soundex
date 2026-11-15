@@ -13,6 +13,10 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P79](parameter-outputs-p79.md) is a pending output-level factorial audit of frozen
+P77 states. All block combinations and failures must remain; no subset selection,
+new training claim or retrospective change to earlier spectral/runtime gates.
+
 [P78](adam-worker-attribution-p78.md) completes exact replay of all sixteen P77
 model/Adam endpoints and first-update attribution. No new quality candidate is
 trained: the inherited readout moment supports the auxiliary at all four origins,

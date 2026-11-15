@@ -1,5 +1,9 @@
 # Research status and experiment history
 
+[P79](parameter-outputs-p79.md) freezes complete base/hidden/readout parameter
+interventions for output attribution, with separate controlled late-producer
+recovery checks. No optimizer update or best-subset selection; results pending.
+
 [P78](adam-worker-attribution-p78.md) reproduces all sixteen P77 model/Adam
 endpoints bitwise and decomposes the first physical update. Readout momentum
 supports the auxiliary at all four origins; second-moment normalization does
