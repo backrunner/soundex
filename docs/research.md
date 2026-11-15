@@ -1,8 +1,13 @@
 # Research status and experiment history
 
-[P78](adam-worker-attribution-p78.md) adds exact P77 endpoint replay and first-step
-Adam numerator/denominator attribution, plus bounded worker event instrumentation.
-It does not change training or repeat timings to replace P77 failures. Results pending.
+[P78](adam-worker-attribution-p78.md) reproduces all sixteen P77 model/Adam
+endpoints bitwise and decomposes the first physical update. Readout momentum
+supports the auxiliary at all four origins; second-moment normalization does
+not cancel the extra step. Some hidden-layer directions conflict, so a global
+moment reset is unsupported. Sixteen bounded event traces retain three misses:
+a host replay catch-up burst, its continuity-reset consequence, and a compute
+window shorter than a nominal hop. One software case fails. The trace reconciles
+all final counters; no new audio-quality or physical-device qualification follows.
 
 [P77](phase-step-p77.md) completes the physical phase-step diagnostic: sixteen
 two-update proposals, eight bitwise-equivalent model/Adam controls and 400 new
@@ -10,7 +15,7 @@ native roles. A larger readout step makes the realized auxiliary's complex mean
 decrease at all four origins, but MR/HF SC increase slightly and all four joint
 gates fail. Effects remain tiny; this does not reject the architecture or justify
 longer unchanged training. A separate opt-in bridge now runs experimental graphs
-through the actual bounded callback/worker transport. All48 host cases execute;
+through the actual bounded callback/worker transport. All 48 host cases execute;
 six fail, with 14 presentation misses and one hop-processing overrun. A final
 drain-accounting error is preserved and corrected without rerunning timing.
 Observed compute peaks at 2.968 ms, but frozen final-metric snapshots have a race

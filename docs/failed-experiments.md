@@ -13,9 +13,26 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
-[P78](adam-worker-attribution-p78.md) is a pending attribution audit, not a changed
-training recipe. It must reproduce all P77 model/Adam endpoints exactly and retain
-every numerical/runtime failure. Local decompositions cannot establish audio gain.
+[P78](adam-worker-attribution-p78.md) completes exact replay of all sixteen P77
+model/Adam endpoints and first-update attribution. No new quality candidate is
+trained: the inherited readout moment supports the auxiliary at all four origins,
+and second-moment interaction does not swallow the added step. Hidden-layer
+directions are mixed; do not reset the full optimizer or repeat unchanged scaling.
+Evidence: `data/runs/adam-contributions-p78-20261116/`. Revisit with identified
+finite output contributions from the base/hidden/readout changes, keeping original
+targets and frozen matched endpoints; local directions are not native audio gains.
+
+The sixteen once-only P78 event cases all reconcile final counters. Case 07
+(seed 20261013 phase, 44.1 kHz synthetic stereo, QoS) fails the existing miss ratio:
+callback 134 follows late callback 133 too quickly, leaving only 0.009666 ms for
+input 133, which is superseded; callback 135 then rejects the gap-invalid result.
+History warmup rises to 160 hops. Case 12 (seed 20261013 magnitude, 48 kHz mono mid
+music, QoS) retains an allowed isolated miss: processing is 2.459625 ms but the
+actual presentation window is 1.892333 ms. All outputs remain finite and complete.
+This instrumented, narrower host simulation cannot erase P77 or qualify a device.
+Evidence: `data/runs/context-events-p78-20261116/`. Revisit with explicit actual-host
+timing/late-producer controls or real integration; preserve the fixed timeline,
+gap reset and causal warmup, and never hide compressed windows by slowing replay.
 
 [P77](phase-step-p77.md) completes sixteen two-update proposals, eight equivalent
 duplicates and 400 additional native roles. Every forward/model/Adam equivalence
