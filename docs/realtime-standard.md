@@ -187,6 +187,16 @@ operations; overlapping consumer windows are not assigned a fictitious exact
 cause. This instrumentation changes the measured workload and does not qualify
 the uninstrumented binary or replace earlier failures.
 
+`TRACE-LATE` enables the separate [P79 controlled fault replay](parameter-outputs-p79.md):
+callbacks 256/640 are delayed by two/four periods without changing later nominal
+arrivals. Require at least 1,100 hops, retain every missed presentation/reset, and
+compare stable history-warmup dry output with input delayed by 256 frames through
+the actual protective limiter. The existing 2e-6 functional PCM tolerance applies;
+transition hops are outside this dry check. Fully warmed acceptance, finite output
+and dry alignment are separate from normal availability and audible continuity.
+All eight P79 cases recover, but retain 85 misses (one outside injected bursts)
+and fail their normal screens. No buffering, warmup or deadline policy is relaxed.
+
 ## Experimental smooth output protection
 
 `SoundExConfig.limiter_mode = LimiterMode::SmoothKnee` selects a memoryless

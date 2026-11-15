@@ -1,8 +1,14 @@
 # Research status and experiment history
 
-[P79](parameter-outputs-p79.md) freezes complete base/hidden/readout parameter
-interventions for output attribution, with separate controlled late-producer
-recovery checks. No optimizer update or best-subset selection; results pending.
+[P79](parameter-outputs-p79.md) completes 32 frozen base/hidden/readout combinations,
+5,860 score records and 57 new native correspondence checks, with zero optimizer
+updates. Readout motion explains nearly all tiny coherent gains; MR/shape effects
+remain mixed and numerically small. Eight controlled late-producer cases recover
+aligned dry output exactly, with compute at most 1.663 ms, but retain 85 presentation
+misses and fail all normal availability screens on faulted input. No overall
+quality/device qualification. The next distinct prerequisite is original-reference
+phase-relation supervision and its derivative/output behavior, auditing the legacy
+helper versus the active objective before registering any new training.
 
 [P78](adam-worker-attribution-p78.md) reproduces all sixteen P77 model/Adam
 endpoints bitwise and decomposes the first physical update. Readout momentum

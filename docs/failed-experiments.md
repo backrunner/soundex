@@ -13,9 +13,28 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
-[P79](parameter-outputs-p79.md) is a pending output-level factorial audit of frozen
-P77 states. All block combinations and failures must remain; no subset selection,
-new training claim or retrospective change to earlier spectral/runtime gates.
+[P79](parameter-outputs-p79.md) completes all 32 frozen P77 parameter combinations,
+5,860 records and 57 new native correspondence checks; zero optimizer updates.
+The readout explains 98.67–101.48% of the tiny paired native complex decrement,
+while HF SC/shape remain mixed and MR changes stay below the registered numerical
+ruler. This is inconclusive about quality, not an architecture failure. Native
+shape counterexamples include `beb6132a...` (+3.663991e-6, seed-12 phase) and
+`2b09292c...` (+2.034809e-6, seed-13 magnitude); full hashes and all absolute errors
+remain in the detailed report and `data/runs/parameter-outputs-p79-20261116/`.
+Do not select a hybrid, reset all moments, repeat unchanged scaling or erase P77.
+Revisit with independently specified phase-relation derivative/output controls,
+auditing the existing legacy helper against the active objective first.
+
+Eight once-only P79 late-producer cases pass fixed-timeline fault recovery and
+protected dry alignment (zero observed error), but retain 85 presentation misses;
+all eight fail unchanged normal availability screens on deliberately faulted input.
+Compute peaks at 1.662792 ms with no hop overruns. Case 02 also misses callback 558
+outside the injected bursts: only 0.112334 ms of actual window is available for
+0.895208 ms processing. Every case warms history for 240 hops (startup 80 + two 80).
+These functional successes do not establish audible transition quality or device
+continuity. Evidence: `data/runs/late-producer-p79-20261116/`, including case 02's
+unforced counterexample. Revisit in an actual host/device with real presentation
+timing and physical stereo music; retain fixed buffering, resets and all failures.
 
 [P78](adam-worker-attribution-p78.md) completes exact replay of all sixteen P77
 model/Adam endpoints and first-update attribution. No new quality candidate is

@@ -12,11 +12,14 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
-[P78 attribution](docs/adam-worker-attribution-p78.md) reproduces the previous
-model/Adam endpoints exactly and finds no blanket momentum obstruction. Bounded
-worker traces distinguish host replay catch-up, history-reset rejection and a
-shortened processing window; one of sixteen software screens fails. These are
-diagnostic findings, not new restoration gains or physical-device qualification.
+[P79 attribution](docs/parameter-outputs-p79.md) completes 32 frozen parameter
+combinations with no new training. Small coherent-error gains reach the output
+through the phase readout, but spectral shape does not improve consistently.
+Eight controlled late-producer cases recover exactly aligned protected dry audio;
+compute peaks at 1.663 ms, with 85 presentation misses retained. This establishes
+fault recovery in the host simulation, not normal availability, audible improvement
+or physical-device qualification. [P78](docs/adam-worker-attribution-p78.md) also
+retains its exact Adam replay and one failed ordinary software timing screen.
 
 [P75 research](docs/realized-supervision-p75.md) audits the objective and relevant
 official implementations. Thirty-two frozen gradient probes find conflicts
