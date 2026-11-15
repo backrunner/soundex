@@ -77,8 +77,122 @@ callback p99<100 us/max<500 us, miss ratio<=0.1% and burst<=20 ms rules. Freeze
 source, binary, input and graph hashes before running after optimizer/build work;
 retain every case without retries. Process CPU/RSS includes load/IO/teardown.
 
-## Status
+## Completed update diagnostic
 
-The unit-coordinate tests pass exact two-step forward/model/moment equivalence,
-including an active-clipping control and canonical export conversion. The fixed
-experiment and runtime adapter checks are pending completion. Defaults unchanged.
+All sixteen proposals and eight original-coordinate duplicates complete their
+fixed budgets. All eight unit controls match both canonical models and persistent
+Adam tensors bitwise after each step and match frozen P76 endpoints. All new
+native/proxy correspondences pass. The 400 new native roles and reused controls
+retain source hashes, original references and recording-level counterexamples.
+
+Native paired-transfer changes below compare **gain64 realized-phase against
+gain64 old**, not against historical legacy or an untreated input. Lower is better;
+values are percentage changes of recording means, not percentage points.
+
+| Origin | MR | Independent HF SC | Realized complex |
+| --- | ---: | ---: | ---: |
+| 20261012 magnitude | +0.000004924% | +0.000010676% | -0.000017954% |
+| 20261012 phase | +0.000005662% | +0.000006090% | -0.000019640% |
+| 20261013 magnitude | +0.000001370% | +0.000006259% | -0.000008928% |
+| 20261013 phase | +0.000000875% | +0.000007581% | -0.000005936% |
+
+All four prospective advancement gates fail. The added objective moves its
+realized complex metric down in all four means, but MR and independent HF SC move
+slightly up. Absolute MR increments are only 2.572e-9 to 1.657e-8. Dynamics is mixed.
+These very small differences do not establish audible degradation or improvement.
+Their recording-bootstrap intervals and every adverse source remain in
+`assessment.json`; aggregate signs must not be extrapolated to all music.
+
+The read-only `completion-review-20261116/` compares retained PCM and canonical
+parameters without new training or rendering. Old gain64 versus unit old has
+maximum per-role PCM RMS 2.434e-6 and peak 2.638e-5; one fit trace per origin has
+active phase-difference RMS 4.990e-5–7.811e-5 radians. The realized-versus-old
+increment at gain64 is much smaller: maximum PCM RMS 1.039e-7, peak 1.073e-6,
+and fit-trace phase RMS 4.534e-6–8.217e-6 radians. This confirms an actual readout
+effect but does not turn the auxiliary into a 64-fold audio improvement. These
+are candidate differences, not errors against the original or audibility scores.
+
+Increasing the readout step with the **old objective alone** lowers MR by
+0.0000350–0.0000995% relative to unit old, while realized complex increases
+0.0000710–0.0001469%; independent HF SC is mixed. Thus the larger step changes the
+tradeoff, but does not solve it. This does not revise P74's separate legacy-relative
+progress or establish any architecture ceiling. Two updates remain insufficient
+to infer convergence. Do not extend this unchanged recipe, search a multiplier
+on these transfer recordings or promote these endpoints.
+
+The changed hypothesis is now answered narrowly: coordinate/Adam conversion is
+correct, and a physically larger final-readout step alone does not produce the
+required joint spectral improvement in this diagnostic. Before another training
+budget, inspect the actual head displacement and objective contributions on fit
+data to distinguish inherited-moment dominance from conflicting target directions.
+Any changed objective must pass derivative/correspondence tests and a newly frozen
+matched protocol. A fixed-budget training study still requires an exposure and
+convergence rationale; no full training is launched from these tiny signs.
+
+## Completed worker screen and retained measurement failure
+
+Evidence: `data/runs/context-worker-p77-20261116/`, including original raw cases,
+`failure.json`, frozen binary/source and `review-20261116/` hash receipt. All
+48 scheduled cases execute once: 52,800 attempted input hops and 48,000
+post-warmup scored callbacks. The original runner exits unsuccessfully at its
+last case; read-only review reconciles all 48 without repeating a timing run.
+
+| Observed quantity | Result |
+| --- | --- |
+| Existing software screens | 42/48 pass; overall fails |
+| Worker model plus DSP maximum | 2.967958 ms; one 48 kHz hop-period overrun |
+| Callback p99 / maximum, worst case | 0.017543 / 0.123667 ms |
+| Presentation misses | 14 whole normal sequence; 10 after the first 100 hops |
+| Longest missed presentation run | 4 hops, 10.667 ms |
+| Producer lateness / queue-wait maximum | 5.985417 / 2.004625 ms |
+| Process peak RSS, maximum | 39.469 MiB |
+| Process CPU, one-core equivalent | 11.38–22.74%, including load/IO/teardown |
+| Output | Every case finite/bounded, 140,800 frames, fixed256-frame delay |
+
+Compute below 5 ms does not remove a 2.667 ms hop deadline or establish device
+continuity. Maxima were captured before join in the frozen binary and can race
+the last metric update, so they are **observed maxima**, not complete final-call
+compute certification. The corrected source joins before returning diagnostic
+counters. No new runtime claim is made for that changed binary.
+
+Retained failing cases are 03 (44.1 kHz mono, seed 12 phase, QoS, three misses),
+21 (48 kHz mono, seed 13 magnitude, RT request, two misses), 31 (48 kHz stereo,
+seed 13 phase, QoS, two early misses), 43 (48 kHz music, seed 12 phase, QoS, one
+processing-period overrun), 46 (48 kHz music, seed 13 phase, RT request, two early
+misses), and 47 (48 kHz music, seed 13 phase, QoS, four misses). Early misses in
+31/46 remain failures despite zero post-100-hop window misses. The observed maximum
+compute in case 43 does not coincide with a presentation miss; cumulative worker
+snapshots do not provide exact per-hop CPU attribution. RT startup requests are
+accepted in all 24 requested cases, but this is not a live-policy/workgroup check
+or a matched repeated policy-superiority study.
+
+Case 47 rejects one input because its queue is full. The frozen harness incorrectly
+waits for all 1,100 attempted inputs; 1,097 processed plus two discarded correctly
+account for the 1,099 enqueued inputs. It times out and records drain=false even
+though all output frames are present. The review preserves that invalid drain
+finding, original failure and independent availability failure. Source now counts
+queue rejections explicitly; a regression checks this exact counterexample and
+final counters are captured after joining. No timing retry or changed threshold
+is used to erase the failure. Both music inputs are stored **mid** mono views,
+not physical stereo; the frozen provenance's word "physical" is corrected here
+and in the review without altering registration evidence.
+
+Four cases restart model history: total warmup counts are 160, 160, 107 and 128 instead
+of 80. Extra dry history recovery is separate from presentation-miss runs and is
+not a 10.667 ms bound on all enhancement unavailability. Initial 80-hop history
+requires 213/232 ms at 48/44.1 kHz; output continues on its fixed delayed dry
+timeline. No listening claim follows from finite output or functional fade tests.
+
+Next runtime work should attribute submission, wake, processing and presentation
+events with explicit host/device boundaries, then assess recovery under a newly
+registered changed harness or integration. Do not shorten causal warmup, add
+buffers or rerun this grid to make its failures disappear. Device 30-minute tests,
+physical stereo music, other hosts and blind listening remain absent. No weights
+are promoted and no full training is launched from this diagnostic.
+
+Validation includes the full core library/integration suite, actual-worker
+functional checks, production rejection and no-default-feature tests, seventeen
+focused Python checks, a queue-accounting regression, Clippy with warnings denied,
+Ruff and English/link/index documentation checks. The accelerated 30-minute audio
+stress test remains explicitly ignored; it is not reported as passed or as a
+physical-device test.

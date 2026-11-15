@@ -13,10 +13,30 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
-[P77](phase-step-p77.md) is pending: it changes physical phase-readout update
-scale with exact coordinate/Adam controls, not an unchanged P76 extension.
-Two-step results cannot establish convergence, architecture ceilings or release
-quality. Preserve P76's failed advancement gates and all native evidence.
+[P77](phase-step-p77.md) completes sixteen two-update proposals, eight equivalent
+duplicates and 400 additional native roles. Every forward/model/Adam equivalence
+control and native correspondence passes, but all four joint-transfer gates fail.
+Gain64 realized-phase versus gain64 old reduces realized complex only
+0.00000594–0.00001964%, while MR and independent HF SC increase by similarly tiny
+amounts. Old-only gain64 lowers MR slightly but raises realized complex: a larger
+physical step alone does not resolve the tradeoff. This is an unqualified
+conditioning diagnostic, not convergence, audible quality or a capacity ceiling.
+All endpoints, recording counterexamples and receipts remain under
+`data/runs/phase-step-p77-20261116/`. Revisit only with an identified change in fit
+objective/update contribution and newly frozen matched controls; do not tune
+multipliers to these transfer recordings or extend this unchanged recipe.
+The separate actual-worker grid executes all 48 cases once, with six failures
+(03,21,31,43,46,47),14 presentation misses and one processing-period overrun.
+Observed maximum compute is 2.967958 ms; four cases restart dry history warmup.
+The final harness drain check falsely expects 1,100 worker inputs after one queue
+rejection; 1,097 processed plus two discarded account for 1,099 enqueued inputs.
+The original failure stays retained, and its availability still fails. Read-only
+review binds every case; source fixes accounting and captures metrics after join
+without a timing retry. Frozen maxima may race the final worker metric store.
+Evidence remains under `data/runs/context-worker-p77-20261116/`; short host replay
+is not a physical-device, final-call timing or listening qualification. Revisit
+runtime only with changed event attribution/integration and a new fixed protocol.
+Preserve all P76 failures and historical timing evidence.
 
 [P76](phase-routing-p76.md) completes twelve two-update proposals across all four
 P74 starts with copied Adam, old/direct-complex controls and 850 native roles.

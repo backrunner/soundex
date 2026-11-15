@@ -1,9 +1,16 @@
 # Research status and experiment history
 
-[P77](phase-step-p77.md) prepares a physical phase-step diagnostic after P76:
-equivalent coordinates/moments/clipping controls, then a fixed last-layer rate
-factor in both old and routed arms. It also tracks separate experimental-worker
-integration. No completed quality or runtime claim yet.
+[P77](phase-step-p77.md) completes the physical phase-step diagnostic: sixteen
+two-update proposals, eight bitwise-equivalent model/Adam controls and 400 new
+native roles. A larger readout step makes the realized auxiliary's complex mean
+decrease at all four origins, but MR/HF SC increase slightly and all four joint
+gates fail. Effects remain tiny; this does not reject the architecture or justify
+longer unchanged training. A separate opt-in bridge now runs experimental graphs
+through the actual bounded callback/worker transport. All48 host cases execute;
+six fail, with 14 presentation misses and one hop-processing overrun. A final
+drain-accounting error is preserved and corrected without rerunning timing.
+Observed compute peaks at 2.968 ms, but frozen final-metric snapshots have a race
+boundary; no device/listening or complete final-call timing qualification follows.
 
 [P76](phase-routing-p76.md) completes twelve two-update proposals with copied Adam,
 bitwise canonical controls and 850 native roles. All four realized-phase routes

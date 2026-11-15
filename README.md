@@ -18,9 +18,14 @@ between realized magnitude and complex fidelity; adding a global complex term
 does not resolve them. [P76](docs/phase-routing-p76.md) completes phase-head routing
 with copied Adam controls and 850 native roles. The finite-transfer screen does
 not pass; incremental changes are too small and mixed to establish useful audio
-improvement or reject the architecture. Next audit physical update conditioning
-before longer training. Default weights and production inference remain unchanged;
-all preparation, numerical and reader failures are retained.
+improvement or reject the architecture. [P77](docs/phase-step-p77.md) verifies exact
+coordinate/Adam equivalence and tests a fixed larger physical phase step. Its
+400 new native roles still fail the joint spectral gate: tiny complex gains do
+not bring MR/HF convergence gains. The experimental graph now has an opt-in
+bridge through the actual callback/worker; short host timing evidence remains
+separate from device qualification, with six of 48 fixed scenarios failing their
+software screen. Default weights and production loading remain
+unchanged; all preparation, numerical, reader and timing failures are retained.
 
 [P74](docs/phase-temporal-p74.md) adds phase relations inside the small temporal
 backbone, with a matched 216,802-parameter magnitude-only control. All four
