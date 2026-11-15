@@ -13,6 +13,12 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P76](phase-routing-p76.md) prepares a bounded phase-head routing diagnostic
+after P75, not a repeat of frozen-base P69. Twelve two-update proposals retain
+all four P74 starts and copied Adam; old and direct-complex controls are fixed.
+Implementation tests pass; native/finite transfer remains unqualified until the
+registered experiment completes. No default or runtime-contract change.
+
 [P75](realized-supervision-p75.md) is a completed frozen diagnostic, not training
 or a quality failure. All four P74 16,384-update endpoints remain unchanged;
 32 endpoint/draw probes use the first eight TRAIN draws and zero optimizer steps.

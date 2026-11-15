@@ -1,5 +1,10 @@
 # Research status and experiment history
 
+[P76](phase-routing-p76.md) prepares the phase-head routing diagnostic: all four
+P74 endpoints, copied persistent Adam, unchanged and direct-reweighting controls,
+two cumulative updates per proposal, then frozen raw/proxy/native comparisons.
+It is not a full training or production-worker qualification.
+
 [P75](realized-supervision-p75.md) completes literature/code research and 32 frozen
 P74 TRAIN gradient probes, with zero optimizer updates. Current training already
 supervises raw/fused realized magnitudes and direct pre-OLA complex spectra.
