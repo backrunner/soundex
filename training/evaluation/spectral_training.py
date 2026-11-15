@@ -36,7 +36,7 @@ def objective_value(model, item, objective):
     return 0.5 * (risk[~identity].mean() + risk[identity].mean())
 
 
-def adam_update(parameters, optimizer, closure):
+def adam_update(parameters, optimizer, closure, *, clip_gradients=None):
     """One genuine optimizer step with measured float32 parameter displacement.
 
     The closure owns averaging/backward and returns a detached scalar. No line
@@ -52,7 +52,8 @@ def adam_update(parameters, optimizer, closure):
     if any(p.grad is None for p in parameters):
         raise ValueError("missing trainable parameter gradient")
     gradients = [p.grad.detach().clone() for p in parameters]
-    norm = torch.nn.utils.clip_grad_norm_(parameters, 5, error_if_nonfinite=True)
+    clip = torch.nn.utils.clip_grad_norm_ if clip_gradients is None else clip_gradients
+    norm = clip(parameters, 5, error_if_nonfinite=True)
     optimizer.step()
     delta = [p.detach() - old for p, old in zip(parameters, before, strict=True)]
     if not all(torch.isfinite(d).all() for d in delta):

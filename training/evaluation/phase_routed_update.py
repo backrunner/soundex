@@ -56,7 +56,7 @@ def backward(prediction, batch, model, arm, divisor):
     return float(old.detach()), float(extra.detach()) if extra is not None else 0.0, gradients
 
 
-def update(model, items, optimizer, arm):
+def update(model, items, optimizer, arm, *, adam_step=adam_update):
     if len(items) != 4:
         raise ValueError("four matched paired/identity batches required")
     before = {k: p.detach().clone() for k, p in model.named_parameters()}
@@ -76,7 +76,7 @@ def update(model, items, optimizer, arm):
                     total.add_(gradient.detach())
         return sum(values) / len(values)
 
-    result = adam_update(model.parameters(), optimizer, closure)
+    result = adam_step(model.parameters(), optimizer, closure)
     derivative = float(
         sum(
             g.double().mul(p.detach().double() - before[k].double()).sum()

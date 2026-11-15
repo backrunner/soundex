@@ -13,6 +13,11 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P77](phase-step-p77.md) is pending: it changes physical phase-readout update
+scale with exact coordinate/Adam controls, not an unchanged P76 extension.
+Two-step results cannot establish convergence, architecture ceilings or release
+quality. Preserve P76's failed advancement gates and all native evidence.
+
 [P76](phase-routing-p76.md) completes twelve two-update proposals across all four
 P74 starts with copied Adam, old/direct-complex controls and 850 native roles.
 All four registered joint-transfer gates fail; MR changes versus matched old are

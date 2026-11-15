@@ -1,5 +1,10 @@
 # Research status and experiment history
 
+[P77](phase-step-p77.md) prepares a physical phase-step diagnostic after P76:
+equivalent coordinates/moments/clipping controls, then a fixed last-layer rate
+factor in both old and routed arms. It also tracks separate experimental-worker
+integration. No completed quality or runtime claim yet.
+
 [P76](phase-routing-p76.md) completes twelve two-update proposals with copied Adam,
 bitwise canonical controls and 850 native roles. All four realized-phase routes
 fail the registered joint-transfer gate, but MR changes against matched old
