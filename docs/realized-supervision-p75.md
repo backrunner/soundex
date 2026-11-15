@@ -5,6 +5,10 @@ Date: 2026-11-13. This work investigates the next step after
 graph, DSP policy, default artifacts or acceptance thresholds. Research conclusions
 and local derivative diagnostics are not restoration-quality claims.
 
+Follow-up: [P76](phase-routing-p76.md) completes routed finite Adam and native
+transfer checks. Its incremental output changes are tiny and mixed, so the
+registered advancement gate fails without establishing a phase-family limit.
+
 ## What the current loss actually supervises
 
 The current P67/P72/P74 objective is the equally balanced paired/identity mean of

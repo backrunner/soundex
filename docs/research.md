@@ -1,9 +1,15 @@
 # Research status and experiment history
 
-[P76](phase-routing-p76.md) prepares the phase-head routing diagnostic: all four
-P74 endpoints, copied persistent Adam, unchanged and direct-reweighting controls,
-two cumulative updates per proposal, then frozen raw/proxy/native comparisons.
-It is not a full training or production-worker qualification.
+[P76](phase-routing-p76.md) completes twelve two-update proposals with copied Adam,
+bitwise canonical controls and 850 native roles. All four realized-phase routes
+fail the registered joint-transfer gate, but MR changes against matched old
+updates are only about 1e-9 in absolute units; this is inconclusive about audible
+quality or architecture. Maximum per-role incremental PCM RMS is 2.655e-8.
+Direct reweighting is similarly tiny/mixed. All 17 native correspondence checks
+pass. The original speech-isolation preparation failure and a corrected read-only
+trace-reader failure remain. Next audit physical phase-update conditioning with
+an equivalent control before longer training; do not infer capacity failure or
+promote numerical sign changes. Runtime interface migration remains separate.
 
 [P75](realized-supervision-p75.md) completes literature/code research and 32 frozen
 P74 TRAIN gradient probes, with zero optimizer updates. Current training already
@@ -13,8 +19,8 @@ cosine 0.990040); missing loss placement alone is not the demonstrated cause.
 Fused magnitude MR conflicts with realized complex error in 19/32 probes.
 A fixed 0.1 full-model auxiliary leaves nine total/complex conflicts and adds one
 adverse HF-magnitude direction. Do not launch that recipe as an established fix.
-Phase-head-only routing is the next untested diagnostic, with native transfer and
-matched finite Adam checks required; the backbone keeps its old joint objective.
+The follow-up P76 above tests phase-head-only routing through native transfer and
+matched finite Adam checks; the backbone keeps its old joint objective.
 An initial FP32 gradient-summation rejection is preserved; the separate FP64 audit
 passes the same tolerances (maximum 5.552e-15). All hashes and frozen weights verify.
 No new quality, runtime or listening result. The report distinguishes AP-BWE,

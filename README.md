@@ -15,9 +15,12 @@ exercise inference but do not improve audio quality. See [model status](models/R
 [P75 research](docs/realized-supervision-p75.md) audits the objective and relevant
 official implementations. Thirty-two frozen gradient probes find conflicts
 between realized magnitude and complex fidelity; adding a global complex term
-does not resolve them. The next diagnostic targets phase-head gradient routing,
-with native/finite-step verification before training. No weights or inference
-behavior changed; the initial numerical failure and corrected audit are retained.
+does not resolve them. [P76](docs/phase-routing-p76.md) completes phase-head routing
+with copied Adam controls and 850 native roles. The finite-transfer screen does
+not pass; incremental changes are too small and mixed to establish useful audio
+improvement or reject the architecture. Next audit physical update conditioning
+before longer training. Default weights and production inference remain unchanged;
+all preparation, numerical and reader failures are retained.
 
 [P74](docs/phase-temporal-p74.md) adds phase relations inside the small temporal
 backbone, with a matched 216,802-parameter magnitude-only control. All four

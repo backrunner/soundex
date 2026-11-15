@@ -13,16 +13,26 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
-[P76](phase-routing-p76.md) prepares a bounded phase-head routing diagnostic
-after P75, not a repeat of frozen-base P69. Twelve two-update proposals retain
-all four P74 starts and copied Adam; old and direct-complex controls are fixed.
-Implementation tests pass. Initial preparation fails before any updates because
+[P76](phase-routing-p76.md) completes twelve two-update proposals across all four
+P74 starts with copied Adam, old/direct-complex controls and 850 native roles.
+All four registered joint-transfer gates fail; MR changes versus matched old are
+only -1.528e-9 to +2.376e-9 and incremental native PCM RMS peaks at 2.655e-8.
+This is an unqualified finite-transfer diagnostic, not evidence of audible harm,
+a phase-family ceiling or sufficient reason to extend training unchanged.
+All 17 native correspondence checks and exact old-control model/Adam checks pass.
+Initial preparation fails before any updates because
 the first8 fit draws cover all3 inherited speech work groups, leaving no fully
 source/work-disjoint transfer draw. Failure/source evidence remains in
 `data/runs/phase-routing-p76-20261115/`; V2 reserves the lexicographically last
 speech group before fit selection, without relaxing isolation or dropping speech.
-Native/finite transfer remains unqualified until the registered experiment
-completes. No default or runtime-contract change.
+The completed V2 evidence is under `data/runs/phase-routing-p76-20261115-v2/`.
+Its first read-only displacement helper fails on absent optional DSP trace fields;
+the corrected review binds that failure and reads actual native conditions, with
+no rerender or optimizer step. All exact endpoints, counterexamples and receipts
+remain in the linked report. Revisit only after a physically observable update
+conditioning hypothesis with forward/Adam-equivalent controls; no multiplier
+tuning to these transfer cases, changed acceptance thresholds, timing retry,
+default promotion or runtime-contract change.
 
 [P75](realized-supervision-p75.md) is a completed frozen diagnostic, not training
 or a quality failure. All four P74 16,384-update endpoints remain unchanged;
