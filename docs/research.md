@@ -1,5 +1,9 @@
 # Research status and experiment history
 
+[P78](adam-worker-attribution-p78.md) adds exact P77 endpoint replay and first-step
+Adam numerator/denominator attribution, plus bounded worker event instrumentation.
+It does not change training or repeat timings to replace P77 failures. Results pending.
+
 [P77](phase-step-p77.md) completes the physical phase-step diagnostic: sixteen
 two-update proposals, eight bitwise-equivalent model/Adam controls and 400 new
 native roles. A larger readout step makes the realized auxiliary's complex mean

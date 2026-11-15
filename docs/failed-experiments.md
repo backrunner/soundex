@@ -13,6 +13,10 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P78](adam-worker-attribution-p78.md) is a pending attribution audit, not a changed
+training recipe. It must reproduce all P77 model/Adam endpoints exactly and retain
+every numerical/runtime failure. Local decompositions cannot establish audio gain.
+
 [P77](phase-step-p77.md) completes sixteen two-update proposals, eight equivalent
 duplicates and 400 additional native roles. Every forward/model/Adam equivalence
 control and native correspondence passes, but all four joint-transfer gates fail.
