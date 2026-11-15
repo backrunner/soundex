@@ -14,6 +14,7 @@ from models.restoration_head import predict_budget
 from scripts.audit_phase_routing import continued, exact, select_draws
 from scripts.run_band_capacity_training import update as canonical_update
 from scripts.run_phase_temporal_training import pack
+from scripts.summarize_phase_routing import phase_delta
 from tests.test_fused_spectrum import batch_for
 
 
@@ -135,3 +136,18 @@ def test_metadata_selection_reserves_speech_group_without_weakening_aliases():
     # back to overlapping recordings or omit speech merely to make the run pass.
     with pytest.raises(ValueError, match="four source/work-disjoint"):
         select_draws(schedule, rows, list(rows.values()), [rows["2-4"]])
+
+
+def test_native_displacement_reader_accepts_ordinary_trace_without_dsp_stages():
+    traces = []
+    for phase in (0.0, 0.02):
+        traces.append(
+            [
+                {"condition": [1.0, 14000 / 24000, 1.0], "prediction": [0.0] * 129 + [phase] * 129}
+                for _ in range(90)
+            ]
+        )
+    result = phase_delta(traces, 48000)
+    assert result["bins"] > 0
+    assert result["max"] == pytest.approx(0.02)
+    assert result["rms"] == pytest.approx(0.02)
