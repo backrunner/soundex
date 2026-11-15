@@ -71,16 +71,55 @@ def samples(schedule, rows, draw):
     ]
 
 
-def prepare(prior, audit, output):
+def select_draws(schedule, rows, universe, reserved):
+    """Reserve a speech work group before fit selection; never inspect scores."""
+    groups = sorted(
+        {
+            rows[s["row_id"]]["split_group"]
+            for s in schedule["specs"]
+            if rows[s["row_id"]]["corpus"] == "speech_library"
+        }
+    )
+    if len(groups) < 2:
+        raise ValueError("at least two speech work groups required")
+    reserved_speech_group = groups[-1]
+    fit = []
+    for i, draw in enumerate(schedule["draws"]):
+        if all(
+            rows[schedule["specs"][j]["row_id"]]["split_group"] != reserved_speech_group
+            for j in draw
+        ):
+            fit.append(i)
+            if len(fit) == 8:
+                break
+    if len(fit) != 8:
+        raise ValueError("eight fit draws excluding reserved speech group required")
+    fit_rows = [s["row"] for i in fit for s in samples(schedule, rows, i)]
+    allowed = isolated_rows(
+        rows, {r["track_id"] for r in rows.values()}, universe, fit_rows + reserved
+    )
+    transfer = []
+    for i, draw in enumerate(schedule["draws"]):
+        if all(schedule["specs"][j]["row_id"] in allowed for j in draw):
+            transfer.append(i)
+            if len(transfer) == 4:
+                break
+    if len(transfer) != 4:
+        raise ValueError("four source/work-disjoint TRAIN draws required")
+    return fit, transfer, reserved_speech_group
+
+
+def prepare(prior, audit, output, previous=None):
     if output.exists():
         raise ValueError("fresh directory required; preserve every attempt")
+    # Preserve preparation failures too, before a schedule/registration exists.
+    output.mkdir(parents=True)
+    snapshot(output)
     checked_receipt(prior / "p74-complete.json")
     checked_receipt(audit / "complete.json")
     old = read(prior / "registration.json")
     rows, _ = load_sources(list(map(Path, old["manifests"])))
     schedule = read(Path(old["schedule"]))["optimization"]
-    fit = list(range(8))
-    fit_rows = [s["row"] for i in fit for s in samples(schedule, rows, i)]
     repo = Path(old["repository"])
     catalogs = sorted((repo / "data/runs").glob("*/evaluation-catalog.jsonl"))
     catalog = repo / "data/catalogs/current-approved.jsonl"
@@ -88,24 +127,16 @@ def prepare(prior, audit, output):
     review = read(Path(old["review_schedule"]))
     reserved = [r for p in catalogs for r in jsonl(p)]
     reserved += [rows[review["specs"][j]["row_id"]] for d in review["review"] for j in d]
-    allowed = isolated_rows(
-        rows, {r["track_id"] for r in rows.values()}, universe, fit_rows + reserved
-    )
-    transfer = []
-    for i in range(8, len(schedule["draws"])):
-        if all(schedule["specs"][j]["row_id"] in allowed for j in schedule["draws"][i]):
-            transfer.append(i)
-            if len(transfer) == 4:
-                break
-    if len(transfer) != 4:
-        raise ValueError("four source/work-disjoint TRAIN draws required")
+    fit, transfer, reserved_speech_group = select_draws(schedule, rows, universe, reserved)
     selected = [s["row"] for i in fit + transfer for s in samples(schedule, rows, i)]
     assert_reserved_isolation(selected, universe, reserved)
-    output.mkdir(parents=True)
-    snapshot(output)
     endpoints = read(prior / "endpoints.json")
     hashes = dict(old["hashes"])
     hashes.update({e["path"]: e["sha256"] for e in endpoints.values()})
+    if previous is not None:
+        if not (previous / "failure.json").is_file():
+            raise ValueError("previous failure must remain available")
+        hashes.update({str(p): sha256_file(p) for p in previous.rglob("*") if p.is_file()})
     for p in (
         prior / "registration.json",
         prior / "p74-complete.json",
@@ -119,6 +150,9 @@ def prepare(prior, audit, output):
     registered(
         {
             "format": "soundex-phase-routing-p76-v1",
+            "previous_attempt": str(previous) if previous is not None else None,
+            "reserved_speech_group": reserved_speech_group,
+            "draw_selection": "Reserve lexicographically last speech split_group in the inherited optimization schedule; use first8 draws excluding it for fit, then first4 draws fully isolated from fit and every reservation. Metadata only, identical across endpoints/arms. Initial first8 approach failed because it included all3 speech groups; retain it, never weaken source/work isolation.",
             "prior": str(prior),
             "audit": str(audit),
             "endpoints": endpoints,
@@ -451,15 +485,23 @@ if __name__ == "__main__":
     parser.add_argument("mode", choices=("prepare", "run"))
     parser.add_argument("--prior", type=Path)
     parser.add_argument("--audit", type=Path)
+    parser.add_argument("--previous-attempt", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     torch.set_num_threads(1)
+    fresh = not args.output.exists()
     try:
         if args.mode == "prepare":
-            prepare(args.prior.resolve(), args.audit.resolve(), args.output.resolve())
+            prepare(
+                args.prior.resolve(),
+                args.audit.resolve(),
+                args.output.resolve(),
+                args.previous_attempt.resolve() if args.previous_attempt else None,
+            )
         else:
             run(args.output.resolve())
     except BaseException:
-        if args.output.exists():
-            write_json_report({"traceback": traceback.format_exc()}, args.output / "failure.json")
+        failure = args.output / "failure.json"
+        if args.output.exists() and not failure.exists() and (args.mode != "prepare" or fresh):
+            write_json_report({"traceback": traceback.format_exc()}, failure)
         raise

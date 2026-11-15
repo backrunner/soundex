@@ -16,8 +16,13 @@ see the latest status in the table and [research index](research.md).
 [P76](phase-routing-p76.md) prepares a bounded phase-head routing diagnostic
 after P75, not a repeat of frozen-base P69. Twelve two-update proposals retain
 all four P74 starts and copied Adam; old and direct-complex controls are fixed.
-Implementation tests pass; native/finite transfer remains unqualified until the
-registered experiment completes. No default or runtime-contract change.
+Implementation tests pass. Initial preparation fails before any updates because
+the first8 fit draws cover all3 inherited speech work groups, leaving no fully
+source/work-disjoint transfer draw. Failure/source evidence remains in
+`data/runs/phase-routing-p76-20261115/`; V2 reserves the lexicographically last
+speech group before fit selection, without relaxing isolation or dropping speech.
+Native/finite transfer remains unqualified until the registered experiment
+completes. No default or runtime-contract change.
 
 [P75](realized-supervision-p75.md) is a completed frozen diagnostic, not training
 or a quality failure. All four P74 16,384-update endpoints remain unchanged;

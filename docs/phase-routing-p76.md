@@ -30,7 +30,7 @@ later base gradients can also change because the updated head changes output.
 
 The runner is `training/scripts/audit_phase_routing.py`; the update implementation
 is `training/evaluation/phase_routed_update.py`. The local evidence directory is
-`data/runs/phase-routing-p76-20261115/`.
+`data/runs/phase-routing-p76-20261115-v2/`.
 
 Copy each endpoint's persistent FP32 Adam state, including its final stored rate,
 betas, epsilon and step counter. Take exactly two cumulative updates of four
@@ -41,9 +41,10 @@ state bitwise. Freeze all twelve proposal hashes before output/transfer scoring.
 Record actual displacements by parameter group and the old/auxiliary derivatives
 along those displacements. Two updates do not establish convergence or capacity.
 
-Fit uses the first eight inherited TRAIN draws. Transfer uses the first four
-later draws whose sources and transitively connected work aliases do not overlap
-fit or reserved evaluation sources; selection reads metadata only. Keep the
+Reserve the lexicographically last speech work group in the inherited schedule
+before selecting fit: take the first eight draws excluding that group, then the
+first four draws whose sources and transitively connected work aliases do not
+overlap fit or reserved evaluation sources. Selection reads metadata only. Keep the
 80:20 music/speech crop mix and equal paired/identity risk. Record actual codecs,
 channel views, recordings and unique supervised duration. These sources remain
 reused TRAIN material from P74, not independent generalization evidence.
@@ -101,6 +102,17 @@ legacy production model and call it validation of P74. Physical-device continuit
 and listening remain separate requirements in [the real-time standard](realtime-standard.md).
 
 ## Status
+
+The initial preparation in `data/runs/phase-routing-p76-20261115/` failed before
+registration or optimizer updates: its first eight fit draws included all three
+speech work groups in the inherited schedule (`vctk:p233`, `vctk:p267`,
+`vctk:p340`), leaving no whole source/work-isolated transfer draw. The failed
+source snapshot and preparation error remain. V2 fixes selection by reserving
+the last speech group before fit selection; it binds the original evidence and
+does not weaken isolation, remove speech, inspect audio scores or change losses.
+Preparation now creates its evidence directory before selection so that early
+failures are recorded automatically. A metadata-only regression test covers
+selection and refusal when all remaining speech groups are reserved.
 
 Implementation and mathematical/control tests are prepared. The preregistered
 finite-update/native experiment must finish before any quality conclusion.

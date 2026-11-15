@@ -11,7 +11,7 @@ from models.direct_spectrum_objective import direct_spectrum_loss
 from models.fused_spectrum import balanced_risk, phase_objective
 from models.phase_temporal import phase_temporal_model
 from models.restoration_head import predict_budget
-from scripts.audit_phase_routing import continued, exact
+from scripts.audit_phase_routing import continued, exact, select_draws
 from scripts.run_band_capacity_training import update as canonical_update
 from scripts.run_phase_temporal_training import pack
 from tests.test_fused_spectrum import batch_for
@@ -107,3 +107,31 @@ def test_auxiliary_correct_reference_and_weak_gradients(scale, arm):
     assert abs(float(value.detach())) < 1e-8
     assert torch.isfinite(gradient).all()
     assert gradient.abs().max() < 1e-7
+
+
+def test_metadata_selection_reserves_speech_group_without_weakening_aliases():
+    rows, specs, draws = {}, [], []
+    for i in range(24):
+        draw = []
+        for j in range(5):
+            key = f"{i}-{j}"
+            rows[key] = {
+                "track_id": key,
+                "source_checksum": key,
+                "split": "train",
+                "held_out": False,
+                "corpus": "speech_library" if j == 4 else "music_library",
+                "split_group": f"speaker-{i % 3}" if j == 4 else key,
+            }
+            draw.append(len(specs))
+            specs.append({"row_id": key, "start": 0})
+        draws.append(draw)
+    schedule = {"specs": specs, "draws": draws}
+    fit, transfer, group = select_draws(schedule, rows, list(rows.values()), [])
+    assert group == "speaker-2"
+    assert fit == [0, 1, 3, 4, 6, 7, 9, 10]
+    assert transfer == [2, 5, 8, 11]
+    # Reserving the third group leaves no source-isolated speech; do not fall
+    # back to overlapping recordings or omit speech merely to make the run pass.
+    with pytest.raises(ValueError, match="four source/work-disjoint"):
+        select_draws(schedule, rows, list(rows.values()), [rows["2-4"]])
