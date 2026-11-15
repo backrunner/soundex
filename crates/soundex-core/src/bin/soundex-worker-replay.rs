@@ -7,6 +7,21 @@ use std::{
     time::{Duration, Instant},
 };
 
+fn input_accounting_complete(
+    attempted: u64,
+    rejected: u64,
+    processed: u64,
+    discarded: u64,
+) -> bool {
+    match (
+        attempted.checked_sub(rejected),
+        processed.checked_add(discarded),
+    ) {
+        (Some(expected), Some(observed)) => expected == observed,
+        _ => false,
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().collect();
     if args.len() != 6 {
@@ -67,7 +82,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let drain_until = Instant::now() + Duration::from_secs(1);
     let drained = loop {
         let w = stream.worker_stats();
-        if w.processed_hops + w.discarded_input_hops >= (input.frames / 128) as u64 {
+        if input_accounting_complete(
+            (input.frames / 128) as u64,
+            stream.stats().queue_overflows,
+            w.processed_hops,
+            w.discarded_input_hops,
+        ) {
             break true;
         }
         if stream.stats().worker_failed || Instant::now() >= drain_until {
@@ -75,10 +95,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         std::thread::sleep(Duration::from_millis(1));
     };
-    let worker = stream.worker_stats();
-    let stats = stream.stats();
     let latency = stream.latency_samples_per_channel();
-    stream.shutdown();
+    // Join first: the processed counter can precede the worker's final metric stores.
+    let (stats, worker) = stream.shutdown_with_stats();
     let finite = output.iter().all(|x| x.is_finite() && x.abs() <= 0.95);
     audio_io::write_audio(
         Path::new(&args[3]),
@@ -92,6 +111,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "time_constraint_requested": rt, "time_constraint_accepted": worker.macos_realtime_request_accepted,
         "qos_applied": worker.macos_qos_applied, "finite": finite, "worker_failed": stats.worker_failed,
         "worker_drain_complete": drained, "output_frames": stats.output_frames,
+        "attempted_input_hops": input.frames / 128, "rejected_input_hops": stats.queue_overflows,
         "processed_hops": worker.processed_hops, "discarded_input_hops": worker.discarded_input_hops,
         "discarded_output_hops": worker.discarded_output_hops,
         "state_history_warmup_hops": worker.state_history_warmup_hops,
@@ -107,4 +127,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("callback output/worker failure retained".into());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::input_accounting_complete;
+
+    #[test]
+    fn queue_rejections_are_not_pending_worker_input() {
+        assert!(input_accounting_complete(1100, 1, 1097, 2));
+        assert!(!input_accounting_complete(1100, 0, 1097, 2));
+        assert!(input_accounting_complete(1100, 0, 1100, 0));
+        assert!(!input_accounting_complete(1100, 0, 1099, 0));
+        assert!(!input_accounting_complete(1100, 0, 1101, 0));
+        assert!(!input_accounting_complete(0, 1, u64::MAX, 1));
+    }
 }

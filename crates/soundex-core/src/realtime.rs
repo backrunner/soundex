@@ -202,6 +202,18 @@ impl RealtimeProcessor {
     /// Stop and join the worker on a control thread, never in an audio callback.
     /// An active inference finishes before shutdown returns.
     pub fn shutdown(mut self) {
+        self.stop_worker();
+    }
+
+    /// Join on the control thread and return final, no-longer-changing counters.
+    /// This opt-in diagnostic includes the final in-flight processing call.
+    #[cfg(feature = "diagnostic-worker")]
+    pub fn shutdown_with_stats(mut self) -> (RealtimeStats, RealtimeWorkerStats) {
+        self.stop_worker();
+        (self.stats(), self.worker_stats())
+    }
+
+    fn stop_worker(&mut self) {
         self.control.stop.store(true, Ordering::Release);
         if let Some(worker) = self.worker.take() {
             let _ = worker.join();

@@ -104,7 +104,10 @@ mod tests {
                 }
                 assert_eq!(callback.worker_stats().state_history_warmup_hops, 80);
                 assert!(!callback.stats().worker_failed);
-                callback.shutdown();
+                let (final_stats, final_worker) = callback.shutdown_with_stats();
+                assert_eq!(final_stats.output_frames, 120 * 128);
+                assert_eq!(final_worker.processed_hops, 120);
+                assert!(final_worker.max_processing_ns > 0);
             }
         }
     }

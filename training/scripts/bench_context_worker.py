@@ -151,7 +151,7 @@ def prepare(prior, binary, output):
                 "sha256": sha256_file(path),
                 "start": 0,
                 "sample": sample,
-                "scope": "Reused P76 TRAIN source, one physical mono channel view",
+                "scope": "Reused P76 TRAIN source, one stored mono view (see channel_role; may be derived mid), not physical stereo evidence",
             }
             break
         else:
@@ -270,21 +270,83 @@ def run(output):
     )
 
 
+def review(output, destination):
+    """Reconcile retained cases without rerunning or overwriting failed evidence."""
+    if destination.exists():
+        raise ValueError("fresh read-only review required")
+    destination.mkdir(parents=True)
+    source = destination / Path(__file__).name
+    shutil.copy2(Path(__file__), source)
+    config = read(output / "registration.json")
+    verify(config["hashes"])
+    results = []
+    for index, case in enumerate(config["schedule"]):
+        directory = output / "cases" / f"{index:02d}"
+        report = read(directory / "raw.json")
+        resources = (directory / "time.txt").read_text()
+        memory = re.search(r"(\d+)\s+maximum resident set size", resources)
+        cpu = re.search(r"([\d.]+) real\s+([\d.]+) user\s+([\d.]+) sys", resources)
+        if memory is None or cpu is None or float(cpu[1]) <= 0:
+            raise ValueError("missing retained process resources")
+        rejected = report["events"][-1]["queue_overflows"]
+        result = {
+            "index": index,
+            **case,
+            **summarize(report),
+            "reported_drain_complete": report["worker_drain_complete"],
+            "rejected_input_hops": rejected,
+            "expected_enqueued_hops": HOPS - rejected,
+            "accounted_input_hops": report["processed_hops"] + report["discarded_input_hops"],
+            "input_accounting_complete": report["processed_hops"] + report["discarded_input_hops"]
+            == HOPS - rejected,
+            "finite": report["finite"],
+            "output_frames": report["output_frames"],
+            "fixed_delay_frames": report["fixed_delay_frames"],
+            "worker_failed": report["worker_failed"],
+            "rt_accepted": report["time_constraint_accepted"],
+            "peak_rss_bytes": int(memory[1]),
+            "process_wall_seconds": float(cpu[1]),
+            "cpu_user_seconds": float(cpu[2]),
+            "cpu_system_seconds": float(cpu[3]),
+            "process_one_core_percent": 100 * (float(cpu[2]) + float(cpu[3])) / float(cpu[1]),
+        }
+        results.append(result)
+    registered(
+        {
+            "cases": results,
+            "all_software_screens_pass": all(r["software_screen_pass"] for r in results),
+            "original_completion_failure_retained": (output / "failure.json").exists(),
+            "scope": "Read-only accounting of all48 original cases, no retries or changed pass rules. Frozen binary checked drain against attempted rather than enqueued hops; rejected input explains case47's false drain failure, but its availability still fails. Historical maxima were read before worker join and may race the last metric update; they are observed values, not final-call compute certification. Stored mono music views can be derived mid, not physical stereo. No device or listening qualification.",
+            "qualified": False,
+        },
+        destination / "assessment.json",
+    )
+    evidence = [p for p in output.rglob("*") if p.is_file() and destination not in p.parents]
+    evidence.extend((source, destination / "assessment.json"))
+    registered({"files": {str(p): sha256_file(p) for p in evidence}}, destination / "complete.json")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("prepare", "run"))
+    parser.add_argument("mode", choices=("prepare", "run", "review"))
     parser.add_argument("--prior", type=Path)
     parser.add_argument("--binary", type=Path)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--review-output", type=Path)
     args = parser.parse_args()
-    fresh = not args.output.exists()
+    if args.mode == "review" and args.review_output is None:
+        parser.error("review requires --review-output")
+    target = args.review_output if args.mode == "review" else args.output
+    fresh = not target.exists()
     try:
         if args.mode == "prepare":
             prepare(args.prior.resolve(), args.binary.resolve(), args.output.resolve())
-        else:
+        elif args.mode == "run":
             run(args.output.resolve())
+        else:
+            review(args.output.resolve(), args.review_output.resolve())
     except BaseException:
-        failure = args.output / "failure.json"
-        if args.output.exists() and not failure.exists() and (args.mode != "prepare" or fresh):
+        failure = target / "failure.json"
+        if target.exists() and not failure.exists() and (args.mode == "run" or fresh):
             write_json_report({"traceback": traceback.format_exc()}, failure)
         raise
