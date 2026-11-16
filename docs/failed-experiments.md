@@ -13,6 +13,29 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P82](realized-phase-relations-p82.md) is a completed but unqualified mechanism
+diagnostic: 32 frozen P74 probes, 40 saved P80 native traces and 32 exact gradient
+replays, with zero optimizer updates. Direct versus reconstructed phase relations
+have different gradients, but full routed MR conflict counts remain those of the
+old objective. Raw circular adds three clean-music head conflicts while resolving
+one; seed-20261013 phase draw 5 changes mixed-head/clean-music MR cosine from
+`+0.317843` to `-0.481168`. The four source hashes and every adverse/resolved stratum
+are in the detailed report and `data/runs/realized-relations-p82-balance-20261116/`.
+These are derivative counterexamples, not measured audio regressions or an
+architecture rejection. The initial wrapped-direct finite-difference fixture
+crossed a zero cusp: 59 tests passed and one failed before any real-data probe.
+Its source, failed assertion and values remain under
+`data/runs/realized-relations-p82-controls-20261116/`; a frequency-varying smooth
+fixture passes unchanged tolerances, and final controls total 61 passing tests.
+All native old scores reproduce; phase-risk correspondence passes analytic bounds
+without proving derivative parity or audible benefit. Main/summary evidence is
+`data/runs/realized-relations-p82-20261116/` and
+`data/runs/realized-relations-p82-summary-20261116/`. Revisit through matched finite
+persistent-Adam and native spectral/preservation measurements under protocol v2,
+with old/direct/raw/fused controls and all origins. Do not turn isolated-stratum
+or head-only cosine improvements into full-model quality, drop clean examples,
+tune a phase threshold, or infer a capacity ceiling from this frozen audit.
+
 [P81](evaluation-audit-p81.md) records measurement/interpretation limitations, not
 a new trained candidate. Analytic controls expose zero envelope dynamics for
 constant-energy frequency motion, a Hann endpoint blind spot, silently intersected

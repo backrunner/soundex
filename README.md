@@ -12,6 +12,13 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
+[P82](docs/realized-phase-relations-p82.md) checks phase supervision before and
+after reconstruction with 32 frozen probes, 40 saved native traces and an exact
+32-probe mixed-objective replay. Reconstruction changes the gradient meaningfully,
+but head-only benefits do not establish whole-model or audible gains. Raw circular
+supervision remains a candidate for matched finite-update validation; clean-music
+conflicts are retained. No new training trajectory or weight promotion follows.
+
 [P81](docs/evaluation-audit-p81.md) revises evaluation interpretation and adds
 within-band spectral dynamics, complete-support PCM checks and strict metric
 completeness. All 144 reaggregated native comparisons reproduce their old scores.

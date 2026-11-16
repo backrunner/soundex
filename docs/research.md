@@ -1,5 +1,18 @@
 # Research status and experiment history
 
+[P82](realized-phase-relations-p82.md) completes 32 frozen direct/raw/fused phase
+relation probes and 40 saved native correspondence checks. Common original-PCM
+targets isolate loss placement; median direct/raw head-gradient cosine is 0.591
+for circular and 0.613 for wrapped. All native metric dictionaries reproduce,
+with phase-risk discrepancies inside per-case analytic bounds. A follow-up
+replays every probe exactly and distinguishes actual balanced routed gradients
+from hypothetical stratum-only updates. Raw circular improves some paired head
+directions but introduces three clean-music MR conflicts; full-model conflict
+counts remain unchanged from old. Preserve the initial cusp-fixture failure,
+all source strata and undefined speech vectors. Sixty-one tests pass. Next use
+matched persistent-Adam finite updates and native spectral/preservation controls;
+no new weight, full training, timing or quality qualification is claimed.
+
 [P81](evaluation-audit-p81.md) audits metric definitions and interpretation without
 new training. The additive panel measures within-band magnitude changes and full
 PCM support; strict pairing rejects silently dropped fields and nonfinite scores.
