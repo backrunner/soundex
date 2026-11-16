@@ -1,5 +1,19 @@
 # Research status and experiment history
 
+[P83](realized-relation-updates-p83.md) completes four old/direct/raw/fused arms
+at all four P74 origins: 16 updates each, 256 updates total, 800 fresh native roles
+and 320 passing correspondence checks. Every auxiliary-arm update descends its
+auxiliary direction and paired-fit relation risks fall versus old. Yet all 12
+native incremental MR/HF-SC intervals cross zero. Raw/fused coherent means improve
+slightly, whereas direct increases; this does not establish restored audio quality.
+Old continuation itself lowers paired fit risk while transfer spectral means rise
+and coherent intervals increase. Music and speech, clean identity, model-only and
+DSP paths expose different tradeoffs. All 104,256 paired metric records reproduce under
+the prospectively added protocol seed-71 reaggregation; seed-83 evidence remains.
+Fifty-eight focused tests pass. No default promotion or timing qualification.
+Next isolate canonical/gain-64 continuation and repeated/fresh training crop
+exposure, before any further full-training or capacity claim.
+
 [P82](realized-phase-relations-p82.md) completes 32 frozen direct/raw/fused phase
 relation probes and 40 saved native correspondence checks. Common original-PCM
 targets isolate loss placement; median direct/raw head-gradient cosine is 0.591

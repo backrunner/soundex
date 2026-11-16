@@ -12,6 +12,13 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
+[P83](docs/realized-relation-updates-p83.md) completes all 16 matched finite-update
+trajectories, 800 fresh native roles and 320 correspondence checks. Reconstructed
+phase losses learn, but all 12 incremental native MR/HF-SC comparisons remain
+unresolved. Old continuation itself lowers fit risk without improving transfer
+spectral means. Next isolate update scaling and repeated crop exposure; no default
+promotion, full-training conclusion or new runtime qualification follows.
+
 [P82](docs/realized-phase-relations-p82.md) checks phase supervision before and
 after reconstruction with 32 frozen probes, 40 saved native traces and an exact
 32-probe mixed-objective replay. Reconstruction changes the gradient meaningfully,

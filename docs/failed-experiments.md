@@ -13,6 +13,32 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P83](realized-relation-updates-p83.md) is a completed, unqualified finite-update
+diagnostic: all four P74 origins, old/direct/raw/fused circular arms, 16 updates
+each (256 total), 800 fresh native roles and 320 passing correspondence checks.
+Four old step-2 model/Adam controls are exact; 58 focused tests pass. Auxiliaries
+learn paired-fit risk and all 192 relevant actual steps descend their auxiliary
+direction, but all 12 native incremental MR/HF-SC intervals cross zero under both
+registered bootstrap seeds. Raw HF-SC means rise at all origins despite small
+coherent gains. Case `10/1`, source
+`51019ced2a92e4b7096c9eeb257296c3b6d772b3836a7d48abd2fd533ff298fe`, has adverse raw
+HF-SC increments `9.440272e-6` to `2.084634e-5`; absolute PCM errors and every
+counterexample remain in the report/assessment. Raw clean-fit relation risk also
+rises at every origin; small absolute dimensionless increments accompany relative
+increases up to 3.636122%. Old continuation versus frozen parent improves paired
+fit risk but raises native spectral means and coherent intervals. This does not
+establish overfitting or an architecture ceiling, and legacy is not rescored.
+The initial bootstrap seed 83 differs from protocol seed 71; a full seed-71
+supplement was registered before endpoint freeze/scoring, preserving all original
+outputs. Main evidence is `data/runs/realized-relation-updates-p83-20261117/`, with
+controls under `data/runs/realized-relation-updates-p83-controls-20261117/` and
+review under `data/runs/realized-relation-updates-p83-summary-20261117/`.
+Revisit by isolating canonical versus gain-64 continuation and repeated versus
+fresh training-only crop exposure with matched moments/budgets and fixed original
+references. Do not repeat unchanged phase scaling, discard clean examples, promote
+a tiny coherent mean, or call 18.724499 seconds of unique fit support full-library
+training. No new timing, independent-test or listening qualification is present.
+
 [P82](realized-phase-relations-p82.md) is a completed but unqualified mechanism
 diagnostic: 32 frozen P74 probes, 40 saved P80 native traces and 32 exact gradient
 replays, with zero optimizer updates. Direct versus reconstructed phase relations
