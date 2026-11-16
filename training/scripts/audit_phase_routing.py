@@ -231,14 +231,16 @@ def add_records(records, config, schedule, rows, draw, path, output_scores):
         )
 
 
-def native(binary, graph, batch, directory, trace_first):
-    rendered, correspondence = [], None
+def native(binary, graph, batch, directory, trace_first, *, trace_roles=()):
+    if any(not isinstance(i, int) or i < 0 or i >= len(batch["pcm"]) for i in trace_roles):
+        raise ValueError("native trace role outside the batch")
+    rendered, correspondence, role_checks = [], None, {}
     for role, pcm in enumerate(batch["pcm"]):
         root = directory / str(role)
         root.mkdir(parents=True)
         rate = int(batch["rate"][role, 0])
         write_sxa(root / "input.sxa", pcm.numpy(), rate)
-        trace = trace_first and role == 0
+        trace = (trace_first and role == 0) or role in trace_roles
         result = subprocess.run(
             [
                 str(binary),
@@ -283,13 +285,21 @@ def native(binary, graph, batch, directory, trace_first):
                 batch["clean_wave"][role : role + 1, region],
                 batch["rate"][role : role + 1],
             )
-            correspondence = {
+            check = {
                 "pcm_max": maximum,
                 "pcm_rms": rms,
                 "passed": maximum <= 2**-14 and rms <= 2e-5,
                 "proxy": scores(proxy[:, region], target, rates),
                 "native": scores(rendered[-1][None, region], target, rates),
             }
+            role_checks[str(role)] = check
+            if role == 0:
+                correspondence = check
+    if trace_roles:
+        correspondence = {
+            "passed": all(c["passed"] for c in role_checks.values()),
+            "roles": role_checks,
+        }
     return torch.stack(rendered), correspondence
 
 
