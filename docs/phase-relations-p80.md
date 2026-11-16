@@ -97,6 +97,18 @@ not physical stereo. Reused transfer is a recheck, not unseen generalization.
 Two updates cannot establish convergence, an architecture ceiling, adequate
 training, audible benefit or release qualification. No timing benchmark is rerun.
 
+## Descriptive common-fit follow-up
+
+After primary completion, `training/scripts/review_phase_relation_fit.py` compares
+all 16 frozen endpoints and all four parents on the same eight fit draws. It
+reports both relation definitions and the unchanged common risk in FP64, using
+actual FP32 predictions lifted exactly and original references. This distinguishes
+a lower fit objective from improved final spectra; totals from different objective
+definitions are never compared against each other. The review freezes source and
+input hashes before its forward passes, performs no optimizer update or extra
+native/held-out render, and cannot modify the registered transfer gates. Evidence:
+`data/runs/phase-relations-p80-fit-review-20261116/`.
+
 ## Retained preparation failure and status
 
 The first numerical suite passed 21 checks and failed two weak-fixture assertions:
