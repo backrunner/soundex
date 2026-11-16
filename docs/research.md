@@ -1,5 +1,16 @@
 # Research status and experiment history
 
+[P81](evaluation-audit-p81.md) audits metric definitions and interpretation without
+new training. The additive panel measures within-band magnitude changes and full
+PCM support; strict pairing rejects silently dropped fields and nonfinite scores.
+An analytic FP32 ULP control shows that the P77 epsilon heuristic is not a score
+error bound. All 144 native reaggregations reproduce P80 exactly; 1,248 comparisons
+are described with separate spectral and coherent directions. All eight new
+relation endpoints remain unresolved on both primary spectral rulers. Their old
+gates remain failures, without becoming architecture or audible-quality verdicts.
+Protocol v2 does not promote weights or approve a new budget. Next audit direct
+versus reconstructed phase-relation supervision before a changed matched recipe.
+
 [P80](phase-relations-p80.md) completes 32 frozen gradient probes, 16 two-update
 endpoints and 400 new native roles. All eight old/realized-complex controls are
 bitwise exact, and all 40 native checks pass. Explicit circular/wrapped phase

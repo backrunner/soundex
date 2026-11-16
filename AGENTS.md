@@ -62,6 +62,12 @@ an exact inverse of lossy compression.
   shape, energy, temporal, coherent and absolute-error rulers visible; aggregate
   paired cases by recording before uncertainty estimates. Missing perceptual
   evidence and undefined relative scores must not silently become passing scores.
+- New evaluation reports use the protocol-v2 strict metric schema and distinguish
+  band-envelope dynamics from within-band spectral dynamics. Preserve historical
+  scores and registered decisions. Bootstrap direction, numerical resolution and
+  audible relevance are separate questions; a multiple of FP32 epsilon is not a
+  universal score-error bound. Report spectral gains and coherent tradeoffs
+  separately, without an automatic phase-sign veto or retrospective acceptance.
 - For very weak reference bands, report relative shape and calibrated absolute PCM
   RMS/dBFS errors together. Unnormalized FFT power is not PCM dBFS. Retain every
   counterexample. Large relative scores do not establish audible severity; small

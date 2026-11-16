@@ -12,6 +12,13 @@ The repository includes the DSP, inference engine, real-time adapter and PyTorch
 restoration weights are not yet published. Bundled synthetic identity graphs
 exercise inference but do not improve audio quality. See [model status](models/README.md).
 
+[P81](docs/evaluation-audit-p81.md) revises evaluation interpretation and adds
+within-band spectral dynamics, complete-support PCM checks and strict metric
+completeness. All 144 reaggregated native comparisons reproduce their old scores.
+Recent two-update spectral effects remain unresolved; no hidden quality win or
+weight promotion is established. Historical gates remain recorded, while future
+reviews distinguish spectral progress, coherent tradeoffs and uncertainty.
+
 [P80](docs/phase-relations-p80.md) tests explicit phase-relation supervision with
 matched two-update controls and 400 new native audio roles. The new objectives
 learn their fixed fit targets, but all eight joint-transfer gates fail; the tiny

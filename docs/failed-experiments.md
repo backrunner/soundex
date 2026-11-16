@@ -13,6 +13,24 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P81](evaluation-audit-p81.md) records measurement/interpretation limitations, not
+a new trained candidate. Analytic controls expose zero envelope dynamics for
+constant-energy frequency motion, a Hann endpoint blind spot, silently intersected
+metric schemas, and a real `-5.960464477539063e-8` SC change below the historical
+`4.76837158203125e-7` FP32 ruler. The new strict/additive evaluator addresses these
+issues while retaining every old score and gate. All 144 native-versus-old
+reaggregations are exact; all eight P80 relation endpoints still have primary
+MR/HF SC intervals crossing zero. Circular complex intervals increase at all
+four origins; no restored-audio quality gain is established. Original P80 source
+counterexamples and historical decisions remain valid records, not architecture
+rejections. Evidence: `data/runs/evaluation-protocol-p81-20261116/`, with separate
+control/validation snapshots linked in the report. A one-frame shape fixture's
+unused temporal return emitted warnings in the first passing test run; that
+source/log is retained and the fixture now uses three identical frames.
+Revisit with distinct direct-versus-realized phase-relation mechanism checks and
+a prospectively registered matched budget, not retrospective threshold fitting,
+unchanged two-step retries or automatic full training/default promotion.
+
 [P80](phase-relations-p80.md) records an initial numerical fixture failure before
 any optimizer update: two assertions incorrectly expected nonzero phase gradients
 for `1e-8` PCM below the existing reference phase floor; 21 other checks passed.
