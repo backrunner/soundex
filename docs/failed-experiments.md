@@ -13,6 +13,15 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P80](phase-relations-p80.md) records an initial numerical fixture failure before
+any optimizer update: two assertions incorrectly expected nonzero phase gradients
+for `1e-8` PCM below the existing reference phase floor; 21 other checks passed.
+Exact source/failure evidence remains under
+`data/runs/phase-relations-p80-controls-20261116/`. Corrected controls explicitly
+distinguish supported/unsupported weak signals and retain magnitude supervision.
+No floor or acceptance gate changes. The registered phase-relation diagnostic
+is pending; no training or quality conclusion follows from passing unit controls.
+
 [P79](parameter-outputs-p79.md) completes all 32 frozen P77 parameter combinations,
 5,860 records and 57 new native correspondence checks; zero optimizer updates.
 The readout explains 98.67–101.48% of the tiny paired native complex decrement,

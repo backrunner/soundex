@@ -36,8 +36,8 @@ def auxiliary(prediction, batch, arm):
     return balanced_risk(values, batch["identity"])
 
 
-def backward(prediction, batch, model, arm, divisor):
-    if arm not in ARMS or divisor < 1:
+def backward(prediction, batch, model, arm, divisor, *, auxiliary_fn=None):
+    if (arm not in ARMS and auxiliary_fn is None) or divisor < 1:
         raise ValueError("registered arm and positive batch divisor required")
     old = phase_objective(prediction, batch, include_fused=True)
     extra, gradients = None, None
@@ -45,7 +45,7 @@ def backward(prediction, batch, model, arm, divisor):
     if not head or not all(p.requires_grad for p in model.parameters()):
         raise ValueError("joint trainable base and explicit phase head required")
     if arm != "old":
-        extra = auxiliary(prediction, batch, arm)
+        extra = (auxiliary if auxiliary_fn is None else auxiliary_fn)(prediction, batch, arm)
         gradients = torch.autograd.grad(extra / divisor, head, retain_graph=True)
     (old / divisor).backward()
     if gradients is not None:
@@ -56,7 +56,7 @@ def backward(prediction, batch, model, arm, divisor):
     return float(old.detach()), float(extra.detach()) if extra is not None else 0.0, gradients
 
 
-def update(model, items, optimizer, arm, *, adam_step=adam_update):
+def update(model, items, optimizer, arm, *, adam_step=adam_update, auxiliary_fn=None):
     if len(items) != 4:
         raise ValueError("four matched paired/identity batches required")
     before = {k: p.detach().clone() for k, p in model.named_parameters()}
@@ -68,7 +68,9 @@ def update(model, items, optimizer, arm, *, adam_step=adam_update):
         values = []
         for objective, context in items:
             prediction, _ = predict_budget(model, objective.batch, context)
-            value, extra, gradients = backward(prediction, objective.batch, model, arm, len(items))
+            value, extra, gradients = backward(
+                prediction, objective.batch, model, arm, len(items), auxiliary_fn=auxiliary_fn
+            )
             values.append(value)
             auxiliary_values.append(extra)
             if gradients is not None:

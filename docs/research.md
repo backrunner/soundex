@@ -1,5 +1,10 @@
 # Research status and experiment history
 
+[P80](phase-relations-p80.md) registers explicit original-reference phase relations
+with circular/wrapped kernels and unchanged old/realized-complex controls. The
+initial weak-fixture assertion failure is retained; no threshold is relaxed.
+Numerical controls pass; frozen probes and the finite native comparison are pending.
+
 [P79](parameter-outputs-p79.md) completes 32 frozen base/hidden/readout combinations,
 5,860 score records and 57 new native correspondence checks, with zero optimizer
 updates. Readout motion explains nearly all tiny coherent gains; MR/shape effects
