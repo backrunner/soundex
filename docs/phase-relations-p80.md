@@ -109,7 +109,7 @@ input hashes before its forward passes, performs no optimizer update or extra
 native/held-out render, and cannot modify the registered transfer gates. Evidence:
 `data/runs/phase-relations-p80-fit-review-20261116/`.
 
-## Retained preparation failure and status
+## Retained preparation failure
 
 The first numerical suite passed 21 checks and failed two weak-fixture assertions:
 at PCM scale `1e-8`, both auxiliaries correctly gave zero risk because no reference
@@ -119,4 +119,157 @@ nonzero phase gradient. Evidence and exact initial source remain in
 The correction preserves the floor, explicitly checks unsupported weak samples,
 adds a supported `1e-5` sample and verifies that invented magnitude is penalized
 even when phase support is empty. This is a fixture correction, not a relaxed
-quality gate. The corrected tests pass; registered results are pending.
+quality gate. All 31 targeted relation/routing/coordinate checks now pass.
+
+## Completed gradient and optimizer checks
+
+All 32 frozen FP64 probes and all 32 diagnostic optimizer steps complete. Both
+old and realized-complex controls reproduce P77 canonical models, coordinate
+models and coordinate Adam states bitwise at all four origins. All 16 endpoints
+and eight new graph hashes are frozen before scoring. No global clipping is
+active (largest canonical gradient norm 2.56215, below the unchanged limit 5).
+
+The median auxiliary head-gradient norm divided by the old head-gradient norm,
+within each origin's eight draws, is:
+
+| Origin | Realized complex | Circular relation | Wrapped relation |
+| --- | ---: | ---: | ---: |
+| 20261012 magnitude | 0.146 | 0.364 | 1.132 |
+| 20261012 phase | 0.142 | 0.404 | 0.863 |
+| 20261013 magnitude | 0.084 | 0.391 | 1.049 |
+| 20261013 phase | 0.098 | 0.446 | 0.962 |
+
+Equal nominal coefficients are not equal gradient scales. The wrapped derivative
+can also be larger near zero; these differences cannot be attributed exclusively
+to antipodal errors. In each origin, 61/80 fit role views have instantaneous support
+and 59/80 have frequency/time edge support. Weighted mass within 1% of an antipode
+is only 0.52–0.93% when pooled by support across views/components/origins separately.
+This does not support a widespread 180-degree saturation explanation. These views
+reuse 40 recordings; pooling is descriptive, not an uncertainty estimate.
+
+Every proposed head-gradient sum has a nonnegative dot product with both fused MR
+and fused HF magnitude gradients in all 32 probes. Conflict with realized complex
+remains in 13/32 circular and 8/32 wrapped sums, compared with 8/32 for the existing
+realized-complex auxiliary. Euclidean head directions do not describe all base
+motion or the eventual Adam step. The actual auxiliary directional derivative
+is negative in every one of the 16 relation updates, with magnitudes
+`1.667e-7`–`4.396e-7`. This confirms a local descent contribution, not final quality.
+
+## Completed common-fit review
+
+All 20 states (16 endpoints plus four original parents) and eight fit draws finish,
+producing 1,600 per-role records. The unchanged common risk is independently
+reconstructed and checked against the original function on every forward. Compared
+with matched old endpoints, both relation recipes lower their own phase risk and
+the common risk at every origin under the fixed balanced paired/identity mean.
+
+| Fixed-fit change versus matched old | Circular | Wrapped |
+| --- | ---: | ---: |
+| Own relation mean, relative percent | -0.000952 to -0.001040% | -0.002048 to -0.002732% |
+| Unchanged common risk, absolute | -6.679e-8 to -1.012e-7 | -8.179e-8 to -1.089e-7 |
+
+Each column uses its own fixed definition; the percentages are not a cross-loss
+ranking. Frequency-relation decreases are larger than time-relation decreases.
+The circular recipe also raises clean-identity common risk in three of four
+origins; the balanced decrease does not erase those exceptions. These tiny fit
+effects establish response to the objective, not convergence or useful restoration.
+There is no reason here to call the loss disconnected or reset all optimizer
+moments. Full per-component/role/corpus/recording results remain in the fit-review
+`assessment.json` and `records.json`; its verified receipt binds 456 files.
+
+## Completed native spectral review
+
+All 400 new native roles complete; all 40 native/proxy checks pass. Maximum PCM
+discrepancies are `2.980232e-7` peak and `2.404784e-8` RMS. The main receipt binds
+2,122 files and 5,900 score records including retained controls. All source/input
+and endpoint/graph hashes verify. These facts establish a valid measurement and
+matched implementation, not a successful quality recipe.
+
+All eight registered joint-transfer gates fail. The table shows candidate minus
+matched old, paired native means over 20 exposed transfer recordings. Negative
+means less error. These are not legacy-relative changes or unseen test scores.
+
+| Origin / relation | MR delta | HF SC delta | Realized complex delta |
+| --- | ---: | ---: | ---: |
+| 20261012 magnitude / circular | -4.359e-8 | +2.047e-8 | +1.177e-7 |
+| 20261012 magnitude / wrapped | -3.634e-8 | -1.436e-7 | +3.260e-9 |
+| 20261012 phase / circular | -5.486e-8 | +5.375e-8 | +9.460e-8 |
+| 20261012 phase / wrapped | -5.675e-8 | -1.383e-7 | +3.589e-8 |
+| 20261013 magnitude / circular | -1.539e-8 | +2.913e-8 | +7.204e-8 |
+| 20261013 magnitude / wrapped | +5.929e-9 | -2.199e-7 | +3.655e-8 |
+| 20261013 phase / circular | -1.806e-8 | +7.672e-8 | +7.753e-8 |
+| 20261013 phase / wrapped | +7.898e-9 | -4.661e-8 | +3.696e-8 |
+
+Every MR/HF SC interval spans zero and every mean change is below its numerical
+ruler (MR `2.791e-7`–`2.807e-7`, HF SC `4.881e-7`–`4.900e-7`). Circular complex
+regression intervals exclude zero at all four origins; wrapped complex intervals
+span zero. All complex changes are also small relative to the corresponding
+`2.945e-7`–`2.982e-7` ruler, which is displayed but is not its sign gate or an
+audibility threshold. No failure establishes audible damage or an architecture
+ceiling, and no tiny favorable mean establishes restoration gain.
+
+Circular native HF shape improves numerically at all four origins; wrapped shape
+improves at three and worsens at seed-13 phase. Energy envelopes and dynamics
+mostly decrease, while hop-boundary difference RMS rises at all eight endpoints
+(`1.561e-9`–`8.068e-9`). Low-band RMS increases `5.846e-12`–`4.149e-11` and HF PCM
+RMS changes range from `-4.983e-10` to `+4.582e-10`. Keep these calibrated absolute
+quantities beside relative errors; their small size does not prove audible quality.
+HF prediction power slightly increases at every endpoint; reduced enhancement
+does not explain all of the small spectral changes, nor does more power prove
+better spectral reconstruction.
+
+On the same transfer population, circular realized-complex error already rises
+before DSP at all four origins. Wrapped raw complex means instead fall slightly,
+but proxy/native means rise. Stage behavior is therefore recipe dependent. The
+increments are tiny and near implementation discrepancy scales: this does not
+justify removing DSP or claiming it universally blocks useful reconstruction.
+
+Keep domain and clean-identity conflicts visible. Wrapped HF SC decreases in all
+four music strata but increases in all four speech strata. Circular music MR also
+decreases at all four origins; its speech MR worsens in both seed-12 origins and
+improves in both seed-13 origins. Identity spectral results remain mixed. All four
+identity-speech native differences are exactly zero for both recipes on these
+four recordings; this does not prove general clean-speech preservation.
+
+Concrete retained paired-transfer counterexamples include:
+
+- `83d9806afed95724ed33230a2aefd7c361406aeeb1f642ac87dc1f23dcb50669`:
+  seed-12 magnitude circular complex delta `+7.247869e-7`; wrapped `+5.395849e-7`.
+- `88ea9784b1a6e849599d20fd09276e6836297aff6185709127708a2ee4df2b35`:
+  seed-13 magnitude circular complex delta `+7.564885e-7`; wrapped `+5.108705e-7`.
+- `363a3164861dca776d124a7786ba452e65085466014079484bff680047e36b8f`:
+  seed-13 magnitude wrapped MR delta `+2.166159e-7`.
+
+Every counterexample, undefined value, interval and untreated/identity-DSP
+comparison remains in the main `assessment.json` and `records.json`. The historical
+legacy model is not rescored here; P74's separately reported legacy-relative
+progress is unchanged. Do not describe this incremental failure as all newer
+models losing to legacy.
+
+## Decision and next evidence
+
+The auxiliary is mathematically connected, takes descent steps and lowers fixed-fit
+risk, yet does not give a reliable combined spectral/coherent gain in this bounded
+native recheck. The tested direct phase-relation recipe is not advanced to full
+training or default weights. Two steps do not reject the family or establish
+overfitting; the result specifically fails the registered prerequisite. Do not
+increase coefficients, reset moments, select the best origin, or extend the same
+recipe merely because its own fit loss fell.
+
+The next distinct question is whether phase relations measured **after actual
+overlap-add/fusion** align with the desired reconstructed spectra, versus these
+direct FFT256 feature relations. Keep the same kernel/support policy and direct
+lossless magnitude targets as explicit controls; do not conflate a new measurement
+location with another coefficient change. P75/P76 compared marginal complex
+distance, not this relational derivative. Before another finite proposal, require
+reference/weak-bin/wrap and native-correspondence checks, matched raw/fused relation
+derivatives and retained component/domain conflicts. This is a proposed diagnostic,
+not a new claim that synthesis supervision is absent or that more training will
+solve the problem.
+
+The inference graph structure, parameter count, causal state, fixed 256-frame
+buffer and DSP remain unchanged. No new compute, CPU/RSS or device measurement is
+made; P79 timing numbers cannot qualify these endpoints. Physical stereo music,
+long device runs and blind listening remain outstanding. Source/docs are committed,
+all failed/source/checkpoint evidence is retained, and no cleanup removes data.
+Ruff, all 31 targeted tests and the English/link/index documentation check pass.

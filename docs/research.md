@@ -1,9 +1,15 @@
 # Research status and experiment history
 
-[P80](phase-relations-p80.md) registers explicit original-reference phase relations
-with circular/wrapped kernels and unchanged old/realized-complex controls. The
-initial weak-fixture assertion failure is retained; no threshold is relaxed.
-Numerical controls pass; frozen probes and the finite native comparison are pending.
+[P80](phase-relations-p80.md) completes 32 frozen gradient probes, 16 two-update
+endpoints and 400 new native roles. All eight old/realized-complex controls are
+bitwise exact, and all 40 native checks pass. Explicit circular/wrapped phase
+relations lower their fixed-fit risk and the unchanged common risk, but all eight
+native joint-transfer gates fail: spectral changes are tiny/mixed and coherent
+means rise. Near-antipodal mass is below 1%, so widespread circular-gradient
+saturation is unsupported. Preserve the initial weak-fixture failure and every
+counterexample. No full training, default promotion or new timing qualification.
+Next distinguish direct feature relations from reconstructed raw/fused relations
+under fixed kernels and original-reference spectral priorities.
 
 [P79](parameter-outputs-p79.md) completes 32 frozen base/hidden/readout combinations,
 5,860 score records and 57 new native correspondence checks, with zero optimizer

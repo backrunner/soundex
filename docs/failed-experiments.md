@@ -19,8 +19,21 @@ for `1e-8` PCM below the existing reference phase floor; 21 other checks passed.
 Exact source/failure evidence remains under
 `data/runs/phase-relations-p80-controls-20261116/`. Corrected controls explicitly
 distinguish supported/unsupported weak signals and retain magnitude supervision.
-No floor or acceptance gate changes. The registered phase-relation diagnostic
-is pending; no training or quality conclusion follows from passing unit controls.
+No floor or acceptance gate changes. The completed diagnostic has 32 gradient
+probes, 16 two-update endpoints (16 new relation and 16 control-replay updates),
+400 new native roles and 40 passing parity checks. All eight joint-transfer gates
+fail versus matched old: MR/HF SC changes remain below the numerical ruler and
+realized-complex means rise. Circular and wrapped losses do decrease on the fixed
+fit bank, so this is not a disconnected loss or failed training execution.
+Counterexamples include `83d9806a...` (seed-12 magnitude circular complex
+`+7.247869e-7`) and `88ea9784...` (seed-13 magnitude circular complex `+7.564885e-7`);
+full hashes, absolute errors and all strata remain in the linked report.
+Evidence: `data/runs/phase-relations-p80-20261116/` and
+`data/runs/phase-relations-p80-fit-review-20261116/`. The two-step result is
+inconclusive about audible quality, convergence, overfitting or a family ceiling.
+Revisit with fixed-kernel direct versus reconstructed phase-relation derivative
+and native controls; do not repeat unchanged scaling, select origins, promote
+weights, or infer a universal DSP obstruction from the mixed raw/fused behavior.
 
 [P79](parameter-outputs-p79.md) completes all 32 frozen P77 parameter combinations,
 5,860 records and 57 new native correspondence checks; zero optimizer updates.
