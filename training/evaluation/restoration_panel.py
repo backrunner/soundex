@@ -25,7 +25,7 @@ def _band(a, b):
     ref = np.linalg.norm(mb)
     pa = ma / np.maximum(ea[..., None], 1e-30)
     pb = mb / np.maximum(eb[..., None], 1e-30)
-    # Hellinger distance between normalized power spectra: gain-independent.
+    # Squared Hellinger distance between normalized power spectra: gain-independent.
     # A missing predicted frame receives distance 1 when reference is nonzero.
     shape = 0.5 * np.square(pa - pb).sum(-1)
     shape = np.where((ea == 0) & (eb > 0), 1.0, shape)
