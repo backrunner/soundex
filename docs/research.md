@@ -1,5 +1,14 @@
 # Research status and experiment history
 
+[P107](missing-band-baseline-p107.md) re-scored the frozen P88 native renders
+inside each clip's actually-missing region, with no training. Every trained model
+leaves that region 9.6-11.6 dB too quiet and reaches 14.4-15.2 dB half-ERB
+envelope error, against 35.3 dB untreated. A reference-assisted per-frame
+half-ERB envelope on a copy-up patch of the retained band reaches 5.1 dB, lower
+on all 15 defined recordings, and raises envelope correlation over time from
+0.57 to 0.85. P88 shape versus control moves the same ruler by under 0.1 dB.
+The oracle is not deployable; it bounds a parametric output, not learnability.
+
 [P83](realized-relation-updates-p83.md) completes four old/direct/raw/fused arms
 at all four P74 origins: 16 updates each, 256 updates total, 800 fresh native roles
 and 320 passing correspondence checks. Every auxiliary-arm update descends its

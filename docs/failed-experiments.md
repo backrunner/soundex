@@ -13,6 +13,18 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P107 missing-band baseline](missing-band-baseline-p107.md) is a measurement
+with no candidate or acceptance rule. Its first two scoring runs are invalid
+measurements, retained with `superseded.json` under
+`data/runs/missing-band-baseline-p107-20261122{,-v2}/`. The first needed 90% of
+bins up to Nyquist to be missing; noise-floor references left every oracle path
+untreated. The second used sqrt-Hann oracle analysis, which leaked low-band
+power over the high band, and a long-term-mean mask dominated by the few frames
+in which codecs retain high bands. Both were detected by oracle sanity checks
+before interpretation. The v3 run uses Rust-matching Hann WOLA and a per-bin
+median-ratio mask. Revisit the mask only with a prospectively stated reason
+independent of model rankings; the mean-rule and -6/-20 dB fields stay reported.
+
 [P83](realized-relation-updates-p83.md) is a completed, unqualified finite-update
 diagnostic: all four P74 origins, old/direct/raw/fused circular arms, 16 updates
 each (256 total), 800 fresh native roles and 320 passing correspondence checks.
