@@ -13,6 +13,17 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P108 learned envelope](learned-envelope-p108.md) met its learning and
+transfer rules but failed its parameterization rule. Band and per-bin outputs had
+equal missing-band envelope error (+0.05 [-0.33, +0.44] and
++0.08 [-0.30, +0.45] dB). Both arms failed clean-input preservation: preserved
+LSD was 5.7-6.0 dB (band) and 7.8 dB (bin), against 0.70 dB for the P74 parent,
+on all 16 clean works. The ported Rust detector stays active on ~99.9% of clean
+frames. Endpoints and per-case records are in
+`data/runs/envelope-predictor-p108-20261122/`. [P109](envelope-clean-preservation-p109.md)
+answers the clean failure. Revisit band versus bin only with a native renderer
+and a different question than envelope error.
+
 [P107 missing-band baseline](missing-band-baseline-p107.md) is a measurement
 with no candidate or acceptance rule. Its first two scoring runs are invalid
 measurements, retained with `superseded.json` under

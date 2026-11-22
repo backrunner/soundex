@@ -1,5 +1,22 @@
 # Research status and experiment history
 
+[P109](envelope-clean-preservation-p109.md) fixed P108's clean-input
+regression with a 2x2 factorial over target (absolute level or missing-energy
+deficit) and a 25% lossless identity share. Identity pairs lowered clean preserved
+LSD by 3.5-4.7 dB for both targets in both seeds. The registered deficit/identity
+candidate still beats the native P74 parent on missing-band envelope error
+(-1.52 and -1.55 dB, intervals below zero). Its clean LSD is level with P74
+(+0.40 and -0.14 dB, intervals crossing zero). It met its rule to advance to a
+native Rust port. Offline Python proxy on an exposed panel; not promoted.
+
+[P108](learned-envelope-p108.md) trained a 219k-parameter causal GRU to predict
+half-ERB high-band energies that drive a copy-up fill, plus a matched per-bin
+control. On the P107 rulers it beat the preserved P74 parent on envelope error
+by 2.3-2.4 dB in both seeds, at about 0.034 ms per hop. Band and per-bin outputs
+tied. On lossless input it raised preserved LSD to 5.7-6.0 dB, because the model
+never saw clean input and the ported Rust detector is active on ~99.9% of clean
+frames.
+
 [P107](missing-band-baseline-p107.md) re-scored the frozen P88 native renders
 inside each clip's actually-missing region, with no training. Every trained model
 leaves that region 9.6-11.6 dB too quiet and reaches 14.4-15.2 dB half-ERB
