@@ -1,5 +1,14 @@
 # Research status and experiment history
 
+[P113](envelope-scale-p113.md) reserved a new source-disjoint panel of 24
+non-electronic works (rock, ambient, metal, hip hop, pop, unlabeled). It retrained
+the envelope recipe on every eligible training row with a 4x budget. Against the
+native P74 parent, both seeds improve missing-band envelope error (-2.17/-1.82 dB)
+and LSD, and also reduce clean-input preserved LSD (-0.38/-0.36 dB), with
+intervals on the favorable side. This is the first candidate to meet its
+registered primary rule on fresh works. The gain over the P111 candidate is
+unresolved, and electronic and hip hop are not improved.
+
 [P112](envelope-fresh-sources-p112.md) tested the frozen P111 gated envelope
 candidate on 16 newly reserved, source-disjoint works (all electronic, 11
 authors). The development-panel advantage did not transfer. Envelope error versus

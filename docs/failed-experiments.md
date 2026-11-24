@@ -13,6 +13,15 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P113 envelope scale](envelope-scale-p113.md) met its primary rule but
+failed its incremental rule. ERB RMS versus the gated P111 candidate of the same
+seed was -0.53 [-1.47, +0.59] and -0.68 [-1.49, +0.23] dB: broader exposure and a
+4x budget gave no resolved gain over the 16,384-update recipe on the new panel.
+The exposed P112 electronic recheck stayed unresolved (-0.54/+0.07 dB). Evidence
+is in `data/runs/envelope-scale-p113-20261124/`. Revisit with more distinct works
+rather than more crops of the same 235. Register genre-targeted coverage and
+evaluate on a newly reserved panel.
+
 [P112 fresh sources](envelope-fresh-sources-p112.md) failed its restoration
 rule in both seeds. ERB RMS versus the native P74 parent was +0.65 [-0.68, +2.31]
 and +0.15 [-0.86, +1.20] dB, 7/15 recordings adverse each. Its clean rule failed
