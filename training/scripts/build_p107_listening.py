@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from evaluation import envelope_oracle  # noqa: E402
-from evaluation.longform_listening import write_listener_files, write_trial  # noqa: E402
+from evaluation.blinded_pack import write_listener_files, write_trial  # noqa: E402
 from evaluation.reporting import write_json_report  # noqa: E402
 from evaluation.rust_bridge import read_sxa  # noqa: E402
 from scripts.score_missing_band import BURN, HOP, NATIVE_LAG, SECONDS  # noqa: E402

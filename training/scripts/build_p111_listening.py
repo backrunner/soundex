@@ -16,7 +16,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from evaluation.longform_listening import write_listener_files, write_trial  # noqa: E402
+from evaluation.blinded_pack import write_listener_files, write_trial  # noqa: E402
 from evaluation.reporting import write_json_report  # noqa: E402
 from evaluation.rust_bridge import read_sxa  # noqa: E402
 from scripts import run_envelope_p108 as p108  # noqa: E402
