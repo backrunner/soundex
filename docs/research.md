@@ -1,5 +1,13 @@
 # Research status and experiment history
 
+[P114](envelope-diagnosis-p114.md) diagnosed the remaining envelope gap with
+no training. The clean-input gate (about 0.2 dB), the detector region and the
+copy-up source are small factors, and level calibration does not help. The error
+lies in how the predicted deficit is distributed across bands and frames, and the
+gap is about 5-6 dB in every genre. Electronic is well covered (46 training works);
+hip hop is not (2). P114 also reserved a fresh 16-work electronic panel and
+listed 37 CC BY/CC0 hip-hop candidates for rights review, without downloading them.
+
 [P113](envelope-scale-p113.md) reserved a new source-disjoint panel of 24
 non-electronic works (rock, ambient, metal, hip hop, pop, unlabeled). It retrained
 the envelope recipe on every eligible training row with a 4x budget. Against the
