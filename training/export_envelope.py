@@ -29,7 +29,7 @@ def tensors(model):
     return [(n, sd[n].detach().to(torch.float32).cpu().numpy()) for n in names]
 
 
-def write(model, target, path, *, warmup_frames=32, provenance=None):
+def write(model, target, path, *, warmup_frames=32, provenance=None, fill_gate_db=None):
     """Write `model` to `path`; returns the header dict."""
     if target not in ("deficit", "level"):
         raise ValueError("target must be deficit or level")
@@ -56,6 +56,8 @@ def write(model, target, path, *, warmup_frames=32, provenance=None):
         "payload_sha256": hashlib.sha256(payload).hexdigest(),
         "provenance": provenance or {},
     }
+    if fill_gate_db is not None:  # Absent key = no gate, as in P110 artifacts.
+        header["fill_gate_db"] = [float(v) for v in fill_gate_db]
     blob = json.dumps(header, sort_keys=True).encode()
     Path(path).write_bytes(MAGIC + struct.pack("<I", len(blob)) + blob + payload)
     return header

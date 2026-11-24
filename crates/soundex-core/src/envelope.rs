@@ -30,6 +30,7 @@ pub struct EnvelopeModel {
     output: usize,
     target: FillTarget,
     warmup_frames: usize,
+    fill_gate_db: Option<(f32, f32)>,
     w_in: Vec<f32>,
     b_in: Vec<f32>,
     w_ih: Vec<Vec<f32>>,
@@ -113,6 +114,21 @@ impl EnvelopeModel {
             "level" => FillTarget::Level,
             _ => return Err(invalid("envelope target must be deficit or level")),
         };
+        // Optional soft gate [low_db, high_db]; absent means no gate (P110 artifacts).
+        let fill_gate_db = match header.get("fill_gate_db") {
+            None | Some(serde_json::Value::Null) => None,
+            Some(value) => {
+                let pair = value
+                    .as_array()
+                    .filter(|v| v.len() == 2)
+                    .and_then(|v| Some((v[0].as_f64()? as f32, v[1].as_f64()? as f32)))
+                    .ok_or_else(|| invalid("fill_gate_db must be [low_db, high_db]"))?;
+                if !pair.0.is_finite() || !pair.1.is_finite() || pair.1 <= pair.0 {
+                    return Err(invalid("fill_gate_db requires finite low < high"));
+                }
+                Some(pair)
+            }
+        };
         let (input, hidden, layers, output) = (
             number("input")?,
             number("hidden")?,
@@ -166,6 +182,7 @@ impl EnvelopeModel {
             output,
             target,
             warmup_frames: number("warmup_frames")?,
+            fill_gate_db,
             w_in,
             b_in,
             w_ih,
@@ -192,6 +209,9 @@ impl EnvelopeModel {
     }
     pub fn warmup_frames(&self) -> usize {
         self.warmup_frames
+    }
+    pub fn fill_gate_db(&self) -> Option<(f32, f32)> {
+        self.fill_gate_db
     }
     pub fn payload_sha256(&self) -> &str {
         &self.payload_sha256

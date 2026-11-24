@@ -127,3 +127,38 @@ fn silence_isolation_and_reset_are_deterministic() {
     let second = processor.process_buffer(&input).unwrap();
     assert_eq!(first, second);
 }
+
+fn with_header_field(key: &str, value: serde_json::Value) -> Vec<u8> {
+    let bytes = std::fs::read(fixture("envelope-probe.sxenv")).unwrap();
+    let length = u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
+    let mut header: serde_json::Value = serde_json::from_slice(&bytes[12..12 + length]).unwrap();
+    header[key] = value;
+    let blob = serde_json::to_vec(&header).unwrap();
+    let mut out = bytes[..8].to_vec();
+    out.extend_from_slice(&(blob.len() as u32).to_le_bytes());
+    out.extend_from_slice(&blob);
+    out.extend_from_slice(&bytes[12 + length..]);
+    out
+}
+
+#[test]
+fn fill_gate_is_optional_and_validated() {
+    let plain = EnvelopeModel::load(&fixture("envelope-probe.sxenv"), 256, 128).unwrap();
+    assert_eq!(plain.fill_gate_db(), None);
+    let gated = EnvelopeModel::from_bytes(
+        &with_header_field("fill_gate_db", serde_json::json!([0.0, 6.0])),
+        256,
+        128,
+    )
+    .unwrap();
+    assert_eq!(gated.fill_gate_db(), Some((0.0, 6.0)));
+    for bad in [
+        serde_json::json!([6.0, 0.0]),
+        serde_json::json!([0.0]),
+        serde_json::json!("x"),
+    ] {
+        assert!(
+            EnvelopeModel::from_bytes(&with_header_field("fill_gate_db", bad), 256, 128).is_err()
+        );
+    }
+}

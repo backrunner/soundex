@@ -146,3 +146,14 @@ def test_deficit_fill_adds_predicted_energy_and_nothing_at_floor(pair, monkeypat
     monkeypatch.setattr(fill, "predict", lambda model, power, rate: floor)
     out, _ = fill.fill_channel(dry[:, 0], RATE, "band_deficit", model=object())
     assert np.allclose(out, dry[:, 0], atol=1e-9)
+
+
+def test_soft_gate_blocks_fill_on_present_bands(pair):
+    ref, _ = pair
+    torch.manual_seed(0)
+    model = EnvelopePredictor("band").eval()
+    with torch.no_grad():
+        model.out.bias.fill_(-1.0)  # Predict a deficit ~10 dB below a full band.
+        model.out.weight.zero_()
+    gated, _ = fill.render(ref, RATE, "band_deficit", model=model, gate_db=(0.0, 6.0))
+    assert np.allclose(gated, ref, atol=1e-12)

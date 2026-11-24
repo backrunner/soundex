@@ -384,7 +384,13 @@ impl ChannelProcessor {
     /// Allocate envelope state for this physical channel (construction time only).
     pub(crate) fn attach_envelope(&mut self, model: &EnvelopeModel, config: &SoundExConfig) {
         self.envelope = Some(EnvelopeChannel {
-            fill: EnvelopeFill::new(config.fft_size, config.sample_rate, model.target()),
+            fill: match model.fill_gate_db() {
+                Some((low, high)) => {
+                    EnvelopeFill::new(config.fft_size, config.sample_rate, model.target())
+                        .with_gate_db(low, high)
+                }
+                None => EnvelopeFill::new(config.fft_size, config.sample_rate, model.target()),
+            },
             features: vec![0.0; model.input_len()],
             prediction: vec![0.0; model.output_len()],
             state: vec![0.0; model.state_len()],

@@ -118,6 +118,7 @@ impl EnvelopeLayout {
 pub struct EnvelopeFill {
     layout: EnvelopeLayout,
     target: FillTarget,
+    gate_db: Option<(f32, f32)>,
     real: Vec<f32>,
     imag: Vec<f32>,
     gain: Vec<f32>,
@@ -134,6 +135,7 @@ impl EnvelopeFill {
         Self {
             layout,
             target,
+            gate_db: None,
             real: vec![0.0; bins],
             imag: vec![0.0; bins],
             gain: vec![0.0; bands],
@@ -145,6 +147,19 @@ impl EnvelopeFill {
 
     pub fn layout(&self) -> &EnvelopeLayout {
         &self.layout
+    }
+
+    /// Soft gate on 10*log10(fill / present band energy): no fill at or below
+    /// `low_db`, full fill at or above `high_db`, linear in dB between. A band
+    /// that is already present (clean input) receives nothing; a band that is
+    /// missing (deficit far above what remains) is filled in full.
+    pub fn with_gate_db(mut self, low_db: f32, high_db: f32) -> Self {
+        assert!(
+            low_db.is_finite() && high_db > low_db,
+            "invalid envelope gate"
+        );
+        self.gate_db = Some((low_db, high_db));
+        self
     }
 
     /// Fill `out` from `original`. `band_log10` holds absolute log10 band energies
@@ -225,10 +240,14 @@ impl EnvelopeFill {
                 continue;
             }
             let want = 10f32.powf(log10) * selected as f32 / total.max(1) as f32;
-            let fill = match self.target {
+            let mut fill = match self.target {
                 FillTarget::Deficit => want,
                 FillTarget::Level => (want - present).max(0.0),
             };
+            if let Some((low, high)) = self.gate_db {
+                let ratio_db = 10.0 * (fill.max(1e-30) / present.max(1e-30)).log10();
+                fill *= ((ratio_db - low) / (high - low)).clamp(0.0, 1.0);
+            }
             *gain = (fill / patch.max(1e-30)).sqrt().min(MAX_GAIN);
         }
     }
@@ -284,5 +303,29 @@ mod tests {
         fill.apply(&frame, &[-4.0; 33], 15_000.0, 7, &mut out);
         assert!(out.log_magnitude[100] > -100.0);
         assert!(out.log_magnitude[..88] == frame.log_magnitude[..88]);
+    }
+
+    #[test]
+    fn gate_skips_present_bands_and_fills_missing_ones() {
+        let mut frame = SpectralFrame::zeros(129);
+        for k in 0..129 {
+            // Full-band input with a hole in 100..110.
+            frame.log_magnitude[k] = if (100..110).contains(&k) {
+                -200.0
+            } else {
+                -10.0
+            };
+            frame.phase[k] = 0.1 * k as f32;
+        }
+        let mut out = SpectralFrame::zeros(129);
+        let mut fill = EnvelopeFill::new(256, 44_100, FillTarget::Deficit).with_gate_db(0.0, 6.0);
+        // On full-band input a deficit below present energy is gated out entirely.
+        let mut full = frame.clone();
+        full.log_magnitude.fill(-10.0);
+        fill.apply(&full, &[-12.0; 33], 15_000.0, 3, &mut out);
+        assert_eq!(out.log_magnitude, full.log_magnitude);
+        // A large deficit fills the band that is actually empty.
+        fill.apply(&frame, &[-4.0; 33], 15_000.0, 3, &mut out);
+        assert!(out.log_magnitude[105] > -100.0);
     }
 }

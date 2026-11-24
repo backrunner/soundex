@@ -79,7 +79,7 @@ def predict(model, power, rate):
     return y[0].double().numpy() + ref[:, None]
 
 
-def fill_channel(pcm, rate, mode, model=None, reference=None):
+def fill_channel(pcm, rate, mode, model=None, reference=None, gate_db=None):
     """One physical channel. mode: 'band' | 'bin' | 'band_deficit' (model) or
     'oracle_band' (reference). Level modes fill max(predicted - present, 0);
     'band_deficit' predicts the missing band energy itself and adds it directly."""
@@ -125,18 +125,21 @@ def fill_channel(pcm, rate, mode, model=None, reference=None):
                 share = sel.sum() / max(counts[b], 1)  # Part of the band above the cutoff.
                 want = 10 ** target[t, b] * share
                 fill = want if mode == "band_deficit" else max(want - present[sel].sum(), 0.0)
+                if gate_db is not None:  # Soft gate, as soundex-dsp EnvelopeFill::with_gate_db.
+                    ratio = 10 * np.log10(max(fill, 1e-30) / max(present[sel].sum(), 1e-30))
+                    fill *= float(np.clip((ratio - gate_db[0]) / (gate_db[1] - gate_db[0]), 0, 1))
                 gain[sel] = np.sqrt(fill / max(p_pow[sel].sum(), 1e-30))
         out[t, ks] += np.minimum(gain, MAX_GAIN) * patch
     return wola(out, len(pcm)), {"active_frames": int(needs.sum()), "frames": len(needs)}
 
 
-def render(pcm, rate, mode, model=None, reference=None):
+def render(pcm, rate, mode, model=None, reference=None, gate_db=None):
     """[samples, channels]; each physical channel keeps independent state."""
     pcm = np.asarray(pcm, np.float64)
     outs, info = [], []
     for c in range(pcm.shape[1]):
         ref = None if reference is None else np.asarray(reference, np.float64)[:, c]
-        y, i = fill_channel(pcm[:, c], rate, mode, model, ref)
+        y, i = fill_channel(pcm[:, c], rate, mode, model, ref, gate_db)
         outs.append(y)
         info.append(i)
     return np.stack(outs, 1), info
