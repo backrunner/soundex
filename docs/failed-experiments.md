@@ -13,6 +13,19 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P110 native envelope](envelope-native-p110.md) failed two registered
+criteria. v1 is an invalid measurement: the stream-eval legacy limiter differed
+from the SmoothKnee limiter of every comparator render. In v2, clean-input
+preservation failed against the native P74 parent: +0.90 [+0.34, +1.57] and
++0.38 [+0.15, +0.68] dB preserved LSD, 15/16 works adverse, with part of the cost
+from limiting the added high band. Realtime availability failed in 3/4 cases
+(worker misses up to 9.0%, callback stalls up to 33 ms, late producer hops), while
+per-hop compute stayed at or below 0.53 ms with zero processing overruns. Evidence
+is in `data/runs/envelope-native-p110-20261124{,-v2}/`. Revisit clean preservation
+with a registered bypass/gating study using prospective thresholds, and
+availability with a vectorized GRU and a separately registered realtime-producer
+configuration.
+
 [P108 learned envelope](learned-envelope-p108.md) met its learning and
 transfer rules but failed its parameterization rule. Band and per-bin outputs had
 equal missing-band envelope error (+0.05 [-0.33, +0.44] and

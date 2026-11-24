@@ -1,5 +1,13 @@
 # Research status and experiment history
 
+[P110](envelope-native-p110.md) ported the P109 candidate into an opt-in
+native Rust Envelope mode (`.sxenv` artifact, native GRU, copy-up fill). With
+matched SmoothKnee limiting, native output equals the Python proxy to float32
+rounding. Against the native P74 parent, missing-band envelope error improves by
+1.87/1.91 dB and LSD by 1.46/1.52 dB in both seeds and every codec. Clean preserved
+LSD rises by 0.90/0.38 dB (15/16 works adverse). Model plus fill takes at most
+0.53 ms per hop; host-scheduling availability failed in 3/4 bench cases.
+
 [P109](envelope-clean-preservation-p109.md) fixed P108's clean-input
 regression with a 2x2 factorial over target (absolute level or missing-energy
 deficit) and a 25% lossless identity share. Identity pairs lowered clean preserved
