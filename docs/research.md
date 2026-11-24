@@ -1,5 +1,13 @@
 # Research status and experiment history
 
+[P112](envelope-fresh-sources-p112.md) tested the frozen P111 gated envelope
+candidate on 16 newly reserved, source-disjoint works (all electronic, 11
+authors). The development-panel advantage did not transfer. Envelope error versus
+the native P74 parent was +0.65 and +0.15 dB, both intervals crossing zero, and
+seed 1 raised clean preserved LSD (+1.27 dB). A reference-envelope oracle still
+reached about 5.3 dB envelope error, against about 12 dB for both models.
+P107-P111 gains are development evidence only.
+
 [P111](envelope-fill-gate-p111.md) added a soft fill gate (0-6 dB on
 fill/present band energy) to native Envelope mode. It kept a 1.70/1.76 dB
 envelope-error advantage over the native P74 parent in every codec. It cut

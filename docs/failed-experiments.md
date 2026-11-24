@@ -13,6 +13,17 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P112 fresh sources](envelope-fresh-sources-p112.md) failed its restoration
+rule in both seeds. ERB RMS versus the native P74 parent was +0.65 [-0.68, +2.31]
+and +0.15 [-0.86, +1.20] dB, 7/15 recordings adverse each. Its clean rule failed
+for seed 1 (+1.27 [+0.18, +2.61] dB). This was the first source-disjoint test
+after five design rounds on the exposed P88 panel. The panel covers only
+electronic works, and development selection and genre shift are confounded.
+Evidence is in `data/runs/envelope-fresh-p112-20261124/`; its catalog now
+reserves the 16 works. Revisit only with new design changes registered before
+scoring on new reserved works from other genres. Do not rerun P111 settings on
+this panel or tune to it.
+
 [P111 fill gate](envelope-fill-gate-p111.md) failed its registered
 two-seed clean-preservation rule. Seed 1's clean preserved LSD versus the native
 P74 parent was +0.68 [+0.12, +1.34] dB, 6/16 works adverse. Its absolute clean
