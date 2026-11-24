@@ -1,5 +1,13 @@
 # Research status and experiment history
 
+[P111](envelope-fill-gate-p111.md) added a soft fill gate (0-6 dB on
+fill/present band energy) to native Envelope mode. It kept a 1.70/1.76 dB
+envelope-error advantage over the native P74 parent in every codec. It cut
+absolute clean high-band error to -92/-98 dBFS, against -88 dBFS for P74. Clean
+preserved LSD versus P74 was +0.68 dB for seed 1 (interval above zero) and
++0.12 dB for seed 2 (crossing zero), so the registered two-seed rule failed. A
+20-trial blinded native pack, including clean-input trials, awaits ratings.
+
 [P110](envelope-native-p110.md) ported the P109 candidate into an opt-in
 native Rust Envelope mode (`.sxenv` artifact, native GRU, copy-up fill). With
 matched SmoothKnee limiting, native output equals the Python proxy to float32

@@ -13,6 +13,15 @@ see the latest status in the table and [research index](research.md).
 
 ## How to use this record
 
+[P111 fill gate](envelope-fill-gate-p111.md) failed its registered
+two-seed clean-preservation rule. Seed 1's clean preserved LSD versus the native
+P74 parent was +0.68 [+0.12, +1.34] dB, 6/16 works adverse. Its absolute clean
+high-band error (-92 dBFS) was no higher than P74's (-88 dBFS). Seed 2 passed
+both parts, and native output matched the gated proxy exactly. Evidence is in
+`data/runs/envelope-gate-p111-20261124/`. Revisit with listener ratings from
+`data/runs/envelope-listening-p111-20261124-v2/`, or with a registered bypass
+study. Do not retune the gate bounds on these works.
+
 [P110 native envelope](envelope-native-p110.md) failed two registered
 criteria. v1 is an invalid measurement: the stream-eval legacy limiter differed
 from the SmoothKnee limiter of every comparator render. In v2, clean-input
