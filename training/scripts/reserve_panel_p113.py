@@ -45,22 +45,21 @@ def _verify(row):
         return {"failed": {"id": row["id"], "reason": f"{type(error).__name__}: {error}"}}
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--workers", type=int, default=10)
-    a = parser.parse_args()
-    a.out.mkdir(parents=True, exist_ok=False)
-    approved = {r["id"] for r in jsonl(APPROVED)}
-    plan = [r for r in jsonl(PLAN) if r["id"] not in approved and r["genre"] != "electronic"]
-    with ProcessPoolExecutor(a.workers) as pool:
+def reserve_panel(out, plan, *, works, tag, study, workers):
+    """Verify `plan` rows offline, then reserve up to `works` isolated stereo works.
+
+    Writes verified candidates, failures, the evaluation catalog, the remaining
+    isolated eligible works (`unreserved-eligible.jsonl`) and a report into `out`.
+    """
+    out.mkdir(parents=True, exist_ok=False)
+    with ProcessPoolExecutor(workers) as pool:
         results = list(pool.map(_verify, plan, chunksize=4))
     verified = [r["ok"] for r in results if "ok" in r]
     failed = [r["failed"] for r in results if "failed" in r]
-    with (a.out / "verified-candidates.jsonl").open("x") as f:
+    with (out / "verified-candidates.jsonl").open("x") as f:
         for row in verified:
             f.write(json.dumps(row, sort_keys=True) + "\n")
-    (a.out / "verification-failures.json").write_text(json.dumps(failed, indent=1))
+    (out / "verification-failures.json").write_text(json.dumps(failed, indent=1))
 
     data = REPO / "data"
     histories = history_files(data)
@@ -90,13 +89,13 @@ def main():
             rights_failures.append({"id": r["id"], "reason": str(error)})
     count = len(pool)
     chosen, authors, genres = [], Counter(), Counter()
-    while pool and len(chosen) < WORKS:
+    while pool and len(chosen) < works:
         row = min(
             pool,
             key=lambda r: (
                 genres[r["genre"]],
                 authors[r["author"]],
-                digest([TAG, r["audio_sha256"]]),
+                digest([tag, r["audio_sha256"]]),
             ),
         )
         chosen.append(row)
@@ -104,11 +103,14 @@ def main():
         genres[row["genre"]] += 1
         protected = closure(aliases(row))
         pool = [r for r in pool if not aliases(r) & protected]
-    with (a.out / "evaluation-catalog.jsonl").open("x") as f:
+    with (out / "evaluation-catalog.jsonl").open("x") as f:
         for row in chosen:
             f.write(json.dumps(row, sort_keys=True) + "\n")
+    with (out / "unreserved-eligible.jsonl").open("x") as f:
+        for row in pool:
+            f.write(json.dumps(row, sort_keys=True) + "\n")
     report = {
-        "study": "p113-reserved-panel",
+        "study": study,
         "created": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "candidates": len(plan),
         "verified": len(verified),
@@ -117,26 +119,34 @@ def main():
         "rights_failures": rights_failures,
         "isolated_stereo_eligible": count,
         "reserved": len(chosen),
+        "unreserved_eligible": len(pool),
         "genres": dict(genres),
         "authors": dict(authors),
         "history_files": [str(p) for p in histories],
     }
-    (a.out / "reservation.json").write_text(json.dumps(report, indent=1))
-    print(
-        json.dumps(
-            {
-                k: report[k]
-                for k in (
-                    "candidates",
-                    "verified",
-                    "verification_failures",
-                    "isolated_stereo_eligible",
-                    "reserved",
-                    "genres",
-                )
-            }
-        )
+    (out / "reservation.json").write_text(json.dumps(report, indent=1))
+    return report
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--workers", type=int, default=10)
+    a = parser.parse_args()
+    approved = {r["id"] for r in jsonl(APPROVED)}
+    plan = [r for r in jsonl(PLAN) if r["id"] not in approved and r["genre"] != "electronic"]
+    report = reserve_panel(
+        a.out, plan, works=WORKS, tag=TAG, study="p113-reserved-panel", workers=a.workers
     )
+    keys = (
+        "candidates",
+        "verified",
+        "verification_failures",
+        "isolated_stereo_eligible",
+        "reserved",
+        "genres",
+    )
+    print(json.dumps({k: report[k] for k in keys}))
 
 
 if __name__ == "__main__":
