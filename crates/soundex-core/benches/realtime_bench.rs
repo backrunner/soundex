@@ -55,7 +55,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err("measurement must be nonzero".into());
     }
     let bytes = fs::read(&model)?;
-    if bytes.len() < 1_000_000 {
+    if enhancement_mode == EnhancementMode::Envelope {
+        // Native envelope artifacts are small by design (~0.9 MB for 219k
+        // parameters); require a valid artifact far larger than the probe fixture.
+        let artifact = soundex_core::envelope::EnvelopeModel::from_bytes(&bytes, 256, 128)?;
+        let parameters = (bytes.len() - 12) / 4;
+        if artifact.state_len() < 64 || parameters < 100_000 {
+            return Err("diagnostic requires a trained envelope model, not a probe fixture".into());
+        }
+    } else if bytes.len() < 1_000_000 {
         return Err("diagnostic requires a trained model, not an identity fixture".into());
     }
     let hash = format!("{:x}", Sha256::digest(&bytes));
