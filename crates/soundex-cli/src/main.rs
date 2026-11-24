@@ -33,7 +33,7 @@ struct Args {
     model: PathBuf,
 
     /// High-frequency candidate path (spectral and hybrid are experimental)
-    #[arg(long, default_value = "neural", value_parser = ["neural", "spectral", "hybrid"])]
+    #[arg(long, default_value = "neural", value_parser = ["neural", "spectral", "hybrid", "envelope"])]
     enhancement_mode: String,
 
     /// High-band gain policy (model preserves predicted levels; experimental)

@@ -12,6 +12,7 @@
 
 pub mod bandwidth;
 pub mod crossover;
+pub mod envelope;
 pub mod extension;
 pub mod gain_calibration;
 pub mod limiter;

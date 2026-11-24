@@ -31,3 +31,9 @@ state order, physical-channel isolation, gap/reset/reload and allocation bugs.
 Its synthetic `temporal_kind=gru` exercises the new interface, not a learned GRU.
 It requires `HighBandGain::Model` and returns aligned dry audio during the first
 64 observed hops. No training data or learned restoration weights are included.
+
+`envelope-probe.sxenv` is a seeded random hidden-width-8 envelope GRU in the
+experimental `.sxenv` format, with `envelope-probe.json` holding PyTorch reference
+outputs for a fixed 12-frame input. It checks native GRU parity, artifact
+validation and Envelope-mode stream behavior only; it is not a restoration model.
+Regenerate with `python tests/fixtures/generate_envelope.py`.

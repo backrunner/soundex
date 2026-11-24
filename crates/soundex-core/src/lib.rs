@@ -30,6 +30,7 @@ pub mod analysis;
 pub mod calibration;
 pub mod config;
 pub mod diagnostics;
+pub mod envelope;
 pub mod error;
 pub mod inference;
 pub mod processor;

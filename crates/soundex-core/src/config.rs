@@ -14,6 +14,9 @@ pub enum EnhancementMode {
     Spectral,
     /// Experimental neural + broadband DSP candidate blend.
     Hybrid,
+    /// Experimental native causal envelope model driving a copy-up fill
+    /// (P108/P109). Loads an `.sxenv` artifact; no ONNX model is used.
+    Envelope,
 }
 
 impl EnhancementMode {
@@ -22,6 +25,7 @@ impl EnhancementMode {
             Self::Neural => "neural",
             Self::Spectral => "spectral",
             Self::Hybrid => "hybrid",
+            Self::Envelope => "envelope",
         }
     }
 }
@@ -33,7 +37,8 @@ impl std::str::FromStr for EnhancementMode {
             "neural" => Ok(Self::Neural),
             "spectral" => Ok(Self::Spectral),
             "hybrid" => Ok(Self::Hybrid),
-            _ => Err("enhancement mode must be neural, spectral or hybrid"),
+            "envelope" => Ok(Self::Envelope),
+            _ => Err("enhancement mode must be neural, spectral, hybrid or envelope"),
         }
     }
 }

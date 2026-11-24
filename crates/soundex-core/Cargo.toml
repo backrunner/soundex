@@ -21,6 +21,8 @@ serde_json.workspace = true
 rustfft.workspace = true
 # Thread CPU clock in opt-in diagnostic replay (also used by benchmarks).
 libc.workspace = true
+# Payload integrity check of experimental envelope (.sxenv) artifacts.
+sha2.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Safe, thread-local USER_INITIATED QoS; no scheduler FFI in the audio adapter.

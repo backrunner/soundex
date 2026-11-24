@@ -5,6 +5,7 @@ use soundex_dsp::limiter::Limiter;
 
 use crate::channel::ChannelProcessor;
 use crate::config::{EnhancementMode, SoundExConfig};
+use crate::envelope::EnvelopeModel;
 use crate::error::{Result, SoundExError};
 use crate::inference::InferenceEngine;
 use crate::stream::{latency_hops, CausalHopIter};
@@ -148,10 +149,45 @@ impl GateMixer {
     }
 }
 
+/// Load the ONNX engine (neural/hybrid) or the native envelope model (envelope).
+/// Spectral mode needs neither.
+fn load_models(
+    path: &std::path::Path,
+    config: &SoundExConfig,
+) -> Result<(Option<InferenceEngine>, Option<EnvelopeModel>)> {
+    Ok(match config.enhancement_mode {
+        EnhancementMode::Spectral => (None, None),
+        EnhancementMode::Envelope => (
+            None,
+            Some(EnvelopeModel::load(path, config.fft_size, config.hop_size)?),
+        ),
+        EnhancementMode::Neural | EnhancementMode::Hybrid => {
+            (Some(InferenceEngine::load(path, config)?), None)
+        }
+    })
+}
+
+fn build_channels(
+    config: &SoundExConfig,
+    context_frames: usize,
+    envelope: Option<&EnvelopeModel>,
+) -> Vec<ChannelProcessor> {
+    (0..config.channels)
+        .map(|_| {
+            let mut channel = ChannelProcessor::new(config, context_frames);
+            if let Some(model) = envelope {
+                channel.attach_envelope(model, config);
+            }
+            channel
+        })
+        .collect()
+}
+
 /// Streaming-capable SoundEx audio enhancement processor.
 pub struct SoundExProcessor {
     config: SoundExConfig,
     engine: Option<InferenceEngine>,
+    envelope_model: Option<EnvelopeModel>,
     channels: Vec<ChannelProcessor>,
     gate: GateMixer,
     dry_limiter: Limiter,
@@ -177,15 +213,9 @@ impl SoundExProcessor {
     /// the experimental spectral mode needs no model or inference backend.
     pub fn new(config: SoundExConfig) -> Result<Self> {
         validate_config(&config)?;
-        let engine = if config.enhancement_mode == EnhancementMode::Spectral {
-            None
-        } else {
-            Some(InferenceEngine::load(&config.model_path, &config)?)
-        };
+        let (engine, envelope_model) = load_models(&config.model_path, &config)?;
         let context_frames = engine.as_ref().map_or(1, InferenceEngine::context_frames);
-        let channels = (0..config.channels)
-            .map(|_| ChannelProcessor::new(&config, context_frames))
-            .collect();
+        let channels = build_channels(&config, context_frames, envelope_model.as_ref());
         let latency = config.fft_size - config.hop_size;
         let interleaved_latency = latency * config.channels as usize;
         let channel_count = config.channels as usize;
@@ -197,6 +227,7 @@ impl SoundExProcessor {
         Ok(Self {
             config,
             engine,
+            envelope_model,
             channels,
             gate,
             dry_limiter,
@@ -471,15 +502,10 @@ impl SoundExProcessor {
     /// Spectral mode only stores the path and resets; it does not load a model.
     pub fn reload_model(&mut self, model_path: impl Into<std::path::PathBuf>) -> Result<()> {
         let path = model_path.into();
-        let engine = if self.config.enhancement_mode == EnhancementMode::Spectral {
-            None
-        } else {
-            Some(InferenceEngine::load(&path, &self.config)?)
-        };
+        let (engine, envelope_model) = load_models(&path, &self.config)?;
         let context_frames = engine.as_ref().map_or(1, InferenceEngine::context_frames);
-        self.channels = (0..self.config.channels)
-            .map(|_| ChannelProcessor::new(&self.config, context_frames))
-            .collect();
+        self.channels = build_channels(&self.config, context_frames, envelope_model.as_ref());
+        self.envelope_model = envelope_model;
         self.inference_input = Array4::zeros((
             self.channel_count(),
             2,
@@ -603,6 +629,9 @@ impl SoundExProcessor {
                 .analyze_hop(&self.channel_inputs[channel_index], &self.config)?;
             if self.observed_hops <= warmup {
                 self.channels[channel_index].suppress_enhancement();
+            }
+            if let Some(model) = &self.envelope_model {
+                self.channels[channel_index].envelope_step(model);
             }
         }
 

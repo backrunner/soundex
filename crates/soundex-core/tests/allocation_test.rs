@@ -239,3 +239,32 @@ fn bounded_worker_trace_never_allocates_or_grows_in_callback() {
     assert_eq!(trace["events"].as_array().unwrap().len(), 8);
     assert!(trace["ignored_writes"].as_u64().unwrap() > 0);
 }
+
+#[test]
+fn envelope_mode_allocates_nothing_in_worker_or_realtime_callback() {
+    let path = model_path("envelope-probe.sxenv");
+    let mut config = SoundExConfig::with_model(path)
+        .channels(2)
+        .enhancement_mode(EnhancementMode::Envelope);
+    config.min_bandwidth_ratio = 1.0; // Keep the fill active after warmup.
+    let mut processor = SoundExProcessor::new(config.clone()).unwrap();
+    let input = stereo_tone(128);
+    let mut output = [0.0; 256];
+    for _ in 0..8 {
+        processor.process_frame(&input, &mut output).unwrap();
+    }
+    let (result, allocations) = count_allocations(|| processor.process_frame(&input, &mut output));
+    result.unwrap();
+    assert_eq!(allocations, 0, "envelope worker hop");
+    let mut realtime = RealtimeProcessor::new(config).unwrap();
+    let (result, allocations) = count_allocations(|| {
+        for _ in 0..1000 {
+            realtime.process(&input, &mut output)?;
+        }
+        Ok::<_, soundex_core::SoundExError>(())
+    });
+    result.unwrap();
+    assert_eq!(allocations, 0, "envelope realtime callback");
+    assert!(output.iter().all(|sample| sample.is_finite()));
+    realtime.shutdown();
+}

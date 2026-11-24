@@ -3,6 +3,7 @@
 use ndarray::{s, Array3, Array4, ArrayView3};
 use soundex_dsp::bandwidth::{BandwidthDetector, BandwidthDetectorConfig};
 use soundex_dsp::crossover::CrossoverBlend;
+use soundex_dsp::envelope::EnvelopeFill;
 use soundex_dsp::extension::SpectralExtension;
 use soundex_dsp::limiter::Limiter;
 use soundex_dsp::loudness::{rms, LoudnessMatcher};
@@ -10,6 +11,7 @@ use soundex_dsp::phase::PhaseSmoother;
 use soundex_dsp::stft::{SpectralFrame, StftAnalyzer, StftSynthesizer};
 
 use crate::config::{EnhancementMode, HighBandGain, PhasePolicy, SoundExConfig};
+use crate::envelope::{EnvelopeModel, EnvelopeScratch};
 use crate::error::{Result, SoundExError};
 use crate::processor::ProcessInfo;
 use crate::stream::StreamBuffer;
@@ -22,6 +24,7 @@ pub(crate) struct ChannelProcessor {
     phase_smoother: PhaseSmoother,
     crossover: CrossoverBlend,
     extension: Option<(SpectralExtension, SpectralFrame)>,
+    envelope: Option<EnvelopeChannel>,
     limiter: Limiter,
     input: StreamBuffer,
     original: SpectralFrame,
@@ -58,12 +61,17 @@ impl ChannelProcessor {
             loudness: LoudnessMatcher::new(-6.0, 0.1),
             phase_smoother: PhaseSmoother::new(),
             crossover: CrossoverBlend::new(config.crossover_width_hz),
-            extension: (config.enhancement_mode != EnhancementMode::Neural).then(|| {
+            extension: matches!(
+                config.enhancement_mode,
+                EnhancementMode::Spectral | EnhancementMode::Hybrid
+            )
+            .then(|| {
                 (
                     SpectralExtension::new(config.fft_size, config.hop_size),
                     SpectralFrame::zeros(bins),
                 )
             }),
+            envelope: None,
             limiter: Limiter::with_mode(config.limiter_ceiling, 10.0, config.limiter_mode),
             input: StreamBuffer::with_latency_padding(config.fft_size, config.hop_size),
             original: SpectralFrame::zeros(bins),
@@ -145,7 +153,17 @@ impl ChannelProcessor {
         config: &SoundExConfig,
     ) -> Result<ProcessInfo> {
         if self.needs_enhancement {
-            self.enhance(prediction, config)?;
+            if let Some(envelope) = &mut self.envelope {
+                envelope.fill.apply(
+                    &self.original,
+                    &envelope.prediction,
+                    self.detected_bandwidth_hz,
+                    envelope.current_hop,
+                    &mut self.synthesis,
+                );
+            } else {
+                self.enhance(prediction, config)?;
+            }
         } else {
             self.synthesis
                 .log_magnitude
@@ -363,6 +381,46 @@ impl ChannelProcessor {
         self.needs_enhancement = false;
     }
 
+    /// Allocate envelope state for this physical channel (construction time only).
+    pub(crate) fn attach_envelope(&mut self, model: &EnvelopeModel, config: &SoundExConfig) {
+        self.envelope = Some(EnvelopeChannel {
+            fill: EnvelopeFill::new(config.fft_size, config.sample_rate, model.target()),
+            features: vec![0.0; model.input_len()],
+            prediction: vec![0.0; model.output_len()],
+            state: vec![0.0; model.state_len()],
+            scratch: model.scratch(),
+            hop: 0,
+            current_hop: 0,
+        });
+    }
+
+    /// Advance the causal envelope model on the analyzed frame. Runs on every
+    /// hop, including bypass and silence, so history follows the stream.
+    /// Enhancement stays suppressed until the declared warmup has elapsed.
+    pub(crate) fn envelope_step(&mut self, model: &EnvelopeModel) {
+        let Some(envelope) = &mut self.envelope else {
+            return;
+        };
+        let reference = envelope
+            .fill
+            .layout()
+            .features_into(&self.original.log_magnitude, &mut envelope.features);
+        model.step(
+            &envelope.features,
+            &mut envelope.state,
+            &mut envelope.scratch,
+            &mut envelope.prediction,
+        );
+        for value in &mut envelope.prediction {
+            *value += reference;
+        }
+        envelope.current_hop = envelope.hop;
+        envelope.hop += 1;
+        if envelope.current_hop < model.warmup_frames() as u64 {
+            self.needs_enhancement = false;
+        }
+    }
+
     pub(crate) fn dry(&self) -> &[f32] {
         &self.dry
     }
@@ -386,6 +444,12 @@ impl ChannelProcessor {
         if let Some((extension, _)) = &mut self.extension {
             extension.reset();
         }
+        if let Some(envelope) = &mut self.envelope {
+            envelope.state.fill(0.0);
+            envelope.prediction.fill(0.0);
+            envelope.hop = 0;
+            envelope.current_hop = 0;
+        }
         self.input.reset_with_latency_padding();
         self.history.fill(0.0);
         self.history_observed = 0;
@@ -396,6 +460,16 @@ impl ChannelProcessor {
         self.dry.fill(0.0);
         self.wet.fill(0.0);
     }
+}
+
+struct EnvelopeChannel {
+    fill: EnvelopeFill,
+    features: Vec<f32>,
+    prediction: Vec<f32>,
+    state: Vec<f32>,
+    scratch: EnvelopeScratch,
+    hop: u64,
+    current_hop: u64,
 }
 
 fn blend_texture(
