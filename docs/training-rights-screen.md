@@ -98,3 +98,38 @@ Candidate metadata is in `data/source-discovery/metadata-hiphop-20261124/`.
 Screened hip-hop tracks are in
 `data/source-discovery/hiphop-screened-20261125.json`. The screen runs again
 deterministically from the catalogs and publisher metadata listed above.
+
+## Official-source review of the expansion pool (2026-11-25)
+
+The maintainer asked that expansion licences be checked to the library
+standard. That standard requires the creator's own official page to grant the
+licence for the exact work.
+
+`training/scripts/review_expansion_evidence.py` looked up each of the 160
+screened albums in the creator's official Bandcamp catalog (or a label Bandcamp
+listed in the archive.org label collection) and required:
+- a title match of at least 0.85;
+- at least 50% track-title overlap;
+- an explicit CC BY or CC0 licence on the official album page;
+- no AI/usage terms or third-party credits on the album page or the artist
+  profile.
+
+Every fetched page is saved with its SHA-256 under
+`data/source-discovery/expansion-evidence-20261125/`. The first,
+slug-only matching pass is kept as `...-pass1`.
+
+| Outcome | Albums | Works |
+| --- | ---: | ---: |
+| Verified against the official source | 21 | 107 (Dafuqex 56, Humworks 31, epi-chord 10, Artificial.Music 10) |
+| Contradicted (official page: all rights reserved) | 1 | 8 (Daniel Birch & Ben Pegley) |
+| Unverified (no official source, or album no longer in the official catalog) | 138 | 556 |
+
+Most unverified works are label releases distributed only through archive.org
+(for example Silent Running Scandal, Crna Zemlja), or albums since removed from
+the artist's catalog (Illusory's official page now returns 404). The uploader's
+identity cannot be independently confirmed, so they are excluded.
+
+The 107 verified works are written as **proposed** records in
+`data/source-discovery/expansion-acceptance-proposal-20261125.jsonl`.
+Acceptance is the maintainer's decision. Accepted rows (status `accepted`) go to
+`data/catalogs/expansion-review-acceptance.jsonl`, which P115 requires.
