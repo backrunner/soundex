@@ -45,7 +45,7 @@ hip-hop candidates showed credits in the creator field and missing creators.
 
 | Pool | Pass | Main exclusion reasons |
 | --- | ---: | --- |
-| Existing approved catalog (`current-approved.jsonl`, 360) | 250 | remix 60, featuring 32, sampling 14, cover 2, medley 1, missing metadata 1 |
+| `current-approved.jsonl` (360; a later catalog, mostly *not* the training library; report only) | 250 | remix 60, featuring 32, sampling 14, cover 2, medley 1, missing metadata 1 |
 | Verified, isolated expansion candidates (P113/P114 audits, 749) | 696 | sample(d/s) 31, share-alike text 15, cover 11, featuring 8, tribute 2 |
 | Archive.org CC BY/CC0 netlabel hip-hop tracks (203) | 39 | sample 44, featuring 20, edit 13, Freesound 6, flip 4, remix 3; then missing creators |
 
@@ -56,23 +56,41 @@ The 39 passing hip-hop tracks are mostly experimental electronic, noise or
 spoken word. Only about 5-8 tracks from about 5 artists are genuine hip hop,
 two of whom already appear in the P113 test panel.
 
+## Correction: the actual training library is already fully reviewed
+
+The first draft of this record treated `current-approved.jsonl` as the training
+data. It is not: the processed training library (catalog `ecf374663d1c...`,
+300 works, used by every P-series run) overlaps it in only 52 works.
+
+All 300 library works carry a manual `source_review` with status `accepted`:
+- scope: commercial codec-restoration training and Apache-2.0 weight distribution;
+- explicit grant, composition, recording and performers/samples bases;
+- **no unresolved issues**;
+- licences: CC BY 3.0/4.0 or CC0.
+
+That manual review is stronger evidence than this keyword screen. The screen
+is not applied to the reviewed library (it misreads review prose such as
+"covers published compositions").
+
 ## Decisions
 
-- **New training snapshots** use only screened material: the 250 passing
-  approved works (restricted to their training split) plus passing expansion
-  works. `current-approved.jsonl` is not edited. The 110 flagged approved works
-  are listed with reasons in the next study's registration. Earlier runs and
-  weights that used them are historical; their release remains subject to
-  maintainer review.
+- **Training snapshots** use the TRAIN-split library works with an accepted
+  review. A new work (the expansion pool) enters training only after a
+  maintainer accepts a review record of the same form. The automated screen
+  narrows the candidates; it does not accept them.
+- **Pending drafts.** `training/scripts/draft_expansion_reviews.py` wrote
+  pending drafts for the 671 screened expansion works (160 albums, 56 authors)
+  to `data/source-discovery/expansion-review-draft-20261125.jsonl`, with an
+  album summary beside it. Accepted rows go to
+  `data/catalogs/expansion-review-acceptance.jsonl`. P115 refuses to register
+  without them.
 - **Hip hop** is not acquired from CC netlabels. Sample-based production makes
-  undisclosed third-party material likely, and the passing pool is too small
-  to close the gap. The hip-hop coverage gap is recorded. Closing it needs a
-  source with explicit training permission, such as commissioned or owned
-  recordings or a licence that permits model training.
+  undisclosed third-party material likely, and too few genuine tracks pass.
+  The coverage gap is recorded. Closing it needs a source with explicit
+  training permission.
 - **Reserved evaluation panels** are scored internally and not distributed.
-  Their screen results are reported (P112: 10/16, P113: 22/24, P114: 13/16
-  pass). Panels are not altered retrospectively, but future reservations apply
-  the screen first.
+  Screen results: P112 10/16, P113 22/24, P114 13/16 pass. The P115 panel was
+  reserved from screen-passing works only.
 
 ## Evidence
 

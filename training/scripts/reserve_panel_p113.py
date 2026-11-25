@@ -60,7 +60,14 @@ def reserve_panel(out, plan, *, works, tag, study, workers):
         for row in verified:
             f.write(json.dumps(row, sort_keys=True) + "\n")
     (out / "verification-failures.json").write_text(json.dumps(failed, indent=1))
+    report = reserve_verified(out, verified, works=works, tag=tag, study=study)
+    report.update(candidates=len(plan), verification_failures=len(failed))
+    (out / "reservation.json").write_text(json.dumps(report, indent=1))
+    return report
 
+
+def reserve_verified(out, verified, *, works, tag, study, accept=None):
+    """Reserve from already-verified rows; `accept(row)` optionally filters the pool."""
     data = REPO / "data"
     histories = history_files(data)
     inventory = sorted(set(histories) | set((data / "catalogs").glob("*.jsonl")))
@@ -82,6 +89,8 @@ def reserve_panel(out, plan, *, works, tag, study, workers):
     pool, rights_failures = [], []
     for r in eligible:
         if r["source_quality"]["channels"] != 2 or aliases(r) & used:
+            continue
+        if accept is not None and not accept(r):
             continue
         try:
             pool.append({**r, "evaluation_rights_evidence": publisher_evidence(r)})
@@ -112,9 +121,7 @@ def reserve_panel(out, plan, *, works, tag, study, workers):
     report = {
         "study": study,
         "created": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-        "candidates": len(plan),
         "verified": len(verified),
-        "verification_failures": len(failed),
         "eligibility_exclusions": dict(Counter(e["reason"] for e in exclusions)),
         "rights_failures": rights_failures,
         "isolated_stereo_eligible": count,
