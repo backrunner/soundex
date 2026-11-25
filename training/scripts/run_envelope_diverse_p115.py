@@ -75,7 +75,7 @@ CONFIG = {
     },
     "seed": 115,
     "target_segments": 132298,  # = P113 training segments.
-    "crops_per_work": 8,
+    "crops_per_work": 8,  # Minimum; raised per work to meet the matched segment quota.
     "crop_seconds": [2.0, 4.0],
     "segments_per_row": 2,
     "validation_works_fraction": 0.05,
@@ -262,7 +262,10 @@ def _generate(task):
     sr, total = info.samplerate, info.frames
     stereo = info.channels >= 2
     segs, prov = [], []
-    starts = np.sort(rng.uniform(0.05, 0.95, CONFIG["crops_per_work"]))
+    # Enough crops to meet the per-work quota (codecs x segments per row per crop).
+    per_crop = len(codecs) * CONFIG["segments_per_row"]
+    crops = max(CONFIG["crops_per_work"], math.ceil((quota or 0) / per_crop) + 1)
+    starts = np.sort(rng.uniform(0.05, 0.95, crops))
     for c, frac in enumerate(starts):
         seconds = rng.uniform(*CONFIG["crop_seconds"]) + 0.5
         frames = int(seconds * sr)
